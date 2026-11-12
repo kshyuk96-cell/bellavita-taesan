@@ -1,0 +1,6 @@
+__pycache__/
+taesan-data/
+.env
+.env.*
+*.sqlite*
+credentials*.json
