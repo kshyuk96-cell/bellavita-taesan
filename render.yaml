@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: bellavita-taesan-test
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python agent.py
+    healthCheckPath: /healthz
+    envVars:
+      - key: TAESAN_BIND
+        value: 0.0.0.0
+      - key: TAESAN_WEBHOOK_SECRET
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TAESAN_MODEL
+        sync: false
+      - key: TAESAN_LIVE_WRITE
+        value: '0'
