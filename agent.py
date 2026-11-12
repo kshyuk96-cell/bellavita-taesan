@@ -81,10 +81,17 @@ def enroll(owner, code):
         row = c.execute('DELETE FROM enrollment WHERE digest=? AND expires>? RETURNING role',
                         (digest, time.time())).fetchone()
         if row is None:
-            return False
+            expires, _, expected = os.getenv('TAESAN_ADMIN_ENROLLMENT', '').partition(':')
+            if not expires.isdecimal() or int(expires) <= time.time() or not hmac.compare_digest(digest, expected):
+                return False
+            if c.execute("SELECT 1 FROM staff WHERE role='admin' LIMIT 1").fetchone():
+                return False
+            role = 'admin'
+        else:
+            role = row['role']
         c.execute("""INSERT INTO staff VALUES (?,?,?)
                   ON CONFLICT(owner) DO UPDATE SET role=excluded.role, enrolled=excluded.enrolled""",
-                  (owner, row['role'], time.time()))
+                  (owner, role, time.time()))
     return True
 
 
@@ -124,10 +131,9 @@ def access_command(owner, message):
             return kakao(f'{row["name"]}님 신청은 {row["decision"]} 상태예요.')
         if command == '직원 검토':
             return kakao(f'{row["name"]}님 등록 신청 · {request_id}', buttons=[
-                ('조회·제작', '직원 조회 승인 '+request_id), ('입고 포함', '직원 입고 승인 '+request_id),
+                ('승인', '직원 승인 '+request_id),
                 ('반려', '직원 반려 '+request_id)])
-        roles = {'직원 조회 승인':'staff', '직원 입고 승인':'writer'}
-        role = roles.get(command)
+        role = 'staff' if command in ('직원 승인', '직원 조회 승인', '직원 입고 승인') else None
         if role:
             c.execute('INSERT OR IGNORE INTO staff VALUES (?,?,?)', (row['owner'], role, time.time()))
         c.execute('UPDATE access_requests SET decision=? WHERE id=?', ('승인' if role else '반려', request_id))
@@ -422,7 +428,7 @@ def handle(message, history, owner):
     if route == 'stock':
         return {'summary': stock(action.get('center'))}
     if route == 'stock_write':
-        if role_of(owner) not in ('admin','writer'):
+        if role_of(owner) not in ('admin','writer','staff'):
             raise ValueError('이 계정에는 입고 등록 권한이 없습니다.')
         with STOCK_LOCK:
             return {'summary': write_inventory(action, message, os.getenv('TAESAN_LIVE_WRITE') == '1')}
@@ -484,7 +490,7 @@ def dispatch(body):
     if not role_of(owner):
         return request_access(owner, message)
     if message == '직원 승인 대기' or re.fullmatch(
-            r'(?:직원 검토|직원 조회 승인|직원 입고 승인|직원 반려) [a-f0-9]{8}', message):
+            r'(?:직원 검토|직원 승인|직원 조회 승인|직원 입고 승인|직원 반려) [a-f0-9]{8}', message):
         return access_command(owner, message)
     if not message or message in ('메뉴', '시작', '처음으로'):
         return menu()
@@ -588,7 +594,14 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--issue-code', choices=('staff','writer','admin'))
+    parser.add_argument('--prepare-admin', action='store_true')
     args = parser.parse_args()
+    if args.prepare_admin:
+        code = secrets.token_urlsafe(12)
+        digest = hashlib.sha256(code.encode()).hexdigest()
+        print(f'TAESAN_ADMIN_ENROLLMENT={int(time.time()) + 900}:{digest}')
+        print(f'직원 등록 {code}')
+        raise SystemExit(0)
     if args.issue_code:
         print('직원 등록 ' + issue_enrollment(args.issue_code))
         raise SystemExit(0)
