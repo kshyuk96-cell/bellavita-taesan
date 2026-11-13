@@ -885,6 +885,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        if path.startswith('/checkout-art/') and (filename := path.removeprefix('/checkout-art/')) in checkout.ARTWORK_FILES:
+            data = (checkout.ARTWORK / filename).read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/webp')
+            self.send_header('Cache-Control', 'public, max-age=3600')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            return self.wfile.write(data)
         admin = re.fullmatch(r'/invitation-orders/admin/([0-9]{10})/([a-f0-9]{64})', path)
         if admin:
             expiry, signature = admin.groups()

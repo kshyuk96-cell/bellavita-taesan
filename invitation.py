@@ -85,7 +85,13 @@ def parse_page(source, raw):
     if not https_url(image) or not (urlsplit(image).hostname == host or urlsplit(image).hostname.endswith('.' + host)):
         image = ''
     families, address = [], ''
+    wedding_photo = ''
     if host == 'bojagicard.com':
+        for candidate in tree.xpath('//*[@data-src_original]/@data-src_original'):
+            resolved = https_url(urljoin(source, candidate))
+            if resolved and (resolved.hostname == host or resolved.hostname.endswith('.' + host)) and resolved.path.startswith('/ecard/photo/'):
+                wedding_photo = resolved.geturl()
+                break
         found = re.search(r"var wday = '([^']+)'", raw)
         when = parse_time(found[1] if found else meta.get('og:description', ''))
         venue_el = tree.xpath('//*[contains(concat(" ",normalize-space(@class)," ")," map_venue_name ")]')
@@ -130,7 +136,8 @@ def parse_page(source, raw):
     if len(families) != 2 or any(not f[2] for f in families):
         raise ValueError('신랑과 신부 이름을 확인해 주세요.')
     return {'name': f'{families[0][2]} {families[1][2]} 결혼', 'when': when, 'venue': venue,
-            'address': address, 'families': families, 'source': source, 'image': image}
+            'address': address, 'families': families, 'source': source, 'image': image,
+            'wedding_photo': wedding_photo}
 
 
 def parse_source(source, extract):
@@ -268,6 +275,8 @@ def make(source, root, origin, extract, photo=None):
         if products:
             snapshot = {**products[price], 'date': date, 'clock': clock, 'venue': event['venue'],
                         'address': event['address'], 'event_time': event['when'].replace(tzinfo=SEOUL).isoformat()}
+            if event.get('wedding_photo'):
+                snapshot['wedding_photo'] = event['wedding_photo']
             (folder / f'{price}.order.json').write_text(json.dumps(snapshot, ensure_ascii=False), encoding='utf-8')
         (folder / f'{price}.html').write_text(page(event,date,clock,order_url,origin+'/guide.png'), encoding='utf-8')
         message = '\n\n'.join(filter(None, [greeting, f"🗓 일시 {date} {clock}\n📍 장소 {event['venue']}", signature,

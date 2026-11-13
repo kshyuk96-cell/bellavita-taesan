@@ -22,6 +22,8 @@ SEOUL = ZoneInfo('Asia/Seoul')
 ORDER_PATH = re.compile(r'/i/([a-f0-9]{32})/(93500|99000)/order')
 RECEIPT_PATH = re.compile(r'/invitation-orders/([a-f0-9]{32})/receipt')
 TEMPLATE = Path(__file__).with_name('checkout.html')
+ARTWORK = Path(__file__).with_name('assets') / 'checkout'
+ARTWORK_FILES = frozenset({'sunflower-easel.webp', 'scroll-paper.webp'})
 PAYAPP_FIELDS = ('USER_ID', 'LINK_KEY', 'LINK_VALUE', 'REQUEST_KEY')
 
 
@@ -158,13 +160,31 @@ def render(product, action, can_pay):
             amount = choice['amount']
             extra = f' (+{amount:,}원)' if amount else ''
             custom = ' data-custom="1"' if choice['custom'] else ''
-            options.append(f'<option value="{escape(code)}" data-amount="{amount}"{custom}>'
+            greeting = (f' data-greeting="{escape(re.sub(r"^\d+\.\s*", "", choice["label"]))}"'
+                        if group['label'] == '축하 문구' and not choice['custom'] else '')
+            options.append(f'<option value="{escape(code)}" data-amount="{amount}"{custom}{greeting}>'
                            f'{escape(choice["label"])}{extra}</option>')
-        groups.append(f'<label>{escape(group["label"])}<select name="choice{index}" required>'
+        greeting = ' id="greeting-choice"' if group['label'] == '축하 문구' else ''
+        groups.append(f'<label>{escape(group["label"])}<select name="choice{index}"{greeting} required>'
                       + ''.join(options) + '</select></label>')
     pictures = ''.join(f'<img src="{escape(src)}" alt="쌀빛그림화환 상품 사진"'
                        + (' loading="lazy"' if index else '') + '>'
                        for index, src in enumerate(product['images']))
+    photo = product.get('wedding_photo', '')
+    if isinstance(photo, str) and photo.startswith('https://'):
+        pictures = f'''<figure class="wreath-preview" id="wreath-preview">
+          <div class="wreath-stage">
+            <img class="wreath-base" src="/checkout-art/sunflower-easel.webp" alt="해바라기 작품 액자화환">
+            <div class="scroll-paper">
+              <img class="scroll-couple" src="{escape(photo)}" alt="신랑신부 사진">
+              <p class="scroll-greeting" id="scroll-greeting"></p>
+              <p class="scroll-sender" id="scroll-sender"></p>
+            </div>
+          </div>
+          <figcaption>족자 미리보기</figcaption>
+        </figure><div class="gallery" id="wreath-fallback" role="group" aria-label="상품 사진" tabindex="0" hidden>{pictures}</div>'''
+    else:
+        pictures = f'<div class="gallery" role="group" aria-label="상품 사진" tabindex="0">{pictures}</div>'
     return Template(TEMPLATE.read_text(encoding='utf-8')).substitute(
         escaped, action=escape(action), groups=''.join(groups), pictures=pictures,
         base=str(product['price']), base_display=f'{product["price"]:,}',
