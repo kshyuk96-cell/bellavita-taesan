@@ -18,6 +18,7 @@ from lxml import html
 
 from blogpay import NoRedirect
 from scroll_sender import split_sender
+from order_operations import stage_paid
 
 SEOUL = ZoneInfo('Asia/Seoul')
 ORDER_PATH = re.compile(r'/i/([a-f0-9]{32})/(93500|99000)/order')
@@ -285,7 +286,7 @@ def normalize_order(product, fields):
             'sender': sender, 'message': value('message', 200) if custom else '',
             'buyer': buyer, 'buyer_phone': buyer_phone,
             'venue': product['venue'], 'address': product['address'],
-            'event_time': product['event_time'], 'amount': amount}
+            'event_time': product['event_time'], 'amount': amount, 'source': product.get('source', '')}
 
 
 def setup(connection):
@@ -344,6 +345,7 @@ def start_order(db, job, price, product, fields, origin, config):
             saved.pop('recipient', None)
             saved.pop('recipient_phone', None)
             saved.pop('wedding_preview', None)
+            saved.setdefault('source', '')
             if row['job'] != job or row['price'] != int(price) or saved != order:
                 raise ValueError('주문서를 다시 열어 주세요.')
             if row['state'] == 'waiting' and row['payment_url']:
@@ -403,4 +405,6 @@ def receive_payment(db, fields, config):
         elif incoming == '4' and state not in ('cancelled', 'partial_cancel'):
             state = 'paid'
         connection.execute('UPDATE invitation_orders SET state=?, payment_number=? WHERE id=?', (state, number, attempt))
+        if state == 'paid':
+            stage_paid(connection, row)
     return True

@@ -68,8 +68,9 @@ def requested_days(message, today):
     monday = today - timedelta(days=today.weekday())
     if re.search(r'다음\s*주|다음\s*(?:토|일)요일', message):
         monday += timedelta(days=7)
-    if '주말' in message:
-        return [(monday + timedelta(days=n)).isoformat() for n in (5, 6)]
+    if '주말' in message or ('토요일' in message and '일요일' in message):
+        weekend = (monday + timedelta(days=n) for n in (5, 6))
+        return [day.isoformat() for day in weekend if day >= today]
     for n, word in enumerate(('월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일')):
         if word in message:
             day = monday + timedelta(days=n)
@@ -375,4 +376,5 @@ def run(message, owner, db, read, now):
         page = f'{page}\n{line}' if page else line
     if page:
         pages.append(page)
-    return {'summary': pages[0], 'route_pages': pages, 'route_buttons': ['다시 계산', '이동시간 10분 추가']}
+    return {'summary': pages[0], 'route_pages': pages, 'route_report': result,
+            'route_buttons': ['다시 계산', '이동시간 10분 추가']}

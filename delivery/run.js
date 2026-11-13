@@ -31,13 +31,16 @@ leg.minGap = order => {
 const plan = routePlan(orders, workers, {start, pickup: 10, install: 30, lead: 60, manualTimes}, leg);
 const ids = visit => (visit.members || [visit]).map(order => order.order);
 const routes = plan.days.flatMap(day => day.workers).filter(worker => worker.jobs.length).map(worker => {
-  let load = 0;
+  let carried = 0;
   let maxLoad = 0;
-  const visits = worker.jobs.map(visit => {
-    load = (visit.pickup ? 0 : load) + visit.qty;
-    maxLoad = Math.max(load, maxLoad);
-    return {orders: ids(visit), done: visit.done, repickup: visit.pickup && visit.count === 1 && visit !== worker.jobs[0]};
-  });
+  const visits = worker.jobs.slice().reverse().map((visit, index) => {
+    carried += visit.qty;
+    maxLoad = Math.max(carried, maxLoad);
+    const row = {orders: ids(visit), event: visit.event, address: visit.address, done: visit.done,
+      quantity: visit.qty, carried, repickup: Boolean(visit.pickup && index < worker.jobs.length - 1)};
+    if (visit.pickup) carried = 0;
+    return row;
+  }).reverse();
   return {name: worker.name, maxLoad, visits};
 });
 const missed = plan.unassigned.flatMap(visit => ids(visit).map(order => ({order,
