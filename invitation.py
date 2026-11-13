@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 from lxml import html as dom
 
+import checkout
 from blogpay import BlogPay, PRICES
 
 SEOUL = ZoneInfo('Asia/Seoul')
@@ -133,18 +134,24 @@ def parse_page(source, raw):
 
 
 def parse_source(source, extract):
-    if source.startswith(('https://','http://')) and not re.search(r'\s', source):
+    source_url, _, supplement = source.partition('\n')
+    if https_url(source_url) and not re.search(r'\s', source_url):
         try:
-            return parse_page(source, get_page(source))
+            event = parse_page(source_url, get_page(source_url))
         except OSError as error:
             raise ValueError('청첩장에 연결하지 못했어요. 잠시 뒤 다시 보내거나 행사 정보를 적어주세요.') from error
+        if not event['address'] and supplement:
+            event['address'] = str(extract(supplement).get('address') or '').strip()[:200]
+        return event
+    if source.startswith('http://') and not re.search(r'\s', source):
+        raise ValueError('https로 시작하는 청첩장 주소를 보내주세요.')
     fields = extract(source)
     missing = [label for key, label in (('name','행사 이름'),('date','날짜와 시간'),('venue','장소'))
                if not isinstance(fields.get(key), str) or not fields[key].strip()]
     if missing:
         raise MissingInformation('빠진 정보만 적어주세요. ' + ', '.join(missing))
     return {'name': fields['name'].strip()[:80], 'when': parse_time(fields['date']),
-            'venue': fields['venue'].strip()[:140], 'address': '', 'families': [],
+            'venue': fields['venue'].strip()[:140], 'address': str(fields.get('address') or '').strip()[:200], 'families': [],
             'source': '', 'image': '', 'greeting': str(fields.get('greeting') or '')[:600],
             'signature': str(fields.get('signature') or '')[:100].removesuffix('.'),
             'note': str(fields.get('note') or '')[:500]}
@@ -215,6 +222,18 @@ def find_links(product):
         return links
 
 
+def find_order_products(product):
+    shop, token = os.getenv('BLOGPAY_SHOP_ID'), os.getenv('BLOGPAY_API_TOKEN')
+    if not shop or not token:
+        raise ValueError('쇼핑몰 연결을 확인해야 해요. 관리자에게 알려주세요.')
+    client = BlogPay(shop, token)
+    with PRODUCT_LOCK:
+        rows = client.existing_products(product)
+    if set(rows) != set(PRICES) or len({row['goodNum'] for row in rows.values()}) != len(PRICES):
+        raise ValueError(f'아래 이름으로 복사한 상품 두 개를 등록해 주세요. 가격은 93,500원과 99,000원이에요.\n\n{product}')
+    return {price: checkout.product_snapshot(client, row) for price, row in rows.items()}
+
+
 def make(source, root, origin, extract, photo=None):
     if photo:
         raise ValueError('사진 첨부는 아직 연결 중이에요. 청첩장 링크나 행사 정보만 먼저 보내주세요.')
@@ -227,9 +246,17 @@ def make(source, root, origin, extract, photo=None):
     if not https_url(origin):
         raise ValueError('초대장 공개 주소를 설정해야 해요. 관리자에게 알려주세요.')
     date, clock, product = display(event)
-    links = find_links(product)
-    if set(links) != set(PRICES) or len(set(links.values())) != len(PRICES):
-        raise ValueError('이 행사에 연결할 93,500원과 99,000원 주문서를 모두 찾지 못했어요. 상품 이름과 가격을 확인해 주세요.')
+    products = None
+    if checkout.enabled():
+        if not all(checkout.payment_config().values()):
+            raise ValueError('초대장 결제 연결을 먼저 마쳐야 해요. 관리자에게 알려주세요.')
+        if not re.search(r'[가-힣\d]+(?:대로|로|길|동|읍|면|리)\s*\d', event['address']):
+            raise MissingInformation('설치 주소를 확인해 주세요. 예식장의 도로명 또는 지번 주소를 적어주세요.')
+        products = find_order_products(product)
+    else:
+        links = find_links(product)
+        if set(links) != set(PRICES) or len(set(links.values())) != len(PRICES):
+            raise ValueError('이 행사에 연결할 93,500원과 99,000원 주문서를 모두 찾지 못했어요. 상품 이름과 가격을 확인해 주세요.')
     job = secrets.token_hex(16)
     folder = root / 'invitations' / job
     folder.mkdir(parents=True, exist_ok=False)
@@ -237,7 +264,12 @@ def make(source, root, origin, extract, photo=None):
     items = []
     for price in PRICES:
         url = f'{origin}/i/{job}/{price}.html'
-        (folder / f'{price}.html').write_text(page(event,date,clock,links[price],origin+'/guide.png'), encoding='utf-8')
+        order_url = f'{origin}/i/{job}/{price}/order' if products else links[price]
+        if products:
+            snapshot = {**products[price], 'date': date, 'clock': clock, 'venue': event['venue'],
+                        'address': event['address'], 'event_time': event['when'].replace(tzinfo=SEOUL).isoformat()}
+            (folder / f'{price}.order.json').write_text(json.dumps(snapshot, ensure_ascii=False), encoding='utf-8')
+        (folder / f'{price}.html').write_text(page(event,date,clock,order_url,origin+'/guide.png'), encoding='utf-8')
         message = '\n\n'.join(filter(None, [greeting, f"🗓 일시 {date} {clock}\n📍 장소 {event['venue']}", signature,
                                   url, f'🌾 화환 안내 · {price:,}원\n쌀빛그림화환으로 축하의 마음을 전해 주세요.',
                                   '화환 문의 ☎ 031-8067-8580']))
