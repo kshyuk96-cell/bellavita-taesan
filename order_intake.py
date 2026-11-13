@@ -26,11 +26,13 @@ def source(message):
     return supported
 
 
-def wants_order(message):
+def wants_order(message, *, explicit_only=False):
     if re.search(r'(?:기능|버튼|화면|코드).*(?:추가|바꿔|개선|고쳐|삭제)', message):
         return False
     if REQUEST.match(message):
         return True
+    if explicit_only:
+        return False
     urls = source(message)
     return bool(urls and re.search(r'화환.*(?:보내|부탁|주문|접수)|(?:주문|접수).*화환|(?m:^[^\n]*https://[^\s]+\s*\n[^\n]{2,140}$)', message))
 

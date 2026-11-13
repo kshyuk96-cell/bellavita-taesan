@@ -906,7 +906,9 @@ def dispatch(body, defer_callback=None):
         pending = c.execute('SELECT details FROM invitation_input WHERE owner=? AND expires>?',
                             (owner, time.time())).fetchone()
         route_context = delivery_routes.session(db, owner)
-        if delivery_routes.wants_route(message, route_context):
+        if order_intake.wants_order(message, explicit_only=True):
+            kind = 'order'
+        elif delivery_routes.wants_route(message, route_context):
             kind = 'route'
         elif pending:
             kind = 'invitation'
