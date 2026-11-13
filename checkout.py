@@ -279,9 +279,11 @@ def normalize_order(product, fields):
     buyer_phone = re.sub(r'[\s-]', '', value('buyer_phone', 20))
     if not re.fullmatch(r'01[016789]\d{7,8}', buyer_phone):
         raise ValueError('주문자 휴대폰 번호를 확인해 주세요.')
+    sender = value('sender', 140)
+    buyer = sender if fields.get('same_buyer') == 'yes' else value('buyer', 60)
     return {'product': product['number'], 'title': product['title'], 'options': selected,
-            'sender': value('sender', 140), 'message': value('message', 200) if custom else '',
-            'buyer': value('buyer', 60), 'buyer_phone': buyer_phone,
+            'sender': sender, 'message': value('message', 200) if custom else '',
+            'buyer': buyer, 'buyer_phone': buyer_phone,
             'venue': product['venue'], 'address': product['address'],
             'event_time': product['event_time'], 'amount': amount}
 

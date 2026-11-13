@@ -120,6 +120,8 @@ input:not([type=checkbox]), select, textarea {
   font-weight: 400;
 }
 input[type=checkbox] { width: 19px; height: 19px; margin: 0 8px 0 0; vertical-align: middle; accent-color: var(--forest); }
+.same-buyer { display: flex; align-items: center; min-height: 44px; width: fit-content; cursor: pointer; }
+input[name=buyer]:read-only { background: #edf2ed; }
 input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible, .gallery:focus-visible {
   outline: 2px solid var(--forest);
   outline-offset: 3px;
@@ -208,6 +210,7 @@ $groups
 </section>
 <section>
 <h2>주문자 정보 <span class="photo-note">(설치 사진 보내드립니다)</span></h2>
+<label class="same-buyer"><input type="checkbox" name="same_buyer" value="yes">보내시는 분과 같음</label>
 <div class="row">
 <label>이름<input name="buyer" autocomplete="name" maxlength="60" required></label>
 <label>휴대폰 번호<input name="buyer_phone" type="tel" autocomplete="tel" maxlength="20" required></label>
@@ -252,6 +255,9 @@ const preview = document.getElementById('preview');
 const amount = document.getElementById('amount');
 const message = form.elements.namedItem('message');
 const sender = form.elements.namedItem('sender');
+const buyer = form.elements.namedItem('buyer');
+const sameBuyer = form.elements.namedItem('same_buyer');
+let separateBuyer = buyer.value;
 const wreath = document.getElementById('wreath-preview');
 const greetingChoice = document.getElementById('greeting-choice');
 const scrollGreeting = document.getElementById('scroll-greeting');
@@ -588,11 +594,25 @@ function update() {
   amount.textContent = total.toLocaleString('ko-KR') + '원';
   updateScroll();
 }
+function syncBuyer() {
+  if (sameBuyer.checked) {
+    if (!buyer.readOnly) separateBuyer = buyer.value;
+    buyer.readOnly = true;
+    buyer.value = sender.value.trim();
+  } else if (buyer.readOnly) {
+    buyer.readOnly = false;
+    buyer.value = separateBuyer;
+  }
+}
+sender.addEventListener('input', syncBuyer);
+sender.addEventListener('change', syncBuyer);
+sameBuyer.addEventListener('change', syncBuyer);
 form.addEventListener('input', update);
 form.addEventListener('change', update);
 form.addEventListener('submit', () => { form.querySelector('button[type="submit"]').disabled = true; });
 window.addEventListener('pageshow', event => {
   if (event.persisted && $can_submit) form.querySelector('button[type="submit"]').disabled = false;
+  syncBuyer();
   update();
   if (event.persisted) updateSender();
 });
@@ -604,6 +624,7 @@ if (wreath) {
   document.fonts?.ready.then(updateScroll);
 }
 updateSender();
+syncBuyer();
 update();
 setupMobileSteps();
 </script>
