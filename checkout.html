@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>주문서 | 벨라비타</title>
+<title>쌀빛그림화환 주문서 | 벨라비타</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&amp;family=Noto+Serif+KR:wght@600;700&amp;display=swap" rel="stylesheet">
@@ -66,8 +66,32 @@ section {
   scroll-snap-align: start;
   background: var(--canvas);
 }
-.intro summary { font-weight: 700; color: var(--forest); }
-.intro p { margin: 12px 0 0; color: var(--muted); word-break: keep-all; }
+.wreath-preview { margin: 0; align-self: start; }
+.wreath-stage { position: relative; width: min(100%, 390px); margin-inline: auto; }
+.wreath-base { display: block; width: 100%; height: auto; }
+.scroll-paper {
+  position: absolute;
+  inset: 43.5% 29% 21.3% 32.5%;
+  background: url('/checkout-art/scroll-paper.webp') center / 100% 100% no-repeat;
+  color: #192846;
+  font-family: var(--heading);
+  text-align: center;
+  container-type: inline-size;
+}
+.scroll-couple { position: absolute; inset: 9.9% 5.2% auto; width: 89.6%; height: 42.3%; object-fit: cover; object-position: 50% 52%; }
+.scroll-paper p { position: absolute; inset-inline: 5.5%; margin: 0; display: grid; place-content: center; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.25; }
+.scroll-greeting { inset-block: 54% 33.3%; color: #1a1a1a; font-size: 7cqw; font-weight: 600; }
+.scroll-sender { inset-block: 67.7% 3.5%; font-size: 19cqw; font-weight: 700; }
+.wreath-preview figcaption { margin: 8px 0 0; color: var(--muted); text-align: center; font-size: .94rem; }
+.preview-link { display: none; }
+.detail-open { background: var(--paper); border: 1px solid #83715d; color: #64503d; }
+.product-detail { width: min(calc(100% - 24px), 690px); max-height: 88dvh; margin: auto; padding: 0; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: var(--paper); }
+.product-detail::backdrop { background: rgb(22 27 22 / .55); }
+.detail-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; padding: 13px 20px; border-bottom: 1px solid var(--line); background: var(--paper); }
+.detail-head h2 { margin: 0; }
+.detail-head button { width: auto; margin: 0; padding-inline: 15px; min-height: 42px; }
+.detail-content { padding: 20px; word-break: keep-all; }
+.detail-content img { display: block; width: 100%; height: auto; }
 .photo-note { font-size: .88em; font-weight: 500; color: var(--muted); }
 label { display: block; margin-bottom: 12px; font-weight: 600; }
 label:last-child { margin-bottom: 0; }
@@ -108,7 +132,8 @@ summary { cursor: pointer; }
   main { padding: 19px 12px 30px; }
   h1 { margin-bottom: 16px; }
   section { padding: 16px; }
-  .product { grid-template-columns: 1fr; gap: 18px; }
+  .product { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .wreath-preview:not([hidden]) ~ .product-options .preview-link { display: inline-block; margin-top: 12px; color: var(--forest); }
   .row { grid-template-columns: 1fr; gap: 11px; }
 }
 </style>
@@ -116,26 +141,23 @@ summary { cursor: pointer; }
 <body>
 <header>벨라비타</header>
 <main>
-<h1>주문서</h1>
+<h1>쌀빛그림화환 주문서</h1>
 <form action="$action" method="post" id="order">
 <input type="hidden" name="attempt" value="$attempt">
 <section class="product" aria-label="상품 정보">
-<div class="gallery" role="group" aria-label="상품 사진" tabindex="0">$pictures</div>
-<div>
+$pictures
+<div class="product-options">
 <h2>$title</h2>
 <p class="price">${base_display}원</p>
 $groups
 <label>보내시는 분<input name="sender" maxlength="140" required placeholder="예: 벨라비타 대표 홍길동"></label>
 <label id="custom" hidden>직접 쓰는 축하 문구<textarea name="message" maxlength="200" rows="2" disabled></textarea></label>
 <p class="preview" id="preview" hidden></p>
+<a class="preview-link" href="#wreath-preview">족자 미리보기 확인</a>
 </div>
 </section>
 <section>
-<details class="intro">
-<summary>상품 소개 보기</summary>
-<p>쌀빛그림화환은 축하 문구와 보내시는 분의 이름을 담아 예식장에 설치하는 액자화환입니다.</p>
-<p>예식이 끝나면 액자는 쌀로 교환해 혼주님 명의로 도움이 필요한 곳에 기부합니다.</p>
-</details>
+<button class="detail-open" type="button" id="open-detail">상세설명 보기</button>
 </section>
 <section>
 <h2>주문자 정보 <span class="photo-note">(설치 사진 보내드립니다)</span></h2>
@@ -161,6 +183,16 @@ $notice
 </section>
 </form>
 </main>
+<dialog class="product-detail" id="product-detail" aria-labelledby="detail-title">
+<div class="detail-head"><h2 id="detail-title">상품 설명</h2><form method="dialog"><button>닫기</button></form></div>
+<div class="detail-content">
+<p><strong>쌀(쌀빛그림)화환 관련</strong></p>
+<p>신청해주신 쌀빛그림화환은 친환경 웨딩갤러리를 만들기 위해 액자를 설치하고<br>예식 후 쌀로 교환하여 혼주님께 드리거나 필요한 시설에 기부합니다.</p>
+<p>필요한 웨딩액자나 작품액자는 준비된 액자를 사용하니<br>전화나 문자를 이용하시거나 주문시스템에서 시청하시면 됩니다.</p>
+<p>문의 전화 031-8067-8580</p>
+<img src="https://bellavita1004.blogpay.io/img/editor/bellavita1004/temp/0524251001759278768.jpg" alt="쌀빛그림화환 상세 안내" loading="lazy">
+</div>
+</dialog>
 <script>
 const form = document.getElementById('order');
 const choices = Array.from(form.querySelectorAll('select'));
@@ -169,6 +201,36 @@ const preview = document.getElementById('preview');
 const amount = document.getElementById('amount');
 const message = form.elements.namedItem('message');
 const sender = form.elements.namedItem('sender');
+const wreath = document.getElementById('wreath-preview');
+const greetingChoice = document.getElementById('greeting-choice');
+const scrollGreeting = document.getElementById('scroll-greeting');
+const scrollSender = document.getElementById('scroll-sender');
+const detail = document.getElementById('product-detail');
+document.getElementById('open-detail').addEventListener('click', () => detail.showModal());
+if (wreath) {
+  const couple = wreath.querySelector('.scroll-couple');
+  const showPhotos = () => {
+    wreath.hidden = true;
+    document.getElementById('wreath-fallback').hidden = false;
+  };
+  couple.addEventListener('error', showPhotos);
+  if (couple.complete && !couple.naturalWidth) showPhotos();
+}
+function fitScrollText(element, value) {
+  element.textContent = value;
+  element.style.fontSize = '';
+  const initialSize = parseFloat(getComputedStyle(element).fontSize);
+  for (let size = initialSize; size > 4 && element.scrollHeight > element.clientHeight + 1; size -= 1) {
+    element.style.fontSize = (size - 1) + 'px';
+  }
+}
+function updateScroll() {
+  if (!wreath || wreath.hidden) return;
+  const selected = greetingChoice?.selectedOptions[0];
+  const greeting = selected?.dataset.custom === '1' ? message.value.trim() : selected?.dataset.greeting || '';
+  fitScrollText(scrollGreeting, greeting);
+  fitScrollText(scrollSender, sender.value.trim());
+}
 function update() {
   const options = choices.map(select => select.selectedOptions[0]);
   const direct = options.some(option => option.dataset.custom === '1');
@@ -180,14 +242,19 @@ function update() {
   preview.hidden = lines.length === 0;
   const total = options.reduce((sum, option) => sum + Number(option.dataset.amount || 0), $base);
   amount.textContent = total.toLocaleString('ko-KR') + '원';
+  updateScroll();
 }
 form.addEventListener('input', update);
 form.addEventListener('change', update);
-form.addEventListener('submit', () => { form.querySelector('button').disabled = true; });
+form.addEventListener('submit', () => { form.querySelector('button[type="submit"]').disabled = true; });
 window.addEventListener('pageshow', event => {
-  if (event.persisted && $can_submit) form.querySelector('button').disabled = false;
+  if (event.persisted && $can_submit) form.querySelector('button[type="submit"]').disabled = false;
   update();
 });
+if (wreath) {
+  window.addEventListener('resize', updateScroll);
+  document.fonts?.ready.then(updateScroll);
+}
 update();
 </script>
 </body>
