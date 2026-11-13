@@ -162,7 +162,6 @@ summary { cursor: pointer; }
     background: #f7f3ea;
   }
   .mobile-preview img { display: block; width: 48px; height: 48px; border-radius: 6px; object-fit: contain; }
-  .mobile-preview.is-active img { object-fit: cover; }
   .mobile-preview strong, .mobile-preview small { display: block; }
   .mobile-preview small { color: var(--muted); font-size: .79rem; line-height: 1.35; }
   .mobile-preview button { min-height: 46px; width: auto; margin: 0; padding: 6px 9px; font-size: .86rem; }
@@ -345,7 +344,6 @@ function setupMobileSteps() {
     });
     const count = choices.filter(select => select.value).length;
     status.textContent = count === 3 ? '옵션 선택 완료' : '옵션 ' + count + ' / 3 선택';
-    mobilePreview.classList.toggle('is-active', count > 0);
     if (viewport && !wreath.hidden) {
       mobilePreview.hidden = false;
       const image = wreath.querySelector(count ? '.scroll-couple' : '.wreath-base');
@@ -435,7 +433,7 @@ function layoutGreeting(text) {
     });
     scrollGreeting.replaceChildren(...spans);
     if (spans.every(row => row.scrollWidth <= scrollGreeting.clientWidth) &&
-        spans.reduce((sum, row) => sum + row.getBoundingClientRect().height, 0) <= scrollGreeting.clientHeight) return;
+        spans.reduce((sum, row) => sum + parseFloat(getComputedStyle(row).lineHeight), 0) <= scrollGreeting.clientHeight) return;
   }
   // Keep all text in the panel even for an unusually long entry without spaces.
   const row = document.createElement('span');
