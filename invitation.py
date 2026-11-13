@@ -201,7 +201,7 @@ h1{{font-size:clamp(25px,5vw,38px);margin-top:0}}p{{white-space:pre-line}}
 </main></body></html>'''
 
 
-def find_links(product):
+def find_links(product, root):
     shop, token = os.getenv('BLOGPAY_SHOP_ID'), os.getenv('BLOGPAY_API_TOKEN')
     if not shop or not token:
         raise ValueError('쇼핑몰 연결을 확인해야 해요. 관리자에게 알려주세요.')
@@ -209,7 +209,8 @@ def find_links(product):
         cached = PRODUCT_CACHE.get(product)
         if cached and cached[0] > time.monotonic():
             return cached[1]
-        links = BlogPay(shop, token).existing_links(product)
+        template = os.getenv('BLOGPAY_INVITATION_TEMPLATE')
+        links = BlogPay(shop, token).ensure_links(product, root, int(template) if template else None)
         if set(links) == set(PRICES):
             PRODUCT_CACHE[product] = (time.monotonic() + 300, links)
         return links
@@ -227,7 +228,7 @@ def make(source, root, origin, extract, photo=None):
     if not https_url(origin):
         raise ValueError('초대장 공개 주소를 설정해야 해요. 관리자에게 알려주세요.')
     date, clock, product = display(event)
-    links = find_links(product)
+    links = find_links(product, root)
     if set(links) != set(PRICES) or len(set(links.values())) != len(PRICES):
         raise ValueError('이 행사에 연결할 93,500원과 99,000원 주문서를 모두 찾지 못했어요. 상품 이름과 가격을 확인해 주세요.')
     job = secrets.token_hex(16)

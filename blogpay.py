@@ -1,5 +1,8 @@
 """Server-side BlogPay product lookup and copying for invitation checkout links."""
 import argparse
+import hashlib
+import secrets
+import sqlite3
 import json
 import os
 import time
@@ -25,12 +28,20 @@ class BlogPay:
         self.last_call = 0
         self.http = build_opener(NoRedirect)
 
-    def request(self, endpoint, *, post=False, **fields):
+    def request(self, endpoint, *, post=False, multipart=False, **fields):
         # The developer guide limits API reads to 15 per minute.
         time.sleep(max(0, 4.1 - (time.monotonic() - self.last_call)))
         params = urlencode({'token': self.token, **fields}, doseq=True)
         url = f'{self.origin}/Api/{endpoint}'
         req = Request(url, params.encode() if post else None) if post else Request(f'{url}?{params}')
+        if multipart:
+            boundary = secrets.token_hex(24)
+            parts = []
+            for key, value in {'token': self.token, **fields}.items():
+                for item in value if isinstance(value, list) else [value]:
+                    parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{item}\r\n')
+            body = ''.join(parts) + f'--{boundary}--\r\n'
+            req = Request(url, body.encode(), headers={'Content-Type':f'multipart/form-data; boundary={boundary}'})
         self.last_call = time.monotonic()
         try:
             with self.http.open(req, timeout=20) as response:
@@ -63,9 +74,9 @@ class BlogPay:
             raise RuntimeError('상품 주문 주소를 확인하지 못했습니다.')
         return url
 
-    def existing_links(self, title):
+    def existing_links(self, title, products=None):
         matches = {}
-        for product in self.products(all_pages=True):
+        for product in self.products(all_pages=True) if products is None else products:
             if product['goodName'] != title:
                 continue
             price = int(product['goodPrice'])
@@ -92,6 +103,109 @@ class BlogPay:
         ):
             raise RuntimeError('복사된 상품을 특정할 수 없습니다. 관리자 상품 목록에서 확인해 주세요.')
         return new[0]
+
+
+    def set_sale(self, item, visible):
+        self.request('goodsList', post=True, mode='updateGood', goodNum=item['goodNum'],
+                     isShow=int(visible), isSoldout=0, isRecommend=0, sort=item['sort'],
+                     inven=item['inven'], is_show_detail=item['is_show_detail'])
+
+    def edit_copy(self, item, title, price):
+        fields = {key:item[key] for key in (
+            'goodsCode', 'shipSubNum', 'cateNum', 'cusNum', 'basisPrice', 'displayPrice', 'orign', 'maker',
+            'brand', 'isDelivery', 'eDeliBPrice', 'eDeliFPrice', 'goodImg', 'goodContent', 'tag', 'isEvent',
+            'supplyUserId', 'isSmUse', 'isCpUse', 'goodSmValue', 'cpNum', 'subtitle', 'subtitleColor',
+            'goodsft', 'addShip', 'bsFree', 'perLimitCount', 'buyDCinfo', 'is_show_detail', 'gBindNum',
+            'IsReserve', 'adminMemo') if item.get(key) is not None}
+        fields.update(mode='updateGoodsNew', goodNum=item['goodNum'], goodName=title, goodPrice=price,
+                      categorySelect='useSelect' if item.get('cateNum') else 'useEmptyCate',
+                      isDisplay=0, isRecommend=0, optionState=item.get('optionState',1),
+                      useNormalOption=int(bool(item.get('normalOption'))),
+                      useInputOption=int(bool(item.get('inputOption'))),
+                      sDate=item.get('SDate') or '', eDate=item.get('EDate') or '')
+        fields['enablePayMethod[]'] = [flag for flag in PAYMENT_FLAGS if int(item['enablePayMethod']) & flag]
+        for option in item.get('normalOption') or []:
+            group = int(option['goodsNormalOptionNum'])
+            fields[f'noTitle[{group}]'] = option['noTitle']
+            for choice in option['list']:
+                entry = int(choice['goodsNormalOptionListNum'])
+                fields[f'noValue[{group}][{entry}]'] = choice['noValue']
+                fields[f'noPrice[{group}][{entry}]'] = choice['noPrice']
+        for option in item.get('inputOption') or []:
+            entry = int(option['goodsInputOptionNum'])
+            fields[f'ioTitle[{entry}]'] = option['ioTitle']
+            fields[f'ioPrice[{entry}]'] = option['ioPrice']
+        self.request('goodsModify', post=True, multipart=True, **fields)
+
+    def settings(self, row):
+        normal = [(x.get('noTitle'), x.get('noRequire'), [
+            tuple(v.get(k) for k in ('noValue','noPrice','noInven','noSourcePrice','optionView'))
+            for v in x.get('list',[])]) for x in row.get('normalOption') or []]
+        inputs = [tuple(x.get(k) for k in ('ioTitle','ioPrice','ioRequire')) for x in row.get('inputOption') or []]
+        keys = ('shipSubNum','enablePayMethod','goodContent','goodImg','cateNum','isDelivery','eDeliBPrice',
+                'eDeliFPrice','is_show_detail','isSmUse','isCpUse','gBindNum','IsReserve','SDate','EDate')
+        return tuple(row.get(k) for k in keys), normal, inputs
+
+    def ensure_links(self, title, root, template_number=None):
+        rows = list(self.products(all_pages=True))
+        links = self.existing_links(title, rows)
+        if set(links) == set(PRICES) or not template_number:
+            return links
+        template = self.detail(template_number)
+        if ('쌀빛그림화환' not in template.get('goodName','') or str(template.get('isRecommend')) != '0'
+                or str(template.get('optionState')) != '1' or template.get('addNormalOption')):
+            raise ValueError('쌀빛그림화환 원본 상품의 옵션과 진열 설정을 확인해 주세요.')
+        with sqlite3.connect(root / 'invitation_products.sqlite3') as db:
+            db.execute('CREATE TABLE IF NOT EXISTS copies (key TEXT PRIMARY KEY, number TEXT, before TEXT)')
+            for price in PRICES:
+                if price in links:
+                    continue
+                key = hashlib.sha256(f'{title}\0{price}'.encode()).hexdigest()
+                record = db.execute('SELECT number,before FROM copies WHERE key=?',(key,)).fetchone()
+                if any(p.get('goodName') == title and int(p.get('goodPrice',0)) == price
+                       and (not record or str(p['goodNum']) != record[0]) for p in rows):
+                    raise ValueError(f'{price:,}원 상품이 이미 있어요. 쇼핑몰에서 판매와 메인진열 상태를 확인해 주세요.')
+                if record is None:
+                    before = {str(x['goodNum']) for x in self.products()}
+                    db.execute('INSERT INTO copies VALUES (?,NULL,?)',(key,json.dumps(sorted(before))))
+                    db.commit()
+                    try:
+                        self.request('goodsList', post=True, goodNum=template_number, mode='copyGood')
+                    except RuntimeError:
+                        pass  # A timeout can happen after the copy was committed.
+                else:
+                    before = set(json.loads(record[1]))
+                if record and record[0]:
+                    number = record[0]
+                else:
+                    new = [x for x in self.products() if str(x['goodNum']) not in before]
+                    candidates = [x for x in new if template['goodName'] in x.get('goodName','')
+                                  and x.get('goodPrice') == template['goodPrice']]
+                    if len(candidates) != 1 or len(new) != 1:
+                        raise ValueError('상품 복제 결과를 확인해야 해요. 중복을 막기 위해 다시 복제하지 않았어요.')
+                    number = str(candidates[0]['goodNum'])
+                    db.execute('UPDATE copies SET number=? WHERE key=?',(number,key))
+                    db.commit()
+                item = self.detail(number)
+                if item.get('goodName') != title or int(item.get('goodPrice',0)) != price:
+                    self.set_sale(item, False)
+                    item = self.detail(number)
+                    if self.settings(item) != self.settings(template):
+                        raise ValueError('복제 상품의 상세 설명, 옵션 또는 배송 설정이 원본과 달라 판매를 중지했어요.')
+                    self.edit_copy(item, title, price)
+                item = self.detail(number)
+                if (item.get('goodName') != title or int(item.get('goodPrice',0)) != price
+                        or self.settings(item) != self.settings(template)):
+                    self.set_sale(item, False)
+                    raise ValueError('상품명, 가격 또는 옵션을 확인해야 해요. 확인 전에는 주문 링크를 보내지 않아요.')
+                self.set_sale(item, True)
+                active = self.detail(number)
+                if any(str(active.get(k)) != v for k,v in
+                       {'isShow':'1','isSoldout':'0','isRecommend':'0'}.items()):
+                    raise ValueError('판매 상태나 메인진열 설정을 확인해야 해요.')
+                product = next((x for x in self.products() if str(x['goodNum']) == number), active)
+                links[price] = self.order_link(product)
+        return links
 
 
 def main():
