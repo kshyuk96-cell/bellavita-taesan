@@ -44,6 +44,7 @@ layout=일반/쌀빛, sender, message, choice, heading, rice_kg, quantity, order
 changes는 수정할 위 필드만 담는다. 사진을 받아야 하는 경우 이 버전은 첨부 수신 미연결임을 안내한다.
 structure의 message는 원문에 기반한 짧은 요청 요약과 예상 변경·영향을 담는다.
 출력은 JSON 객체 하나다. 쓰지 않는 필드는 생략할 수 있다.
+반드시 action 키에 다음 중 하나를 넣어라: answer, clarify, today, stock, stock_write, scroll, revise, structure. 기능 안내나 일반 답변은 action을 answer로 하고 답변 문장을 message에 넣어라. 예: {"action":"answer","message":"오늘 할 일이나 센터 재고를 확인해 드릴 수 있어요."}
 """
 
 
