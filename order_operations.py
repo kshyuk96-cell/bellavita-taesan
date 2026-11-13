@@ -61,6 +61,14 @@ def intake(db, owner, message):
     return key, None
 
 
+def latest_intake(c, owner):
+    return c.execute(
+        """SELECT state,order_number FROM order_operations
+           WHERE owner=? AND kind='kakao' ORDER BY created DESC LIMIT 1""",
+        (owner,),
+    ).fetchone()
+
+
 def paid_details(row):
     data = json.loads(row['details'])
     recipient = next((value for label, value in data.get('options', []) if '받으시는 분' in label or '받는 분' in label), '')

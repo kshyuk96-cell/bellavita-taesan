@@ -607,7 +607,7 @@ def run_order(message, owner):
     if duplicate:
         return {'summary': duplicate}
     if not os.getenv('TAESAN_ORDER_SHEET_ID'):
-        return {'summary': '주문 내용을 보관했어요. 원장 연결이 끝나면 등록할 수 있어요.'}
+        return {'summary': '주문 내용을 보관했어요. 원장 연결이 끝나면 등록할 수 있어요.', 'order_status': True}
     try:
         with ORDER_LOCK:
             number, data = order_operations.save(db, key, order_intake.extract, write_order, order_saved)
@@ -615,7 +615,7 @@ def run_order(message, owner):
         with db() as c:
             order_operations.defer(c, key)
         detail = str(error) if isinstance(error, ValueError) else '행사 정보나 시트 연결을 확인해 주세요.'
-        return {'summary': '주문을 보관했어요. 원장 등록은 확인이 필요해요.\n' + detail[:130]}
+        return {'summary': '주문을 보관했어요. 원장 등록은 확인이 필요해요.\n' + detail[:130], 'order_status': True}
     return {'summary': '원장에 등록했어요.\n' + order_intake.report(number, data)}
 
 
@@ -736,6 +736,8 @@ def present(job, result, owner=None):
         ]}}
     if result.get('guide'):
         return menu(owner)
+    if result.get('order_status'):
+        return kakao(result['summary'], buttons=[('주문 접수 상태', '주문 접수 상태')])
     outputs = result.get('outputs') or {}
     selected = result.get('selected')
     if selected:
@@ -828,6 +830,14 @@ def dispatch(body, defer_callback=None):
         if row:
             return present(row['id'], json.loads(row['result']), owner)
         return kakao('아직 만든 배송보고서가 없어요.', buttons=[('배송루트', '배송루트')])
+    if re.fullmatch(r'(?:내\s*)?(?:최근\s*)?주문\s*(?:접수\s*상태|등록\s*상태)(?:\s*(?:확인|알려|보여)\s*(?:해\s*)?(?:줘|주세요)?)?[.!?]?', message):
+        with db() as c:
+            order = order_operations.latest_intake(c, owner)
+        if not order:
+            return kakao('아직 직접 접수한 카톡 주문이 없어요.')
+        if order['state'] == 'saved':
+            return kakao(f'최근 카톡 주문을 원장에 등록했어요. 주문번호는 {order["order_number"]}번이에요.')
+        return kakao('최근 카톡 주문은 접수됐어요. 원장 등록은 아직 확인되지 않았어요.')
     if message == '초대장 주문관리':
         base = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
         if not invitation.https_url(base):
