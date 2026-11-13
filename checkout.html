@@ -72,7 +72,10 @@ section {
   background: var(--canvas);
 }
 .wreath-preview { margin: 0; align-self: start; }
-.wreath-stage { position: relative; width: min(100%, 390px); margin-inline: auto; }
+.wreath-viewport { width: min(100%, 390px); aspect-ratio: 500 / 768; margin-inline: auto; overflow: hidden; }
+.wreath-stage { position: relative; transform-origin: 53% 71%; transition: transform .3s ease; }
+.wreath-preview.is-close-up .wreath-stage { transform: scale(2.1); }
+@media (prefers-reduced-motion: reduce) { .wreath-stage { transition: none; } }
 .wreath-base { display: block; width: 100%; height: auto; }
 .scroll-paper {
   position: absolute;
@@ -140,6 +143,19 @@ summary { cursor: pointer; }
   h1 { margin-bottom: 16px; }
   section { padding: 16px; }
   .product { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .wreath-preview.is-close-up::before { content: ''; display: block; width: min(100%, 390px); aspect-ratio: 500 / 768; margin-inline: auto; }
+  .wreath-preview.is-close-up .wreath-viewport {
+    position: fixed;
+    z-index: 2;
+    inset: auto 12px calc(12px + env(safe-area-inset-bottom)) auto;
+    width: min(36vw, 150px, 25dvh);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgb(22 27 22 / .22);
+    background: var(--paper);
+    pointer-events: none;
+  }
+  .product:has(.is-close-up) ~ section { scroll-margin-bottom: 230px; }
   .wreath-preview:not([hidden]) ~ .product-options .preview-link { display: inline-block; margin-top: 12px; color: var(--forest); }
   .row { grid-template-columns: 1fr; gap: 11px; }
 }
@@ -217,12 +233,28 @@ const detail = document.getElementById('product-detail');
 document.getElementById('open-detail').addEventListener('click', () => detail.showModal());
 if (wreath) {
   const couple = wreath.querySelector('.scroll-couple');
+  const productChoice = choices.find(select => select.querySelector('option[data-kg]'));
+  let closeUpTimer;
+  const resetCloseUp = () => {
+    clearTimeout(closeUpTimer);
+    wreath.classList.remove('is-close-up');
+  };
   const showPhotos = () => {
+    resetCloseUp();
     wreath.hidden = true;
     document.getElementById('wreath-fallback').hidden = false;
   };
   couple.addEventListener('error', showPhotos);
   if (couple.complete && !couple.naturalWidth) showPhotos();
+  const changeCloseUp = () => {
+    resetCloseUp();
+    if (wreath.hidden || !greetingChoice?.value) return;
+    wreath.classList.add('is-close-up');
+    if (productChoice?.value) closeUpTimer = setTimeout(resetCloseUp, 5000);
+  };
+  greetingChoice?.addEventListener('change', changeCloseUp);
+  productChoice?.addEventListener('change', changeCloseUp);
+  form.addEventListener('submit', resetCloseUp);
 }
 function fitScrollText(element, value) {
   element.textContent = value;
