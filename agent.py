@@ -213,7 +213,7 @@ def choose(message, history):
     client = OpenAI(timeout=22, max_retries=0)
     response = client.responses.create(
         model=os.environ['TAESAN_MODEL'], store=False, instructions=PROMPT,
-        input=json_text({'message': message, 'history': safe_history}),
+        input='Return one JSON object.\n' + json_text({'message': message, 'history': safe_history}),
         text={'format': {'type': 'json_object'}},
     )
     return json.loads(response.output_text)
@@ -417,6 +417,15 @@ def scroll(action, history):
 
 
 def handle(message, history, owner):
+    if message in ('오늘 할 일', '오늘 현황'):
+        return {'summary': today()}
+    if message == '재고 조회':
+        return {'summary': '어느 센터 재고를 확인할까요? 예를 들어 “울산 재고 조회”라고 보내주세요.'}
+    stock_request = re.fullmatch(r'([가-힣A-Za-z0-9]+) 재고 조회', message)
+    if stock_request:
+        return {'summary': stock(stock_request[1])}
+    if message == '자유 문의':
+        return {'summary': '궁금한 내용을 편하게 적어주세요.'}
     action = choose(message, history)
     if not isinstance(action, dict) or action.get('action') not in ACTIONS:
         raise ValueError('어떤 업무인지 한 번 더 말씀해 주세요.')
@@ -443,8 +452,11 @@ def run_job(job, message, owner):
         result = handle(message, recent(owner), owner)
     except ValueError as error:
         result = {'summary': str(error)[:300]}
-    except Exception:
-        result = {'summary': '처리 결과를 확인하지 못했어요. 입고 요청이었다면 시트에서 반영 여부를 먼저 확인해 주세요.'}
+    except Exception as error:
+        if getattr(error, 'code', None) == 'credit_balance_exhausted':
+            result = {'summary': 'AI 이용 잔액이 부족해 이 요청을 해석하지 못했어요. 메뉴의 오늘 할 일과 재고 조회는 이용할 수 있어요.'}
+        else:
+            result = {'summary': '처리 결과를 확인하지 못했어요. 입고 요청이었다면 시트에서 반영 여부를 먼저 확인해 주세요.'}
     with db() as c:
         c.execute("UPDATE jobs SET state='done',result=? WHERE id=?", (json_text(result), job))
     return result
