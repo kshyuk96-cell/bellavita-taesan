@@ -29,6 +29,13 @@ def enabled():
     return os.getenv('INVITATION_CHECKOUT_ENABLED') == '1'
 
 
+def payment_enabled(job):
+    pilot_jobs = os.getenv('INVITATION_CHECKOUT_PILOT_JOBS', '')
+    if pilot_jobs:
+        return job in (item.strip() for item in pilot_jobs.split(','))
+    return enabled()
+
+
 def payment_config():
     return {key: os.getenv('INVITATION_PAYAPP_' + key, '') for key in PAYAPP_FIELDS}
 
@@ -120,10 +127,14 @@ def admin_page(orders):
     rows = []
     for order in orders:
         data = json.loads(order['details'])
-        options = ', '.join(value for _, value in data['options'])
+        recipient = next((value for label, value in data['options'] if label == '받으시는 분'), '')
+        options = ', '.join(value for label, value in data['options'] if label != '받으시는 분')
+        saved_contact = ' '.join(filter(None, (data.get('recipient'), data.get('recipient_phone'))))
+        if saved_contact:
+            recipient = ' · '.join(filter(None, (recipient, saved_contact)))
         values = (order['id'], order['created'][:16].replace('T', ' '), data['title'], options,
                   data['sender'], data['message'], data['buyer'] + ' ' + data['buyer_phone'],
-                  data['recipient'] + ' ' + data['recipient_phone'],
+                  recipient,
                   data['venue'] + ' ' + data['address'], f"{data['amount']:,}원",
                   {'paid': '결제 완료', 'cancelled': '취소', 'partial_cancel': '일부 취소'}[order['state']])
         rows.append('<tr>' + ''.join(f'<td>{escape(value)}</td>' for value in values) + '</tr>')
@@ -163,9 +174,9 @@ def render(product, action, can_pay):
 
 
 def normalize_order(product, fields):
-    def value(key, limit, required=True):
+    def value(key, limit):
         text = fields.get(key, '').strip()
-        if (required and not text) or len(text) > limit:
+        if not text or len(text) > limit:
             raise ValueError('입력하신 주문 정보를 다시 확인해 주세요.')
         return text
 
@@ -178,23 +189,15 @@ def normalize_order(product, fields):
         if not choice:
             raise ValueError('상품 옵션을 모두 선택해 주세요.')
         amount += choice['amount']
-        selected.append((group['label'], choice['label']))
+        selected.append([group['label'], choice['label']])
         custom |= choice['custom']
     buyer_phone = re.sub(r'[\s-]', '', value('buyer_phone', 20))
     if not re.fullmatch(r'01[016789]\d{7,8}', buyer_phone):
         raise ValueError('주문자 휴대폰 번호를 확인해 주세요.')
-    buyer = value('buyer', 60)
-    if fields.get('same_recipient') == 'yes':
-        recipient, recipient_phone = buyer, buyer_phone
-    else:
-        recipient = value('recipient', 60)
-        recipient_phone = re.sub(r'[\s-]', '', value('recipient_phone', 24))
-        if not re.fullmatch(r'0\d{7,11}', recipient_phone):
-            raise ValueError('받으시는 분 연락처를 확인해 주세요.')
     return {'product': product['number'], 'title': product['title'], 'options': selected,
             'sender': value('sender', 140), 'message': value('message', 200) if custom else '',
-            'buyer': buyer, 'buyer_phone': buyer_phone, 'recipient': recipient,
-            'recipient_phone': recipient_phone, 'venue': product['venue'], 'address': product['address'],
+            'buyer': value('buyer', 60), 'buyer_phone': buyer_phone,
+            'venue': product['venue'], 'address': product['address'],
             'event_time': product['event_time'], 'amount': amount}
 
 
@@ -236,7 +239,10 @@ def start_order(db, job, price, product, fields, origin, config):
         connection.execute('BEGIN IMMEDIATE')
         row = connection.execute('SELECT * FROM invitation_orders WHERE id=?', (attempt,)).fetchone()
         if row:
-            if row['job'] != job or row['price'] != int(price) or row['details'] != details:
+            saved = json.loads(row['details'])
+            saved.pop('recipient', None)
+            saved.pop('recipient_phone', None)
+            if row['job'] != job or row['price'] != int(price) or saved != order:
                 raise ValueError('주문서를 다시 열어 주세요.')
             if row['state'] == 'waiting' and row['payment_url']:
                 return row['payment_url']
