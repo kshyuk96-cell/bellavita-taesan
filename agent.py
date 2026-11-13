@@ -725,7 +725,7 @@ def present(job, result, owner=None):
         else:
             answer = kakao(pages[index], buttons=buttons)
         answer['template']['outputs'].append({'textCard': {
-            'title': '배송원별 일정', 'description': '다운로드 주소는 한 시간 동안 열려요.',
+            'title': '배송원별 일정', 'description': '한 시간 뒤에는 카톡에 “최근 배송보고서”라고 보내 새 주소를 받으세요.',
             'buttons': [{'label': '엑셀 내려받기', 'action': 'webLink',
                          'webLinkUrl': delivery_reports.url(base, secret, job, 'delivery.xlsx')}],
         }})
@@ -822,7 +822,7 @@ def dispatch(body, defer_callback=None):
             return kakao('내 메뉴에 최근 배송보고서 버튼을 추가했어요.',
                          buttons=[('최근 배송보고서', '최근 배송보고서'), ('메뉴', '메뉴')])
         return kakao('내 메뉴에서 최근 배송보고서 버튼을 뺐어요.', buttons=[('메뉴', '메뉴')])
-    if re.fullmatch(staff_features.REPORT + r'(?:\s*(?:다시\s*)?(?:보여|보내)\s*(?:줘|주세요|줘요))?[.!]?', message):
+    if staff_features.REPORT_REQUEST.fullmatch(message):
         with db() as c:
             row = c.execute("""SELECT id,result FROM jobs WHERE owner=? AND state='done'
                                AND json_type(result,'$.route_report')='object'
@@ -1144,7 +1144,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_route_report(self, path, job, filename):
         if not delivery_reports.authorized(path, os.getenv('TAESAN_WEBHOOK_SECRET', '')):
-            return self.send_json({'error': '주소가 만료됐어요. 카톡에서 배정안을 다시 열어 주세요.'}, 403)
+            return self.send_json({'error': '이 주소를 열 수 없어요. 카톡에 “최근 배송보고서”라고 보내 새 주소를 받으세요.'}, 403)
         with db() as c:
             row = c.execute("SELECT owner,result FROM jobs WHERE id=? AND state='done'", (job,)).fetchone()
         days = json.loads(row['result']).get('route_report') if row and role_of(row['owner']) else None
