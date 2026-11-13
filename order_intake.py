@@ -95,6 +95,8 @@ def extract(message):
                       address=labels.get('주소', ''), recipient=labels.get('받는 분', ''))
         if not (result['venue'] or result['address']):
             raise ValueError('청첩장·부고장 주소나 설치 장소를 적어주세요.')
+    elif not result.get('address'):
+        result['address'] = labels.get('주소', '')
     sender = labels.get('보내시는 분') or labels.get('보내는 분')
     if not sender:
         lines = [line.strip() for line in details.splitlines() if line.strip() and ':' not in line

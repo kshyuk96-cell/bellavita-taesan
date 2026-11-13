@@ -21,3 +21,20 @@ class DeliveryOrderFieldTests(unittest.TestCase):
             data = order_intake.extract('주문 접수\nhttps://salondeletter.com/w/example\n보내는 분: 모의 직원')
         self.assertEqual((data['delivery_date'], data['delivery_time']), ('', ''))
         self.assertIn('배송 일시: 확인 필요', order_intake.report(1001, data))
+
+    def test_linked_order_uses_explicit_address_when_invitation_has_none(self):
+        for invitation_address in ('', '부산 동구 가상로 22'):
+            with self.subTest(invitation_address=invitation_address):
+                event = {'event_type': '결혼', 'recipient': '모의 수신자', 'venue': '가상 예식장',
+                         'address': invitation_address}
+                message = ('주문 접수\nhttps://salondeletter.com/w/example\n'
+                           '주소: 부산 동구 가상로 10\n보내는 분: 모의 직원')
+                with patch.object(order_intake, 'wedding', return_value=event):
+                    details = order_intake.extract(message)
+                cells = [{} for _ in range(29)]
+                cells[8] = {'dataValidation': {'condition': {'type': 'ONE_OF_LIST',
+                            'values': [{'userEnteredValue': '부산센터A3'}]}}}
+                data = order_ledger.details_for_sheet(details, cells, [['부산센터A3', '부산센터', '', True]])
+                self.assertEqual(data['address'], invitation_address or '부산 동구 가상로 10')
+                self.assertEqual(data['channel'], '부산센터A3')
+                self.assertEqual(data['sender'], '모의 직원')
