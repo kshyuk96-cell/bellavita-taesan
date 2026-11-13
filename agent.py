@@ -830,11 +830,11 @@ class Handler(BaseHTTPRequestHandler):
         auth = self.headers.get('Authorization', '')
         return len(secret) >= 24 and hmac.compare_digest(auth.encode(), ('Bearer '+secret).encode())
 
-    def send_order_html(self, page, status=200):
+    def send_order_html(self, page, status=200, *, referrer_policy='no-referrer'):
         self.send_response(status)
         self.send_header('Content-Type', 'text/html; charset=utf-8')
         self.send_header('Cache-Control', 'private, no-store')
-        self.send_header('Referrer-Policy', 'no-referrer')
+        self.send_header('Referrer-Policy', referrer_policy)
         self.send_header('X-Robots-Tag', 'noindex, nofollow')
         self.send_header('X-Frame-Options', 'DENY')
         self.end_headers()
@@ -869,7 +869,7 @@ class Handler(BaseHTTPRequestHandler):
         if not checkout.payment_enabled(job) or not all(config.values()) or not invitation.https_url(origin):
             return self.order_message('현재 결제를 이용할 수 없어요. 문의 031-8067-8580', 503, back=True)
         if self.headers.get('Origin') not in (None, origin):
-            return self.order_message('초대장에서 주문서를 다시 열어 주세요.', 403)
+            return self.order_message('주문서를 다시 열고 결제하기를 눌러 주세요.', 403, back=True)
         try:
             location = checkout.start_order(db, job, price, product, self.read_order_form(), origin, config)
         except ValueError as error:
@@ -904,7 +904,9 @@ class Handler(BaseHTTPRequestHandler):
             if not checkout.available(product):
                 return self.order_message('이 행사의 주문이 마감됐어요.', 410)
             can_pay = checkout.payment_enabled(order[1]) and all(checkout.payment_config().values())
-            return self.send_order_html(checkout.render(product, path, can_pay))
+            # A no-referrer policy sends Origin: null on a browser form POST.
+            return self.send_order_html(checkout.render(product, path, can_pay),
+                                        referrer_policy='same-origin')
         receipt = checkout.RECEIPT_PATH.fullmatch(path)
         if receipt:
             with db() as connection:
