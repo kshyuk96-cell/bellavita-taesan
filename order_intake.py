@@ -89,7 +89,7 @@ def extract(message):
         result = {'event_type': '', 'venue': '', 'address': '', 'recipient': '', 'source': ''}
     details = REQUEST.sub('', message).replace(link, '').strip()
     labels = {label: value.strip() for label, value in re.findall(
-        r'(?m)^[ \t]*(보내시는 분|보내는 분|받는 분|배송일|배송시간|작품|규격|축하문구|축하 문구|행사 구분|설치장소|설치 장소|주소)[ \t]*[:：][ \t]*([^\n]+)$', details)}
+        r'(?m)^[ \t]*(보내시는 분|보내는 분|받는 분|배송[ \t]*일|배송[ \t]*(?:시간|시각)|작품|규격|축하문구|축하 문구|행사 구분|설치장소|설치 장소|주소)[ \t]*[:：][ \t]*([^\n]+)$', details)}
     if not link:
         result.update(event_type=labels.get('행사 구분', ''), venue=labels.get('설치장소') or labels.get('설치 장소', ''),
                       address=labels.get('주소', ''), recipient=labels.get('받는 분', ''))
@@ -104,8 +104,10 @@ def extract(message):
     if not sender or len(sender) > 140:
         raise ValueError('보내시는 분의 이름과 직함을 한 줄로 적어주세요.')
     side = re.search(r'(신랑|신부)\s*측', details) if result['event_type'] == '결혼' else None
+    delivery_fields = {re.sub(r'[ \t]+', '', label): value for label, value in labels.items() if label.startswith('배송')}
     result.update(sender=sender, recipient=labels.get('받는 분') or (result['recipient'] + (' ' + side[1] + '측' if side else '')),
-                  delivery_date=labels.get('배송일', ''), delivery_time=labels.get('배송시간', ''), artwork=labels.get('작품', ''),
+                  delivery_date=delivery_fields.get('배송일', ''),
+                  delivery_time=delivery_fields.get('배송시간') or delivery_fields.get('배송시각', ''), artwork=labels.get('작품', ''),
                   size=labels.get('규격', ''), message=labels.get('축하문구') or labels.get('축하 문구', ''))
     return result
 
