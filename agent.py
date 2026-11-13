@@ -234,7 +234,8 @@ def menu(owner=None):
     base = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
     images = [(base + '/guide.png', '오늘 할 일, 센터 재고, 입고 등록, 맞춤 족자 안내')] if base else []
     message = '어떤 일을 도와드릴까요? 버튼을 누르거나 편하게 말씀해 주세요.'
-    labels = ['초대장', '초대장 주문관리', '배송루트', '오늘 할 일', '재고 조회', '재고 입고', '맞춤 족자', '자유 문의']
+    labels = ['초대장', '초대장 주문관리', '배송루트', '주문 접수', '오늘 할 일',
+              '재고 조회', '재고 입고', '맞춤 족자', '자유 문의']
     if owner:
         with db() as c:
             if staff_features.enabled(c, owner):
@@ -830,6 +831,14 @@ def dispatch(body, defer_callback=None):
         if row:
             return present(row['id'], json.loads(row['result']), owner)
         return kakao('아직 만든 배송보고서가 없어요.', buttons=[('배송루트', '배송루트')])
+    if order_intake.REQUEST.fullmatch(message):
+        return kakao(
+            '주문 접수라고 쓰고 같은 메시지에 주문 내용을 적어 주세요.\n'
+            '청첩장이나 부고장이 있으면 링크와 보내는 분을 함께 보내 주세요.\n'
+            '링크가 없으면 아래처럼 보내 주세요.\n\n'
+            '주문 접수\n설치장소: 예식장 이름과 주소\n보내는 분: 이름 또는 업체명',
+            buttons=[('주문 접수 상태', '주문 접수 상태'), ('메뉴', '메뉴')],
+        )
     if re.fullmatch(r'(?:내\s*)?(?:최근\s*)?주문\s*(?:접수\s*상태|등록\s*상태)(?:\s*(?:확인|알려|보여)\s*(?:해\s*)?(?:줘|주세요)?)?[.!?]?', message):
         with db() as c:
             order = order_operations.latest_intake(c, owner)
