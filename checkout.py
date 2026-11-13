@@ -29,6 +29,13 @@ def enabled():
     return os.getenv('INVITATION_CHECKOUT_ENABLED') == '1'
 
 
+def payment_enabled(job):
+    pilot_jobs = os.getenv('INVITATION_CHECKOUT_PILOT_JOBS', '')
+    if pilot_jobs:
+        return job in (item.strip() for item in pilot_jobs.split(','))
+    return enabled()
+
+
 def payment_config():
     return {key: os.getenv('INVITATION_PAYAPP_' + key, '') for key in PAYAPP_FIELDS}
 

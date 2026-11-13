@@ -866,7 +866,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.order_message('이 행사의 주문이 마감됐어요.', 410)
         config = checkout.payment_config()
         origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
-        if not checkout.enabled() or not all(config.values()) or not invitation.https_url(origin):
+        if not checkout.payment_enabled(job) or not all(config.values()) or not invitation.https_url(origin):
             return self.order_message('현재 결제를 이용할 수 없어요. 문의 031-8067-8580', 503, back=True)
         if self.headers.get('Origin') not in (None, origin):
             return self.order_message('초대장에서 주문서를 다시 열어 주세요.', 403)
@@ -903,7 +903,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.order_message('주문서를 찾지 못했어요.', 404)
             if not checkout.available(product):
                 return self.order_message('이 행사의 주문이 마감됐어요.', 410)
-            return self.send_order_html(checkout.render(product, path, checkout.enabled() and all(checkout.payment_config().values())))
+            can_pay = checkout.payment_enabled(order[1]) and all(checkout.payment_config().values())
+            return self.send_order_html(checkout.render(product, path, can_pay))
         receipt = checkout.RECEIPT_PATH.fullmatch(path)
         if receipt:
             with db() as connection:
