@@ -12,6 +12,8 @@
 main{max-width:1020px;margin:auto;padding:18px} h1{font-size:1.42rem;margin:0 0 16px;text-align:center} h2{font-size:1.14rem;margin:0 0 14px}
 section{background:white;border:1px solid #ddd;border-radius:4px;padding:20px;margin-bottom:14px}.product{display:grid;grid-template-columns:1fr 1fr;gap:22px}.product>div{min-width:0}
 .gallery{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory}.gallery img{width:100%;object-fit:contain;align-self:start;scroll-snap-align:start;background:#f7f7f7}
+.intro{margin:0}.intro summary{cursor:pointer;font-size:1.14rem;font-weight:700}.intro p:last-child{margin-bottom:0}
+.photo-note{font-size:.9em;font-weight:500;color:#555}
 label{display:block;margin:0 0 12px;font-weight:650} input:not([type=checkbox]),select,textarea{display:block;width:100%;padding:9px 11px;margin-top:4px;min-height:44px;border:1px solid #aaa;border-radius:4px;background:#fff;color:inherit;font:inherit}
 input[type=checkbox]{width:19px;height:19px;margin:0 8px 0 0;vertical-align:middle} input:focus,select:focus,textarea:focus,button:focus{outline:2px solid #205d46;outline-offset:2px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.price{font-size:1.2rem;font-weight:750}.hint{color:#555;font-size:.91rem}.preview{background:#f6f6f6;padding:10px;overflow-wrap:anywhere;white-space:pre-wrap}.venue{margin:13px 0 0}.venue span{display:block}.total{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid #ddd;padding-top:12px;margin:10px 0 0}.total output{font-weight:800;font-size:1.35rem} button{width:100%;border:0;border-radius:4px;background:#222;color:white;padding:13px;min-height:48px;font:inherit;font-weight:750;cursor:pointer} button:disabled{background:#666;cursor:default} details{margin:0 0 12px}
@@ -36,20 +38,22 @@ $groups
 </div>
 </section>
 <section>
-<h2>주문자 정보</h2>
+<details class="intro">
+<summary>상품 소개 보기</summary>
+<p>쌀빛그림화환은 축하 문구와 보내시는 분의 이름을 담아 예식장에 설치하는 액자화환입니다.</p>
+<p>예식이 끝나면 액자는 쌀로 교환해 혼주님 명의로 도움이 필요한 곳에 기부합니다.</p>
+</details>
+</section>
+<section>
+<h2>주문자 정보 <span class="photo-note">(설치 사진 보내드립니다)</span></h2>
 <div class="row">
 <label>이름<input name="buyer" autocomplete="name" maxlength="60" required></label>
 <label>휴대폰 번호<input name="buyer_phone" type="tel" autocomplete="tel" maxlength="20" required></label>
 </div>
 </section>
 <section>
-<h2>받으시는 분 정보</h2>
-<label><input type="checkbox" name="same_recipient" value="yes">주문자 정보와 동일</label>
-<div class="row" id="recipient">
-<label>이름<input name="recipient" maxlength="60" required></label>
-<label>연락처<input name="recipient_phone" type="tel" maxlength="24" required></label>
-</div>
-<p class="venue"><strong>설치 장소</strong> · $venue <span>$address</span><span>$date $clock</span></p>
+<h2>설치 장소</h2>
+<p class="venue">$venue <span>$address</span><span>$date $clock</span></p>
 </section>
 <section>
 <h2>최종 결제정보</h2>
@@ -57,7 +61,7 @@ $groups
 </section>
 <section>
 <h2>주문 정보 수집 동의</h2>
-<details><summary>수집 항목과 이용 목적 보기</summary><p>벨라비타는 주문 확인, 행사장 설치 및 고객 문의 처리에 필요한 주문자와 받으시는 분의 이름·연락처, 보내시는 분, 주문 옵션과 축하 문구를 수집합니다. 결제를 위해 상품명, 결제금액, 주문자 연락처를 페이앱에 전달합니다. 주문 정보는 거래 확인과 관련 법령에 따른 보관에 사용합니다. 필수 항목 수집을 거부할 수 있으며, 거부 시 주문을 진행할 수 없습니다. 문의 031-8067-8580</p></details>
+<details><summary>수집 항목과 이용 목적 보기</summary><p>벨라비타는 주문 확인, 행사장 설치, 설치 사진 전송과 고객 문의 처리를 위해 주문자 이름·휴대폰 번호, 보내시는 분, 주문 옵션과 축하 문구를 수집합니다. 결제를 위해 상품명, 결제금액, 주문자 연락처를 페이앱에 전달합니다. 주문 정보는 거래 확인과 관련 법령에 따른 보관에 사용합니다. 필수 항목 수집을 거부할 수 있으며, 거부 시 주문을 진행할 수 없습니다. 문의 031-8067-8580</p></details>
 <label><input type="checkbox" name="consent" value="yes" required>주문 정보 수집에 동의합니다.</label>
 $notice
 <button type="submit" $button_state>결제하기</button>
@@ -69,11 +73,9 @@ const form = document.getElementById('order');
 const choices = Array.from(form.querySelectorAll('select'));
 const custom = document.getElementById('custom');
 const preview = document.getElementById('preview');
-const recipient = document.getElementById('recipient');
 const amount = document.getElementById('amount');
 const message = form.elements.namedItem('message');
 const sender = form.elements.namedItem('sender');
-const same = form.elements.namedItem('same_recipient');
 function update() {
   const options = choices.map(select => select.selectedOptions[0]);
   const direct = options.some(option => option.dataset.custom === '1');
@@ -83,10 +85,6 @@ function update() {
   const lines = [sender.value.trim(), direct ? message.value.trim() : ''].filter(Boolean);
   preview.textContent = lines.join('\n');
   preview.hidden = lines.length === 0;
-  recipient.hidden = same.checked;
-  for (const input of recipient.querySelectorAll('input')) {
-    input.disabled = same.checked;
-  }
   const total = options.reduce((sum, option) => sum + Number(option.dataset.amount || 0), $base);
   amount.textContent = total.toLocaleString('ko-KR') + '원';
 }
