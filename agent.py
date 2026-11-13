@@ -773,6 +773,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        if path == '/checkout-sender':
+            if self.headers.get('Origin') != os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'):
+                return self.send_json({'error': '주문서를 다시 열어 주세요.'}, 403)
+            try:
+                sender = self.read_order_form().get('sender', '').strip()
+            except (ValueError, UnicodeError):
+                return self.send_json({'error': '보내시는 분을 확인해 주세요.'}, 400)
+            if not 0 < len(sender) <= 140:
+                return self.send_json({'error': '보내시는 분을 확인해 주세요.'}, 422)
+            return self.send_json(checkout.sender_preview(sender))
         admin = checkout.ADMIN_PATH.fullmatch(path)
         if admin:
             if not checkout.admin_authorized(*admin.groups(), os.environ['TAESAN_WEBHOOK_SECRET']):

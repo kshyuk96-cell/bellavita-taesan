@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from lxml import html
 
 from blogpay import NoRedirect
+from scroll_sender import split_sender
 
 SEOUL = ZoneInfo('Asia/Seoul')
 ORDER_PATH = re.compile(r'/i/([a-f0-9]{32})/(93500|99000)/order')
@@ -149,6 +150,17 @@ def wedding_image(preview, *, review=False):
     return f'<img class="scroll-couple" src="{escape(preview["url"])}" alt="신랑신부 사진" style="{style}"{lazy}>'
 
 
+def sender_preview(sender):
+    parsed = split_sender(sender)
+    name = parsed.get('name') or sender
+    if parsed.get('group'):
+        return {'group': name.splitlines()}
+    structured = parsed.get('companyAffiliationTitle')
+    label = list(structured) if structured else parsed.get('label', '').splitlines()
+    extra = [part for key in ('note', 'footer') for part in parsed.get(key, '').splitlines() if part]
+    return {'label': label, 'name': name + parsed.get('nameSuffix', ''), 'note': extra}
+
+
 def admin_page(orders, action):
     rows = []
     for order in orders:
@@ -230,7 +242,7 @@ def render(product, action, can_pay):
               {wedding_image(preview)}
               <img class="scroll-weight" id="scroll-weight" src="/checkout-art/rice-10kg.webp" alt="쌀 10kg">
               <p class="scroll-greeting" id="scroll-greeting"></p>
-              <p class="scroll-sender" id="scroll-sender"></p>
+              <div class="scroll-sender" id="scroll-sender"></div>
             </div>
           </div>
           </div>
