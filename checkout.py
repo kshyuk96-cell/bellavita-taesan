@@ -294,6 +294,16 @@ def setup(connection):
         details TEXT NOT NULL, state TEXT NOT NULL, payment_number TEXT UNIQUE, payment_url TEXT)''')
     connection.execute('''CREATE TABLE IF NOT EXISTS invitation_photo_reviews (
         order_id TEXT PRIMARY KEY, reviewed_at TEXT NOT NULL)''')
+    connection.execute('''CREATE TABLE IF NOT EXISTS payment_events (
+        order_id TEXT NOT NULL, event_key TEXT NOT NULL, kind TEXT NOT NULL,
+        payment_number TEXT NOT NULL, amount INTEGER NOT NULL,
+        provider_time TEXT NOT NULL, received TEXT NOT NULL, previous_state TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY(order_id, event_key))''')
+    if 'previous_state' not in {row[1] for row in connection.execute('PRAGMA table_info(payment_events)')}:
+        connection.execute("ALTER TABLE payment_events ADD COLUMN previous_state TEXT NOT NULL DEFAULT ''")
+    connection.execute('''CREATE TABLE IF NOT EXISTS payment_checks (
+        id INTEGER PRIMARY KEY, order_id TEXT NOT NULL, payment_number TEXT NOT NULL,
+        amount INTEGER NOT NULL, note TEXT NOT NULL, checked TEXT NOT NULL)''')
 
 
 def review_photo(connection, fields):
@@ -318,11 +328,21 @@ def payapp_request(config, order_id, order, origin):
               'returnurl': f'{origin}/invitation-orders/{order_id}/receipt'}
     request = Request('https://api.payapp.kr/oapi/v2', urlencode(fields).encode('ascii'))
     with build_opener(NoRedirect).open(request, timeout=12) as reply:
-        result = parse_qs(reply.read(32768).decode('utf-8'))
-    if result.get('state') != ['1']:
+        try:
+            result = parse_qs(reply.read(32768).decode('utf-8'))
+        except ValueError as error:
+            raise OSError('Uncertain payment response') from error
+    if result.get('errno') == ['9040'] or result.get('errorCode') == ['9040']:
+        raise OSError('Payment request timed out')
+    if result.get('state') == ['0']:
         raise ValueError('결제창을 열지 못했어요. 문의 031-8067-8580')
+    if result.get('state') != ['1'] or not result.get('mul_no') or not result.get('payurl'):
+        raise OSError('Uncertain payment response')
     number, url = result['mul_no'][0], result['payurl'][0]
-    parsed = urlsplit(url)
+    try:
+        parsed = urlsplit(url)
+    except ValueError as error:
+        raise OSError('Unexpected payment URL') from error
     if not re.fullmatch(r'[0-9]{1,20}', number) or parsed.scheme not in ('http', 'https') or (
         parsed.netloc not in ('payapp.kr', 'www.payapp.kr', 'api.payapp.kr')
     ):
@@ -335,7 +355,8 @@ def start_order(db, job, price, product, fields, origin, config):
     if not re.fullmatch(r'[a-f0-9]{32}', attempt):
         raise ValueError('주문서를 다시 열어 주세요.')
     order = normalize_order(product, fields)
-    details = json.dumps({**order, 'wedding_preview': wedding_preview(product)}, ensure_ascii=False)
+    details = json.dumps({**order, 'wedding_preview': wedding_preview(product),
+                          'product_snapshot': product}, ensure_ascii=False)
     with db() as connection:
         connection.execute('BEGIN IMMEDIATE')
         row = connection.execute('SELECT * FROM invitation_orders WHERE id=?', (attempt,)).fetchone()
@@ -344,6 +365,7 @@ def start_order(db, job, price, product, fields, origin, config):
             saved.pop('recipient', None)
             saved.pop('recipient_phone', None)
             saved.pop('wedding_preview', None)
+            saved.pop('product_snapshot', None)
             if row['job'] != job or row['price'] != int(price) or saved != order:
                 raise ValueError('주문서를 다시 열어 주세요.')
             if row['state'] == 'waiting' and row['payment_url']:
@@ -378,29 +400,79 @@ def receive_payment(db, fields, config):
     when = fields.get('responsedate', '')
     if not re.fullmatch(r'[0-9]{14}', when):
         return False
+    try:
+        dt.datetime.strptime(when, '%Y%m%d%H%M%S')
+    except ValueError:
+        return False
     expected = {'userid': config['USER_ID'], 'linkkey': config['LINK_KEY'],
-                'linkval': config['LINK_VALUE'], 'hash': signature(config, when)}
+                'linkval': config['LINK_VALUE']}
     if any(not hmac.compare_digest(value.encode(), fields.get(key, '').encode()) for key, value in expected.items()):
         return False
+    if not hmac.compare_digest(signature(config, when), fields.get('hash', '').lower()):
+        return False
     incoming = fields.get('pay_state')
+    if incoming not in ('1', '4', '8', '9', '10', '32', '64', '70', '71'):
+        return False
     partial = incoming in ('70', '71')
     attempt = fields.get('var1', '')
     number = fields.get('orig_mul_no' if partial else 'mul_no', '')
     amount = fields.get('orig_price' if partial else 'price')
     if not re.fullmatch(r'[a-f0-9]{32}', attempt) or not re.fullmatch(r'[0-9]{1,20}', number):
         return False
+    event_number = fields.get('mul_no', '')
+    if not re.fullmatch(r'[0-9]{1,20}', event_number):
+        return False
+    kind = ('partial' if partial else 'cancel' if incoming in ('9', '64') else
+            'request_cancel' if incoming in ('8', '32') else 'paid' if incoming == '4' else 'waiting')
+    event_amount = fields.get('price', '')
+    if not re.fullmatch(r'[0-9]{1,9}', event_amount):
+        return False
+    event_amount = int(event_amount)
+    # A partial cancellation has its own mul_no; 70/71 and repeated delivery
+    # describe the same cancellation, never a second refund.
+    key = kind + ':' + event_number
     with db() as connection:
         connection.execute('BEGIN IMMEDIATE')
         row = connection.execute('SELECT * FROM invitation_orders WHERE id=?', (attempt,)).fetchone()
         if (not row or row['payment_number'] not in (None, number) or
                 amount != str(json.loads(row['details'])['amount'])):
             return False
+        total = json.loads(row['details'])['amount']
+        if partial and (number == event_number or not 0 < event_amount <= total):
+            return False
+        existing = connection.execute('SELECT amount FROM payment_events WHERE order_id=? AND event_key=?',
+                                      (attempt, key)).fetchone()
+        if existing and existing['amount'] != event_amount:
+            return False
+        refunded = connection.execute("SELECT COALESCE(SUM(amount),0) FROM payment_events WHERE order_id=? AND kind='partial'",
+                                      (attempt,)).fetchone()[0]
+        if partial and not existing and refunded + event_amount > total:
+            return False
+        # The UNIQUE payment number also protects orders whose first notification
+        # arrives before payrequest returns. Reject a cross-order reference cleanly.
+        duplicate = connection.execute('SELECT id FROM invitation_orders WHERE payment_number=? AND id!=?',
+                                       (number, attempt)).fetchone()
+        if duplicate:
+            return False
+        had_request_cancel = connection.execute("""SELECT 1 FROM payment_events WHERE order_id=? AND kind='request_cancel'
+                                                AND previous_state IN ('requesting','waiting','failed')""",
+                                                (attempt,)).fetchone()
+        had_full_cancel = connection.execute("SELECT 1 FROM payment_events WHERE order_id=? AND kind='cancel'",
+                                             (attempt,)).fetchone()
+        connection.execute('INSERT OR IGNORE INTO payment_events VALUES (?,?,?,?,?,?,?,?)',
+                           (attempt, key, kind, event_number, event_amount, when,
+                            dt.datetime.now(SEOUL).isoformat(), row['state']))
         state = row['state']
-        if incoming in ('8', '9', '32', '64'):
+        if kind == 'cancel':
             state = 'cancelled'
-        elif partial and state != 'cancelled':
+        elif partial and (state != 'cancelled' or (had_request_cancel and not had_full_cancel)):
             state = 'partial_cancel'
-        elif incoming == '4' and state not in ('cancelled', 'partial_cancel'):
+        elif kind == 'paid' and (state not in ('cancelled', 'partial_cancel') or
+                                (state == 'cancelled' and had_request_cancel and not had_full_cancel)):
             state = 'paid'
+        elif kind == 'request_cancel' and state in ('requesting', 'waiting', 'failed'):
+            state = 'cancelled'
+        elif kind == 'waiting' and state == 'requesting':
+            state = 'waiting'
         connection.execute('UPDATE invitation_orders SET state=?, payment_number=? WHERE id=?', (state, number, attempt))
     return True

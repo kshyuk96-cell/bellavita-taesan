@@ -169,6 +169,31 @@ def read_offer(connection, offer_id):
     return json.loads(row['details']), bool(row['active'])
 
 
+def record_payment_check(connection, fields):
+    """Record a merchant-side comparison without inventing a payment notification."""
+    order_id = required(fields, 'order_id', 32)
+    row = connection.execute('''SELECT o.* FROM invitation_orders o
+        JOIN shop_offers s ON s.id=o.job WHERE o.id=?''', (order_id,)).fetchone()
+    if not row:
+        raise ValueError('쇼핑몰 주문을 찾지 못했어요.')
+    order = json.loads(row['details'])
+    number = fields.get('payment_number', '').strip()
+    amount = money(required(fields, 'amount', 9))
+    phone = re.sub(r'[\s-]', '', required(fields, 'buyer_phone', 20))
+    note = required(fields, 'note', 600)
+    if (not re.fullmatch(r'[0-9]{1,20}', number) or amount != order['amount']
+            or phone != order['buyer_phone'] or fields.get('compared') != 'yes'
+            or row['payment_number'] not in (None, number)):
+        raise ValueError('페이앱의 원결제번호·원금액·주문자 전화번호를 주문과 대조해 주세요.')
+    if connection.execute('SELECT 1 FROM invitation_orders WHERE payment_number=? AND id!=?',
+                          (number, order_id)).fetchone():
+        raise ValueError('다른 주문에 연결된 결제번호예요.')
+    connection.execute('UPDATE invitation_orders SET payment_number=? WHERE id=?', (number, order_id))
+    connection.execute('''INSERT INTO payment_checks(order_id,payment_number,amount,note,checked)
+                          VALUES (?,?,?,?,?)''',
+                       (order_id, number, amount, note, datetime.now(SEOUL).isoformat()))
+
+
 def admin_page(connection, path, origin):
     def form(action, fields, button):
         return (f'<form method="post" action="{escape(path)}">'
@@ -225,10 +250,13 @@ def admin_page(connection, path, origin):
 
     orders = []
     for row in connection.execute('''SELECT o.* FROM invitation_orders o
-            JOIN shop_offers s ON s.id=o.job ORDER BY o.created DESC LIMIT 200'''):
+            JOIN shop_offers s ON s.id=o.job
+            ORDER BY (o.state='requesting') DESC, o.created DESC LIMIT 200'''):
         order = json.loads(row['details'])
         details = [
             ('주문번호', row['id']), ('접수 시각', row['created'][:16].replace('T', ' ')),
+            ('판매 링크', f'{origin}/shop/order/{row["job"]}'),
+            ('원결제금액', f'{order["amount"]:,}원'),
             ('페이앱 결제번호', row['payment_number'] or '미확인'),
             ('주문자', order['buyer'] + ' · ' + order['buyer_phone']),
             ('보내시는 분', order['sender']),
@@ -237,9 +265,38 @@ def admin_page(connection, path, origin):
             ('설치 장소', order['venue'] + ' · ' + order['address']),
             ('행사 시간', order['event_time'][:16].replace('T', ' ')),
         ]
+        events = connection.execute('SELECT * FROM payment_events WHERE order_id=? ORDER BY received,event_key',
+                                    (row['id'],)).fetchall()
+        partial_total = sum(event['amount'] for event in events if event['kind'] == 'partial')
+        if any(event['kind'] == 'cancel' for event in events):
+            details.append(('승인취소 금액', f'{order["amount"]:,}원 (전체)'))
+        elif partial_total:
+            details.extend([('부분취소 합계', f'{partial_total:,}원'),
+                            ('남은 결제금액', f'{order["amount"] - partial_total:,}원')])
+        elif row['state'] in ('partial_cancel', 'cancelled'):
+            details.append(('취소 금액', '이전 기록은 금액 확인 필요 · 페이앱에서 대조'))
+        for event in events:
+            label = {'partial': '부분취소', 'cancel': '승인취소', 'request_cancel': '요청취소',
+                     'paid': '결제완료', 'waiting': '결제대기'}[event['kind']]
+            details.append(('페이앱 통보', f'{label} · {event["payment_number"]} · {event["amount"]:,}원 · {event["provider_time"]}'))
+        for check in connection.execute('SELECT * FROM payment_checks WHERE order_id=? ORDER BY id', (row['id'],)):
+            details.append(('관리자 대조 기록', f'{check["checked"][:16]} · {check["payment_number"]} · {check["note"]}'))
         content = ''.join(f'<dt>{key}</dt><dd>{escape(value)}</dd>' for key, value in details)
+        check_form = ''
+        if row['state'] in ('requesting', 'waiting', 'failed'):
+            check_form = ('<p>페이앱 판매자 결제현황에서 주문번호(연동 변수), 접수 시각, 전화번호와 원금액을 대조하세요. '
+                          '결제번호를 기록한 후 페이앱에 통보 재전송을 요청하세요. '
+                          '이 기록만으로 결제 완료 처리하지 않습니다. 결과가 불명확하면 새 결제를 요청하지 마세요.</p>'
+                          + form('record_payment_check', hidden('order_id', row['id'])
+                                 + field('페이앱 원결제번호', 'payment_number', row['payment_number'] or '')
+                                 + field('페이앱 원결제금액(원)', 'amount', input_type='number')
+                                 + field('페이앱 주문자 전화번호', 'buyer_phone')
+                                 + field('페이앱 확인 상태·대조 근거·재전송 요청 결과', 'note', multiline=True)
+                                 + '<label><input type="checkbox" name="compared" value="yes" required>'
+                                   '페이앱 원거래와 주문을 직접 대조했습니다</label>', '대조 기록 저장'))
         orders.append(f'<li><details><summary>{escape(order["title"])} · {order["amount"]:,}원 · '
-                      f'{STATES.get(row["state"], "확인 필요")}</summary><dl>{content}</dl></details></li>')
+                      f'{STATES.get(row["state"], "확인 필요")} · 주문 {row["id"]}</summary>'
+                      f'<dl>{content}</dl>{check_form}</details></li>')
 
     return ('''<!doctype html><html lang="ko"><meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1"><title>벨라비타 쇼핑몰 관리</title>
@@ -256,5 +313,6 @@ def admin_page(connection, path, origin):
       + ''.join(products) + '<section><h2>행사별 주문 링크</h2>'
       + ('<ul>' + ''.join(offers) + '</ul>' if offers else '<p>발급된 링크가 없어요.</p>')
       + '</section><section><h2>쇼핑몰 주문·결제 내역</h2>'
+      + '<p>결제 요청 확인 필요 주문은 페이앱 대조 후 통보 재전송으로 확인합니다. 취소는 페이앱 판매자 화면에서 실행합니다.</p>'
       + ('<ul>' + ''.join(orders) + '</ul>' if orders else '<p>접수된 주문이 없어요.</p>')
       + '</section></main></html>')

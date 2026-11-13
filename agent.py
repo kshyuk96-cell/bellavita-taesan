@@ -907,7 +907,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 fields = self.read_order_form()
                 action = {'save_product': shop.save_product, 'issue_offers': shop.issue_offers,
-                          'change_offer': shop.change_offer}.get(fields.get('action'))
+                          'change_offer': shop.change_offer,
+                          'record_payment_check': shop.record_payment_check}.get(fields.get('action'))
                 if action is None:
                     raise ValueError('요청 내용을 확인해 주세요.')
                 with db() as connection:
@@ -993,6 +994,7 @@ class Handler(BaseHTTPRequestHandler):
                 orders = connection.execute('''SELECT o.*, r.reviewed_at AS photo_reviewed
                     FROM invitation_orders o LEFT JOIN invitation_photo_reviews r ON r.order_id=o.id
                     WHERE o.state IN ('paid', 'cancelled', 'partial_cancel')
+                    AND NOT EXISTS (SELECT 1 FROM shop_offers s WHERE s.id=o.job)
                     ORDER BY o.created DESC LIMIT 200''').fetchall()
             return self.send_order_html(checkout.admin_page(orders, path), referrer_policy='same-origin')
         order = checkout.ORDER_PATH.fullmatch(path)
