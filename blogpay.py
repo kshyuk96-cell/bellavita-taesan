@@ -64,6 +64,9 @@ class BlogPay:
         return url
 
     def existing_links(self, title):
+        return {price: self.order_link(row) for price, row in self.existing_products(title).items()}
+
+    def existing_products(self, title):
         matches = {}
         for product in self.products(all_pages=True):
             if product['goodName'] != title:
@@ -74,7 +77,7 @@ class BlogPay:
                     and str(product.get('isRecommend')) == '0'):
                 if price in matches:
                     raise RuntimeError(f'{price:,}원 판매 상품이 중복 등록되어 있습니다.')
-                matches[price] = self.order_link(product)
+                matches[price] = product
         return matches
 
     def copy_product(self, template_number):
