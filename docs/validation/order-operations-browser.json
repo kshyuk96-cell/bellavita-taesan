@@ -1,0 +1,13 @@
+{
+  "order_id": "0255f6ba2308e9931adddf375dac3cfe",
+  "stage": "delivered",
+  "staff_and_buyer_notifications_queued": 6,
+  "private_sample_image_size": [
+    900,
+    1200
+  ],
+  "cash_receipt_request_saved": true,
+  "actual_messages_sent": false,
+  "actual_receipts_issued": false,
+  "javascript_errors": []
+}
