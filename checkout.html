@@ -299,10 +299,11 @@ function layoutGreeting(text) {
   const style = getComputedStyle(scrollGreeting);
   const width = scrollGreeting.clientWidth;
   const height = scrollGreeting.clientHeight;
-  for (let size = parseFloat(style.fontSize); size >= 1; size *= .88) {
+  const defaultSize = parseFloat(style.fontSize);
+  for (let size = defaultSize; size >= 1; size *= .88) {
     greetingMeasure.font = style.fontWeight + ' ' + size + 'px ' + style.fontFamily;
     const measure = line => greetingMeasure.measureText(line).width;
-    const maxLines = Math.floor(height / (size * 1.2));
+    const maxLines = Math.min(Math.max(2, paragraphs.length), Math.floor(height / (size * 1.2)));
     if (paragraphs.length > maxLines) continue;
     const groups = paragraphs.map(line => balancedLines(line, measure, width, maxLines));
     if (groups.some(lines => !lines)) continue;
