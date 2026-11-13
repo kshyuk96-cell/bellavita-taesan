@@ -22,6 +22,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from zoneinfo import ZoneInfo
 
 import checkout
+import delivery_routes
 import invitation
 import owner_alerts
 
@@ -81,6 +82,7 @@ def db():
     connection.execute('''CREATE TABLE IF NOT EXISTS invitation_input (
         owner TEXT PRIMARY KEY, expires REAL NOT NULL, details TEXT NOT NULL)''')
     checkout.setup(connection)
+    delivery_routes.setup(connection)
     owner_alerts.setup(connection)
     return connection
 
@@ -223,7 +225,7 @@ def menu():
     images = [(base + '/guide.png', '오늘 할 일, 센터 재고, 입고 등록, 맞춤 족자 안내')] if base else []
     message = '어떤 일을 도와드릴까요? 버튼을 누르거나 편하게 말씀해 주세요.'
     return kakao(message, images=images,
-                 buttons=[(x, x) for x in ['초대장', '오늘 할 일', '재고 조회', '재고 입고', '맞춤 족자', '자유 문의']])
+                 buttons=[(x, x) for x in ['초대장', '배송루트', '오늘 할 일', '재고 조회', '재고 입고', '맞춤 족자', '자유 문의']])
 
 
 def recent(owner):
@@ -272,6 +274,18 @@ def read_values(rng, render='UNFORMATTED_VALUE'):
         r = session.get(sheet_url(rng), params={'valueRenderOption': render}, timeout=15)
         r.raise_for_status()
         return r.json().get('values', [])
+
+
+def read_delivery_ranges(ranges):
+    with sheets_service() as session:
+        result = []
+        url = sheet_url('').removesuffix('/values/') + '/values:batchGet'
+        for start in range(0, len(ranges), 40):
+            response = session.get(url, params={'ranges': ranges[start:start + 40],
+                                               'valueRenderOption': 'UNFORMATTED_VALUE'}, timeout=12)
+            response.raise_for_status()
+            result.extend(item.get('values', []) for item in response.json()['valueRanges'])
+    return result
 
 
 def center_name(value, headers):
@@ -568,11 +582,19 @@ def run_invitation(message, owner):
 
 def run_job(job, message, owner, kind=''):
     try:
-        result = run_invitation(message, owner) if kind == 'invitation' else handle(message, recent(owner), owner)
+        if kind == 'route':
+            result = delivery_routes.run(message, owner, db, read_delivery_ranges, datetime.now(SEOUL))
+        elif kind == 'invitation':
+            result = run_invitation(message, owner)
+        else:
+            result = handle(message, recent(owner), owner)
     except ValueError as error:
         result = {'summary': str(error)[:300]}
     except Exception as error:
-        if getattr(error, 'code', None) == 'credit_balance_exhausted':
+        if kind == 'route':
+            print('배송루트 계산 실패:', type(error).__name__, file=sys.stderr, flush=True)
+            result = {'summary': '배송루트 자료를 확인하지 못했어요. 잠시 뒤 “다시 계산”이라고 말씀해 주세요.'}
+        elif getattr(error, 'code', None) == 'credit_balance_exhausted':
             result = {'summary': 'AI 이용 잔액이 부족해 이 요청을 해석하지 못했어요. 메뉴의 오늘 할 일과 재고 조회는 이용할 수 있어요.'}
         else:
             result = {'summary': '처리 결과를 확인하지 못했어요. 입고 요청이었다면 시트에서 반영 여부를 먼저 확인해 주세요.'}
@@ -598,6 +620,17 @@ def signed_url(job, number, label):
 
 
 def present(job, result):
+    if 'route_buttons' in result:
+        pages = result.get('route_pages', [result['summary']])
+        index = result.get('selected', 1) - 1
+        if not 0 <= index < len(pages):
+            return kakao('이 배정안에는 해당 쪽이 없어요.')
+        buttons = [(label, label) for label in result['route_buttons']]
+        if index > 0:
+            buttons.append(('이전 쪽', f'결과 {job} {index}'))
+        if index + 1 < min(len(pages), 99):
+            buttons.append(('다음 쪽', f'결과 {job} {index + 2}'))
+        return kakao(pages[index], buttons=buttons)
     if result.get('invitations'):
         return {'version': '2.0', 'template': {'outputs': [
             {'simpleText': {'text': item['message']}} for item in result['invitations']
@@ -708,6 +741,8 @@ def dispatch(body, defer_callback=None):
     if check:
         row = load_job(owner, check[1])
         if not row or row['state'] != 'done':
+            if row and json.loads(row['input']).get('kind') == 'route':
+                return kakao('아직 배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {check[1]}')])
             return kakao('해당 결과가 아직 없거나 처리 중이에요.')
         result = json.loads(row['result'])
         if check[2]:
@@ -719,15 +754,17 @@ def dispatch(body, defer_callback=None):
     with LOCK, db() as c:
         pending = c.execute('SELECT details FROM invitation_input WHERE owner=? AND expires>?',
                             (owner, time.time())).fetchone()
-        kind = 'invitation' if pending else ''
-        if pending and pending['details'] and not message.startswith(('https://', 'http://')):
+        route_context = delivery_routes.session(db, owner)
+        kind = 'route' if delivery_routes.wants_route(message, route_context) else 'invitation' if pending else ''
+        if kind == 'invitation' and pending['details'] and not message.startswith(('https://', 'http://')):
             message = (pending['details'] + '\n' + message)[-6000:]
-        fingerprint_input = 'invitation\0' + message if kind else message
+        fingerprint_input = kind + '\0' + message if kind else message
         fingerprint = hashlib.sha256(fingerprint_input.encode()).hexdigest()
         for old in [key for key, future in ACTIVE.items() if future.done()]:
             ACTIVE.pop(old, None)
-        row = c.execute('SELECT * FROM jobs WHERE owner=? AND fingerprint=? AND created>? ORDER BY created DESC LIMIT 1',
-                        (owner, fingerprint, time.time()-180)).fetchone()
+        row = None if kind == 'route' else c.execute(
+            'SELECT * FROM jobs WHERE owner=? AND fingerprint=? AND created>? ORDER BY created DESC LIMIT 1',
+            (owner, fingerprint, time.time()-180)).fetchone()
         if row:
             job = row['id']
             if row['state'] == 'done':
@@ -752,6 +789,8 @@ def dispatch(body, defer_callback=None):
         if url and defer_callback:
             defer_callback(url, job, future)
             return {'version': '2.0', 'useCallback': True}
+        if kind == 'route':
+            return kakao('배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {job}')])
         return kakao('답을 바로 보내기 어려워요. 잠시 뒤 다시 말씀해 주세요.')
     finally:
         if future.done():
