@@ -6,12 +6,12 @@ import sqlite3
 import json
 import os
 import time
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode, urljoin, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 PRICES = (93500, 99000)
-PAYMENT_FLAGS = (1, 4, 8, 16, 128, 256, 512, 1024, 2048, 8192, 16384, 32768, 262144)
+PAYMENT_FLAGS = (1, 4, 8, 16, 32, 128, 256, 512, 1024, 2048, 8192, 16384, 32768, 262144)
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -113,7 +113,7 @@ class BlogPay:
     def edit_copy(self, item, title, price):
         fields = {key:item[key] for key in (
             'goodsCode', 'shipSubNum', 'cateNum', 'cusNum', 'basisPrice', 'displayPrice', 'orign', 'maker',
-            'brand', 'isDelivery', 'eDeliBPrice', 'eDeliFPrice', 'goodImg', 'goodContent', 'tag', 'isEvent',
+            'brand', 'isDelivery', 'eDeliBPrice', 'eDeliFPrice', 'goodContent', 'tag', 'isEvent',
             'supplyUserId', 'isSmUse', 'isCpUse', 'goodSmValue', 'cpNum', 'subtitle', 'subtitleColor',
             'goodsft', 'addShip', 'bsFree', 'perLimitCount', 'buyDCinfo', 'is_show_detail', 'gBindNum',
             'IsReserve', 'adminMemo') if item.get(key) is not None}
@@ -121,6 +121,7 @@ class BlogPay:
                       categorySelect='useSelect' if item.get('cateNum') else 'useEmptyCate',
                       isDisplay=0, isRecommend=0, optionState=item.get('optionState',1),
                       useNormalOption=int(bool(item.get('normalOption'))),
+                      taxType=item.get('gTaxType', 'TG01'),
                       useInputOption=int(bool(item.get('inputOption'))),
                       sDate=item.get('SDate') or '', eDate=item.get('EDate') or '')
         fields['enablePayMethod[]'] = [flag for flag in PAYMENT_FLAGS if int(item['enablePayMethod']) & flag]
@@ -142,9 +143,30 @@ class BlogPay:
             tuple(v.get(k) for k in ('noValue','noPrice','noInven','noSourcePrice','optionView'))
             for v in x.get('list',[])]) for x in row.get('normalOption') or []]
         inputs = [tuple(x.get(k) for k in ('ioTitle','ioPrice','ioRequire')) for x in row.get('inputOption') or []]
-        keys = ('shipSubNum','enablePayMethod','goodContent','goodImg','cateNum','isDelivery','eDeliBPrice',
-                'eDeliFPrice','is_show_detail','isSmUse','isCpUse','gBindNum','IsReserve','SDate','EDate')
+        keys = ('shipSubNum','enablePayMethod','goodContent','cateNum','isDelivery','eDeliBPrice',
+                'eDeliFPrice','is_show_detail','isSmUse','isCpUse','gBindNum','IsReserve','SDate','EDate',
+                'gTaxType','isDeliveryPrice','isTodayShipUse','todayShipTime')
         return tuple(row.get(k) for k in keys), normal, inputs
+
+    def image_checksums(self, item):
+        base = item.get('goodImgUri', '').rsplit('/', 1)[0]
+        hashes = []
+        for key in ('goodImg', 'subImg1', 'subImg2', 'subImg3', 'subImg4'):
+            name = item.get(key)
+            if not name:
+                hashes.append(None)
+                continue
+            if not base.startswith('/img/g/') or '/' in name or chr(92) in name:
+                raise ValueError('상품 사진 경로를 확인할 수 없어요.')
+            url = urljoin(self.origin, base + '/' + name)
+            if urlsplit(url).netloc != urlsplit(self.origin).netloc:
+                raise ValueError('상품 사진 주소를 확인할 수 없어요.')
+            with self.http.open(Request(url), timeout=8) as response:
+                content = response.read(5_000_001)
+            if not content or len(content) > 5_000_000:
+                raise ValueError('상품 사진 크기를 확인할 수 없어요.')
+            hashes.append(hashlib.sha256(content).digest())
+        return hashes
 
     def ensure_links(self, title, root, template_number=None):
         rows = list(self.products(all_pages=True))
@@ -153,8 +175,10 @@ class BlogPay:
             return links
         template = self.detail(template_number)
         if ('쌀빛그림화환' not in template.get('goodName','') or str(template.get('isRecommend')) != '0'
+                or str(template.get('isShow')) != '0'
                 or str(template.get('optionState')) != '1' or template.get('addNormalOption')):
             raise ValueError('쌀빛그림화환 원본 상품의 옵션과 진열 설정을 확인해 주세요.')
+        template_images = self.image_checksums(template)
         with sqlite3.connect(root / 'invitation_products.sqlite3') as db:
             db.execute('CREATE TABLE IF NOT EXISTS copies (key TEXT PRIMARY KEY, number TEXT, before TEXT)')
             for price in PRICES:
@@ -166,7 +190,7 @@ class BlogPay:
                        and (not record or str(p['goodNum']) != record[0]) for p in rows):
                     raise ValueError(f'{price:,}원 상품이 이미 있어요. 쇼핑몰에서 판매와 메인진열 상태를 확인해 주세요.')
                 if record is None:
-                    before = {str(x['goodNum']) for x in self.products()}
+                    before = {str(x['goodNum']) for x in rows}
                     db.execute('INSERT INTO copies VALUES (?,NULL,?)',(key,json.dumps(sorted(before))))
                     db.commit()
                     try:
@@ -178,14 +202,18 @@ class BlogPay:
                 if record and record[0]:
                     number = record[0]
                 else:
-                    new = [x for x in self.products() if str(x['goodNum']) not in before]
-                    candidates = [x for x in new if template['goodName'] in x.get('goodName','')
-                                  and x.get('goodPrice') == template['goodPrice']]
-                    if len(candidates) != 1 or len(new) != 1:
+                    copy_name = template['goodName'] + ' - 복사본'
+                    candidates = []
+                    for row in self.products(all_pages=True):
+                        if (str(row['goodNum']) not in before and row.get('goodName') == copy_name
+                                and int(row.get('goodPrice', 0)) == int(template['goodPrice'])):
+                            candidates.append(row)
+                    if len(candidates) != 1:
                         raise ValueError('상품 복제 결과를 확인해야 해요. 중복을 막기 위해 다시 복제하지 않았어요.')
                     number = str(candidates[0]['goodNum'])
                     db.execute('UPDATE copies SET number=? WHERE key=?',(number,key))
                     db.commit()
+                    rows.append(candidates[0])
                 item = self.detail(number)
                 if item.get('goodName') != title or int(item.get('goodPrice',0)) != price:
                     self.set_sale(item, False)
@@ -195,7 +223,8 @@ class BlogPay:
                     self.edit_copy(item, title, price)
                 item = self.detail(number)
                 if (item.get('goodName') != title or int(item.get('goodPrice',0)) != price
-                        or self.settings(item) != self.settings(template)):
+                        or self.settings(item) != self.settings(template)
+                        or self.image_checksums(item) != template_images):
                     self.set_sale(item, False)
                     raise ValueError('상품명, 가격 또는 옵션을 확인해야 해요. 확인 전에는 주문 링크를 보내지 않아요.')
                 self.set_sale(item, True)
@@ -203,8 +232,9 @@ class BlogPay:
                 if any(str(active.get(k)) != v for k,v in
                        {'isShow':'1','isSoldout':'0','isRecommend':'0'}.items()):
                     raise ValueError('판매 상태나 메인진열 설정을 확인해야 해요.')
-                product = next((x for x in self.products() if str(x['goodNum']) == number), active)
-                links[price] = self.order_link(product)
+                order = active if active.get('shortGoodUrl') else next(
+                    (x for x in self.products(all_pages=True) if str(x['goodNum']) == number), active)
+                links[price] = self.order_link(order)
         return links
 
 
