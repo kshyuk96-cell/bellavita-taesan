@@ -91,7 +91,7 @@ section {
 .scroll-greeting { position: absolute; inset: 54% 5.5% 34.5% 27%; margin: 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; color: #1a1a1a; font-size: 6.2cqw; line-height: 1.2; }
 .scroll-sender { position: absolute; inset: 67.7% 5.5% 3.5%; display: flex; flex-direction: column; justify-content: center; overflow: hidden; line-height: 1.16; }
 .scroll-greeting > span, .scroll-sender > span { display: block; flex: 0 0 auto; white-space: nowrap; }
-.scroll-greeting { contain: size layout paint; }
+.scroll-greeting { contain: size layout paint; -webkit-text-size-adjust: none; text-size-adjust: none; }
 .scroll-greeting, .scroll-sender { font-family: 'Bellavita Scroll', var(--heading); font-weight: 900; letter-spacing: -.045em; }
 .wreath-preview figcaption { margin: 8px 0 0; color: var(--muted); text-align: center; font-size: .94rem; }
 .mobile-preview, .mobile-choice { display: none; }
@@ -146,6 +146,8 @@ summary { cursor: pointer; }
   .product { grid-template-columns: minmax(0, 1fr); gap: 18px; }
   .wreath-preview .wreath-viewport { width: min(100%, 245px); }
   .wreath-preview.is-close-up .wreath-stage { transform: none; }
+  .scroll-greeting { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  .scroll-greeting > svg { display: block; flex: none; width: 100%; height: 100%; overflow: hidden; fill: currentColor; }
   .mobile-preview:not([hidden]) {
     display: grid;
     grid-template-columns: 48px minmax(0, 1fr) auto;
@@ -174,7 +176,7 @@ summary { cursor: pointer; }
   .mobile-choice-buttons button[aria-pressed=true] { border-color: var(--forest); background: #e8eee7; }
   #mobile-example .wreath-viewport { width: min(100%, 390px, 44dvh); }
   #mobile-example .wreath-stage { transform: scale(2.1); }
-  #mobile-example-message { margin: 14px 0 0; padding: 12px; border-radius: 8px; background: #f7f3ea; white-space: pre-wrap; overflow-wrap: anywhere; }
+  #mobile-example-message { margin: 14px 0 0; padding: 12px; border-radius: 8px; background: #f7f3ea; white-space: pre-wrap; word-break: normal; overflow-wrap: anywhere; }
   .row { grid-template-columns: 1fr; gap: 11px; }
 }
 </style>
@@ -408,21 +410,76 @@ function balancedLines(text, measure, limit, maxLines) {
   return null;
 }
 
+function greetingFits(rows) {
+  const panel = scrollGreeting.getBoundingClientRect();
+  // Measure painted text after mobile font sizing and the preview transform.
+  const range = document.createRange();
+  return rows.every(row => {
+    range.selectNodeContents(row);
+    return Array.from(range.getClientRects()).every(rect =>
+      rect.left >= panel.left - .5 && rect.right <= panel.right + .5 &&
+      rect.top >= panel.top - .5 && rect.bottom <= panel.bottom + .5
+    );
+  });
+}
 const greetingMeasure = document.createElement('canvas').getContext('2d');
+function layoutMobileGreeting(paragraphs, style) {
+  // Size the lettering in SVG units so mobile text enlargement cannot move it outside the paper.
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('aria-hidden', 'true');
+  const group = document.createElementNS(ns, 'g');
+  group.setAttribute('font-size', '32');
+  group.setAttribute('text-anchor', 'middle');
+  svg.append(group);
+  const maxWidth = 530;
+  greetingMeasure.font = style.fontWeight + ' 32px ' + style.fontFamily;
+  const measure = line => greetingMeasure.measureText(line).width;
+  const rows = paragraphs.flatMap(paragraph => {
+    const balanced = balancedLines(paragraph, measure, maxWidth, 5);
+    if (balanced) return balanced;
+    const lines = [];
+    let line = '';
+    for (const character of paragraph) {
+      if (line && measure(line + character) > maxWidth) {
+        lines.push(line.trim());
+        line = '';
+      }
+      line += character;
+    }
+    if (line.trim()) lines.push(line.trim());
+    return lines;
+  });
+  rows.forEach((row, index) => {
+    const text = document.createElementNS(ns, 'text');
+    text.setAttribute('y', String(index * 39));
+    text.textContent = row;
+    group.append(text);
+  });
+  scrollGreeting.replaceChildren(svg);
+  const bounds = group.getBBox();
+  const width = Math.max(550, 2 * Math.max(-bounds.x, bounds.x + bounds.width) + 24);
+  const height = Math.max(79, bounds.height + 16);
+  svg.setAttribute('viewBox', [-width / 2, bounds.y + (bounds.height - height) / 2, width, height].join(' '));
+}
+
 function layoutGreeting(text) {
   scrollGreeting.replaceChildren();
   scrollGreeting.style.fontSize = '';
   if (!text || !scrollGreeting.clientWidth) return;
   const paragraphs = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   const style = getComputedStyle(scrollGreeting);
+  if (mobile.matches) {
+    layoutMobileGreeting(paragraphs, style);
+    return;
+  }
   const width = Math.max(0, scrollGreeting.clientWidth - 2);
   const height = Math.max(0, scrollGreeting.clientHeight - 1);
   const defaultSize = parseFloat(style.fontSize);
-  const preferredLines = mobile.matches && text.length > 64 ? 5 : 2;
   for (let size = defaultSize; size >= .5; size *= .88) {
     greetingMeasure.font = style.fontWeight + ' ' + size + 'px ' + style.fontFamily;
     const measure = line => greetingMeasure.measureText(line).width;
-    const maxLines = Math.min(Math.max(preferredLines, paragraphs.length), Math.floor(height / (size * 1.2)));
+    const maxLines = Math.min(Math.max(2, paragraphs.length), Math.floor(height / (size * 1.2)));
     if (paragraphs.length > maxLines) continue;
     const groups = paragraphs.map(line => balancedLines(line, measure, width, maxLines));
     if (groups.some(lines => !lines)) continue;
@@ -435,8 +492,7 @@ function layoutGreeting(text) {
       return row;
     });
     scrollGreeting.replaceChildren(...spans);
-    if (spans.every(row => row.scrollWidth <= scrollGreeting.clientWidth) &&
-        spans.reduce((sum, row) => sum + parseFloat(getComputedStyle(row).lineHeight), 0) <= scrollGreeting.clientHeight) return;
+    if (greetingFits(spans)) return;
   }
   // Keep all text in the panel even for an unusually long entry without spaces.
   const row = document.createElement('span');
@@ -445,7 +501,7 @@ function layoutGreeting(text) {
   row.textContent = text;
   for (let size = Math.max(.5, Math.min(defaultSize, height / 2.4)); size >= .1; size *= .8) {
     scrollGreeting.style.fontSize = size + 'px';
-    if (row.scrollWidth <= scrollGreeting.clientWidth && row.offsetHeight <= scrollGreeting.clientHeight) break;
+    if (greetingFits([row])) break;
   }
 }
 let senderLayout;
