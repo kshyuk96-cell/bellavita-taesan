@@ -7,8 +7,13 @@
 <title>쌀빛그림화환 주문서 | 벨라비타</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&amp;family=Noto+Serif+KR:wght@600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&amp;family=Noto+Serif+KR:wght@600;700;900&amp;display=swap" rel="stylesheet">
 <style>
+@font-face {
+  font-family: 'Bellavita Scroll';
+  src: local('SeoulHangangC BL'), local('서울한강 장체 BL');
+  font-weight: 900;
+}
 :root {
   color-scheme: light;
   --canvas: #f5f2ea;
@@ -78,10 +83,12 @@ section {
   text-align: center;
   container-type: inline-size;
 }
-.scroll-couple { position: absolute; inset: 9.9% 5.2% auto; width: 89.6%; height: 42.3%; object-fit: cover; object-position: 50% 52%; }
+.scroll-couple { position: absolute; inset: 9.9% 5.2% auto; width: 89.6%; height: 42.3%; }
+.scroll-weight { position: absolute; inset: 54.3% auto auto 6.3%; width: 20%; height: 10.5%; object-fit: contain; }
 .scroll-paper p { position: absolute; inset-inline: 5.5%; margin: 0; display: grid; place-content: center; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.25; }
-.scroll-greeting { inset-block: 54% 33.3%; color: #1a1a1a; font-size: 7cqw; font-weight: 600; }
-.scroll-sender { inset-block: 67.7% 3.5%; font-size: 19cqw; font-weight: 700; }
+.scroll-paper .scroll-greeting { inset-block: 54% 34.5%; inset-inline-start: 27%; color: #1a1a1a; font-size: 4.3cqw; }
+.scroll-sender { inset-block: 67.7% 3.5%; font-size: 19cqw; }
+.scroll-greeting, .scroll-sender { font-family: 'Bellavita Scroll', var(--heading); font-weight: 900; letter-spacing: -.045em; }
 .wreath-preview figcaption { margin: 8px 0 0; color: var(--muted); text-align: center; font-size: .94rem; }
 .preview-link { display: none; }
 .detail-open { background: var(--paper); border: 1px solid #83715d; color: #64503d; }
@@ -153,7 +160,7 @@ $groups
 <label>보내시는 분<input name="sender" maxlength="140" required placeholder="예: 벨라비타 대표 홍길동"></label>
 <label id="custom" hidden>직접 쓰는 축하 문구<textarea name="message" maxlength="200" rows="2" disabled></textarea></label>
 <p class="preview" id="preview" hidden></p>
-<a class="preview-link" href="#wreath-preview">족자 미리보기 확인</a>
+<a class="preview-link" href="#wreath-preview">설치 예시 보기</a>
 </div>
 </section>
 <section>
@@ -205,6 +212,7 @@ const wreath = document.getElementById('wreath-preview');
 const greetingChoice = document.getElementById('greeting-choice');
 const scrollGreeting = document.getElementById('scroll-greeting');
 const scrollSender = document.getElementById('scroll-sender');
+const scrollWeight = document.getElementById('scroll-weight');
 const detail = document.getElementById('product-detail');
 document.getElementById('open-detail').addEventListener('click', () => detail.showModal());
 if (wreath) {
@@ -230,6 +238,10 @@ function updateScroll() {
   const greeting = selected?.dataset.custom === '1' ? message.value.trim() : selected?.dataset.greeting || '';
   fitScrollText(scrollGreeting, greeting);
   fitScrollText(scrollSender, sender.value.trim());
+  const kg = choices.map(select => select.selectedOptions[0]?.dataset.kg).find(Boolean) || '10';
+  const badge = '/checkout-art/rice-' + kg + 'kg.webp';
+  if (scrollWeight.getAttribute('src') !== badge) scrollWeight.src = badge;
+  scrollWeight.alt = '쌀 ' + kg + 'kg';
 }
 function update() {
   const options = choices.map(select => select.selectedOptions[0]);

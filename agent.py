@@ -773,6 +773,24 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        admin = checkout.ADMIN_PATH.fullmatch(path)
+        if admin:
+            if not checkout.admin_authorized(*admin.groups(), os.environ['TAESAN_WEBHOOK_SECRET']):
+                return self.order_message('태산이에서 초대장 주문 내역을 다시 열어 주세요.', 403)
+            if self.headers.get('Origin') != os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'):
+                return self.order_message('초대장 주문 내역을 다시 열어 주세요.', 403)
+            try:
+                fields = self.read_order_form()
+            except (ValueError, UnicodeError):
+                return self.order_message('사진 검토 내용을 확인해 주세요.', 400)
+            with db() as connection:
+                if not checkout.review_photo(connection, fields):
+                    return self.order_message('결제 완료 상태와 사진을 확인해 주세요.', 409)
+            self.send_response(303)
+            self.send_header('Location', path)
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            return
         order = checkout.ORDER_PATH.fullmatch(path)
         if order:
             return self.place_invitation_order(order[1], order[2])
@@ -893,17 +911,16 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(data)))
             self.end_headers()
             return self.wfile.write(data)
-        admin = re.fullmatch(r'/invitation-orders/admin/([0-9]{10})/([a-f0-9]{64})', path)
+        admin = checkout.ADMIN_PATH.fullmatch(path)
         if admin:
-            expiry, signature = admin.groups()
-            expected = checkout.admin_signature(expiry, os.environ['TAESAN_WEBHOOK_SECRET'])
-            if int(expiry) < time.time() or not hmac.compare_digest(signature, expected):
+            if not checkout.admin_authorized(*admin.groups(), os.environ['TAESAN_WEBHOOK_SECRET']):
                 return self.order_message('태산이에서 초대장 주문 내역을 다시 열어 주세요.', 403)
             with db() as connection:
-                orders = connection.execute('''SELECT * FROM invitation_orders
-                    WHERE state IN ('paid', 'cancelled', 'partial_cancel')
-                    ORDER BY created DESC LIMIT 200''').fetchall()
-            return self.send_order_html(checkout.admin_page(orders))
+                orders = connection.execute('''SELECT o.*, r.reviewed_at AS photo_reviewed
+                    FROM invitation_orders o LEFT JOIN invitation_photo_reviews r ON r.order_id=o.id
+                    WHERE o.state IN ('paid', 'cancelled', 'partial_cancel')
+                    ORDER BY o.created DESC LIMIT 200''').fetchall()
+            return self.send_order_html(checkout.admin_page(orders, path), referrer_policy='same-origin')
         order = checkout.ORDER_PATH.fullmatch(path)
         if order:
             product = checkout.read(ROOT, order[1], order[2])

@@ -277,6 +277,8 @@ def make(source, root, origin, extract, photo=None):
                         'address': event['address'], 'event_time': event['when'].replace(tzinfo=SEOUL).isoformat()}
             if event.get('wedding_photo'):
                 snapshot['wedding_photo'] = event['wedding_photo']
+            if 'wedding_crop' in event:
+                snapshot['wedding_crop'] = event['wedding_crop']
             (folder / f'{price}.order.json').write_text(json.dumps(snapshot, ensure_ascii=False), encoding='utf-8')
         (folder / f'{price}.html').write_text(page(event,date,clock,order_url,origin+'/guide.png'), encoding='utf-8')
         message = '\n\n'.join(filter(None, [greeting, f"🗓 일시 {date} {clock}\n📍 장소 {event['venue']}", signature,

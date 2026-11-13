@@ -21,9 +21,11 @@ from blogpay import NoRedirect
 SEOUL = ZoneInfo('Asia/Seoul')
 ORDER_PATH = re.compile(r'/i/([a-f0-9]{32})/(93500|99000)/order')
 RECEIPT_PATH = re.compile(r'/invitation-orders/([a-f0-9]{32})/receipt')
+ADMIN_PATH = re.compile(r'/invitation-orders/admin/([0-9]{10})/([a-f0-9]{64})')
 TEMPLATE = Path(__file__).with_name('checkout.html')
 ARTWORK = Path(__file__).with_name('assets') / 'checkout'
-ARTWORK_FILES = frozenset({'sunflower-easel.webp', 'scroll-paper.webp'})
+ARTWORK_FILES = frozenset({'sunflower-easel.webp', 'scroll-paper.webp',
+                           'rice-10kg.webp', 'rice-20kg.webp', 'rice-30kg.webp'})
 PAYAPP_FIELDS = ('USER_ID', 'LINK_KEY', 'LINK_VALUE', 'REQUEST_KEY')
 
 
@@ -125,7 +127,29 @@ def admin_signature(expiry, secret):
     return hmac.new(secret.encode(), ('invitation-orders/' + expiry).encode(), 'sha256').hexdigest()
 
 
-def admin_page(orders):
+def admin_authorized(expiry, signature, secret):
+    return int(expiry) >= dt.datetime.now(dt.timezone.utc).timestamp() and hmac.compare_digest(
+        signature, admin_signature(expiry, secret))
+
+
+def wedding_preview(product):
+    photo = product.get('wedding_photo')
+    if not isinstance(photo, str) or not photo.startswith('https://'):
+        return None
+    crop = product.get('wedding_crop')
+    if type(crop) in (int, float) and 0 <= crop <= 100:
+        return {'url': photo, 'position': float(crop)}
+    return {'url': photo, 'position': None}
+
+
+def wedding_image(preview, *, review=False):
+    position = preview['position']
+    style = f'object-fit:cover;object-position:50% {position:g}%' if position is not None else 'object-fit:contain'
+    lazy = ' loading="lazy"' if review else ''
+    return f'<img class="scroll-couple" src="{escape(preview["url"])}" alt="신랑신부 사진" style="{style}"{lazy}>'
+
+
+def admin_page(orders, action):
     rows = []
     for order in orders:
         data = json.loads(order['details'])
@@ -139,16 +163,40 @@ def admin_page(orders):
                   recipient,
                   data['venue'] + ' ' + data['address'], f"{data['amount']:,}원",
                   {'paid': '결제 완료', 'cancelled': '취소', 'partial_cancel': '일부 취소'}[order['state']])
-        rows.append('<tr>' + ''.join(f'<td>{escape(value)}</td>' for value in values) + '</tr>')
+        preview = data.get('wedding_preview')
+        review = '사진 확인 필요 · 제작 보류'
+        if order['photo_reviewed'] and order['state'] == 'paid':
+            review = '사진 검토 완료'
+        elif preview and order['state'] == 'paid':
+            review = (f'<details class="photo-review"><summary>사진 검토 · 제작 보류</summary>{wedding_image(preview, review=True)}'
+                      f'<form method="post" action="{escape(action)}">'
+                      f'<input type="hidden" name="order_id" value="{escape(order["id"])}">'
+                      '<label><input type="checkbox" name="both_faces" value="yes" required> '
+                      '신랑·신부가 맞고 두 얼굴이 모두 온전히 보입니다.</label>'
+                      '<button type="submit" disabled>사진 검토 완료</button></form></details>')
+        elif order['state'] != 'paid':
+            review = '제작 보류'
+        rows.append('<tr>' + ''.join(f'<td>{escape(value)}</td>' for value in values) + f'<td>{review}</td></tr>')
     headings = ('주문번호', '주문 시각', '상품', '옵션', '보내시는 분', '직접 쓴 문구', '주문자',
-                '받으시는 분', '설치 장소', '주문금액', '상태')
+                '받으시는 분', '설치 장소', '주문금액', '상태', '제작 사진')
     table = ('<table><thead><tr>' + ''.join(f'<th scope="col">{name}</th>' for name in headings) +
              '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>') if rows else '<p>확정된 주문이 없어요.</p>'
     return ('<!doctype html><html lang="ko"><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
             '<title>초대장 주문 내역</title><style>body{font:16px system-ui;margin:20px}'
-            'table{border-collapse:collapse}td,th{padding:8px;border:1px solid #aaa;text-align:left}</style>'
-            '<h1>초대장 주문 내역</h1>' + table + '</html>')
+            'table{border-collapse:collapse}td,th{padding:8px;border:1px solid #aaa;text-align:left}'
+            '.scroll-couple{display:block;width:min(320px,80vw);aspect-ratio:1.5;margin:8px 0}'
+            'button{display:block;margin-top:8px}</style>'
+            '<h1>초대장 주문 내역</h1>' + table + '''<script>
+            for (const review of document.querySelectorAll('.photo-review')) {
+                const image = review.querySelector('img');
+                const button = review.querySelector('button');
+                const checkImage = () => { button.disabled = !image.naturalWidth; };
+                image.addEventListener('load', checkImage);
+                image.addEventListener('error', checkImage);
+                checkImage();
+            }
+            </script></html>''')
 
 
 def render(product, action, can_pay):
@@ -162,7 +210,9 @@ def render(product, action, can_pay):
             custom = ' data-custom="1"' if choice['custom'] else ''
             greeting = (f' data-greeting="{escape(re.sub(r"^\d+\.\s*", "", choice["label"]))}"'
                         if group['label'] == '축하 문구' and not choice['custom'] else '')
-            options.append(f'<option value="{escape(code)}" data-amount="{amount}"{custom}{greeting}>'
+            kg = re.search(r'(?<!\d)(10|20|30)\s*(?:kg|㎏|키로|킬로)', choice['label'], re.I) if group['label'] == '상품 선택' else None
+            weight = f' data-kg="{kg[1]}"' if kg else ''
+            options.append(f'<option value="{escape(code)}" data-amount="{amount}"{custom}{greeting}{weight}>'
                            f'{escape(choice["label"])}{extra}</option>')
         greeting = ' id="greeting-choice"' if group['label'] == '축하 문구' else ''
         groups.append(f'<label>{escape(group["label"])}<select name="choice{index}"{greeting} required>'
@@ -170,18 +220,19 @@ def render(product, action, can_pay):
     pictures = ''.join(f'<img src="{escape(src)}" alt="쌀빛그림화환 상품 사진"'
                        + (' loading="lazy"' if index else '') + '>'
                        for index, src in enumerate(product['images']))
-    photo = product.get('wedding_photo', '')
-    if isinstance(photo, str) and photo.startswith('https://'):
+    preview = wedding_preview(product)
+    if preview:
         pictures = f'''<figure class="wreath-preview" id="wreath-preview">
           <div class="wreath-stage">
             <img class="wreath-base" src="/checkout-art/sunflower-easel.webp" alt="해바라기 작품 액자화환">
             <div class="scroll-paper">
-              <img class="scroll-couple" src="{escape(photo)}" alt="신랑신부 사진">
+              {wedding_image(preview)}
+              <img class="scroll-weight" id="scroll-weight" src="/checkout-art/rice-10kg.webp" alt="쌀 10kg">
               <p class="scroll-greeting" id="scroll-greeting"></p>
               <p class="scroll-sender" id="scroll-sender"></p>
             </div>
           </div>
-          <figcaption>족자 미리보기</figcaption>
+          <figcaption>예식 당일 신랑신부 사진 및<br>풍경사진으로 설치해드립니다.</figcaption>
         </figure><div class="gallery" id="wreath-fallback" role="group" aria-label="상품 사진" tabindex="0" hidden>{pictures}</div>'''
     else:
         pictures = f'<div class="gallery" role="group" aria-label="상품 사진" tabindex="0">{pictures}</div>'
@@ -225,6 +276,20 @@ def setup(connection):
     connection.execute('''CREATE TABLE IF NOT EXISTS invitation_orders (
         id TEXT PRIMARY KEY, job TEXT NOT NULL, price INTEGER NOT NULL, created TEXT NOT NULL,
         details TEXT NOT NULL, state TEXT NOT NULL, payment_number TEXT UNIQUE, payment_url TEXT)''')
+    connection.execute('''CREATE TABLE IF NOT EXISTS invitation_photo_reviews (
+        order_id TEXT PRIMARY KEY, reviewed_at TEXT NOT NULL)''')
+
+
+def review_photo(connection, fields):
+    order_id = fields.get('order_id', '')
+    if fields.get('both_faces') != 'yes' or not re.fullmatch(r'[a-f0-9]{32}', order_id):
+        return False
+    cursor = connection.execute('''INSERT INTO invitation_photo_reviews(order_id, reviewed_at)
+        SELECT id, ? FROM invitation_orders
+        WHERE id=? AND state='paid' AND json_type(details, '$.wedding_preview')='object'
+        ON CONFLICT(order_id) DO UPDATE SET reviewed_at=invitation_photo_reviews.reviewed_at''',
+        (dt.datetime.now(SEOUL).isoformat(), order_id))
+    return cursor.rowcount == 1
 
 
 def payapp_request(config, order_id, order, origin):
@@ -254,7 +319,7 @@ def start_order(db, job, price, product, fields, origin, config):
     if not re.fullmatch(r'[a-f0-9]{32}', attempt):
         raise ValueError('주문서를 다시 열어 주세요.')
     order = normalize_order(product, fields)
-    details = json.dumps(order, ensure_ascii=False)
+    details = json.dumps({**order, 'wedding_preview': wedding_preview(product)}, ensure_ascii=False)
     with db() as connection:
         connection.execute('BEGIN IMMEDIATE')
         row = connection.execute('SELECT * FROM invitation_orders WHERE id=?', (attempt,)).fetchone()
@@ -262,6 +327,7 @@ def start_order(db, job, price, product, fields, origin, config):
             saved = json.loads(row['details'])
             saved.pop('recipient', None)
             saved.pop('recipient_phone', None)
+            saved.pop('wedding_preview', None)
             if row['job'] != job or row['price'] != int(price) or saved != order:
                 raise ValueError('주문서를 다시 열어 주세요.')
             if row['state'] == 'waiting' and row['payment_url']:
