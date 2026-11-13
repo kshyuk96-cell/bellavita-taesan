@@ -547,7 +547,7 @@ def dispatch(body):
     try:
         result = future.result(timeout=2.5)
     except TimeoutError:
-        return kakao(f'확인 중이에요. 접수번호 {job}', buttons=[('결과 보기', f'결과 {job}')])
+        return kakao('잠시만요!', buttons=[('결과 보기', f'결과 {job}')])
     finally:
         if future.done():
             with LOCK:
