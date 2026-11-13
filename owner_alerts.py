@@ -20,14 +20,17 @@ def configured():
 def setup(db):
     db.execute('CREATE TABLE IF NOT EXISTS alert_link (digest TEXT PRIMARY KEY, expires REAL)')
     db.execute('CREATE TABLE IF NOT EXISTS alert_account (singleton INTEGER PRIMARY KEY, refresh TEXT)')
+    db.execute('CREATE TABLE IF NOT EXISTS alert_links (id TEXT PRIMARY KEY, url TEXT NOT NULL)')
     db.execute("""CREATE TABLE IF NOT EXISTS alert_outbox (
         id TEXT PRIMARY KEY, message TEXT NOT NULL, created REAL NOT NULL,
         sent INTEGER NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0, retry REAL NOT NULL DEFAULT 0)""")
 
 
-def enqueue(db, event, message):
+def enqueue(db, event, message, link=None):
     db.execute('INSERT OR IGNORE INTO alert_outbox(id,message,created) VALUES (?,?,?)',
                (event, message[:185], time.time()))
+    if link:
+        db.execute('INSERT OR IGNORE INTO alert_links VALUES (?,?)', (event, link))
 
 
 def digest(value):
@@ -82,7 +85,8 @@ def connect(db_factory, code, state):
 def send_pending(db_factory):
     with db_factory() as c:
         account = c.execute('SELECT refresh FROM alert_account WHERE singleton=1').fetchone()
-        row = c.execute('SELECT * FROM alert_outbox WHERE sent=0 AND retry<=? ORDER BY created LIMIT 1',
+        row = c.execute('''SELECT o.*,l.url FROM alert_outbox o LEFT JOIN alert_links l USING(id)
+                        WHERE sent=0 AND retry<=? ORDER BY created LIMIT 1''',
                         (time.time(),)).fetchone()
     if not account or not row:
         return
@@ -92,8 +96,9 @@ def send_pending(db_factory):
             with db_factory() as c:
                 c.execute('UPDATE alert_account SET refresh=? WHERE singleton=1 AND refresh=?',
                           (issued['refresh_token'], account['refresh']))
-        template = {'object_type':'text', 'text':row['message'], 'link':{'web_url':ORIGIN,'mobile_web_url':ORIGIN},
-                    'button_title':'태산이 안내'}
+        link = row['url'] or ORIGIN
+        template = {'object_type':'text', 'text':row['message'], 'link':{'web_url':link,'mobile_web_url':link},
+                    'button_title':'주문 내역' if row['url'] else '태산이 안내'}
         response = post('https://kapi.kakao.com/v2/api/talk/memo/default/send',
                         {'template_object':json.dumps(template, ensure_ascii=False)}, issued['access_token'])
         if response.get('result_code') != 0:

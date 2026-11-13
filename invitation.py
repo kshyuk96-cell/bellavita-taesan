@@ -45,9 +45,9 @@ def https_url(value):
         return None
 
 
-def get_page(url):
+def get_page(url, *, hosts=HOSTS):
     u = https_url(url)
-    if not u or u.hostname.removeprefix('www.') not in HOSTS:
+    if not u or u.hostname.removeprefix('www.') not in hosts:
         raise ValueError('이 청첩장 주소는 아직 읽기 어려워요. 행사 이름, 날짜와 시간, 장소를 적어주세요.')
     with build_opener(NoRedirect()).open(Request(url, headers={'User-Agent': 'Mozilla/5.0'}), timeout=9) as response:
         raw = response.read(2_000_001)
@@ -274,7 +274,8 @@ def make(source, root, origin, extract, photo=None):
         order_url = f'{origin}/i/{job}/{price}/order' if products else links[price]
         if products:
             snapshot = {**products[price], 'date': date, 'clock': clock, 'venue': event['venue'],
-                        'address': event['address'], 'event_time': event['when'].replace(tzinfo=SEOUL).isoformat()}
+                        'address': event['address'], 'source': event['source'],
+                        'event_time': event['when'].replace(tzinfo=SEOUL).isoformat()}
             if event.get('wedding_photo'):
                 snapshot['wedding_photo'] = event['wedding_photo']
             if 'wedding_crop' in event:
