@@ -76,6 +76,9 @@ def excel(days):
                 if isinstance(cell.value, str):
                     cell.data_type = 's'  # Keep even formula-looking source cells as literal text.
         sheet.auto_filter.ref = sheet.dimensions
+    for sheet, column in ((summary, 7), (schedule, 7), (missed, 3)):
+        for (cell,) in sheet.iter_rows(min_row=2, min_col=column, max_col=column):
+            cell.alignment = Alignment(wrap_text=True, vertical='top')
     output = BytesIO()
     book.save(output)
     return output.getvalue()
