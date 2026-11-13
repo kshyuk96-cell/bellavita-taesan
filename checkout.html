@@ -164,7 +164,7 @@ summary { cursor: pointer; }
   .mobile-preview img { display: block; width: 48px; height: 48px; border-radius: 6px; object-fit: contain; }
   .mobile-preview strong, .mobile-preview small { display: block; }
   .mobile-preview small { color: var(--muted); font-size: .79rem; line-height: 1.35; }
-  .mobile-preview button { min-height: 46px; width: auto; margin: 0; padding: 6px 9px; font-size: .86rem; }
+  .mobile-preview button { min-height: 46px; width: auto; max-width: 8.5em; margin: 0; padding: 6px 9px; font-size: .86rem; word-break: keep-all; }
   .mobile-steps-ready .mobile-choice { display: block; margin-bottom: 9px; border: 1px solid var(--line); border-radius: 9px; background: #fff; scroll-margin-top: 100px; }
   .mobile-steps-ready .mobile-native-choice { position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; overflow: hidden; clip-path: inset(50%); }
   .mobile-choice summary { min-height: 54px; padding: 12px; color: var(--forest); font-weight: 700; }
@@ -193,7 +193,7 @@ $pictures
 <div class="mobile-preview" id="mobile-preview" hidden>
 <img id="mobile-preview-image" alt="">
 <div><strong>설치 예시</strong><small id="mobile-option-status" aria-live="polite"></small></div>
-<button type="button" id="open-mobile-example">크게 보기</button>
+<button type="button" id="open-mobile-example">설치 예시 크게 보기</button>
 </div>
 $groups
 <label>보내시는 분<input name="sender" maxlength="140" required placeholder="예: 벨라비타 대표 홍길동"></label>
