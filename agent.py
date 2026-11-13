@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 import checkout
 import invitation
 import owner_alerts
+import shop
 
 ROOT = Path(os.getenv('TAESAN_DATA', 'taesan-data')).resolve()
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -81,6 +82,7 @@ def db():
     connection.execute('''CREATE TABLE IF NOT EXISTS invitation_input (
         owner TEXT PRIMARY KEY, expires REAL NOT NULL, details TEXT NOT NULL)''')
     checkout.setup(connection)
+    shop.setup(connection)
     owner_alerts.setup(connection)
     return connection
 
@@ -685,18 +687,21 @@ def dispatch(body, defer_callback=None):
             c.execute('INSERT OR REPLACE INTO invitation_input VALUES (?,?,?)', (owner, time.time()+1800, ''))
         return kakao('청첩장 링크나 행사 정보를 올려주세요',
                      buttons=[('초대장 취소', '초대장 취소')])
-    if message == '초대장 주문 내역':
+    if message in ('초대장 주문 내역', '쇼핑몰 관리'):
         if role_of(owner) != 'admin':
-            return kakao('대표 계정에서만 초대장 주문 내역을 볼 수 있어요.')
+            return kakao('대표 계정에서만 열 수 있어요.')
         origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
         if not invitation.https_url(origin):
-            return kakao('초대장 주문 내역 주소를 설정해 주세요.')
+            return kakao('관리 화면 주소를 설정해 주세요.')
         expiry = str(int(time.time()) + 600)
-        signature = checkout.admin_signature(expiry, os.environ['TAESAN_WEBHOOK_SECRET'])
-        url = f'{origin}/invitation-orders/admin/{expiry}/{signature}'
+        is_shop = message == '쇼핑몰 관리'
+        route = 'shop/admin' if is_shop else 'invitation-orders/admin'
+        signature = (shop.admin_signature if is_shop else checkout.admin_signature)(
+            expiry, os.environ['TAESAN_WEBHOOK_SECRET'])
+        url = f'{origin}/{route}/{expiry}/{signature}'
         return {'version': '2.0', 'template': {'outputs': [{'basicCard': {
-            'title': '초대장 주문 내역', 'description': '이 주소는 10분 동안 열 수 있어요.',
-            'buttons': [{'action': 'webLink', 'label': '주문 내역 보기', 'webLinkUrl': url}],
+            'title': message, 'description': '이 주소는 10분 동안 열 수 있어요.',
+            'buttons': [{'action': 'webLink', 'label': '관리 화면 열기', 'webLinkUrl': url}],
         }}]}}
     if message == '초대장 취소':
         with db() as c:
@@ -773,6 +778,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        shop_admin = shop.ADMIN_PATH.fullmatch(path)
+        if shop_admin:
+            return self.shop_admin(shop_admin, write=True)
+        shop_order = shop.ORDER_PATH.fullmatch(path)
+        if shop_order:
+            return self.shop_order(shop_order[1], submit=True)
         if path == '/checkout-sender':
             if self.headers.get('Origin') != os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'):
                 return self.send_json({'error': '주문서를 다시 열어 주세요.'}, 403)
@@ -886,6 +897,49 @@ class Handler(BaseHTTPRequestHandler):
                              '<title>벨라비타 주문</title><main><h1>벨라비타 주문</h1><p>'
                              + escape(message) + '</p>' + link + '</main></html>', status)
 
+    def shop_admin(self, match, *, write=False):
+        if not shop.admin_authorized(*match.groups(), os.environ['TAESAN_WEBHOOK_SECRET']):
+            return self.order_message('태산이에서 쇼핑몰 관리를 다시 열어 주세요.', 403)
+        origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
+        if write:
+            if not invitation.https_url(origin) or self.headers.get('Origin') != origin:
+                return self.order_message('태산이에서 쇼핑몰 관리를 다시 열어 주세요.', 403)
+            try:
+                fields = self.read_order_form()
+                action = {'save_product': shop.save_product, 'issue_offers': shop.issue_offers,
+                          'change_offer': shop.change_offer}.get(fields.get('action'))
+                if action is None:
+                    raise ValueError('요청 내용을 확인해 주세요.')
+                with db() as connection:
+                    connection.execute('BEGIN IMMEDIATE')
+                    action(connection, fields)
+            except (ValueError, UnicodeError) as error:
+                return self.order_message(str(error), 422, back=True)
+            self.send_response(303)
+            self.send_header('Location', match[0])
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            return
+        with db() as connection:
+            page = shop.admin_page(connection, match[0], origin)
+        return self.send_order_html(page, referrer_policy='same-origin')
+
+    def shop_order(self, offer_id, *, submit=False):
+        with db() as connection:
+            product, active = shop.read_offer(connection, offer_id)
+        if not product:
+            return self.order_message('주문서를 찾지 못했어요.', 404)
+        if not active or not checkout.available(product):
+            return self.order_message('이 행사의 주문이 마감됐어요.', 410)
+        config = checkout.payment_config()
+        origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
+        can_pay = (os.getenv('SHOP_CHECKOUT_ENABLED') == '1' and all(config.values())
+                   and invitation.https_url(origin))
+        if submit:
+            return self.submit_checkout(offer_id, product['price'], product, can_pay, origin, config)
+        return self.send_order_html(checkout.render(product, f'/shop/order/{offer_id}', can_pay),
+                                    referrer_policy='same-origin')
+
     def place_invitation_order(self, job, price):
         product = checkout.read(ROOT, job, price)
         if not product:
@@ -894,7 +948,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.order_message('이 행사의 주문이 마감됐어요.', 410)
         config = checkout.payment_config()
         origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
-        if not checkout.payment_enabled(job) or not all(config.values()) or not invitation.https_url(origin):
+        can_pay = checkout.payment_enabled(job) and all(config.values()) and invitation.https_url(origin)
+        return self.submit_checkout(job, price, product, can_pay, origin, config)
+
+    def submit_checkout(self, job, price, product, can_pay, origin, config):
+        if not can_pay:
             return self.order_message('현재 결제를 이용할 수 없어요. 문의 031-8067-8580', 503, back=True)
         if self.headers.get('Origin') not in (None, origin):
             return self.order_message('주문서를 다시 열고 결제하기를 눌러 주세요.', 403, back=True)
@@ -913,6 +971,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        shop_admin = shop.ADMIN_PATH.fullmatch(path)
+        if shop_admin:
+            return self.shop_admin(shop_admin)
+        shop_order = shop.ORDER_PATH.fullmatch(path)
+        if shop_order:
+            return self.shop_order(shop_order[1])
         if path.startswith('/checkout-art/') and (filename := path.removeprefix('/checkout-art/')) in checkout.ARTWORK_FILES:
             data = (checkout.ARTWORK / filename).read_bytes()
             self.send_response(200)
@@ -1040,3 +1104,4 @@ if __name__ == '__main__':
     owner_alerts.start(db)
     ThreadingHTTPServer((os.getenv('TAESAN_BIND', '127.0.0.1'), int(os.getenv('PORT', '8080'))),
                         Handler).serve_forever()
+
