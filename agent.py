@@ -17,11 +17,12 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from zoneinfo import ZoneInfo
 
 import invitation
+import owner_alerts
 
 ROOT = Path(os.getenv('TAESAN_DATA', 'taesan-data')).resolve()
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -78,6 +79,7 @@ def db():
         created REAL NOT NULL, decision TEXT)''')
     connection.execute('''CREATE TABLE IF NOT EXISTS invitation_input (
         owner TEXT PRIMARY KEY, expires REAL NOT NULL, details TEXT NOT NULL)''')
+    owner_alerts.setup(connection)
     return connection
 
 
@@ -126,6 +128,7 @@ def request_access(owner, message):
             return kakao('등록 요청이 많아 접수하지 못했어요. 관리자에게 알려주세요.')
         request_id = secrets.token_hex(4)
         c.execute('INSERT INTO access_requests VALUES (?,?,?,?,NULL)', (request_id, owner, name, time.time()))
+        owner_alerts.enqueue(c, 'staff:'+request_id, f'{name}님이 직원 등록을 신청했어요.\n신청번호 {request_id}\n태산이 채널에서 직원 승인 대기를 확인해 주세요.')
     return kakao(f'{name}님 등록 신청 {request_id}을 받았어요. 승인되면 바로 업무를 요청할 수 있어요.')
 
 
@@ -573,6 +576,9 @@ def run_job(job, message, owner, kind=''):
             result = {'summary': '처리 결과를 확인하지 못했어요. 입고 요청이었다면 시트에서 반영 여부를 먼저 확인해 주세요.'}
     with db() as c:
         c.execute("UPDATE jobs SET state='done',result=? WHERE id=?", (json_text(result), job))
+        if result.get('approval') == 'pending':
+            title, _, summary = result['summary'].partition('\n')
+            owner_alerts.enqueue(c, 'job:'+job, f'{title}\n{summary[:95]}\n태산이 채널에서 승인 대기를 확인해 주세요.')
     return result
 
 
@@ -654,6 +660,18 @@ def dispatch(body, defer_callback=None):
                      else '등록 코드가 틀렸거나 만료됐어요.')
     if not role_of(owner):
         return request_access(owner, message)
+    if message == '개인톡 알림 연결':
+        if role_of(owner) != 'admin':
+            return kakao('대표 계정에서만 연결할 수 있어요.')
+        with db() as c:
+            url = owner_alerts.link(c)
+        if not url:
+            return kakao('개인톡 알림 설정을 준비하고 있어요.')
+        return {'version':'2.0','template':{'outputs':[{'basicCard':{
+            'title':'대표님 개인톡 알림',
+            'description':'대표님 카카오 계정을 선택하고 메시지 전송에 동의해 주세요.',
+            'buttons':[{'action':'webLink','label':'개인톡 연결','webLinkUrl':url}]
+        }}]}}
     if message == '직원 승인 대기' or re.fullmatch(
             r'(?:직원 검토|직원 승인|직원 조회 승인|직원 입고 승인|직원 반려) [a-f0-9]{8}', message):
         return access_command(owner, message)
@@ -786,6 +804,24 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        if path == '/owner-alerts/connected':
+            query = parse_qs(urlsplit(self.path).query)
+            ok = False
+            if query.get('code') and query.get('state'):
+                try:
+                    ok = owner_alerts.connect(db, query['code'][0], query['state'][0])
+                except Exception:
+                    print('개인톡 알림 연결 실패', file=sys.stderr, flush=True)
+            message = ('개인톡 알림이 연결됐어요. 카카오톡의 나와의 채팅을 확인해 주세요.' if ok
+                       else '연결하지 못했어요. 태산이 채널에서 개인톡 알림 연결을 다시 요청해 주세요.')
+            data = ('<!doctype html><html lang="ko"><meta charset="utf-8"><title>태산이 알림</title>'
+                    '<meta name="viewport" content="width=device-width"><p>'+message+'</p>').encode()
+            self.send_response(200 if ok else 400)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Referrer-Policy', 'no-referrer')
+            self.end_headers()
+            return self.wfile.write(data)
         if path == '/healthz':
             return self.send_json({'status': 'ok'})
         match = re.fullmatch(r'/jobs/([a-f0-9]{32})', path)
@@ -854,5 +890,6 @@ if __name__ == '__main__':
         raise SystemExit(0)
     if len(os.getenv('TAESAN_WEBHOOK_SECRET', '')) < 32:
         raise SystemExit('TAESAN_WEBHOOK_SECRET에 32자 이상의 임의 문자열이 필요합니다.')
+    owner_alerts.start(db)
     ThreadingHTTPServer((os.getenv('TAESAN_BIND', '127.0.0.1'), int(os.getenv('PORT', '8080'))),
                         Handler).serve_forever()
