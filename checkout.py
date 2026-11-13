@@ -223,6 +223,7 @@ def render(product, action, can_pay):
     preview = wedding_preview(product)
     if preview:
         pictures = f'''<figure class="wreath-preview" id="wreath-preview">
+          <div class="wreath-viewport">
           <div class="wreath-stage">
             <img class="wreath-base" src="/checkout-art/sunflower-easel.webp" alt="해바라기 작품 액자화환">
             <div class="scroll-paper">
@@ -231,6 +232,7 @@ def render(product, action, can_pay):
               <p class="scroll-greeting" id="scroll-greeting"></p>
               <p class="scroll-sender" id="scroll-sender"></p>
             </div>
+          </div>
           </div>
           <figcaption>예식 당일 신랑신부 사진 및<br>풍경사진으로 설치해드립니다.</figcaption>
         </figure><div class="gallery" id="wreath-fallback" role="group" aria-label="상품 사진" tabindex="0" hidden>{pictures}</div>'''
