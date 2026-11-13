@@ -37,7 +37,7 @@ def notification(order_id, number='1234', state='4', amount=93500, **extra):
                 var1=order_id, mul_no=number, price=str(amount), pay_state=state, **extra)
 
 
-class ShopTest(unittest.TestCase):
+class ShopFixture(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name) / 'data'
@@ -115,6 +115,8 @@ class ShopTest(unittest.TestCase):
         with agent.db() as c:
             return c.execute('SELECT * FROM invitation_orders WHERE id=?', (attempt,)).fetchone()
 
+
+class ShopTest(ShopFixture):
     def test_price_snapshot_and_repeat_issue(self):
         self.post_admin(**self.event)
         with agent.db() as c:

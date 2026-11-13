@@ -18,6 +18,7 @@ from lxml import html
 
 from blogpay import NoRedirect
 from scroll_sender import split_sender
+import order_ops
 
 SEOUL = ZoneInfo('Asia/Seoul')
 ORDER_PATH = re.compile(r'/i/([a-f0-9]{32})/(93500|99000)/order')
@@ -253,6 +254,8 @@ def render(product, action, can_pay):
     return Template(TEMPLATE.read_text(encoding='utf-8')).substitute(
         escaped, action=escape(action), groups=''.join(groups), pictures=pictures,
         base=str(product['price']), base_display=f'{product["price"]:,}',
+        receipt_section_state='' if 'cash_tax_type' in product else 'hidden',
+        receipt_controls_state='' if 'cash_tax_type' in product else 'disabled',
         attempt=secrets.token_hex(16),
         button_state='' if can_pay else 'disabled', can_submit='true' if can_pay else 'false',
         notice='' if can_pay else '<p class="hint">현재 결제를 이용할 수 없습니다. 문의 031-8067-8580</p>')
@@ -281,11 +284,23 @@ def normalize_order(product, fields):
         raise ValueError('주문자 휴대폰 번호를 확인해 주세요.')
     sender = value('sender', 140)
     buyer = sender if fields.get('same_buyer') == 'yes' else value('buyer', 60)
-    return {'product': product['number'], 'title': product['title'], 'options': selected,
+    order = {'product': product['number'], 'title': product['title'], 'options': selected,
             'sender': sender, 'message': value('message', 200) if custom else '',
             'buyer': buyer, 'buyer_phone': buyer_phone,
             'venue': product['venue'], 'address': product['address'],
             'event_time': product['event_time'], 'amount': amount}
+    kind = fields.get('cash_receipt_type', '')
+    if kind:
+        if kind not in ('personal', 'business', 'self'):
+            raise ValueError('현금영수증 발급 구분을 확인해 주세요.')
+        identifier = ('0100001234' if kind == 'self' else buyer_phone if kind == 'personal' and
+                      not fields.get('cash_receipt_identifier', '').strip() else
+                      re.sub(r'[\s-]', '', fields.get('cash_receipt_identifier', '')))
+        pattern = r'01[016789]\d{8}' if kind == 'personal' else r'\d{10}'
+        if not re.fullmatch(pattern, identifier):
+            raise ValueError('현금영수증 휴대폰 번호(11자리) 또는 사업자번호(10자리)를 확인해 주세요.')
+        order['cash_receipt'] = {'kind': kind, 'identifier': identifier}
+    return order
 
 
 def setup(connection):
@@ -304,6 +319,7 @@ def setup(connection):
     connection.execute('''CREATE TABLE IF NOT EXISTS payment_checks (
         id INTEGER PRIMARY KEY, order_id TEXT NOT NULL, payment_number TEXT NOT NULL,
         amount INTEGER NOT NULL, note TEXT NOT NULL, checked TEXT NOT NULL)''')
+    order_ops.setup(connection)
 
 
 def review_photo(connection, fields):
@@ -475,4 +491,5 @@ def receive_payment(db, fields, config):
         elif kind == 'waiting' and state == 'requesting':
             state = 'waiting'
         connection.execute('UPDATE invitation_orders SET state=?, payment_number=? WHERE id=?', (state, number, attempt))
+        order_ops.on_payment(connection, attempt, state, fields)
     return True

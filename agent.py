@@ -25,6 +25,9 @@ import checkout
 import invitation
 import owner_alerts
 import shop
+import order_ops
+import order_sample
+import cash_receipts
 
 ROOT = Path(os.getenv('TAESAN_DATA', 'taesan-data')).resolve()
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -778,6 +781,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        delivery = order_ops.DELIVERY_PATH.fullmatch(path)
+        if delivery:
+            return self.delivery(delivery, write=True)
         shop_admin = shop.ADMIN_PATH.fullmatch(path)
         if shop_admin:
             return self.shop_admin(shop_admin, write=True)
@@ -897,6 +903,35 @@ class Handler(BaseHTTPRequestHandler):
                              '<title>벨라비타 주문</title><main><h1>벨라비타 주문</h1><p>'
                              + escape(message) + '</p>' + link + '</main></html>', status)
 
+    def delivery(self, match, *, write=False):
+        order_id, expiry, signed = match.groups()
+        if not order_ops.authorized('delivery', order_id, expiry, signed, os.environ['TAESAN_WEBHOOK_SECRET']):
+            return self.order_message('주문·배송 관리 링크가 만료됐어요. 대표에게 최신 링크를 요청해 주세요.', 403)
+        if write:
+            if self.headers.get('Origin') != os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'):
+                return self.order_message('주문·배송 화면을 다시 열어 주세요.', 403)
+            try:
+                fields = self.read_order_form()
+                if fields.get('action') != 'change_stage' or fields.get('order_id') != order_id:
+                    raise ValueError('이 주문의 배송 상태만 변경할 수 있어요.')
+                with db() as c:
+                    c.execute('BEGIN IMMEDIATE')
+                    order_ops.change_stage(c, fields, actor='staff-order-link')
+            except (ValueError, UnicodeError) as error:
+                return self.order_message(str(error), 422)
+            self.send_response(303)
+            self.send_header('Location', match[0])
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            return
+        with db() as c:
+            row = c.execute('''SELECT o.* FROM invitation_orders o JOIN shop_fulfillment f
+                               ON f.order_id=o.id WHERE o.id=?''', (order_id,)).fetchone()
+            if not row:
+                return self.order_message('주문을 찾지 못했어요.', 404)
+            page = order_ops.delivery_page(c, row, match[0])
+        return self.send_order_html(page, referrer_policy='same-origin')
+
     def shop_admin(self, match, *, write=False):
         if not shop.admin_authorized(*match.groups(), os.environ['TAESAN_WEBHOOK_SECRET']):
             return self.order_message('태산이에서 쇼핑몰 관리를 다시 열어 주세요.', 403)
@@ -908,7 +943,11 @@ class Handler(BaseHTTPRequestHandler):
                 fields = self.read_order_form()
                 action = {'save_product': shop.save_product, 'issue_offers': shop.issue_offers,
                           'change_offer': shop.change_offer,
-                          'record_payment_check': shop.record_payment_check}.get(fields.get('action'))
+                          'record_payment_check': shop.record_payment_check,
+                          'save_notifications': order_ops.save_settings,
+                          'change_stage': order_ops.change_stage, 'retry_message': order_ops.retry_message,
+                          'reconcile_message': order_ops.reconcile_message,
+                          'reconcile_receipt': cash_receipts.reconcile}.get(fields.get('action'))
                 if action is None:
                     raise ValueError('요청 내용을 확인해 주세요.')
                 with db() as connection:
@@ -972,6 +1011,29 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        sample = order_ops.SAMPLE_PATH.fullmatch(path)
+        if sample:
+            order_id, expiry, signed = sample.groups()
+            if not order_ops.authorized('sample', order_id, expiry, signed, os.environ['TAESAN_WEBHOOK_SECRET']):
+                return self.order_message('이미지 확인 링크가 만료됐어요.', 403)
+            with db() as c:
+                row = c.execute('''SELECT o.* FROM invitation_orders o JOIN shop_fulfillment f
+                                   ON f.order_id=o.id WHERE o.id=?''', (order_id,)).fetchone()
+            if not row:
+                return self.order_message('주문을 찾지 못했어요.', 404)
+            try:
+                data = order_sample.sample(ROOT, row).read_bytes()
+            except Exception:
+                return self.order_message('샘플 이미지 생성 설정을 확인해 주세요.', 503)
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/jpeg')
+            self.send_header('Cache-Control', 'private, no-store')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            return self.wfile.write(data)
+        delivery = order_ops.DELIVERY_PATH.fullmatch(path)
+        if delivery:
+            return self.delivery(delivery)
         shop_admin = shop.ADMIN_PATH.fullmatch(path)
         if shop_admin:
             return self.shop_admin(shop_admin)
@@ -1011,9 +1073,12 @@ class Handler(BaseHTTPRequestHandler):
         receipt = checkout.RECEIPT_PATH.fullmatch(path)
         if receipt:
             with db() as connection:
-                row = connection.execute('SELECT state FROM invitation_orders WHERE id=?', (receipt[1],)).fetchone()
+                row = connection.execute('SELECT * FROM invitation_orders WHERE id=?', (receipt[1],)).fetchone()
+                page = order_ops.customer_receipt(connection, row) if row else None
             if not row:
                 return self.order_message('주문을 찾지 못했어요.', 404)
+            if page:
+                return self.send_order_html(page, referrer_policy='same-origin')
             message = {'paid': '결제가 완료됐어요.', 'cancelled': '결제가 취소됐어요.',
                        'partial_cancel': '결제 금액의 일부가 취소됐어요.'}.get(row['state'], '결제 상태를 확인하고 있어요.')
             return self.order_message(message)
@@ -1104,6 +1169,7 @@ if __name__ == '__main__':
     if len(os.getenv('TAESAN_WEBHOOK_SECRET', '')) < 32:
         raise SystemExit('TAESAN_WEBHOOK_SECRET에 32자 이상의 임의 문자열이 필요합니다.')
     owner_alerts.start(db)
+    order_ops.start(db, ROOT)
     ThreadingHTTPServer((os.getenv('TAESAN_BIND', '127.0.0.1'), int(os.getenv('PORT', '8080'))),
                         Handler).serve_forever()
 

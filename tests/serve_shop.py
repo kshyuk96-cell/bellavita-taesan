@@ -32,6 +32,7 @@ def main():
     os.environ.update(TAESAN_DATA=str(root), TAESAN_PUBLIC_URL='https://localhost',
                       TAESAN_WEBHOOK_SECRET=secret, TAESAN_LIVE_WRITE='0', SHOP_CHECKOUT_ENABLED='1',
                       INVITATION_CHECKOUT_ENABLED='0', KAKAO_CLIENT_ID='',
+                      SHOP_MESSAGES_ENABLED='0', SHOP_CASH_RECEIPT_ENABLED='0',
                       TAESAN_ADMIN_IDS='test-admin', TAESAN_STAFF_IDS='test-staff', OPENAI_API_KEY='')
     for key in ('USER_ID', 'LINK_KEY', 'LINK_VALUE', 'REQUEST_KEY'):
         os.environ['INVITATION_PAYAPP_' + key] = 'isolated-demo-' + key.lower()

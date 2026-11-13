@@ -37,7 +37,8 @@ def inspect(source):
     with closing(sqlite3.connect((root / 'state.sqlite3').as_uri() + '?mode=ro', uri=True)) as connection:
         tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         counts = {name: connection.execute('SELECT COUNT(*) FROM ' + name).fetchone()[0]
-                  for name in ('shop_products', 'shop_offers', 'invitation_orders', 'payment_events', 'payment_checks')
+                  for name in ('shop_products', 'shop_offers', 'invitation_orders', 'payment_events', 'payment_checks',
+                               'shop_fulfillment', 'shop_stage_history', 'shop_messages', 'shop_cash_receipts')
                   if name in tables}
     return {'data_path': str(root), 'under_var_data': root.is_relative_to(Path('/var/data').resolve()),
             'var_data_is_mount': os.path.ismount('/var/data'), 'integrity_check': 'ok', 'counts': counts}

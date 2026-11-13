@@ -10,6 +10,9 @@ from html import escape
 from urllib.parse import urlsplit
 
 from checkout import SEOUL
+import order_ops
+import order_messages
+import cash_receipts
 
 ADMIN_PATH = re.compile(r'/shop/admin/([0-9]{10})/([a-f0-9]{64})')
 ORDER_PATH = re.compile(r'/shop/order/([a-f0-9]{32})')
@@ -86,7 +89,10 @@ def save_product(connection, fields):
         'images': [image_url(url.strip()) for url in required(fields, 'images', 3000).splitlines() if url.strip()],
         'options': required(fields, 'options', 2400),
         'greetings': required(fields, 'greetings', 2400),
+        'cash_tax_type': fields.get('cash_tax_type', ''),
     }
+    if details['cash_tax_type'] not in ('', 'TG01', 'TG02'):
+        raise ValueError('현금영수증 과세 구분을 확인해 주세요.')
     if not details['price'] or len(details['images']) > 5:
         raise ValueError('기본 가격과 상품 사진(최대 5장)을 확인해 주세요.')
     greetings = choices(details['greetings'])
@@ -137,6 +143,7 @@ def issue_offers(connection, fields):
         'venue': required(fields, 'venue', 120), 'address': required(fields, 'address', 200),
         'date': when.date().isoformat(), 'clock': when.strftime('%H:%M'),
         'event_time': when.isoformat(),
+        'cash_tax_type': product.get('cash_tax_type', ''),
     }
     photo = fields.get('wedding_photo', '').strip()
     if photo and fields.get('kind') == 'wedding':
@@ -210,13 +217,17 @@ def admin_page(connection, path, origin):
         return f'<label>{label}{control}</label>'
 
     def product_fields(product):
+        tax_options = ''.join(f'<option value="{code}"' + (' selected' if product.get('cash_tax_type', '') == code else '')
+                              + f'>{label}</option>' for code, label in
+                              [('', '미설정 · 자동 발급 보류'), ('TG01', '과세'), ('TG02', '면세')])
         return (field('상품명', 'title', product.get('title', ''))
                 + field('기본 판매가(원)', 'price', product.get('price', ''), input_type='number')
                 + field('상품 사진 HTTPS 주소 · 한 줄에 하나', 'images',
                         '\n'.join(product.get('images', [])), multiline=True)
                 + field('상품 옵션 · 옵션명 | 추가금', 'options', product.get('options', '쌀 10kg | 0'), multiline=True)
                 + field('기본 축하 문구 · 한 줄에 하나', 'greetings',
-                        product.get('greetings', '결혼을 진심으로 축하합니다'), multiline=True))
+                        product.get('greetings', '결혼을 진심으로 축하합니다'), multiline=True)
+                + '<label>현금영수증 과세 구분<select name="cash_tax_type">' + tax_options + '</select></label>')
 
     products = []
     for row in connection.execute('SELECT * FROM shop_products ORDER BY rowid DESC'):
@@ -296,7 +307,15 @@ def admin_page(connection, path, origin):
                                    '페이앱 원거래와 주문을 직접 대조했습니다</label>', '대조 기록 저장'))
         orders.append(f'<li><details><summary>{escape(order["title"])} · {order["amount"]:,}원 · '
                       f'{STATES.get(row["state"], "확인 필요")} · 주문 {row["id"]}</summary>'
-                      f'<dl>{content}</dl>{check_form}</details></li>')
+                      f'<dl>{content}</dl>{check_form}' + order_ops.controls(connection, row, path) + '</details></li>')
+
+    notification_settings = ('<section><h2>직원 주문 알림</h2>'
+        + form('save_notifications', field('알림 받을 직원 휴대폰 · 쉼표 또는 줄바꿈으로 구분', 'staff_phones',
+                                           '\n'.join(order_ops.phones(connection)), multiline=True, optional=True), '직원 알림 번호 저장')
+        + '<p>결제 확인 후 직원·주문자에게 문구 샘플을 첨부합니다. 배송 상태 변경도 알립니다. '
+          '실제 MMS 발송은 발신번호 등록과 발송 설정이 필요합니다. 결과 불명인 알림은 자동 재발송하지 않습니다.</p>'
+        + ('<p>실제 알림 발송 활성화</p>' if order_messages.configured() else '<p>실제 알림 발송 꺼짐 또는 설정 미완료 · 대기열만 보관</p>')
+        + ('<p>직원 알림 번호가 없습니다.</p>' if not order_ops.phones(connection) else '') + '</section>')
 
     return ('''<!doctype html><html lang="ko"><meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1"><title>벨라비타 쇼핑몰 관리</title>
@@ -306,10 +325,11 @@ def admin_page(connection, path, origin):
       label,input,textarea,select{display:block;box-sizing:border-box;width:100%}
       label{margin:10px 0;font-weight:600}input,textarea,select{font:inherit;padding:8px;border:1px solid #aab5aa;border-radius:6px}
       input[type=hidden]{display:none}button{font:inherit;background:#284d39;color:white;border:0;border-radius:7px;padding:8px 12px}
+      input[type=checkbox]{display:inline;width:auto}
       a{color:#204c36}summary{cursor:pointer;padding:6px 0}small{overflow-wrap:anywhere}li{margin-bottom:12px}
       dd{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 8px}dt{font-weight:bold}</style>
       <main><h1>벨라비타 쇼핑몰 관리</h1><section><h2>새 상품 등록</h2>'''
-      + form('save_product', product_fields({}), '상품 등록') + '</section>'
+      + form('save_product', product_fields({}), '상품 등록') + '</section>' + notification_settings
       + ''.join(products) + '<section><h2>행사별 주문 링크</h2>'
       + ('<ul>' + ''.join(offers) + '</ul>' if offers else '<p>발급된 링크가 없어요.</p>')
       + '</section><section><h2>쇼핑몰 주문·결제 내역</h2>'

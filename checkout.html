@@ -220,13 +220,19 @@ $groups
 <h2>설치 장소</h2>
 <p class="venue">$venue <span>$address</span><span>$date $clock</span></p>
 </section>
+<section $receipt_section_state>
+<h2>현금영수증</h2>
+<label>발급 구분<select name="cash_receipt_type" id="cash-receipt-type" $receipt_controls_state><option value="personal">소득공제 · 주문자 휴대폰</option><option value="business">지출증빙 · 사업자번호</option><option value="self">자진발급</option></select></label>
+<label id="cash-receipt-label">발급 번호<input name="cash_receipt_identifier" id="cash-receipt-identifier" $receipt_controls_state inputmode="numeric" maxlength="20" placeholder="공란이면 주문자 휴대폰 번호"></label>
+<p class="hint">현금성 결제에만 적용됩니다. 카드와 간편결제는 결제사 발급 내역을 따릅니다.</p>
+</section>
 <section>
 <h2>최종 결제정보</h2>
 <p class="total"><strong>총 결제금액</strong><output id="amount">${base_display}원</output></p>
 </section>
 <section>
 <h2>주문 정보 수집 동의</h2>
-<details class="consent-details"><summary>수집 항목과 이용 목적 보기</summary><p>벨라비타는 주문 확인, 행사장 설치, 설치 사진 전송과 고객 문의 처리를 위해 주문자 이름·휴대폰 번호, 보내시는 분, 주문 옵션과 축하 문구를 수집합니다. 결제를 위해 상품명, 결제금액, 주문자 연락처를 페이앱에 전달합니다. 주문 정보는 거래 확인과 관련 법령에 따른 보관에 사용합니다. 필수 항목 수집을 거부할 수 있으며, 거부 시 주문을 진행할 수 없습니다. 문의 031-8067-8580</p></details>
+<details class="consent-details"><summary>수집 항목과 이용 목적 보기</summary><p>벨라비타는 주문 확인, 행사장 설치, 샘플 이미지·주문 및 배송 알림, 설치 사진 전송과 고객 문의 처리를 위해 주문자 이름·휴대폰 번호, 보내시는 분, 주문 옵션과 축하 문구를 수집합니다. 결제를 위해 상품명, 결제금액, 주문자 연락처를 페이앱에 전달합니다. 현금영수증 신청 시 발급용 휴대폰·사업자번호를 페이앱에 전달합니다. 주문·배송 담당 직원이 주문 정보를 확인하며, 문자 알림 발송을 위해 발송 대행사에 연락처·알림 내용·문구 샘플 이미지를 전달합니다. 주문 정보는 거래 확인과 관련 법령에 따른 보관에 사용합니다. 필수 항목 수집을 거부할 수 있으며, 거부 시 주문을 진행할 수 없습니다. 문의 031-8067-8580</p></details>
 <label><input type="checkbox" name="consent" value="yes" required>주문 정보 수집에 동의합니다.</label>
 $notice
 <button type="submit" $button_state>결제하기</button>
@@ -249,7 +255,7 @@ $notice
 </dialog>
 <script>
 const form = document.getElementById('order');
-const choices = Array.from(form.querySelectorAll('select'));
+const choices = Array.from(form.querySelectorAll('select[name^="choice"]'));
 const custom = document.getElementById('custom');
 const preview = document.getElementById('preview');
 const amount = document.getElementById('amount');
@@ -257,6 +263,14 @@ const message = form.elements.namedItem('message');
 const sender = form.elements.namedItem('sender');
 const buyer = form.elements.namedItem('buyer');
 const sameBuyer = form.elements.namedItem('same_buyer');
+const receiptType = document.getElementById('cash-receipt-type');
+const receiptIdentifier = document.getElementById('cash-receipt-identifier');
+receiptType.addEventListener('change', () => {
+  const business = receiptType.value === 'business';
+  document.getElementById('cash-receipt-label').hidden = receiptType.value === 'self';
+  receiptIdentifier.required = business;
+  receiptIdentifier.placeholder = business ? '사업자번호 10자리' : '공란이면 주문자 휴대폰 번호';
+});
 let separateBuyer = buyer.value;
 const wreath = document.getElementById('wreath-preview');
 const greetingChoice = document.getElementById('greeting-choice');

@@ -3,13 +3,14 @@ import datetime as dt
 import hashlib
 import http.client
 import json
+import os
 from pathlib import Path
 import ssl
 from urllib.parse import urlencode, urlsplit
 
 from playwright.sync_api import sync_playwright
 
-ROOT = Path('/tmp/bellavita-shop-demo')
+ROOT = Path(os.getenv('SHOP_TEST_DATA', '/tmp/bellavita-shop-demo'))
 ARTIFACTS = Path(__file__).resolve().parents[1] / 'test-artifacts'
 ARTIFACTS.mkdir(exist_ok=True)
 LINKS = json.loads((ROOT / 'test-links.json').read_text())
