@@ -42,6 +42,8 @@ STOCK_LOCK = threading.Lock()
 ORDER_LOCK = threading.Lock()
 # This release keeps order intake local pending ledger validation on a sheet copy.
 ORDER_LEDGER_ENABLED = False
+STOCK_QUERY = re.compile(r'([가-힣A-Za-z0-9]+) 재고 조회')
+STOCK_SHORTCUTS = ('구로', '울산', '청주', '대전', '광주')
 SEOUL = ZoneInfo('Asia/Seoul')
 ACTIONS = ['answer', 'guide', 'clarify', 'today', 'stock', 'stock_write', 'scroll', 'revise', 'structure', 'development']
 PROMPT = """너는 벨라비타 내부 업무비서 강태산 대리다. 자연어를 이해하여 아래 허용된 행동을 고른다.
@@ -518,9 +520,7 @@ def handle(message, history, owner):
             if date:
                 offset = ('오늘', '내일', '모레').index(date[0])
                 return {'summary': delivery_count(datetime.now(SEOUL).date() + timedelta(days=offset))}
-    if message == '재고 조회':
-        return {'summary': '어느 센터 재고를 확인할까요? 예를 들어 “울산 재고 조회”라고 보내주세요.'}
-    stock_request = re.fullmatch(r'([가-힣A-Za-z0-9]+) 재고 조회', message)
+    stock_request = STOCK_QUERY.fullmatch(message)
     if stock_request:
         return {'summary': stock(stock_request[1])}
     if message == '자유 문의':
@@ -927,12 +927,17 @@ def dispatch(body, defer_callback=None):
     if message == '승인 대기' or re.fullmatch(
             r'(?:승인 검토|구조 변경 승인|구조 변경 반려) [a-f0-9]{12}', message):
         return approval_command(owner, message)
+    if message == '재고 조회':
+        return kakao('센터를 누르거나 “익산 재고 조회”처럼 말씀해 주세요.',
+                     buttons=[(center, f'{center} 재고 조회') for center in STOCK_SHORTCUTS])
     with LOCK, db() as c:
         pending = c.execute('SELECT details FROM invitation_input WHERE owner=? AND expires>?',
                             (owner, time.time())).fetchone()
         route_context = delivery_routes.session(db, owner)
         if order_intake.wants_order(message, explicit_only=True):
             kind = 'order'
+        elif STOCK_QUERY.fullmatch(message):
+            kind = 'stock'
         elif delivery_routes.wants_route(message, route_context):
             kind = 'route'
         elif pending:
@@ -945,7 +950,7 @@ def dispatch(body, defer_callback=None):
         fingerprint = hashlib.sha256(fingerprint_input.encode()).hexdigest()
         for old in [key for key, future in ACTIVE.items() if future.done()]:
             ACTIVE.pop(old, None)
-        row = None if kind == 'route' else c.execute(
+        row = None if kind in ('route', 'stock') else c.execute(
             'SELECT * FROM jobs WHERE owner=? AND fingerprint=? AND created>? ORDER BY created DESC LIMIT 1',
             (owner, fingerprint, time.time()-180)).fetchone()
         if row:
