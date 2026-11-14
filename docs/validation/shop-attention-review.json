@@ -1,0 +1,55 @@
+{
+  "checked_on_kst": "2026-11-14",
+  "scope": "approved_admin_search_attention_and_independent_restore",
+  "change": "all-record payment/alert/receipt attention links and composable saved search filter",
+  "unit_regression": {
+    "passed": 180,
+    "seconds": 84.256
+  },
+  "additional_saved_filter_test": {
+    "passed": 1
+  },
+  "browser": {
+    "scenarios": [
+      {
+        "width": 375,
+        "off_page_alert_and_receipt_links": true,
+        "all_record_search": true,
+        "combined_filters": true,
+        "pagination_30": true,
+        "next_action_visible": true,
+        "clipboard_fallback": true,
+        "saved_context_preserved": true,
+        "manual_search": true,
+        "overflow": false
+      },
+      {
+        "width": 1280,
+        "off_page_alert_and_receipt_links": true,
+        "all_record_search": true,
+        "combined_filters": true,
+        "pagination_30": true,
+        "next_action_visible": true,
+        "clipboard_fallback": true,
+        "saved_context_preserved": true,
+        "manual_search": true,
+        "overflow": false
+      }
+    ],
+    "javascript_errors": [],
+    "live_side_effects": false
+  },
+  "independent_business_rehearsal": {
+    "source_commit": "2975715",
+    "result": "passed",
+    "restored_orders": 2,
+    "duplicate_restored_orders": 0,
+    "outbound_network_requests": 0
+  },
+  "invitation_restore": "synthetic UTF-8 invitation bytes preserved through encrypted restore; tampered file rejected",
+  "production_data_inspected": false,
+  "actual_payments": false,
+  "actual_messages": false,
+  "actual_receipts": false,
+  "remaining": "production DB/file inspection, provider access and real receipt/delivery verification"
+}

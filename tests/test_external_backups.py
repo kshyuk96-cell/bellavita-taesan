@@ -36,6 +36,18 @@ class ExternalBackupTest(unittest.TestCase):
         (self.snapshot/'extra.txt').write_text('changed')
         with self.assertRaises(ValueError):external.pack(self.snapshot,KEY)
 
+    def test_invitation_files_survive_encrypted_restore_and_tampering_is_rejected(self):
+        invitation=self.snapshot/'invitations'/'synthetic-couple'/'index.html'
+        invitation.parent.mkdir(parents=True)
+        content='<html lang="ko">기존 초대장 복구 검증</html>'.encode()
+        invitation.write_bytes(content)
+        (self.snapshot/'backup-manifest.json').write_text(json.dumps({'version':1,'sha256':manage_data.inventory(self.snapshot)}))
+        blob=external.pack(self.snapshot,KEY)
+        external.restore(blob,self.root/'invitation-restored',KEY)
+        self.assertEqual((self.root/'invitation-restored'/'invitations'/'synthetic-couple'/'index.html').read_bytes(),content)
+        invitation.write_bytes(content+b'changed')
+        with self.assertRaises(ValueError):external.pack(self.snapshot,KEY)
+
     def test_encrypted_archive_cannot_escape_restore_directory(self):
         stream=io.BytesIO()
         with tarfile.open(fileobj=stream,mode='w:gz') as archive:

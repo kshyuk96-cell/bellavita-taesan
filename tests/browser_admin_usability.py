@@ -7,7 +7,7 @@ from test_shop import ORIGIN
 
 
 def main():
-    fixture=AdminUsabilityTest('test_search_full_records_phone_filters_and_paging');fixture.setUp();fixture.seed_orders()
+    fixture=AdminUsabilityTest('test_search_full_records_phone_filters_and_paging');fixture.setUp();fixture.seed_orders();fixture.seed_attention()
     reports=[];errors=[]
     try:
         upstream='http://127.0.0.1:'+str(fixture.server.server_address[1])
@@ -27,6 +27,12 @@ def main():
                     request.fulfill(response=response,headers=outgoing)
                 context.route('**/*',route);page=context.new_page();page.on('pageerror',lambda e:errors.append(str(e)))
                 page.goto(upstream+fixture.admin);assert page.locator('[data-shop-order]').count()==30
+                for label in ('알림 실패·결과 대조 · 전체 1건','영수증 확인 필요 · 전체 1건'):
+                    page.get_by_role('navigation',name='전체 주문 확인 필요').get_by_role('link',name=label,exact=True).click();page.wait_for_load_state()
+                    assert page.locator('[data-shop-order]').count()==1
+                    assert page.locator('[data-shop-order]').get_attribute('data-shop-order')=='0'*32
+                    assert '전체 일치 1건' in page.locator('#shop-result-count').inner_text()
+                    page.goto(upstream+fixture.admin)
                 page.locator('[name=q]').fill('찾는 주문자');page.locator('.admin-search select[name=state]').select_option('paid');page.locator('.admin-search select[name=stage]').select_option('confirmed');page.locator('[name=from_date]').fill('2026-12-10');page.locator('[name=to_date]').fill('2026-12-10');page.locator('.admin-search').get_by_role('button',name='검색',exact=True).click();page.wait_for_load_state();assert page.locator('[data-shop-order]').count()==1;assert '전체 일치 1건' in page.locator('#shop-result-count').inner_text()
                 row=page.locator('[data-shop-order]');assert row.locator('.order-next').is_visible();row.locator('details').first.locator('summary').first.click()
                 # Force the unsupported clipboard path and verify a usable selected field.
@@ -37,7 +43,7 @@ def main():
                 assert page.locator('.admin-saved').is_visible();assert 'q=' in page.url and '#admin-settings' in page.url, __import__('urllib.parse',fromlist=['urlsplit']).urlsplit(page.url)._replace(path='[admin]').geturl();assert page.locator('[name=q]').input_value()=='찾는 주문자';assert page.locator('[data-shop-order]').count()==1
                 page.get_by_role('link',name='관리 매뉴얼',exact=True).click();page.wait_for_load_state();page.locator('#manual-search').fill('타임아웃');assert page.locator('article:visible').count()==1;assert page.get_by_role('link',name='매뉴얼 파일 받기').count()==1
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth');Path('test-artifacts').mkdir(exist_ok=True);page.screenshot(path='test-artifacts/admin-manual-'+str(width)+'.png',full_page=False)
-                reports.append({'width':width,'all_record_search':True,'combined_filters':True,'pagination_30':True,'next_action_visible':True,'clipboard_fallback':True,'saved_context_preserved':True,'manual_search':True,'overflow':False});context.close()
+                reports.append({'width':width,'off_page_alert_and_receipt_links':True,'all_record_search':True,'combined_filters':True,'pagination_30':True,'next_action_visible':True,'clipboard_fallback':True,'saved_context_preserved':True,'manual_search':True,'overflow':False});context.close()
             browser.close()
         assert not errors,errors
         report={'scenarios':reports,'javascript_errors':errors,'live_side_effects':False};Path('test-artifacts/admin-usability.json').write_text(json.dumps(report,ensure_ascii=False,indent=2));print(json.dumps(report,ensure_ascii=False))

@@ -7,12 +7,18 @@ from urllib.parse import urlencode
 
 STATES={'':'전체 결제 상태','requesting':'결제 요청 확인 필요','waiting':'결제 대기','failed':'결제 요청 실패','paid':'결제 완료','partial_cancel':'일부 취소','cancelled':'취소'}
 STAGES={'':'전체 배송 상태','confirmed':'주문 확인','shipping':'배송 중','delivered':'배송 완료'}
-KEYS=('q','order','state','stage','from_date','to_date','page','task','task_owner','task_priority')
+ATTENTION={'':'전체 확인 항목','payment':'결제 확인 필요','alerts':'알림 실패·결과 대조','receipts':'영수증 확인 필요'}
+ATTENTION_SQL={
+    'payment':"o.state IN ('requesting','waiting','failed')",
+    'alerts':"EXISTS(SELECT 1 FROM shop_messages m WHERE m.order_id=o.id AND m.state IN ('failed','uncertain'))",
+    'receipts':"EXISTS(SELECT 1 FROM shop_cash_receipts r WHERE r.order_id=o.id AND r.state IN ('failed','uncertain','held'))"}
+KEYS=('q','order','state','stage','from_date','to_date','page','task','task_owner','task_priority','attention')
 PAGE_SIZE=30
 
 
 def filters(fields):
     result={key:str(fields.get(key,'')).strip() for key in KEYS}
+    if result['attention'] not in ATTENTION:raise ValueError('확인 필요 항목을 선택해 주세요.')
     if len(result['q'])>100:raise ValueError('검색어는 100자 이내로 입력하세요.')
     if result['task_priority'] not in ('','high','normal','low'):raise ValueError('업무 우선순위 검색을 확인하세요.')
     if result['task'] not in ('','open','overdue','soon','done') or len(result['task_owner'])>60:raise ValueError('업무 상태·담당자 검색을 확인하세요.')
@@ -39,6 +45,7 @@ def select(c,fields):
         clauses.append('instr(lower('+terms+'),lower(?))>0');args.append(re.sub(r'[-\s()]','',f['q']))
     if f['state']:clauses.append('o.state=?');args.append(f['state'])
     if f['stage']:clauses.append('f.stage=?');args.append(f['stage'])
+    if f['attention']:clauses.append(ATTENTION_SQL[f['attention']])
     for key,sign in (('from_date','>='),('to_date','<=')):
         if f[key]:clauses.append("substr(json_extract(o.details,'$.event_time'),1,10)"+sign+'?');args.append(f[key])
     if f['task'] or f['task_owner'] or f['task_priority']:
@@ -63,7 +70,7 @@ def redirect(path,fields):
     from urllib.parse import parse_qsl
     encoded=fields.get('_return_query','')
     if len(encoded)>2400:raise ValueError('화면 복귀 정보를 확인하세요.')
-    pairs=parse_qsl(encoded,keep_blank_values=True,max_num_fields=10)
+    pairs=parse_qsl(encoded,keep_blank_values=True,max_num_fields=len(KEYS))
     if any(k not in KEYS for k,_ in pairs) or len({k for k,_ in pairs})!=len(pairs):raise ValueError('화면 복귀 정보를 확인하세요.')
     f=filters(dict(pairs))
     order=fields.get('order_id','');product=fields.get('product_id','')
@@ -75,8 +82,8 @@ def redirect(path,fields):
 def controls(path,meta):
     from html import escape
     f=meta['filters']
-    def select(name,labels):return '<label>'+('결제 상태' if name=='state' else '배송 상태')+'<select name="'+name+'">'+''.join('<option value="'+code+'"'+(' selected' if f[name]==code else '')+'>'+label+'</option>' for code,label in labels.items())+'</select></label>'
-    form='<form method="get" action="'+escape(path)+'" class="admin-search"><h3>전체 주문 검색·필터</h3><label>검색어<input name="q" maxlength="100" value="'+escape(f['q'])+'" placeholder="주문번호·주문자·휴대폰·문구·상품·행사장"></label><div class="search-grid">'+select('state',STATES)+select('stage',STAGES)
+    def select(name,labels):return '<label>'+{'state':'결제 상태','stage':'배송 상태','attention':'확인 필요 항목'}[name]+'<select name="'+name+'">'+''.join('<option value="'+code+'"'+(' selected' if f[name]==code else '')+'>'+label+'</option>' for code,label in labels.items())+'</select></label>'
+    form='<form method="get" action="'+escape(path)+'" class="admin-search"><h3>전체 주문 검색·필터</h3><label>검색어<input name="q" maxlength="100" value="'+escape(f['q'])+'" placeholder="주문번호·주문자·휴대폰·문구·상품·행사장"></label><div class="search-grid">'+select('state',STATES)+select('stage',STAGES)+select('attention',ATTENTION)
     for key,label in [('from_date','행사 시작일'),('to_date','행사 종료일')]:form+='<label>'+label+'<input type="date" name="'+key+'" value="'+escape(f[key])+'"></label>'
     form+='<label>업무 상태<select name="task">'+''.join('<option value="'+k+'"'+(' selected' if f['task']==k else '')+'>'+v+'</option>' for k,v in [('', '업무 조건 없음'),('open','미처리 업무 있음'),('overdue','기한 초과 업무 있음'),('soon','24시간 이내 기한 업무 있음'),('done','완료 업무 있음')])+'</select></label><label>업무 담당자<input name="task_owner" maxlength="60" value="'+escape(f['task_owner'])+'"></label>'
     form+='<label>업무 우선순위<select name="task_priority">'+''.join('<option value="'+k+'"'+(' selected' if f['task_priority']==k else '')+'>'+v+'</option>' for k,v in [('', '전체 우선순위'),('high','높음'),('normal','보통'),('low','낮음')])+'</select></label>'

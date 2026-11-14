@@ -13,6 +13,37 @@ import shop_admin_queries
 
 
 class AdminUsabilityTest(ShopFixture):
+    def seed_attention(self):
+        identity='0'*32
+        with agent.db() as c:
+            for index,state in enumerate(('failed','uncertain')):
+                c.execute("INSERT INTO shop_messages(id,order_id,event,audience,recipient,state,created) VALUES (?,?,?,'customer','01000000000',?,'2026-11-01')",(str(index),identity,'confirmed',state))
+            c.execute("INSERT INTO shop_cash_receipts(order_id,generation,amount,state,error,updated) VALUES (?,1,93500,'uncertain','provider_already_issued','2026-11-01')",(identity,))
+
+    def test_attention_search_finds_off_page_orders_and_preserves_filters(self):
+        self.seed_orders();self.seed_attention()
+        with agent.db() as c:
+            rows,_=shop_admin_queries.select(c,{})
+            self.assertNotIn('0'*32,[r['id'] for r in rows])
+            for category in ('alerts','receipts'):
+                rows,meta=shop_admin_queries.select(c,{'attention':category})
+                self.assertEqual(meta['total'],1)
+                self.assertEqual([r['id'] for r in rows],['0'*32])
+                self.assertEqual(shop_admin_queries.select(c,{'attention':category,'state':'paid'})[1]['total'],0)
+            self.assertEqual(shop_admin_queries.select(c,{'attention':'payment'})[1]['total'],35)
+        self.assertEqual(self.http(self.admin+'?attention=unknown')[0],422)
+        page=self.http(self.admin)[2]
+        self.assertIn('알림 실패·결과 대조 · 전체 1건',page)
+        self.assertIn('영수증 확인 필요 · 전체 1건',page)
+        query=urlencode({'attention':'receipts','q':'운영','page':'2'})
+        location=shop_admin_queries.redirect(self.admin,{'_return_query':query})
+        self.assertEqual(parse_qs(urlsplit(location).query)['attention'],['receipts'])
+        self.post_admin(action='save_search',search_name='영수증 대조',saved_filters=query)
+        with agent.db() as c:
+            saved=json.loads(c.execute('SELECT filters FROM shop_saved_searches').fetchone()[0])
+            self.assertEqual(saved['attention'],'receipts')
+        self.assertIn('attention=receipts',self.http(self.admin)[2])
+
     def seed_orders(self):
         with agent.db() as c:
             for i in range(70):

@@ -35,12 +35,20 @@ def next_action(c,row):
     return '다음 할 일: 담당자·설치 정보 확인 후 배송 단계 처리'
 
 
-def panel(c,rows=None):
+def panel(c,rows=None,path=None):
     rows=rows if rows is not None else c.execute('SELECT o.* FROM invitation_orders o JOIN shop_offers s ON s.id=o.job ORDER BY o.created DESC LIMIT 200').fetchall()
     grouped={key:[] for key in LABELS}
     for row in rows:
         for key in categories(c,row):grouped[key].append(row['id'])
-    result='<section id="shop-dashboard"><h2>운영 현황판</h2><p>현재 페이지에 표시된 주문 기준 · 주문은 여러 확인 항목에 함께 표시될 수 있습니다.</p><div class="shop-queue-filters">'
+    result='<section id="shop-dashboard"><h2>운영 현황판</h2>'
+    if path:
+        import shop_admin_queries as queries
+        result+='<nav aria-label="전체 주문 확인 필요"><p>전체 주문 기준 · 페이지 밖의 주문도 포함합니다.</p>'
+        for key,condition in queries.ATTENTION_SQL.items():
+            count=c.execute('SELECT count(*) FROM invitation_orders o JOIN shop_offers s ON s.id=o.job WHERE '+condition).fetchone()[0]
+            result+='<p><a href="'+escape(path+'?'+queries.query({},attention=key))+'">'+escape(queries.ATTENTION[key])+' · 전체 '+str(count)+'건</a></p>'
+        result+='</nav>'
+    result+='<p>현재 페이지에 표시된 주문 기준 · 주문은 여러 확인 항목에 함께 표시될 수 있습니다.</p><div class="shop-queue-filters">'
     result+='<button type="button" data-shop-filter="all">전체 '+str(len(rows))+'건</button>'
     for key,label in LABELS.items():result+=f'<button type="button" data-shop-filter="{key}">{label} {len(grouped[key])}건</button>'
     result+='<p id="shop-local-count" role="status"></p></div><label>현재 페이지 빠른 검색<input id="shop-order-search" type="search" placeholder="현재 페이지에서 찾기"></label>'

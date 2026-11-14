@@ -26,7 +26,7 @@ def save_search(c,f):
     if not 1<=len(name)<=40:raise ValueError('검색 이름은 1~40자로 입력하세요.')
     encoded=f.get('saved_filters','')
     if len(encoded)>2400:raise ValueError('검색 조건을 확인하세요.')
-    pairs=parse_qsl(encoded,keep_blank_values=True,max_num_fields=10)
+    pairs=parse_qsl(encoded,keep_blank_values=True,max_num_fields=len(shop_admin_queries.KEYS))
     if any(k not in shop_admin_queries.KEYS for k,_ in pairs) or len({k for k,_ in pairs})!=len(pairs):raise ValueError('검색 조건을 확인하세요.')
     filters=shop_admin_queries.filters(dict(pairs));filters.pop('page',None)
     if c.execute('SELECT 1 FROM shop_saved_searches WHERE name=?',(name,)).fetchone():raise ValueError('같은 이름이 있습니다. 다른 이름으로 저장하거나 기존 검색을 삭제하세요.')
