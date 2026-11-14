@@ -5,6 +5,7 @@ from delivery_routes import EPOCH, value
 
 
 DAYS = ('오늘', '내일', '모레')
+OPERATIONS_SHEET_ID = '16d6lM1o4C45Hy7beIyp2eqrNEHjNW0FhGA4Fx-DVK2s'
 ALL_CENTERS = {'', '전체', '전체센터', '모든센터'}
 COUNT = re.compile(r'몇|건수|얼마나|수량|총\s*건')
 PENDING = re.compile(r'미\s*(?:완료|처리)|안\s*(?:됐|된|한|끝)|'
@@ -16,6 +17,14 @@ CENTER = re.compile(r'([가-힣]{2,10})\s*센터(?:에서|의|는|만|에)?')
 REPLACEMENT = re.compile(r'말고|대신')
 EXCLUDED = re.compile(r'개발|기능|수정|바꿔|버그|개선|늘려|줄여|체크해|처리해|완료해|지난|어제|이번\s*주|다음\s*주|'
                       r'\d+\s*(?:월|일)|[월화수목금토일]요일|택배|재고|제작|미배정|이미지|엑셀|보고서|루트')
+SHORT_STATUS = re.compile(r'(?:배송\s*)?(?:미\s*완료|완료|남은\s*건)(?:만|도)?[.!?]?')
+COUNT_CHALLENGE = re.compile(r'(?:뭔|무슨|왜|어떻게)\s*\d+\s*(?:건|개)|이렇게\s*밖에.*남')
+PHOTO_MESSAGE = re.compile(r'(?:\[\s*(?:사진|이미지)\s*\]|사진|이미지|사진을 보냈습니다\.?|이미지를 보냈습니다\.?)')
+COUNT_BUTTONS = (
+    ('오늘 배송 미완료', '오늘 배송 미완료 몇 건?'),
+    ('오늘 배송 완료', '오늘 배송완료 몇 건?'),
+    ('오늘 배송 전체', '오늘 전체 배송 몇 건?'),
+)
 
 
 def metric(message):
@@ -45,6 +54,19 @@ def request(message):
     if re.match(r'\s*(?!(?:중|몇|건|총|다|아직|안|체크|끝|남|완료|미완료|처리|말고|대신|은|는|이|가|을|를|확인|얼마|수량))\S+\s+', remainder):
         return None  # Let the existing language router interpret an unlabelled center or extra qualifier.
     return days[0] if days else 0, center, metric(message)
+
+
+def follow_up(message):
+    """Recognize a correction to today's delivery counts without carrying a prior answer."""
+    if EXCLUDED.search(message) or ('\n' in message) or CENTER.search(message):
+        return None
+    if SHORT_STATUS.fullmatch(message) and '배송' in message:
+        return 0, None, metric(message)
+    if any(label in message for label in DAYS[1:]) or not PENDING.search(message):
+        return None
+    if re.search(r'미\s*완료|배송', message) and (COUNT.search(message) or COUNT_CHALLENGE.search(message)):
+        return 0, None, 'pending'
+    return None
 
 
 def count(day, center, kind, read):

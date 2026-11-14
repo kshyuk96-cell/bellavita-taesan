@@ -303,7 +303,10 @@ def menu(owner=None):
         with db() as c:
             if staff_features.enabled(c, owner):
                 labels.insert(2, '최근 배송보고서')
-    return kakao(message, images=images, buttons=[(label, label) for label in labels])
+    buttons = [(label, label) for label in labels]
+    if len(buttons) < 10:
+        buttons.insert(5, delivery_counts.COUNT_BUTTONS[0])
+    return kakao(message, images=images, buttons=buttons)
 
 
 def recent(owner):
@@ -342,8 +345,8 @@ def sheets_service(write=False):
     return AuthorizedSession(credentials)
 
 
-def sheet_url(rng):
-    return ('https://sheets.googleapis.com/v4/spreadsheets/' + os.environ['TAESAN_SHEET_ID']
+def sheet_url(rng, spreadsheet=None):
+    return ('https://sheets.googleapis.com/v4/spreadsheets/' + (spreadsheet or os.environ['TAESAN_SHEET_ID'])
             + '/values/' + quote(rng, safe=''))
 
 
@@ -354,10 +357,10 @@ def read_values(rng, render='UNFORMATTED_VALUE'):
         return r.json().get('values', [])
 
 
-def read_delivery_ranges(ranges):
+def read_delivery_ranges(ranges, *, spreadsheet=None):
     with sheets_service() as session:
         result = []
-        url = sheet_url('').removesuffix('/values/') + '/values:batchGet'
+        url = sheet_url('', spreadsheet).removesuffix('/values/') + '/values:batchGet'
         for start in range(0, len(ranges), 40):
             response = session.get(url, params={'ranges': ranges[start:start + 40],
                                                'valueRenderOption': 'UNFORMATTED_VALUE'}, timeout=12)
@@ -403,25 +406,41 @@ def stock(center):
 def today():
     now = datetime.now(SEOUL)
     serial = (now.date() - datetime(1899, 12, 30).date()).days
-    rows = [r + [''] * (15-len(r)) for r in read_values("'배송관리'!A4:O15000")
-            if len(r) > 1 and r[0] and r[1] == serial]
-    pending = [r for r in rows if r[10] is not True]
-    production = [r for r in rows if r[9] is not True]
-    unassigned = [r for r in pending if not r[14]]
-    orders = ', '.join(str(r[0]) for r in unassigned[:8]) or '없음'
-    return (f'{now:%m/%d} 배송관리 기준 {len(rows)}건\n제작 미완료 {len(production)}건 · '
-            f'배송 미완료 {len(pending)}건 · 배송원 미배정 {len(unassigned)}건\n미배정 주문번호: {orders}')
+    value = delivery_routes.value
+    rows, statuses, assignees = read_delivery_ranges(
+        ["'배송관리'!A3:B", "'배송관리'!J3:K", "'배송관리'!O3:O"], spreadsheet=delivery_read_sheet())
+    if rows[:1] != [['주문번호', '배송일']] or statuses[:1] != [['제작 완료', '배송 완료']]:
+        raise ValueError('배송관리의 주문번호와 완료 열 제목을 확인해 주세요.')
+    selected = [i for i, row in enumerate(rows) if value(row, 0) and value(row, 1) == serial]
+    pending = [i for i in selected if value(value(statuses, i), 1) is False]
+    unknown = [i for i in selected if type(value(value(statuses, i), 1)) is not bool]
+    production = [i for i in selected if value(value(statuses, i), 0) is False]
+    unassigned = [i for i in pending if not value(value(assignees, i), 0)]
+    orders = ', '.join(str(rows[i][0]) for i in unassigned[:8]) or '없음'
+    extra = f' · 배송 상태 확인 필요 {len(unknown)}건' if unknown else ''
+    return (f'{now:%m/%d} 배송관리 기준 {len(selected)}건\n제작 미완료 {len(production)}건 · '
+            f'배송 미완료 {len(pending)}건{extra} · 배송원 미배정 {len(unassigned)}건\n미배정 주문번호: {orders}')
+
+
+def delivery_read_sheet():
+    return os.getenv('TAESAN_DELIVERY_READ_SHEET_ID') or delivery_counts.OPERATIONS_SHEET_ID
 
 
 def delivery_count(offset, center, metric):
     day = datetime.now(SEOUL).date() + timedelta(days=offset)
+    spreadsheet = delivery_read_sheet()
+
+    def read(ranges):
+        return read_delivery_ranges(ranges, spreadsheet=spreadsheet)
+
     try:
-        return {'summary': delivery_counts.count(day, center, metric, read_delivery_ranges)}
+        summary = delivery_counts.count(day, center, metric, read)
     except ValueError as error:
-        return {'summary': str(error)}
+        summary = str(error)
     except Exception as error:
         print('배송 건수 조회 실패:', type(error).__name__, file=sys.stderr, flush=True)
-        return {'summary': '배송 건수를 읽지 못했어요. 잠시 뒤 다시 물어봐 주세요.'}
+        summary = '배송 건수를 읽지 못했어요. 아래 버튼으로 다시 확인해 주세요.'
+    return {'summary': summary, 'delivery_count': True}
 
 
 def inventory_rows(action, original, headers):
@@ -551,8 +570,8 @@ def scroll(action, history):
 
 def handle(message, history, owner):
     if message in ('오늘 할 일', '오늘 현황'):
-        return {'summary': today()}
-    query = delivery_counts.request(message)
+        return {'summary': today(), 'delivery_count': True}
+    query = delivery_counts.request(message) or delivery_counts.follow_up(message)
     if query:
         return delivery_count(*query)
     if message in ('전체', 'ㅇㅇ', '응', '네', '맞아', '그래') and history:
@@ -810,6 +829,8 @@ def present(job, result, owner=None):
         return kakao(result['summary'], buttons=[('내 개발 요청 상태', '내 개발 요청 상태')])
     if result.get('order_status'):
         return kakao(result['summary'], buttons=[('주문 접수 상태', '주문 접수 상태')])
+    if result.get('delivery_count'):
+        return kakao(result['summary'], buttons=delivery_counts.COUNT_BUTTONS)
     outputs = result.get('outputs') or {}
     selected = result.get('selected')
     if selected:
@@ -868,6 +889,9 @@ def dispatch(body, defer_callback=None):
                      else '등록 코드가 틀렸거나 만료됐어요.')
     if not role_of(owner):
         return request_access(owner, message)
+    if delivery_counts.PHOTO_MESSAGE.fullmatch(message):
+        return kakao('사진 내용은 받지 못했어요. 오늘 배송 현황은 아래 버튼을 눌러 바로 확인하세요.',
+                     buttons=delivery_counts.COUNT_BUTTONS)
     if development_queue.STATUS.fullmatch(message):
         with db() as c:
             return kakao(development_queue.latest_status(c, owner))
@@ -1001,7 +1025,7 @@ def dispatch(body, defer_callback=None):
             kind = 'order'
         elif development_queue.request_detail(message):
             kind = 'development'
-        elif delivery_counts.request(message):
+        elif delivery_counts.request(message) or delivery_counts.follow_up(message):
             kind = 'delivery_count'
         elif delivery_routes.wants_route(message, route_context):
             kind = 'route'
@@ -1027,7 +1051,7 @@ def dispatch(body, defer_callback=None):
             future = ACTIVE[job]
         else:
             running = c.execute("SELECT id FROM jobs WHERE owner=? AND state='running' ORDER BY created DESC LIMIT 1", (owner,)).fetchone()
-            if running and running['id'] in ACTIVE:
+            if running and running['id'] in ACTIVE and kind != 'delivery_count':
                 return kakao('앞에서 말씀하신 일을 확인하고 있어요.')
             job = secrets.token_hex(6)
             c.execute('INSERT INTO jobs VALUES (?,?,?,?,?,?,NULL)',
