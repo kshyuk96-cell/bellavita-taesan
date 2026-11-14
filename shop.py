@@ -13,6 +13,9 @@ from urllib.parse import urlsplit
 from checkout import SEOUL
 import order_ops
 import shop_dashboard
+import shop_dispatch
+import shop_settlement
+import shop_diagnostics
 import order_messages
 import cash_receipts
 
@@ -205,7 +208,10 @@ def record_payment_check(connection, fields):
                        (order_id, number, amount, note, datetime.now(SEOUL).isoformat()))
 
 
-def admin_page(connection, path, origin):
+def admin_page(connection, path, origin, fields=None, root=None):
+    fields=fields or {}
+    selected_order=fields.get('order','')
+    if selected_order and not re.fullmatch(r'[a-f0-9]{32}',selected_order):raise ValueError('전체 주문 조회에는 정확한 주문번호를 입력해 주세요.')
     def form(action, fields, button):
         return (f'<form method="post" action="{escape(path)}">'
                 f'<input type="hidden" name="action" value="{action}">'
@@ -265,8 +271,8 @@ def admin_page(connection, path, origin):
 
     orders = []
     for row in connection.execute('''SELECT o.* FROM invitation_orders o
-            JOIN shop_offers s ON s.id=o.job
-            ORDER BY (o.state='requesting') DESC, o.created DESC LIMIT 200'''):
+            JOIN shop_offers s ON s.id=o.job WHERE (?='' OR o.id=?)
+            ORDER BY (o.state='requesting') DESC, o.created DESC LIMIT 200''',(selected_order,selected_order)):
         order = json.loads(row['details'])
         details = [
             ('주문번호', row['id']), ('접수 시각', row['created'][:16].replace('T', ' ')),
@@ -324,7 +330,7 @@ def admin_page(connection, path, origin):
     return ('''<!doctype html><html lang="ko"><meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1"><title>벨라비타 쇼핑몰 관리</title>
       <style>body{background:#f5f5ef;color:#243329;font:16px/1.5 system-ui;margin:0}
-      main{max-width:850px;margin:auto;padding:24px}section{background:white;border:1px solid #dadfd6;
+      main{max-width:850px;margin:auto;padding:24px;overflow-wrap:anywhere}section{background:white;border:1px solid #dadfd6;
       padding:18px;margin:14px 0;border-radius:14px}h1,h2{letter-spacing:-.04em}h2{font-size:1.2em}
       label,input,textarea,select{display:block;box-sizing:border-box;width:100%}
       label{margin:10px 0;font-weight:600}input,textarea,select{font:inherit;padding:8px;border:1px solid #aab5aa;border-radius:6px}
@@ -332,11 +338,12 @@ def admin_page(connection, path, origin):
       input[type=checkbox]{display:inline;width:auto}
       a{color:#204c36}summary{cursor:pointer;padding:6px 0}small{overflow-wrap:anywhere}li{margin-bottom:12px}
       dd{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 8px}dt{font-weight:bold}</style>
-      <main><h1>벨라비타 쇼핑몰 관리</h1>''' + shop_dashboard.panel(connection) + '''<section><h2>새 상품 등록</h2>'''
+      <main><h1>벨라비타 쇼핑몰 관리</h1>''' + shop_dashboard.panel(connection) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + '''<section><h2>새 상품 등록</h2>'''
       + form('save_product', product_fields({}), '상품 등록') + '</section>' + notification_settings
       + ''.join(products) + '<section><h2>행사별 주문 링크</h2>'
       + ('<ul>' + ''.join(offers) + '</ul>' if offers else '<p>발급된 링크가 없어요.</p>')
       + '</section><section><h2>쇼핑몰 주문·결제 내역</h2>'
+      + f'<form method="get" action="{escape(path)}"><label>전체 기록에서 주문번호로 열기<input name="order" pattern="[a-f0-9]{{32}}" maxlength="32" required></label><button>고유 주문번호 조회</button></form><p><a href="{escape(path)}">최근 주문 목록</a></p>'
       + '<p>결제 요청 확인 필요 주문은 페이앱 대조 후 통보 재전송으로 확인합니다. 취소는 페이앱 판매자 화면에서 실행합니다.</p>'
       + ('<ul>' + ''.join(orders) + '</ul>' if orders else '<p>접수된 주문이 없어요.</p>')
       + '''</section></main><script>

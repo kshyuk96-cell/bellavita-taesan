@@ -1,0 +1,12 @@
+{
+  "mobile_width": 375,
+  "assignment_handover": "passed",
+  "staff_upload_admin_publish": "passed",
+  "customer_photo_confirmation": "passed",
+  "schedule_board": true,
+  "settlement_workbook_orders": 1,
+  "local_mock_diagnostics": "passed",
+  "javascript_errors": [],
+  "actual_delivery": false,
+  "actual_outbound_requests": false
+}

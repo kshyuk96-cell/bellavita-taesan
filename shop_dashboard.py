@@ -41,4 +41,5 @@ SCRIPT='''<script>
 (()=>{let filter='all';const search=document.getElementById('shop-order-search');
 function apply(){for(const row of document.querySelectorAll('[data-shop-order]'))row.hidden=(filter!=='all'&&!row.dataset.queues.split(',').includes(filter))||!row.textContent.toLowerCase().includes(search.value.toLowerCase());}
 for(const button of document.querySelectorAll('[data-shop-filter]'))button.addEventListener('click',()=>{filter=button.dataset.shopFilter;for(const other of document.querySelectorAll('[data-shop-filter]'))other.setAttribute('aria-pressed',String(other===button));apply();});search?.addEventListener('input',apply);
+function openOrder(){const target=document.getElementById(location.hash.slice(1));if(target?.hasAttribute('data-shop-order')){const details=target.querySelector('details');if(details)details.open=true;}}window.addEventListener('hashchange',openOrder);openOrder();
 })();</script>'''

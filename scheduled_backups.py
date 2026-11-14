@@ -47,6 +47,12 @@ def snapshot(root,destination):
                     for ext,expected in (('png',png_hash),('pdf',pdf_hash)):
                         if hashlib.sha256(production_files.artifact_path(restored,order_id,version,ext).read_bytes()).hexdigest()!=expected:
                             raise ValueError('restored_artifact_hash_changed')
+        with sqlite3.connect(restored/'state.sqlite3') as c:
+            if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='shop_delivery_photos'").fetchone():
+                import delivery_photos
+                for order_id,photo_id,expected in c.execute('SELECT order_id,id,sha256 FROM shop_delivery_photos'):
+                    if hashlib.sha256(delivery_photos.photo_path(restored,order_id,photo_id).read_bytes()).hexdigest()!=expected:
+                        raise ValueError('restored_delivery_photo_changed')
         def logical(path):
             with sqlite3.connect(path/'state.sqlite3') as c:
                 digest=hashlib.sha256()

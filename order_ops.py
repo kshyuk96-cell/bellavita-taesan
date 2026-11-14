@@ -15,6 +15,9 @@ import order_handoff
 import partial_reviews
 import production_files
 import scheduled_backups
+import shop_dispatch
+import delivery_photos
+import shop_diagnostics
 
 SEOUL = ZoneInfo('Asia/Seoul')
 STAGES = {'confirmed': '주문 확인', 'shipping': '배송 중', 'delivered': '배송 완료'}
@@ -47,6 +50,9 @@ def setup(c):
     columns={row[1] for row in c.execute('PRAGMA table_info(shop_messages)')}
     for name,definition in (('channel',"TEXT NOT NULL DEFAULT 'mms'"),('request_json','TEXT')):
         if name not in columns:c.execute('ALTER TABLE shop_messages ADD COLUMN '+name+' '+definition)
+    shop_dispatch.setup(c)
+    delivery_photos.setup(c)
+    shop_diagnostics.setup(c)
     scheduled_backups.setup(c)
     production_files.setup(c)
     partial_reviews.setup(c)
@@ -181,9 +187,11 @@ def controls(c, row, path, *, staff=False):
         content += '<p>결제 취소·부분취소로 배송 처리를 보류합니다.</p>'
     for history in c.execute('SELECT * FROM shop_stage_history WHERE order_id=? ORDER BY version', (row['id'],)):
         content += f'<p>{escape(history["changed"][:16])} · {STAGES[history["stage"]]} · {escape(history["actor"])}</p>'
+    content += shop_dispatch.panel(c,row,path,staff=staff)
+    content += delivery_photos.panel(c,row,path,staff=staff)
     if staff:
         return content
-    delivery = signed_path('delivery', row['id'], os.environ['TAESAN_WEBHOOK_SECRET'], 86400)
+    delivery = shop_dispatch.link(c,row['id'],os.environ['TAESAN_WEBHOOK_SECRET'])
     content += f'<p><a href="{escape(delivery)}">직원용 주문·배송 링크 (24시간)</a></p>'
     content += production_files.panel(c, row, path)
     content += partial_reviews.panel(c, row, path)
@@ -247,7 +255,7 @@ def customer_receipt(c, row):
             '<main><h1>벨라비타 주문 상태</h1><p>' + payment + '</p><p>주문번호 ' + row['id']
             + '</p><p>주문 확인 → 배송 중 → 배송 완료</p><h2>' + STAGES[fulfillment['stage']] + '</h2>'
             + '<p>현금영수증: ' + escape(cash_receipts.status(c, row)) + '</p>'
-            + f'<img src="{escape(image)}" id="sample" alt="입력하신 주문 문구 샘플" style="width:100%;max-width:450px;height:auto"></main></html>')
+            + f'<img src="{escape(image)}" id="sample" alt="입력하신 주문 문구 샘플" style="width:100%;max-width:450px;height:auto">' + delivery_photos.customer(c,row) + '</main></html>')
 
 
 def start(db, root):

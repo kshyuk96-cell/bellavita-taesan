@@ -38,13 +38,13 @@ def api(path, body=None):
         return json.loads(response.read(200_000).decode())
 
 
-def text_for(job, order):
+def text_for(job, order,delivery_link=None):
     data = json.loads(order['details'])
     status = order_ops.STAGES.get(job['event'], '부분취소 잔액 대조 후 재개' if job['event'].startswith('resumed:') else '결제 일부 취소' if job['event'].startswith('refund:') else '결제 취소')
     text = f'[벨라비타] {status}\n주문번호 {order["id"]}\n{data["title"]}\n{data["venue"]}\n{data["event_time"][:16].replace("T", " ")}\n문구 확인용 샘플 이미지를 첨부합니다.'
     if job['audience'] == 'staff':
         origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
-        text += '\n주문·배송 관리: ' + origin + order_ops.signed_path('delivery', order['id'], os.environ['TAESAN_WEBHOOK_SECRET'], 86400)
+        text += '\n주문·배송 관리: ' + origin + (delivery_link or order_ops.signed_path('delivery', order['id'], os.environ['TAESAN_WEBHOOK_SECRET'], 86400))
     else:
         text += '\n주문 상태: ' + os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/') + f'/invitation-orders/{order["id"]}/receipt'
     return text
@@ -103,9 +103,11 @@ def process_one(db, root):
             if not order_ops.partial_reviews.allowed(c, current) and (job['event'] in order_ops.STAGES or job['event'].startswith('resumed:')):
                 c.execute("UPDATE shop_messages SET state='held',error='payment_changed' WHERE id=?", (job['id'],))
                 return
-            payload=json.loads(job['request_json']) if job['request_json'] else (alimtalk.message(job,current) if job['channel']=='alimtalk' else {
+            import shop_dispatch
+            tracking=shop_dispatch.link(c,current['id'],os.environ['TAESAN_WEBHOOK_SECRET'])
+            payload=json.loads(job['request_json']) if job['request_json'] else (alimtalk.message(job,current,tracking=(os.getenv('TAESAN_PUBLIC_URL','').rstrip('/')+tracking) if job['audience']=='staff' else None) if job['channel']=='alimtalk' else {
                 'to':job['recipient'],'from':os.environ['SOLAPI_SENDER'],'type':'MMS',
-                'text':text_for(job,current),'subject':'벨라비타 주문 안내','imageId':image_id,
+                'text':text_for(job,current,tracking),'subject':'벨라비타 주문 안내','imageId':image_id,
                 'customFields':{'orderId':job['order_id'],'notificationId':job['id']}})
             c.execute("UPDATE shop_messages SET state='sending',image_id=?,request_json=? WHERE id=?", (image_id,json.dumps(payload,ensure_ascii=False),job['id']))
     except Exception:

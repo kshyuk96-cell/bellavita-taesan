@@ -33,6 +33,10 @@ import shop
 import order_ops
 import order_sample
 import production_files
+import shop_dispatch
+import delivery_photos
+import shop_settlement
+import shop_diagnostics
 import cash_receipts
 import order_handoff
 import order_intake
@@ -1109,6 +1113,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        customer_confirm=re.fullmatch(r'/invitation-orders/([a-f0-9]{32})/delivery-confirm',path)
+        if customer_confirm:
+            if self.headers.get('Origin')!=os.getenv('TAESAN_PUBLIC_URL','').rstrip('/'):return self.order_message('고객 주문 화면을 다시 열어 주세요.',403)
+            try:
+                fields=self.read_order_form()
+                with db() as c:
+                    c.execute('BEGIN IMMEDIATE');delivery_photos.confirm(c,customer_confirm[1],fields)
+            except (ValueError,UnicodeError) as error:return self.order_message(str(error),422,back=True)
+            self.send_response(303);self.send_header('Location','/invitation-orders/'+customer_confirm[1]+'/receipt');self.send_header('Cache-Control','no-store');self.end_headers();return
         if path in ('/shop/handoff/claim', '/shop/handoff/ack'):
             if not order_handoff.authorize(self.headers.get('Authorization', '')):
                 return self.send_json({'error': 'handoff_not_authorized'}, 401)
@@ -1127,6 +1140,8 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, UnicodeError):
                 return self.send_json({'error': 'invalid_request'}, 400)
             return self.send_json(result, status)
+        assigned_delivery=re.fullmatch(r'/shop/assigned-delivery/([a-f0-9]{32})/([0-9]+)/([0-9]{10})/([a-f0-9]{64})',path)
+        if assigned_delivery:return self.delivery(assigned_delivery,write=self.command=='POST',assigned=True)
         delivery = order_ops.DELIVERY_PATH.fullmatch(path)
         if delivery:
             return self.delivery(delivery, write=True)
@@ -1266,6 +1281,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def read_order_form(self):
         size = int(self.headers.get('Content-Length', '0'))
+        if self.headers.get_content_type()=='multipart/form-data':
+            if not 0<size<=delivery_photos.MAX_UPLOAD+32768:raise ValueError('사진은 5MB 이내로 업로드해 주세요.')
+            return delivery_photos.multipart(self.headers['Content-Type'],self.rfile.read(size))
         if not 0 < size <= 16384 or self.headers.get_content_type() != 'application/x-www-form-urlencoded':
             raise ValueError('주문 정보가 올바르지 않아요.')
         fields = parse_qs(self.rfile.read(size).decode(), keep_blank_values=True, max_num_fields=100)
@@ -1282,20 +1300,32 @@ class Handler(BaseHTTPRequestHandler):
                              '<title>벨라비타 주문</title><main><h1>벨라비타 주문</h1><p>'
                              + escape(message) + '</p>' + link + '</main></html>', status)
 
-    def delivery(self, match, *, write=False):
-        order_id, expiry, signed = match.groups()
-        if not order_ops.authorized('delivery', order_id, expiry, signed, os.environ['TAESAN_WEBHOOK_SECRET']):
+    def delivery(self, match, *, write=False, assigned=False):
+        if assigned:order_id,version,expiry,signed=match.groups()
+        else:order_id,expiry,signed=match.groups();version=None
+        kind='assigned-delivery-'+version if assigned else 'delivery'
+        if not order_ops.authorized(kind, order_id, expiry, signed, os.environ['TAESAN_WEBHOOK_SECRET']):
             return self.order_message('주문·배송 관리 링크가 만료됐어요. 대표에게 최신 링크를 요청해 주세요.', 403)
+        with db() as c:
+            assignment=shop_dispatch.current(c,order_id)
+            if (assigned and not shop_dispatch.valid(c,order_id,version)) or (not assigned and assignment and assignment['owner']):
+                return self.order_message('담당자가 변경됐거나 전용 링크가 필요합니다. 현재 담당자 링크를 열어 주세요.',403)
         if write:
             if self.headers.get('Origin') != os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'):
                 return self.order_message('주문·배송 화면을 다시 열어 주세요.', 403)
             try:
                 fields = self.read_order_form()
-                if fields.get('action') != 'change_stage' or fields.get('order_id') != order_id:
+                if fields.get('action') not in ('change_stage','upload_delivery_photo','accept_assignment') or fields.get('order_id') != order_id:
                     raise ValueError('이 주문의 배송 상태만 변경할 수 있어요.')
                 with db() as c:
                     c.execute('BEGIN IMMEDIATE')
-                    order_ops.change_stage(c, fields, actor='staff-order-link')
+                    current_assignment=shop_dispatch.current(c,order_id)
+                    if (assigned and not shop_dispatch.valid(c,order_id,version)) or (not assigned and current_assignment and current_assignment['owner']):raise ValueError('담당자가 변경됐습니다. 최신 링크를 열어 주세요.')
+                    actor='assignment-link-v'+version if assigned else 'staff-order-link'
+                    if fields['action']=='change_stage':order_ops.change_stage(c,fields,actor=actor)
+                    elif fields['action']=='upload_delivery_photo':delivery_photos.upload(c,fields,ROOT,actor=actor)
+                    elif assigned and fields.get('assignment_version')==version:shop_dispatch.accept(c,fields,actor=actor)
+                    else:raise ValueError('현재 담당자 전용 링크에서 인수 확인해 주세요.')
             except (ValueError, UnicodeError) as error:
                 return self.order_message(str(error), 422)
             self.send_response(303)
@@ -1324,6 +1354,10 @@ class Handler(BaseHTTPRequestHandler):
                           'change_offer': shop.change_offer,
                           'record_payment_check': shop.record_payment_check,
                           'save_notifications': order_ops.save_settings,
+                          'assign_delivery':shop_dispatch.assign,
+                          'upload_delivery_photo':lambda c,f:delivery_photos.upload(c,f,ROOT),
+                          'publish_delivery_photo':lambda c,f:delivery_photos.publish(c,f,ROOT),
+                          'run_shop_diagnostics':lambda c,f:shop_diagnostics.run(c,f,ROOT),
                           'change_stage': order_ops.change_stage, 'retry_message': order_ops.retry_message,
                           'reconcile_message': order_ops.reconcile_message,
                           'review_partial': order_ops.partial_reviews.review,
@@ -1344,7 +1378,8 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         with db() as connection:
-            page = shop.admin_page(connection, match[0], origin)
+            try:page = shop.admin_page(connection, match[0], origin,dict(parse_qsl(urlsplit(self.path).query)),ROOT)
+            except ValueError as error:return self.order_message(str(error),422,back=True)
         return self.send_order_html(page, referrer_policy='same-origin')
 
     def shop_order(self, offer_id, *, submit=False):
@@ -1425,6 +1460,34 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        photo_match=re.fullmatch(r'/shop/delivery-photo/(admin|customer)/([a-f0-9]{32})/([a-f0-9]{32})/([0-9]{10})/([a-f0-9]{64})\.jpg',path)
+        if photo_match:
+            audience,order_id,photo_id,expiry,signed=photo_match.groups()
+            if not order_ops.authorized('delivery-photo-'+audience+'-'+photo_id,order_id,expiry,signed,os.environ['TAESAN_WEBHOOK_SECRET']):return self.order_message('사진 링크가 만료됐어요.',403)
+            with db() as c:
+                photo=c.execute('SELECT * FROM shop_delivery_photos WHERE id=? AND order_id=?',(photo_id,order_id)).fetchone()
+                if not photo:return self.order_message('사진을 찾지 못했어요.',404)
+                if audience=='customer' and (photo['state']!='public' or not delivery_photos.deliverable(c,order_id)):return self.order_message('고객에게 공개되지 않은 사진입니다.',403)
+                try:
+                    content=delivery_photos.photo_path(ROOT,order_id,photo_id).read_bytes()
+                    if hashlib.sha256(content).hexdigest()!=photo['sha256']:raise ValueError('photo_changed')
+                except (OSError,ValueError):return self.order_message('배송 사진 무결성·백업을 확인해 주세요.',503)
+            self.send_response(200);self.send_header('Content-Type','image/jpeg');self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
+        for suffix in ('/settlement.xlsx','/diagnostics.json'):
+            admin_export=shop.ADMIN_PATH.fullmatch(path.removesuffix(suffix)) if path.endswith(suffix) else None
+            if admin_export:
+                if not shop.admin_authorized(*admin_export.groups(),os.environ['TAESAN_WEBHOOK_SECRET']):return self.order_message('관리자 링크가 만료됐어요.',403)
+                try:
+                    fields=dict(parse_qsl(urlsplit(self.path).query))
+                    with db() as c:
+                        if suffix=='/settlement.xlsx':content,filename=shop_settlement.workbook(c,fields)
+                        else:
+                            if not fields.get('run','').isdigit():raise ValueError('진단 기록을 선택해 주세요.')
+                            row=c.execute('SELECT report FROM shop_diagnostic_runs WHERE id=?',(int(fields['run']),)).fetchone()
+                            if not row:return self.order_message('진단 기록이 없습니다.',404)
+                            content=row['report'].encode();filename='shop-diagnostics.json'
+                except ValueError as error:return self.order_message(str(error),422,back=True)
+                self.send_response(200);self.send_header('Content-Type','application/json; charset=utf-8' if suffix.endswith('json') else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');self.send_header('Content-Disposition','attachment; filename="'+filename+'"');self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
         production=re.fullmatch(r'/shop/(production-([0-9]+)-(png|pdf))/([a-f0-9]{32})/([0-9]{10})/([a-f0-9]{64})',path)
         factory_file=re.fullmatch(r'/shop/handoff/file/([a-f0-9]{32})/([0-9]+)\.(png|pdf)',path)
         if production or factory_file:
@@ -1469,6 +1532,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(data)))
             self.end_headers()
             return self.wfile.write(data)
+        assigned_delivery=re.fullmatch(r'/shop/assigned-delivery/([a-f0-9]{32})/([0-9]+)/([0-9]{10})/([a-f0-9]{64})',path)
+        if assigned_delivery:return self.delivery(assigned_delivery,write=self.command=='POST',assigned=True)
         delivery = order_ops.DELIVERY_PATH.fullmatch(path)
         if delivery:
             return self.delivery(delivery)
