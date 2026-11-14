@@ -606,26 +606,43 @@ def read_staff_delivery(ranges):
     return read_delivery_ranges(ranges, spreadsheet=delivery_read_sheet())
 
 
-def photo_order_status(image_urls):
+def photo_order_status(image_urls, question):
+    mode = staff_photo.question_mode(question)
+    if mode is None:
+        return {'summary': '사진으로는 배송 완료·미완료 상태를 조회할 수 있어요. “전체 상태”나 “완료된 것만 보여줘”라고 말씀해 주세요.'}
     from openai import OpenAI
     client = OpenAI(timeout=12, max_retries=0)
     numbers = staff_photo.extract_numbers(image_urls, client,
                                          os.getenv('TAESAN_VISION_MODEL') or os.environ['TAESAN_MODEL'])
     if not numbers:
         return {'summary': '주문번호가 잘 보이도록 사진을 잘라 다시 보내 주세요.'}
-    date_rows, checks = read_staff_delivery(["'배송관리'!A3:C", "'배송관리'!K3:K"])
-    if date_rows[:1] != [['주문번호', '배송일', '행사시간']] or checks[:1] != [['배송 완료']]:
+    try:
+        order_rows, checks = read_staff_delivery(["'배송관리'!A3:A", "'배송관리'!K3:K"])
+    except Exception as error:
+        print('사진 배송 상태 조회 실패:', type(error).__name__, file=sys.stderr, flush=True)
+        return {'summary': '사진에서 주문번호는 읽었지만 배송관리를 조회하지 못했어요. 잠시 뒤 다시 보내 주세요.'}
+    if order_rows[:1] != [['주문번호']] or checks[:1] != [['배송 완료']]:
         return {'summary': '배송관리 열 제목을 확인해 주세요.'}
     result = {number: [] for number in numbers}
-    for i, row in enumerate(date_rows[1:], 1):
+    for i, row in enumerate(order_rows[1:], 1):
         number = str(delivery_routes.value(row, 0))
         if number in result:
             checked = delivery_routes.value(delivery_routes.value(checks, i), 0)
             result[number].append({True: '완료', False: '미완료'}.get(checked, '확인 필요')
                                   if type(checked) is bool else '확인 필요')
-    lines = [f"{number}번 · {states[0] if len(states) == 1 else '주문번호 확인 필요' if states else '배송관리에서 찾을 수 없음'}"
-             for number, states in result.items()]
-    return {'summary': '사진에서 읽은 주문번호를 배송관리에서 확인했어요.\n'+'\n'.join(lines)}
+    resolved = {number: states[0] if len(states) == 1 else
+                '주문번호 확인 필요' if states else '배송관리에서 찾을 수 없음'
+                for number, states in result.items()}
+    if mode == 'all':
+        lines = [f'{number}번 · {status}' for number, status in resolved.items()]
+        return {'summary': '사진에서 읽은 주문번호를 배송관리에서 확인했어요.\n' + '\n'.join(lines)}
+    status = '완료' if mode == 'complete' else '미완료'
+    matches = [f'{number}번' for number, value in resolved.items() if value == status]
+    unknown = sum(value not in ('완료', '미완료') for value in resolved.values())
+    summary = f'사진 속 배송 {status} {len(matches)}건' + (f' · {", ".join(matches)}' if matches else '')
+    if unknown:
+        summary += f'\n배송 상태를 확인하지 못한 주문 {unknown}건'
+    return {'summary': summary}
 
 
 def handle(message, history, owner):
@@ -820,10 +837,10 @@ def start_order_queue():
     threading.Thread(target=loop, daemon=True).start()
 
 
-def run_job(job, message, owner, kind='', photo_urls=None):
+def run_job(job, message, owner, kind='', photo_urls=None, photo_question=''):
     try:
         if kind == 'photo':
-            result = photo_order_status(photo_urls)
+            result = photo_order_status(photo_urls, photo_question)
         elif kind == 'route':
             result = delivery_routes.run(message, owner, db, read_delivery_ranges, datetime.now(SEOUL))
         elif kind == 'invitation':
@@ -997,7 +1014,12 @@ def dispatch(body, defer_callback=None):
     message = user_request.get('utterance') or ''
     if not isinstance(message, str):
         return kakao('요청 내용을 확인해 주세요.')
-    message = '사진으로 배송 확인' if photo_urls is not None else message.strip()
+    message = message.strip()
+    photo_question = message if photo_urls is not None else ''
+    if photo_urls is not None:
+        if len(photo_question) > 4000:
+            return kakao('사진과 함께 보낼 질문은 4,000자 이내로 적어 주세요.')
+        message = '사진으로 배송 확인'
     registration = re.fullmatch(r'직원 등록 ([a-zA-Z0-9_-]{16})', message)
     if registration:
         return kakao('직원 등록이 완료됐어요. 메뉴라고 입력해 보세요.' if enroll(owner, registration[1])
@@ -1186,7 +1208,7 @@ def dispatch(body, defer_callback=None):
             c.execute('INSERT INTO jobs VALUES (?,?,?,?,?,?,NULL)',
                       (job, owner, fingerprint, time.time(), 'running', json_text({'message': message, 'kind': kind})))
             c.commit()
-            future = (POOL.submit(run_job, job, message, owner, kind, photo_urls) if photo_urls
+            future = (POOL.submit(run_job, job, message, owner, kind, photo_urls, photo_question) if photo_urls
                       else POOL.submit(run_job, job, message, owner, kind))
             ACTIVE[job] = future
     try:
