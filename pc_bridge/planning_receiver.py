@@ -109,13 +109,13 @@ class WindowsChatCopyPort:
         if len(lists)!=1:raise RoomBlocked('Chat list is missing or ambiguous')
         self.chat=lists[0]
     def validate(self):
-        import win32gui,win32process
+        import win32gui
+        from windows_native import focus_handle,root_handle
         from room_access import check_window
         check_window(self.window,{'window_title':self.room})
-        thread=win32process.GetWindowThreadProcessId(self.window.handle)[0]
         if (win32gui.GetForegroundWindow()!=self.window.handle or
-            win32gui.GetGUIThreadInfo(thread)['hwndFocus']!=self.chat.handle or
-            win32gui.GetAncestor(self.chat.handle,2)!=self.window.handle or
+            focus_handle(self.window.handle)!=self.chat.handle or
+            root_handle(self.chat.handle)!=self.window.handle or
             win32gui.GetClassName(self.chat.handle)!='EVA_VH_ListControl_Dblclk'):
             raise RoomBlocked('Focus must remain on the planning-room chat list')
     def copy(self):

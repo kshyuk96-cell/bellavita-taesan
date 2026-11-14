@@ -60,17 +60,16 @@ class WindowsPastePort:
 
     def validate(self, focused=False):
         import win32gui
+        from windows_native import focus_handle,root_handle
         from room_access import check_window
         check_window(self.window, {'window_title': ROOM})
-        if not win32gui.IsWindow(self.box.handle) or win32gui.GetAncestor(self.box.handle, 2) != self.window.handle:
+        if not win32gui.IsWindow(self.box.handle) or root_handle(self.box.handle) != self.window.handle:
             raise RoomBlocked('입력칸이 변경되었습니다.')
         if win32gui.GetClassName(self.box.handle) != 'RICHEDIT50W':
             raise RoomBlocked('입력칸 종류가 변경되었습니다.')
         if focused:
-            import win32process
-            thread = win32process.GetWindowThreadProcessId(self.window.handle)[0]
             if (win32gui.GetForegroundWindow() != self.window.handle or
-                    win32gui.GetGUIThreadInfo(thread)['hwndFocus'] != self.box.handle):
+                    focus_handle(self.window.handle) != self.box.handle):
                 raise RoomBlocked('대상 입력칸에서 포커스가 벗어났습니다.')
 
     def read_input(self):

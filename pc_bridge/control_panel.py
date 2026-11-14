@@ -26,8 +26,10 @@ class Panel:
         self.db=sqlite3.connect(STATE/'panel.sqlite3');setup(self.db)
         self.db.execute('CREATE TABLE IF NOT EXISTS room_baselines (id TEXT PRIMARY KEY,seen TEXT NOT NULL)');self.db.commit()
         self.root=tk.Tk();self.root.title('태산이 주문 테스트');self.root.geometry('920x760')
-        self.status=tk.StringVar(value='주문 분석은 PC 안에서만 처리합니다. 카톡 전송 대상: 기획')
+        self.status=tk.StringVar(value='업무 PC 모드 · 백그라운드 수신 연결 미완료 · 주문 분석은 PC 안에서만 처리합니다.')
         ttk.Label(self.root,textvariable=self.status,wraplength=880).pack(pady=8)
+        self.manual_mode=tk.BooleanVar(value=False)
+        ttk.Checkbutton(self.root,text='직접 조작하는 테스트 허용 · 카톡 창과 클립보드를 사용합니다',variable=self.manual_mode).pack(anchor='w',padx=10)
         bar=ttk.Frame(self.root);bar.pack(fill='x',padx=10)
         for label,action in [('고객방 설정',self.settings),('방 목록 새로고침',self.refresh),
                              ('선택 방 읽기',self.capture),('연결 테스트',self.connect),
@@ -45,7 +47,10 @@ class Panel:
         try:fn()
         except Exception as e:
             # Do not log request headers, raw customer transcripts or credentials.
-            self.status.set('중단: '+(str(e) if isinstance(e,(ValueError,RoomBlocked)) else type(e).__name__))
+            import traceback
+            trace=traceback.extract_tb(e.__traceback__)
+            where=(' / '+Path(trace[-1].filename).name+':'+str(trace[-1].lineno)) if trace else ''
+            self.status.set('중단: '+(str(e) if isinstance(e,(ValueError,RoomBlocked)) else type(e).__name__+where))
     def config(self):
         if not self.config_path.exists():return {'allowed_rooms':[]}
         result=json.loads(self.config_path.read_text(encoding='utf-8-sig'));validate_config(result);return result
@@ -61,6 +66,7 @@ class Panel:
         self.output.configure(state='normal');self.output.delete('1.0','end');self.output.insert('1.0',text);self.output.configure(state='disabled')
     def analyze(self):self.show(preview(self.input.get('1.0','end'))['text'])
     def capture(self):
+        if not self.manual_mode.get():raise ValueError('업무 PC 모드에서는 창·클립보드를 조작하는 수집을 실행하지 않습니다.')
         config=self.config();name=self.room.get()
         entries=[e for e in validate_config(config) if e['window_title']==name]
         if len(entries)!=1:raise ValueError('설정에서 고객방을 등록하고 선택하세요.')
@@ -86,6 +92,7 @@ class Panel:
             ttk.Button(choices,text='선택한 메시지 한 건 분석',command=select).pack()
         self.later('선택한 고객방의 대화 말풍선을 클릭하세요',read)
     def connect(self):
+        if not self.manual_mode.get():raise ValueError('업무 PC 모드에서는 카톡 조작 테스트를 실행하지 않습니다.')
         token=self.key.get()
         if len(token)<32:raise ValueError('Render의 전용 연결 키를 입력하세요. 키를 채팅에 보내지 마세요.')
         def baseline():
@@ -114,6 +121,7 @@ class Panel:
         with self.db:self.db.execute('UPDATE receipts SET state=? WHERE id=?',('sent' if confirmed else 'uncertain',key))
         self.status.set('전송을 시도했습니다. 실제 말풍선을 확인해 주세요. 자동 재전송은 차단됩니다.')
     def share_review(self):
+        if not self.manual_mode.get():raise ValueError('업무 PC 모드에서는 카톡 자동 입력을 실행하지 않습니다.')
         path=ROOT/'planning-test-manifest.json'
         if not path.exists():raise ValueError('검토용 주문서 파일을 먼저 준비해야 합니다.')
         m=json.loads(path.read_text(encoding='utf-8'))
