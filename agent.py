@@ -1098,6 +1098,26 @@ class Handler(BaseHTTPRequestHandler):
         return self.order_message('카톡에서 “초대장 주문관리”를 열어 직원 로그인을 해 주세요.', 401)
 
     def do_POST(self):
+        if self.path == '/pc/planning-probe':
+            import planning_probe
+            token = os.getenv('TAESAN_PC_PROBE_TOKEN', '')
+            authorization = self.headers.get('Authorization', '')
+            if not planning_probe.authorized(authorization, token):
+                return self.send_json({'error': 'probe_not_authorized'}, 401)
+            try:
+                size = int(self.headers.get('Content-Length', '0'))
+                if not 0 < size <= 1024:
+                    return self.send_json({'error': 'invalid_probe_size'}, 400)
+                payload = json.loads(self.rfile.read(size))
+            except (ValueError, UnicodeError):
+                return self.send_json({'error': 'invalid_probe'}, 400)
+            # Keep test nonces separate from staff, orders, payments and Sheets.
+            connection = sqlite3.connect(ROOT / 'planning-probe.sqlite3')
+            try:
+                status, result = planning_probe.respond(connection, authorization, token, payload)
+            finally:
+                connection.close()
+            return self.send_json(result, status)
         path = urlsplit(self.path).path
         if path == '/development-queue':
             try:
