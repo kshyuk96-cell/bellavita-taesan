@@ -128,7 +128,7 @@
     {
       "id": "owner_acceptance",
       "status": "pending",
-      "required": "final four-product price/options/design and sample delivery channel acceptance"
+      "required": "final four-product price/options/design acceptance; notification channel confirmed as Kakao Alimtalk sample link"
     },
     {
       "id": "real_payapp",
@@ -138,7 +138,7 @@
     {
       "id": "real_notifications",
       "status": "unverified",
-      "required": "approved channel/templates, staff/customer handset receipt; distinguish MMS attachment from Kakao image link"
+      "required": "approved Alimtalk channel/templates and staff/customer handset receipt using confirmed sample-image links"
     },
     {
       "id": "real_receipts",
@@ -171,7 +171,19 @@
   },
   "live_verification_followup": {
     "product_features_added": 0,
-    "notification_channel_decision": "requested_pending",
+    "notification_channel_decision": {
+      "status": "confirmed_by_user",
+      "channel": "alimtalk",
+      "sample_delivery": "image_confirmation_link",
+      "audiences": [
+        "staff",
+        "customer"
+      ],
+      "sms_fallback": false,
+      "live_messages_enabled_changed": false,
+      "mock_tests_passed": 3,
+      "actual_messages_sent": 0
+    },
     "available_access": {
       "render_service_metadata": true,
       "render_environment_read": false,
