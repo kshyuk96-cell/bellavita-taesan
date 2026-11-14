@@ -728,7 +728,10 @@ def present(job, result, owner=None):
             buttons.append(('배정 자세히 보기', f'결과 {job} 1'))
         if index == 0 and not result.get('selected'):
             image = delivery_reports.url(base, secret, job, 'summary.png')
-            answer = kakao('구로센터 배송루트 배정안을 준비했어요.',
+            summary = '구로센터 배송루트 배정안을 준비했어요.'
+            if any(day['missed'] for day in days.values()):
+                summary += '\n미배정 사유는 배정 자세히 보기 또는 엑셀에서 확인해 주세요.'
+            answer = kakao(summary,
                            images=[(image, '날짜별 배정과 미배정 요약')], buttons=buttons)
         else:
             answer = kakao(pages[index], buttons=buttons)
