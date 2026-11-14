@@ -29,6 +29,8 @@ import delivery_routes
 import development_queue
 import invitation
 import owner_alerts
+import order_duplicates
+import order_location_provider
 import order_intake
 import order_ledger
 import order_operations
@@ -738,6 +740,14 @@ def run_job(job, message, owner, kind=''):
             result = run_invitation(message, owner)
         elif kind == 'order':
             result = run_order(message, owner)
+        elif kind == 'order_duplicate':
+            if not role_of(owner):
+                result = {'summary': '조회 권한이 없어 중복 주문을 확인하지 못했어요.'}
+            else:
+                resolver = order_location_provider.make_resolver(os.getenv('KAKAO_REST_API_KEY', ''))
+                summary = order_duplicates.check(int(message), read_delivery_ranges, resolver=resolver)
+                result = {'summary': summary if role_of(owner) else
+                          '조회 권한이 변경되어 중복 주문 결과를 표시하지 않았어요.'}
         else:
             result = handle(message, recent(owner), owner)
     except ValueError as error:
@@ -748,6 +758,8 @@ def run_job(job, message, owner, kind=''):
             result = {'summary': '배송루트 자료를 확인하지 못했어요. 잠시 뒤 “다시 계산”이라고 말씀해 주세요.'}
         elif kind == 'order':
             result = {'summary': '원장 등록을 확인하지 못했어요. 주문 내용을 보관하고 다시 확인할게요.'}
+        elif kind == 'order_duplicate':
+            result = {'summary': '원장을 읽지 못해 중복을 확인하지 못했어요. 잠시 뒤 다시 말씀해 주세요.'}
         elif getattr(error, 'code', None) == 'credit_balance_exhausted':
             result = {'summary': 'AI 이용 잔액이 부족해 이 요청을 해석하지 못했어요. 메뉴의 오늘 할 일과 재고 조회는 이용할 수 있어요.'}
         else:
@@ -1008,11 +1020,15 @@ def dispatch(body, defer_callback=None):
             or development_queue.APPROVE.fullmatch(message)) or re.fullmatch(
             r'(?:승인 검토|구조 변경 승인|구조 변경 반려) [a-f0-9]{12}', message):
         return approval_command(owner, message)
+    duplicate_check = order_duplicates.REQUEST.fullmatch(message)
     with LOCK, db() as c:
         pending = c.execute('SELECT details FROM invitation_input WHERE owner=? AND expires>?',
                             (owner, time.time())).fetchone()
         route_context = delivery_routes.session(db, owner)
-        if order_intake.wants_order(message, explicit_only=True):
+        if duplicate_check:
+            message = duplicate_check['first'] or duplicate_check['last']
+            kind = 'order_duplicate'
+        elif order_intake.wants_order(message, explicit_only=True):
             kind = 'order'
         elif development_queue.request_detail(message):
             kind = 'development'
@@ -1030,7 +1046,7 @@ def dispatch(body, defer_callback=None):
         fingerprint = hashlib.sha256(fingerprint_input.encode()).hexdigest()
         for old in [key for key, future in ACTIVE.items() if future.done()]:
             ACTIVE.pop(old, None)
-        row = None if kind in ('route', 'delivery_count') else c.execute(
+        row = None if kind in ('route', 'delivery_count', 'order_duplicate') else c.execute(
             'SELECT * FROM jobs WHERE owner=? AND fingerprint=? AND created>? ORDER BY created DESC LIMIT 1',
             (owner, fingerprint, time.time()-180)).fetchone()
         if row:
@@ -1042,7 +1058,7 @@ def dispatch(body, defer_callback=None):
             future = ACTIVE[job]
         else:
             running = c.execute("SELECT id FROM jobs WHERE owner=? AND state='running' ORDER BY created DESC LIMIT 1", (owner,)).fetchone()
-            if running and running['id'] in ACTIVE and kind != 'delivery_count':
+            if running and running['id'] in ACTIVE and kind not in ('delivery_count', 'order_duplicate'):
                 return kakao('앞에서 말씀하신 일을 확인하고 있어요.')
             job = secrets.token_hex(6)
             c.execute('INSERT INTO jobs VALUES (?,?,?,?,?,?,NULL)',
@@ -1059,6 +1075,8 @@ def dispatch(body, defer_callback=None):
             return {'version': '2.0', 'useCallback': True}
         if kind == 'order':
             return kakao('주문을 확인하고 있어요.', buttons=[('주문 확인', f'결과 {job}')])
+        if kind == 'order_duplicate':
+            return kakao('원장과 실제 장소를 확인하고 있어요.', buttons=[('중복 확인 결과', f'결과 {job}')])
         if kind == 'route':
             return kakao('배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {job}')])
         if kind == 'delivery_count':
