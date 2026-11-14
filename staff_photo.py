@@ -7,6 +7,7 @@ from urllib.parse import urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 MAX_BYTES = 5_000_000
+NUMBER_REPLY = re.compile(r'(?:주문\s*번호\s*[:：]?\s*)?([1-9][0-9]{0,6})\s*(?:번(?:이에요|입니다)?)?[.!]?')
 
 ALL = re.compile(r'(?:사진으로 배송 확인|(?:배송\s*)?(?:전체(?:\s*상태)?|전부|상태|현황)\s*(?:를?\s*(?:보여|알려|확인)(?:\s*(?:해|줘|주세요|줘요))*)?)[?.!]*')
 FILTER = re.compile(r'(?:이\s*사진에서\s*)?(?:배송\s*)?(미\s*완료|완료|아직\s*안\s*끝난|아직\s*안\s*된|끝난)(?:\s*된)?(?:\s*(?:건|것|거))?\s*만\s*(?:(?:보여|알려)\s*(?:줘|줘요|주세요)?|확인\s*(?:해\s*)?(?:줘|줘요|주세요)?)?[?.!]*')
