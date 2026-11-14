@@ -1,0 +1,41 @@
+name: Manager bridge validation
+
+on:
+  pull_request:
+    paths:
+      - 'manager_bridge/**'
+      - 'tests/test_manager_bridge.py'
+      - '.github/workflows/manager-bridge.yml'
+  push:
+    branches:
+      - 'codex/taesan-manager-*'
+    paths:
+      - 'manager_bridge/**'
+      - 'tests/test_manager_bridge.py'
+      - '.github/workflows/manager-bridge.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manager-validation-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  protocol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate independent manager protocol with fixture providers
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python -m unittest discover -s manager_bridge/tests -t . -q
+      - name: Check whitespace
+        run: git diff --check HEAD^ HEAD
