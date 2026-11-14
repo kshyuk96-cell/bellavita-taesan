@@ -4,10 +4,15 @@ import json,re,uuid
 import order_operations as ops
 import order_intake
 import order_review_rules
+import order_sharing
 
 COMMAND=re.compile(r'^(주문 수정|주문 취소|추가 주문) ([1-9][0-9]*)(?:\n([\s\S]+))?$')
 
 def command(db,owner,message):
+    from order_lock import writer_lock
+    with writer_lock(db):return _command_locked(db,owner,message)
+
+def _command_locked(db,owner,message):
     match=COMMAND.fullmatch(message)
     if not match:
         if re.search(r'아까.*(?:수정|취소)|같은\s*(?:걸|거).*하나\s*더|주문\s*(?:수정|취소)|추가\s*주문',message):
@@ -22,7 +27,8 @@ def command(db,owner,message):
         if action=='주문 취소':
             if body.strip():return '취소 요청에는 주문번호만 적어주세요.'
             if row['state']=='cancel_requested':return '이미 취소 요청을 기록했어요. 현장·배송 취소 완료는 아직 미확인입니다.'
-            if row['state'] not in ('saved','update'):return '처리 상태를 확인한 뒤 취소를 요청해 주세요.'
+            if row['state'] not in ('saved','update','review_hold'):return '처리 상태를 확인한 뒤 취소를 요청해 주세요.'
+            order_sharing.invalidate(c,row['id'])
             after={**before,'cancellation_requested':True}
             c.execute('INSERT INTO order_changes VALUES (?,?,?,?,?)',(row['id'],owner,ops.now(),ops.dump(before),ops.dump(after)))
             c.execute("UPDATE order_operations SET state='cancel_requested',details=? WHERE id=?",(ops.dump(after),row['id']))
@@ -53,6 +59,7 @@ def command(db,owner,message):
         except ValueError:return '배송일을 YYYY-MM-DD 형식의 실제 날짜로 적어주세요.'
         if after.get('delivery_time') and not re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]',after['delivery_time']):return '배송시각을 HH:MM으로 확인해 주세요.'
         if after==before:return '기존 주문과 같은 값이라 추가 수정하지 않았어요.'
+        order_sharing.invalidate(c,row['id'])
         c.execute('INSERT INTO order_changes VALUES (?,?,?,?,?)',(row['id'],owner,ops.now(),ops.dump(before),ops.dump(after)))
-        c.execute("UPDATE order_operations SET details=?,state='update',retry_after=0 WHERE id=?",(ops.dump(after),row['id']))
+        c.execute("UPDATE order_operations SET details=?,state='update',attempts=0,retry_after=0 WHERE id=?",(ops.dump(after),row['id']))
         return '기존 주문번호에 수정 요청을 보관했어요. 원장 반영은 아직 미확인입니다.'

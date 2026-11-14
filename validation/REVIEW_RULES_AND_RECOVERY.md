@@ -8,3 +8,5 @@
 Validation: 100 unittest tests pass. 6,000 new synthetic checks cover the first three changes; existing 50,375 ledger-derived variations retain 50,361 exact matches and 14 information-preserving normalization differences. Actual saved invitation responses still match 12 sender references and all 10 available wedding date/time references. Historical-input comparisons are not end-to-end production readiness.
 
 Publication: the authenticated GitHub account and repository owner are kshyuk96-cell; connected repository metadata confirms admin/push permission and PUBLIC visibility. The user explicitly authorized code/tests and aggregate-only publication to customer-order-hardening-20261114 / draft PR #23. Customer raw input, pages, addresses, identifiers and private invitation URLs remain outside the repository. This is a stacked review branch against PR #19, not main. No merge, deploy, service configuration change, live sheet write or Kakao send is authorized in this bundle.
+
+Current writer serialization, retry limits and sharing behavior supersede earlier single-process notes: see [writer/retry/sharing](WRITER_RETRY_AND_SHARING.md).

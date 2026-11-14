@@ -27,3 +27,5 @@ Examples (synthetic):
 배송시간: 10:00
 규격: 2호
 ```
+
+Current writer serialization, retry limits and sharing behavior supersede earlier single-process notes: see [writer/retry/sharing](WRITER_RETRY_AND_SHARING.md).

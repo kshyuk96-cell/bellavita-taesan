@@ -16,7 +16,11 @@ class LedgerDeliveryTimeTests(unittest.TestCase):
                 if rng=="'액자화환'!A4:K4":return [order_ledger.HEADER]
                 if rng=="'배송채널DB'!A2:D200":return []
                 if rng=="'액자화환'!A5:AC5":
-                    row=['']*29;row[5]='모의 예식장';row[10]='모의 수신자';row[15]='모의 회사';return [row]
+                    row=['']*29
+                    for request in session.post.call_args.kwargs['json']['requests']:
+                        update=request['updateCells'];entered=update['rows'][0]['values'][0].get('userEnteredValue',{})
+                        row[update['start']['columnIndex']]=next(iter(entered.values()),'')
+                    return [row]
                 raise AssertionError('Unexpected read')
         details={'event_type':'결혼','venue':'모의 예식장','recipient':'모의 수신자','sender':'모의 회사','event_date':'2026-11-21','event_time':'13:00'}
         ledger=FakeLedger(session,'test-sheet')
@@ -44,7 +48,11 @@ class NewLedgerEventTimeTests(unittest.TestCase):
                 if rng=="'액자화환'!A5:A":return []
                 if rng=="'배송채널DB'!A2:D200":return []
                 if rng=="'액자화환'!A5:AC5":
-                    row=['']*29;row[5]='모의 예식장';row[10]='모의 수신자';row[15]='모의 회사';return [row]
+                    row=['']*29
+                    for request in session.post.call_args.kwargs['json']['requests']:
+                        update=request['updateCells'];entered=update['rows'][0]['values'][0].get('userEnteredValue',{})
+                        row[update['start']['columnIndex']]=next(iter(entered.values()),'')
+                    return [row]
                 raise AssertionError('Unexpected read')
         details={'event_type':'결혼','venue':'모의 예식장','recipient':'모의 수신자','sender':'모의 회사','event_time':'14:30','delivery_time':'09:30'}
         ledger=FakeLedger(session,'test-sheet')

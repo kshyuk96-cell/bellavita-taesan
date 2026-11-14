@@ -618,7 +618,7 @@ def run_order(message, owner):
             number, data = order_operations.save(db, key, order_intake.extract, write_order, order_saved)
     except Exception as error:
         with db() as c:
-            order_operations.defer(c, key)
+            order_operations.defer(c, key, error)
         detail = str(error) if isinstance(error, ValueError) else '행사 정보나 시트 연결을 확인해 주세요.'
         return {'summary': '주문을 보관했어요. 원장 등록은 확인이 필요해요.\n' + detail[:130] + '\n접수ID: ' + key, 'order_status': True}
     return {'summary': '원장에 등록했어요.\n' + order_assistance.question(data) + '\n' + order_intake.report(number, data)}
@@ -644,9 +644,9 @@ def process_order_queue():
             return
         try:
             order_operations.save(db, row['id'], order_intake.extract, write_order, order_saved)
-        except Exception:
+        except Exception as error:
             with db() as c:
-                order_operations.defer(c, row['id'])
+                order_operations.defer(c, row['id'], error)
 
 
 def start_order_queue():
@@ -850,6 +850,8 @@ def dispatch(body, defer_callback=None):
             return kakao('아직 직접 접수한 카톡 주문이 없어요.')
         if order['state'] == 'cancel_requested':
             return kakao('최근 카톡 주문은 취소 요청 상태예요. 시트·배송 취소 완료는 아직 미확인입니다.')
+        if order['state'] == 'review_hold':
+            return kakao('최근 주문은 반복 실패로 검토 보류했어요. 접수ID 또는 주문번호로 상태를 확인해 주세요.')
         if order['state'] == 'update':
             return kakao('최근 카톡 주문은 수정 요청을 보관했어요. 원장 반영은 아직 미확인입니다.')
         if order['state'] == 'saved':
