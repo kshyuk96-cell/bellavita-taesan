@@ -43,5 +43,17 @@
   },
   "catalog_browser": "passed: 375/1280",
   "existing_admin_growth_browser": "passed: 375",
-  "hosted_verification": "pending"
+  "hosted_verification": {
+    "hosted_ui": true,
+    "saved_search_after_redeploy": true,
+    "handover_after_redeploy": true,
+    "previous_order_states_preserved": true,
+    "order_count": 3,
+    "integrity": "ok",
+    "mount_verified": true,
+    "new_tables_restore_verified": true,
+    "manual_matches_source": true,
+    "live_side_effects": false
+  },
+  "verified_commit": "1d55e04f2d7262c63ed87e831af3371258b09182"
 }
