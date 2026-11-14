@@ -1,0 +1,100 @@
+{
+  "service_url": "https://bellavita-shop-verification-v3b4.onrender.com",
+  "service_id": "srv-dbs3drbrjlhs73d278sg",
+  "disk_id": "dsk-dbs3drjrjlhs73d279b0",
+  "validated_commit": "44837361cbe27f8e66c349f8287691e8d7a0eb28",
+  "live_deploy": "dep-dbs3gkrl550s73fbe7ng",
+  "previous_deploy": "dep-dbs3f9l6e07s738nfqf0",
+  "mount_verified": true,
+  "data_under_var_data": true,
+  "integrity": "ok",
+  "stored_orders": 3,
+  "counts": {
+    "shop_products": 4,
+    "shop_offers": 3,
+    "invitation_orders": 3,
+    "payment_events": 3,
+    "payment_checks": 0,
+    "shop_fulfillment": 1,
+    "shop_stage_history": 1,
+    "shop_messages": 3,
+    "shop_cash_receipts": 0,
+    "shop_handoff": 3,
+    "shop_partial_reviews": 0,
+    "shop_artifacts": 0,
+    "shop_artifact_reviews": 0,
+    "shop_backup_runs": 1,
+    "shop_assignments": 0,
+    "shop_assignment_history": 0,
+    "shop_assignment_accepts": 0,
+    "shop_delivery_photos": 0,
+    "shop_delivery_photo_changes": 0,
+    "shop_delivery_confirms": 0,
+    "shop_diagnostic_runs": 0,
+    "shop_amendments": 0,
+    "shop_amendment_events": 0,
+    "shop_service_cases": 0,
+    "shop_service_events": 0,
+    "shop_service_photos": 0,
+    "shop_assignment_batches": 0
+  },
+  "order_states": [
+    {
+      "id": "453fa83bc60e010dce7d2bca40d4b481",
+      "state": "waiting"
+    },
+    {
+      "id": "63c3a4d1205ea7d4c0cfb67a5a59960b",
+      "state": "cancelled"
+    },
+    {
+      "id": "0d6e5d89349d2b82ed8ece055597c765",
+      "state": "waiting"
+    }
+  ],
+  "expected_order_amounts": {
+    "63c3a4d1205ea7d4c0cfb67a5a59960b": 165000,
+    "0d6e5d89349d2b82ed8ece055597c765": 110000
+  },
+  "amounts_verified_in_admin": true,
+  "redeploy_preserved": true,
+  "automatic_backup_verified": true,
+  "backup_restore": {
+    "backup_restore": "passed",
+    "integrity": "ok",
+    "restored_counts": {
+      "shop_products": 4,
+      "shop_offers": 3,
+      "invitation_orders": 3,
+      "payment_events": 3,
+      "payment_checks": 0,
+      "shop_fulfillment": 1,
+      "shop_stage_history": 1,
+      "shop_messages": 3,
+      "shop_cash_receipts": 0,
+      "shop_handoff": 3,
+      "shop_partial_reviews": 0,
+      "shop_artifacts": 0,
+      "shop_artifact_reviews": 0,
+      "shop_backup_runs": 1,
+      "shop_assignments": 0,
+      "shop_assignment_history": 0,
+      "shop_assignment_accepts": 0,
+      "shop_delivery_photos": 0,
+      "shop_delivery_photo_changes": 0,
+      "shop_delivery_confirms": 0,
+      "shop_diagnostic_runs": 0,
+      "shop_amendments": 0,
+      "shop_amendment_events": 0,
+      "shop_service_cases": 0,
+      "shop_service_events": 0,
+      "shop_service_photos": 0,
+      "shop_assignment_batches": 0
+    }
+  },
+  "actual_payment": false,
+  "actual_messages": false,
+  "actual_cash_receipts": false,
+  "external_backup_configured": false,
+  "original_main_service_changed": false
+}

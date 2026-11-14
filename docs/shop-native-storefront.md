@@ -29,7 +29,7 @@
 - 검증 주문은 로컬 모의 결제 페이지의 결제/부분취소/전체취소 버튼으로 통보 규격을 통과시켜 처리한다. 32는 요청취소, 승인 전체취소는 64로 구분한다.
 - Render Shell에서 `python shop_verification.py --admin-link`를 실행하면 10분 관리자 링크를 발급한다. URL의 서명은 비밀 접근 정보로 취급한다.
 - 백업 경로 /var/data/shop-verification-backups는 데이터 디렉터리 밖이지만 같은 디스크다. 외부 재해복구 백업으로 간주하지 않는다. 운영 전 별도 외부 저장소 설정이 필요하다.
-- 적용 전 Blueprint 계획 검토가 필요하며 실제 Render 재배포/디스크 보존 결과는 적용 후 검증한다. 계획 수립이나 로컬 재시작 검증을 Render 검증 성공으로 기록하지 않는다.
+- 사용자 계획 검토/승인 후 https://bellavita-shop-verification-v3b4.onrender.com/shop 에 배포하고 실제 디스크·재배포 보존·백업/임시 복구를 검증했다. 근거는 docs/validation/shop-native-render.json이다.
 
 ## 검증 재현
 

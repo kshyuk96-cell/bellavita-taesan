@@ -5,9 +5,9 @@ main: 9348afabf049322b2bf3f061d511f5848d7aa1bf. main 병합/운영 배포 없음
 
 1. 대표 상품 4개를 Python 백엔드의 /shop, /shop/products/{id}와 기존 SQLite/페이앱 결제 경로에 연결했다. 행사별 초대장 상품은 전시하지 않는다.
 2. 관리자 상품명/가격/사진/옵션 묶음·선택지/직접입력·전시/판매 편집을 제공하고 기존 주문·발급 링크 스냅샷을 보존한다. 전체 기록 대상 주문 검색도 연결했다.
-3. 별도 Render Blueprint를 준비하고 공식 최신 JSON Schema 검증을 통과했다. 기존 main 서비스/디스크는 변경하지 않는다. 새 계획 검토/적용 후 실제 Render 검증을 수행해야 한다.
+3. 별도 Render Blueprint를 준비하고 공식 최신 JSON Schema 검증을 통과했다. 기존 main 서비스/디스크는 변경하지 않는다. 사용자 계획 승인 후 별도 검증 서버에 배포했다.
 4. 공식 페이앱 개발 문서의 요청/통보 해시, 원금액·결제번호, 상태 4/9/64/70/71 및 부분취소 원거래 필드를 재대조했다. 실가맹점 호출은 하지 않았다.
-5. SQLite와 파일 백업/복구, 독립 서버 프로세스 재시작 후 주문 보존을 검증했다. Render 실제 디스크/재배포는 아직 미검증이다.
+5. SQLite와 파일 백업/복구, 독립 서버 프로세스 재시작 후 주문 보존을 검증했다. Render 실제 디스크 마운트와 재배포 후 기록 보존도 확인했다.
 
 ## 통과한 검사
 
@@ -32,3 +32,19 @@ main: 9348afabf049322b2bf3f061d511f5848d7aa1bf. main 병합/운영 배포 없음
 
 증거: docs/validation/shop-native-catalog-browser.json, shop-native-catalog-rehearsal.json.
 운영 및 재현: docs/shop-native-storefront.md.
+
+## Render 실환경 검증 완료
+
+- 검증 주소: https://bellavita-shop-verification-v3b4.onrender.com/shop
+- service srv-dbs3drbrjlhs73d278sg / disk dsk-dbs3drjrjlhs73d279b0, 별도 1GB /var/data. 기존 main 서비스는 수정하지 않았다.
+- 코드 44837361cbe27f8e66c349f8287691e8d7a0eb28, deploy dep-dbs3gkrl550s73fbe7ng가 live 된 뒤 HTTP 검증했다.
+- /verification: data_under_var_data=true, mount_verified=true, 실결제/메시지/영수증 false.
+- Render에서 모의 165,000원 주문, 승인 중복·부분취소 중복·승인취소·늦은 승인 통보를 확인했다. 취소 상태 유지, 부분취소 이벤트 1건.
+- 별도 110,000원 대기 주문과 함께 배포 전후 보존, 관리자 원금액·주문번호 대조 완료. 테스트 클라이언트의 헤더 처리 중단으로 남은 모의 대기 주문을 포함해 전체 3건 보존.
+- 실제 디스크에서 자동 백업 이력 verified 확인. 현재 3건이 들어 있는 새 백업과 임시 복구본을 생성하여 SQLite 무결성·체크섬·SQL·기록 건수 대조 통과. 실제 원본 DB를 덮어쓰지 않았다.
+- 별도 인증키가 없는 원격 점검은 거부하도록 검증했고, 인증 후 관리자 10분 링크 발급/관리 화면 응답도 확인했다. 인증키와 관리자 서명 URL은 저장소 보고서에 넣지 않았다.
+- 환경변수 수정 도구가 자동으로 이전 빌드를 재배포한 사실을 확인하고, 종료를 기다린 후 최신 코드 배포를 수동 실행했다.
+- 배포 전환 중 502, Render가 소문자로 반환한 location 헤더를 대문자만 찾은 검증 클라이언트 오류를 기록했다. 클라이언트를 수정해 같은 시나리오를 재확인했다.
+- 고객 상태 화면은 기존 동작상 원금액을 표시하지 않으므로 금액은 인증된 관리자 해당 주문 행에서 대조했다. 검증 단언을 실제 화면 역할에 맞춰 수정했다.
+
+검증 근거: docs/validation/shop-native-render.json. 같은 영구 디스크 안의 백업이며 외부 재해복구 백업은 아직 연결하지 않았다.
