@@ -35,5 +35,20 @@
   "daily_admin_browser": "passed: 375/1280",
   "catalog_browser": "passed: 375/1280",
   "prechange_backup_restore": "passed",
-  "hosted_verification": "pending"
+  "hosted_verification": {
+    "hosted_ui": true,
+    "quick_done_reopen_record_preserved": true,
+    "favorite_after_redeploy": true,
+    "favorite_prefill_matches_choice": true,
+    "filtered_private_text_download": true,
+    "note_preview_and_feature_search_served": true,
+    "existing_order_states_preserved": true,
+    "order_count": 3,
+    "integrity": "ok",
+    "mount_verified": true,
+    "favorites_tables_restore_verified": true,
+    "manual_matches_source": true,
+    "live_side_effects": false
+  },
+  "verified_commit": "9469e8be175d8b025b8238e6ae65601ca579a000"
 }
