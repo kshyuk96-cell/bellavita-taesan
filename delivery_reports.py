@@ -7,12 +7,12 @@ from io import BytesIO
 from pathlib import Path
 
 
-LINK = re.compile(r'/route-report/([a-f0-9]{12})/(summary\.png|delivery\.xlsx)/([0-9]{10})/([a-f0-9]{64})')
+LINK = re.compile(r'/route-report/([a-f0-9]{12})/(summary\.png|delivery\.xlsx|pending\.png|status\.xlsx)/([0-9]{10})/([a-f0-9]{64})')
 LIFETIME = 3600
 
 
 def url(base, secret, job, filename):
-    path = f'/route-report/{job}/{filename}/{int(time.time()) + LIFETIME}'
+    path = f'/route-report/{job}/{filename}/{int(time.time()) + (300 if filename in ('pending.png', 'status.xlsx') else LIFETIME)}'
     return f'{base}{path}/{hmac.digest(secret.encode(), path.encode(), "sha256").hex()}'
 
 
