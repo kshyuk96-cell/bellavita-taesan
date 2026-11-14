@@ -7,16 +7,21 @@ from delivery_routes import EPOCH, value
 DAYS = ('오늘', '내일', '모레')
 ALL_CENTERS = {'', '전체', '전체센터', '모든센터'}
 COUNT = re.compile(r'몇|건수|얼마나|수량|총\s*건')
-PENDING = re.compile(r'미\s*(?:완료|처리)|안\s*(?:됐|된|한)|안\s*끝|(?:체크|완료|처리)(?:가|이|를|을|되지)?\s*(?:안|않)|'
+PENDING = re.compile(r'미\s*(?:완료|처리)|안\s*(?:됐|된|한|끝)|'
+                     r'(?:체크|완료|처리)(?:\s*(?:가|이|를|을|되지|하지))?\s*(?:안|않|못)|'
                      r'남(?:은|았)|아직|체크\s*전|끝나지\s*않')
-COMPLETE = re.compile(r'배송\s*완료|완료\s*(?:체크|된|처리|건)|체크\s*(?:된|한)|끝난')
+COMPLETE = re.compile(r'배송\s*완료|완료\s*(?:체크|된|처리|건|했|한)|체크\s*(?:된|한)|끝난')
 TOTAL = re.compile(r'전체|모든\s*센터|총\s*(?:몇|건|배송|수량)|합계|전부')
-CENTER = re.compile(r'([가-힣]{2,10})\s*센터')
+CENTER = re.compile(r'([가-힣]{2,10})\s*센터(?:에서|의|는|만|에)?')
+REPLACEMENT = re.compile(r'말고|대신')
 EXCLUDED = re.compile(r'개발|기능|수정|바꿔|버그|개선|늘려|줄여|체크해|처리해|완료해|지난|어제|이번\s*주|다음\s*주|'
                       r'\d+\s*(?:월|일)|[월화수목금토일]요일|택배|재고|제작|미배정|이미지|엑셀|보고서|루트')
 
 
 def metric(message):
+    before, *after = REPLACEMENT.split(message)
+    if after and (PENDING.search(before) or COMPLETE.search(before) or TOTAL.search(before)):
+        message = after[-1]
     if PENDING.search(message):
         return 'pending'
     if COMPLETE.search(message):
@@ -37,7 +42,7 @@ def request(message):
     center = centers[0] if centers else None
     remainder = CENTER.sub('', undated)
     remainder = re.sub(r'전체|모든|배송|[.,!?]', '', remainder)
-    if re.match(r'\s*(?!(?:중|몇|건|총|다|아직|안|체크|끝|남|완료|미완료|처리|은|는|이|가|을|를|확인|얼마|수량))\S+\s+', remainder):
+    if re.match(r'\s*(?!(?:중|몇|건|총|다|아직|안|체크|끝|남|완료|미완료|처리|말고|대신|은|는|이|가|을|를|확인|얼마|수량))\S+\s+', remainder):
         return None  # Let the existing language router interpret an unlabelled center or extra qualifier.
     return days[0] if days else 0, center, metric(message)
 
