@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 
 import cash_receipts
 import order_handoff
+import partial_reviews
 
 SEOUL = ZoneInfo('Asia/Seoul')
 STAGES = {'confirmed': '주문 확인', 'shipping': '배송 중', 'delivered': '배송 완료'}
@@ -41,6 +42,7 @@ def setup(c):
     c.execute('''CREATE TABLE IF NOT EXISTS shop_message_checks (
         id INTEGER PRIMARY KEY, message_id TEXT NOT NULL, decision TEXT NOT NULL,
         note TEXT NOT NULL, checked TEXT NOT NULL)''')
+    partial_reviews.setup(c)
     cash_receipts.setup(c)
     order_handoff.setup(c)
 
@@ -81,9 +83,9 @@ def on_payment(c, order_id, state, fields):
         if created:
             c.execute("INSERT INTO shop_stage_history VALUES (?,1,'confirmed','payment',?)", (order_id, now()))
             queue(c, order_id, 'confirmed')
-    if state in ('cancelled', 'partial_cancel'):
+    if state in ('cancelled', 'partial_cancel') and not partial_reviews.allowed(c, row):
         c.execute("""UPDATE shop_messages SET state='held',error='payment_changed' WHERE order_id=? AND state='queued'
-                     AND event IN ('confirmed','shipping','delivered')""",
+                     AND (event IN ('confirmed','shipping','delivered') OR event LIKE 'resumed:%')""",
                   (order_id,))
         if fields.get('pay_state') in ('9', '64', '70', '71', '8', '32'):
             event = ('refund:' if fields.get('orig_mul_no') else 'cancel:') + fields.get('mul_no', '')
@@ -94,9 +96,9 @@ def on_payment(c, order_id, state, fields):
 
 def change_stage(c, fields, actor='admin-link'):
     order_id, stage = fields.get('order_id', ''), fields.get('stage', '')
-    row = c.execute('''SELECT f.*, o.state FROM shop_fulfillment f
+    row = c.execute('''SELECT f.*, o.state,o.details,o.payment_number,o.id FROM shop_fulfillment f
                        JOIN invitation_orders o ON o.id=f.order_id WHERE order_id=?''', (order_id,)).fetchone()
-    if not row or row['state'] != 'paid' or stage not in STAGES:
+    if not row or not partial_reviews.allowed(c, row) or stage not in STAGES:
         raise ValueError('결제가 확인된 쇼핑몰 주문만 배송 처리할 수 있어요. 취소·부분취소는 먼저 대조해 주세요.')
     if str(row['version']) != fields.get('version'):
         raise ValueError('주문 상태가 변경됐어요. 최신 화면에서 다시 확인해 주세요.')
@@ -158,7 +160,7 @@ def controls(c, row, path, *, staff=False):
     image = signed_path('sample', row['id'], os.environ['TAESAN_WEBHOOK_SECRET'])
     content = f'<h3>주문·배송: {STAGES[stage]}</h3><img src="{escape(image)}" alt="고객 입력 문구 샘플" style="width:100%;max-width:320px;height:auto">'
     next_stage = {'confirmed': 'shipping', 'shipping': 'delivered'}.get(stage)
-    if next_stage and row['state'] == 'paid':
+    if next_stage and partial_reviews.allowed(c, row):
         button_label = '배송 중으로 변경' if next_stage == 'shipping' else '배송 완료로 변경'
         content += (f'<form method="post" action="{escape(path)}">'
                     '<input type="hidden" name="action" value="change_stage">'
@@ -166,7 +168,7 @@ def controls(c, row, path, *, staff=False):
                     f'<input type="hidden" name="version" value="{version}">'
                     f'<input type="hidden" name="stage" value="{next_stage}">'
                     f'<button>{button_label}</button></form>')
-    if row['state'] != 'paid':
+    if not partial_reviews.allowed(c, row):
         content += '<p>결제 취소·부분취소로 배송 처리를 보류합니다.</p>'
     for history in c.execute('SELECT * FROM shop_stage_history WHERE order_id=? ORDER BY version', (row['id'],)):
         content += f'<p>{escape(history["changed"][:16])} · {STAGES[history["stage"]]} · {escape(history["actor"])}</p>'
@@ -174,6 +176,7 @@ def controls(c, row, path, *, staff=False):
         return content
     delivery = signed_path('delivery', row['id'], os.environ['TAESAN_WEBHOOK_SECRET'], 86400)
     content += f'<p><a href="{escape(delivery)}">직원용 주문·배송 링크 (24시간)</a></p>'
+    content += partial_reviews.panel(c, row, path)
     content += '<h3>알림 이력</h3>'
     for message in c.execute('SELECT * FROM shop_messages WHERE order_id=? ORDER BY created,id', (row['id'],)):
         audience = '직원' if message['audience'] == 'staff' else '주문자'

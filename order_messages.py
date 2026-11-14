@@ -36,7 +36,7 @@ def api(path, body=None):
 
 def text_for(job, order):
     data = json.loads(order['details'])
-    status = order_ops.STAGES.get(job['event'], '결제 일부 취소' if job['event'].startswith('refund:') else '결제 취소')
+    status = order_ops.STAGES.get(job['event'], '부분취소 잔액 대조 후 재개' if job['event'].startswith('resumed:') else '결제 일부 취소' if job['event'].startswith('refund:') else '결제 취소')
     text = f'[벨라비타] {status}\n주문번호 {order["id"]}\n{data["title"]}\n{data["venue"]}\n{data["event_time"][:16].replace("T", " ")}\n문구 확인용 샘플 이미지를 첨부합니다.'
     if job['audience'] == 'staff':
         origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
@@ -77,7 +77,7 @@ def process_one(db, root):
                 c.execute("UPDATE shop_messages SET state='held',error='staff_recipient_removed' WHERE id=?", (job['id'],))
                 return
             order = c.execute('SELECT * FROM invitation_orders WHERE id=?', (job['order_id'],)).fetchone()
-            if order['state'] != 'paid' and job['event'] in order_ops.STAGES:
+            if not order_ops.partial_reviews.allowed(c, order) and (job['event'] in order_ops.STAGES or job['event'].startswith('resumed:')):
                 c.execute("UPDATE shop_messages SET state='held',error='payment_changed' WHERE id=?", (job['id'],))
                 return
             c.execute("UPDATE shop_messages SET state='preparing' WHERE id=?", (job['id'],))
@@ -94,8 +94,8 @@ def process_one(db, root):
                 raise ValueError('invalid_image_id')
         with db() as c:
             c.execute('BEGIN IMMEDIATE')
-            current = c.execute('SELECT state FROM invitation_orders WHERE id=?', (job['order_id'],)).fetchone()[0]
-            if current != 'paid' and job['event'] in order_ops.STAGES:
+            current = c.execute('SELECT * FROM invitation_orders WHERE id=?', (job['order_id'],)).fetchone()
+            if not order_ops.partial_reviews.allowed(c, current) and (job['event'] in order_ops.STAGES or job['event'].startswith('resumed:')):
                 c.execute("UPDATE shop_messages SET state='held',error='payment_changed' WHERE id=?", (job['id'],))
                 return
             c.execute("UPDATE shop_messages SET state='sending',image_id=? WHERE id=?", (image_id, job['id']))

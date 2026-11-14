@@ -42,13 +42,16 @@ def database(root):
         c.execute("ALTER TABLE order_ledger ADD COLUMN payment TEXT NOT NULL DEFAULT '{}'")
     c.execute('''CREATE TABLE IF NOT EXISTS production_queue (
         order_id TEXT PRIMARY KEY, details TEXT NOT NULL, state TEXT NOT NULL)''')
+    for table in ('production_queue', 'received_events'):
+        if 'guard' not in {row[1] for row in c.execute('PRAGMA table_info('+table+')')}:
+            c.execute("ALTER TABLE "+table+" ADD COLUMN guard TEXT NOT NULL DEFAULT '[0,0]'")
     return c
 
 
 def ingest(root, job):
     payload = job['payload']
-    if (payload.get('schema_version') != 1 or payload.get('kind') != job.get('kind')
-            or job.get('kind') not in ('ready', 'hold') or payload['order'].get('id') != job.get('order_id')
+    if (payload.get('schema_version') != (2 if job.get('kind') == 'resume' else 1) or payload.get('kind') != job.get('kind')
+            or job.get('kind') not in ('ready', 'hold', 'resume') or payload['order'].get('id') != job.get('order_id')
             or hashlib.sha256(canonical(payload).encode()).hexdigest() != job.get('sha256')):
         raise ValueError('handoff_payload_mismatch')
     if payload['kind'] == 'ready' and payload.get('payment', {}).get('state') != 'paid':
@@ -58,6 +61,17 @@ def ingest(root, job):
     if (any(type(value) is not int for value in (total,refunded,remaining)) or total != payload['order']['amount']
             or not 0 <= refunded <= total or remaining != total-refunded):
         raise ValueError('payment_totals_mismatch')
+    revision = payload.get('review_revision', 0)
+    if type(revision) is not int or revision < 0:
+        raise ValueError('invalid_review_revision')
+    if payload['kind'] == 'resume':
+        approval = payload.get('approval', {})
+        if (payment['state'] != 'partial_cancel' or remaining <= 0 or approval.get('decision') != 'resume'
+                or approval.get('id') != revision or revision <= 0 or approval.get('remaining') != remaining
+                or approval.get('refunded') != refunded or not isinstance(approval.get('fingerprint'), str)
+                or len(approval['fingerprint']) != 64):
+            raise ValueError('partial_approval_required')
+    guard = [refunded, revision]
     order_id, kind = job['order_id'], job['kind']
     ack = {'event_id': job['event_id'], 'lease_token': job['lease_token'], 'consumer': job['consumer'],
            'references': {'ledger': order_id, 'production': order_id}}
@@ -78,13 +92,19 @@ def ingest(root, job):
             # A delayed partial hold/ready can never reduce an already recorded refund.
             if refunded >= previous.get('refunded_amount',0):
                 c.execute('UPDATE order_ledger SET payment=? WHERE order_id=?', (canonical(payment),order_id))
-            c.execute('INSERT OR IGNORE INTO production_queue VALUES (?,?,?)', (order_id, canonical(payload['production']), state))
-            if kind == 'hold':
+            c.execute('INSERT OR IGNORE INTO production_queue(order_id,details,state,guard) VALUES (?,?,?,?)', (order_id, canonical(payload['production']), state, canonical(guard)))
+            current_guard = json.loads(c.execute('SELECT guard FROM production_queue WHERE order_id=?', (order_id,)).fetchone()[0])
+            if kind == 'hold' and guard >= current_guard:
                 c.execute("UPDATE order_ledger SET state='held' WHERE order_id=?", (order_id,))
                 c.execute("UPDATE production_queue SET state='held' WHERE order_id=?", (order_id,))
-            c.execute('''INSERT INTO received_events(event_id,order_id,kind,digest,ack_json) VALUES (?,?,?,?,?)
+            if kind == 'resume' and guard > current_guard:
+                c.execute("UPDATE order_ledger SET state='awaiting_ack' WHERE order_id=?", (order_id,))
+                c.execute("UPDATE production_queue SET state='awaiting_ack' WHERE order_id=?", (order_id,))
+            if guard >= current_guard:
+                c.execute('UPDATE production_queue SET guard=? WHERE order_id=?', (canonical(guard), order_id))
+            c.execute('''INSERT INTO received_events(event_id,order_id,kind,digest,ack_json,guard) VALUES (?,?,?,?,?,?)
                          ON CONFLICT(event_id) DO UPDATE SET ack_json=excluded.ack_json''',
-                      (job['event_id'], order_id, kind, job['sha256'], canonical(ack)))
+                      (job['event_id'], order_id, kind, job['sha256'], canonical(ack), canonical(guard)))
     finally:
         c.close()
     return ack
@@ -97,13 +117,17 @@ def finish(root, event_id, *, payment_changed=False):
             row = c.execute('SELECT * FROM received_events WHERE event_id=?', (event_id,)).fetchone()
             if not row:
                 raise ValueError('unknown_local_event')
+            current_guard = c.execute('SELECT guard FROM production_queue WHERE order_id=?', (row['order_id'],)).fetchone()[0]
             if payment_changed:
+                if json.loads(row['guard']) < json.loads(current_guard):
+                    c.execute('UPDATE received_events SET ack_json=NULL WHERE event_id=?', (event_id,))
+                    return
                 c.execute("UPDATE order_ledger SET state='held' WHERE order_id=?", (row['order_id'],))
                 c.execute("UPDATE production_queue SET state='held' WHERE order_id=?", (row['order_id'],))
                 c.execute('UPDATE received_events SET ack_json=NULL WHERE event_id=?', (event_id,))
                 return
             c.execute('UPDATE received_events SET acked=1,ack_json=NULL WHERE event_id=?', (event_id,))
-            if row['kind'] == 'ready':
+            if row['kind'] in ('ready','resume') and row['guard'] == current_guard:
                 c.execute("UPDATE order_ledger SET state='received' WHERE order_id=? AND state!='held'", (row['order_id'],))
                 c.execute("UPDATE production_queue SET state='pending' WHERE order_id=? AND state!='held'", (row['order_id'],))
     finally:
@@ -156,7 +180,7 @@ def acknowledge_pending(root, transport):
 
 def run_once(root, consumer, transport):
     acknowledge_pending(root, transport)
-    result = transport('claim', {'consumer': consumer})
+    result = transport('claim', {'consumer': consumer, 'capabilities':['partial-resume-v1']})
     job = result.get('job')
     if not job:
         return False

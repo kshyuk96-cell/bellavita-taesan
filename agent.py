@@ -1301,6 +1301,7 @@ class Handler(BaseHTTPRequestHandler):
                           'save_notifications': order_ops.save_settings,
                           'change_stage': order_ops.change_stage, 'retry_message': order_ops.retry_message,
                           'reconcile_message': order_ops.reconcile_message,
+                          'review_partial': order_ops.partial_reviews.review,
                           'prepare_handoff': order_handoff.prepare, 'review_shop_photo': order_handoff.review_photo,
                           'reconcile_receipt': cash_receipts.reconcile}.get(fields.get('action'))
                 if action is None:

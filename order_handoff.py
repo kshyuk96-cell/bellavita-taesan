@@ -10,6 +10,8 @@ from datetime import datetime
 from html import escape
 from zoneinfo import ZoneInfo
 
+import partial_reviews
+
 SEOUL = ZoneInfo('Asia/Seoul')
 STATES = {'review': '사진 검토 후 제작 접수', 'pending': '공장 전달 대기', 'leased': '공장 수신 처리 중',
           'acked': '원장·제작 대기열 접수 확인', 'held': '결제 변경으로 제작 보류'}
@@ -44,9 +46,17 @@ def payload_for(c, row, kind):
     refunded = c.execute("SELECT COALESCE(SUM(amount),0) FROM payment_events WHERE order_id=? AND kind='partial'", (row['id'],)).fetchone()[0]
     if row['state'] == 'cancelled':
         refunded = data['amount']
-    return {'schema_version': 1, 'kind': kind, 'order': order, 'production': production,
+    result = {'schema_version': 2 if kind == 'resume' else 1, 'kind': kind, 'order': order, 'production': production,
             'payment': {'state': row['state'], 'number': row['payment_number'], 'original_amount': data['amount'],
                         'refunded_amount': refunded, 'remaining_amount': data['amount']-refunded}}
+    latest = c.execute('SELECT id FROM shop_partial_reviews WHERE order_id=? ORDER BY id DESC LIMIT 1', (row['id'],)).fetchone()
+    result['review_revision'] = latest['id'] if latest else 0
+    if kind == 'resume':
+        check = partial_reviews.approval(c, row)
+        if not check:
+            raise ValueError('partial_approval_required')
+        result['approval'] = {'id': check['id'], 'fingerprint': check['fingerprint'], 'remaining': check['remaining'], 'refunded': check['refunded'], 'decision': 'resume'}
+    return result
 
 
 def enqueue(c, row, kind, event_id, state):
@@ -68,8 +78,8 @@ def ensure_ready(c, row):
 
 def on_payment(c, row, fields):
     ensure_ready(c, row)
-    if row['state'] in ('partial_cancel', 'cancelled'):
-        c.execute("UPDATE shop_handoff SET state='held' WHERE order_id=? AND kind='ready' AND state!='acked'", (row['id'],))
+    if row['state'] in ('partial_cancel', 'cancelled') and not partial_reviews.allowed(c, row):
+        c.execute("UPDATE shop_handoff SET state='held' WHERE order_id=? AND kind IN ('ready','resume') AND state!='acked'", (row['id'],))
         # A hold is itself an idempotent event, including when cancellation follows an ACK.
         # A receiver must create a held tombstone even if it has not seen ready yet.
         if fields.get('pay_state') in ('9','64','70','71'):
@@ -89,6 +99,9 @@ def review_photo(c, fields):
     import checkout
     order_id = fields.get('order_id', '')
     row = c.execute('''SELECT o.* FROM invitation_orders o JOIN shop_offers s ON s.id=o.job WHERE o.id=?''', (order_id,)).fetchone()
+    if row and row['state'] == 'partial_cancel' and fields.get('both_faces') == 'yes' and json.loads(row['details']).get('wedding_preview'):
+        c.execute('INSERT OR IGNORE INTO invitation_photo_reviews VALUES (?,?)', (order_id, datetime.now(SEOUL).isoformat()))
+        return
     if not row or not checkout.review_photo(c, fields):
         raise ValueError('결제 상태와 신랑신부 사진의 두 얼굴을 먼저 확인해 주세요.')
     ensure_ready(c, row)
@@ -111,11 +124,13 @@ def claim(c, fields):
     consumer = consumer_name(fields.get('consumer'))
     now = time.time()
     c.execute('BEGIN IMMEDIATE')
-    # Recheck payment at claim time, not only when the outbox event was made.
-    c.execute("""UPDATE shop_handoff SET state='held' WHERE kind='ready' AND state IN ('pending','leased')
-        AND order_id IN (SELECT id FROM invitation_orders WHERE state!='paid')""")
-    row = c.execute('''SELECT * FROM shop_handoff WHERE state='pending' OR (state='leased' AND lease_until<=?)
-        ORDER BY (kind='hold') DESC,created,event_id LIMIT 1''', (now,)).fetchone()
+    # Recheck approval at lease time, including stale refund versions.
+    for candidate in c.execute("SELECT * FROM shop_handoff WHERE kind IN ('ready','resume') AND state IN ('pending','leased')").fetchall():
+        if not fulfill_event(c, candidate):
+            c.execute("UPDATE shop_handoff SET state='held' WHERE event_id=?", (candidate['event_id'],))
+    supports_resume = 'partial-resume-v1' in fields.get('capabilities', [])
+    row = c.execute("""SELECT * FROM shop_handoff WHERE (state='pending' OR (state='leased' AND lease_until<=?))
+        AND (kind!='resume' OR ?) ORDER BY (kind='hold') DESC,created,event_id LIMIT 1""", (now, supports_resume)).fetchone()
     if not row:
         return {'job': None}
     token = secrets.token_hex(32)
@@ -125,6 +140,14 @@ def claim(c, fields):
     return {'job': {'event_id': row['event_id'], 'order_id': row['order_id'], 'kind': row['kind'],
                     'payload': json.loads(row['payload']), 'sha256': row['digest'],
                     'lease_token': token, 'lease_until': until, 'consumer': consumer}}
+
+
+def fulfill_event(c, event):
+    order = c.execute('SELECT * FROM invitation_orders WHERE id=?', (event['order_id'],)).fetchone()
+    if event['kind'] == 'ready':
+        return order['state'] == 'paid'
+    check = partial_reviews.approval(c, order)
+    return check is not None and json.loads(event['payload']).get('approval', {}).get('id') == check['id']
 
 
 def acknowledge(c, fields):
@@ -144,8 +167,7 @@ def acknowledge(c, fields):
     receipt = canonical(refs)
     if row['state'] == 'acked':
         return ({'ok': True}, 200) if row['receipt'] == receipt else ({'error': 'receipt_mismatch'}, 409)
-    payment = c.execute('SELECT state FROM invitation_orders WHERE id=?', (row['order_id'],)).fetchone()[0]
-    if row['kind'] == 'ready' and payment != 'paid':
+    if row['kind'] in ('ready','resume') and not fulfill_event(c, row):
         c.execute("UPDATE shop_handoff SET state='held' WHERE event_id=?", (event_id,))
         return {'error': 'payment_changed'}, 409
     if row['state'] != 'leased' or row['lease_until'] <= time.time():
@@ -163,12 +185,12 @@ def panel(c, row, path):
         result += (f'<form method="post" action="{escape(path)}">{hidden}'
                    '<input type="hidden" name="action" value="prepare_handoff"><button>후속 접수 준비</button></form>')
     for record in records:
-        kind = '제작 접수' if record['kind'] == 'ready' else '제작 보류 전달'
+        kind = {'ready':'제작 접수','resume':'잔액 대조 후 재개','hold':'제작 보류 전달'}[record['kind']]
         result += '<p>' + kind + ' · ' + STATES[record['state']] + '</p>'
         if record['receipt']:
             refs = json.loads(record['receipt'])
             result += '<p>원장 접수번호: ' + escape(refs['ledger']) + '<br>제작 대기열 번호: ' + escape(refs['production']) + '</p>'
-    if any(record['state'] == 'review' for record in records):
+    if any(record['state'] == 'review' for record in records) or (row['state'] == 'partial_cancel' and not c.execute('SELECT 1 FROM invitation_photo_reviews WHERE order_id=?', (row['id'],)).fetchone()):
         data = json.loads(row['details'])
         photo = data.get('wedding_preview')
         if photo:
