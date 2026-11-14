@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>쌀빛그림화환 주문서 | 벨라비타</title>
+<title>$checkout_heading | 벨라비타</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&amp;family=Noto+Serif+KR:wght@600;700;900&amp;display=swap" rel="stylesheet">
@@ -182,13 +182,14 @@ summary { cursor: pointer; }
   .row { grid-template-columns: 1fr; gap: 11px; }
 }
 </style>
+$catalog_style
 </head>
 <body>
 <header>벨라비타</header>
 <main>
-<h1>쌀빛그림화환 주문서</h1>
-<form action="$action" method="post" id="order">
-<input type="hidden" name="attempt" value="$attempt">
+<h1>$checkout_heading</h1>
+<form action="$action" method="post" id="order" data-force-message="$force_message">
+<input type="hidden" name="attempt" value="$attempt"><input type="hidden" name="product_revision" value="$product_revision">
 <section class="product" aria-label="상품 정보">
 $pictures
 <div class="product-options">
@@ -200,6 +201,7 @@ $pictures
 <button type="button" id="open-mobile-example">설치 예시 크게 보기</button>
 </div>
 $groups
+$extra_fields
 <label>보내시는 분<input name="sender" maxlength="140" required placeholder="예: 벨라비타 대표 홍길동"></label>
 <label id="custom" hidden>직접 쓰는 축하 문구<textarea name="message" maxlength="200" rows="2" disabled></textarea></label>
 <p class="preview" id="preview" hidden></p>
@@ -218,7 +220,7 @@ $groups
 </section>
 <section>
 <h2>설치 장소</h2>
-<p class="venue">$venue <span>$address</span><span>$date $clock</span></p>
+$installation
 </section>
 <section $receipt_section_state>
 <h2>현금영수증</h2>
@@ -242,11 +244,7 @@ $notice
 <dialog class="product-detail" id="product-detail" aria-labelledby="detail-title">
 <div class="detail-head"><h2 id="detail-title">상품 설명</h2><form method="dialog"><button>닫기</button></form></div>
 <div class="detail-content">
-<p><strong>쌀(쌀빛그림)화환 관련</strong></p>
-<p>신청해주신 쌀빛그림화환은 친환경 웨딩갤러리를 만들기 위해 액자를 설치하고<br>예식 후 쌀로 교환하여 혼주님께 드리거나 필요한 시설에 기부합니다.</p>
-<p>필요한 웨딩액자나 작품액자는 준비된 액자를 사용하니<br>전화나 문자를 이용하시거나 주문시스템에서 시청하시면 됩니다.</p>
-<p>문의 전화 031-8067-8580</p>
-<img src="https://bellavita1004.blogpay.io/img/editor/bellavita1004/temp/0524251001759278768.jpg" alt="쌀빛그림화환 상세 안내" loading="lazy">
+$detail_content
 </div>
 </dialog>
 <dialog class="product-detail" id="mobile-example" aria-labelledby="mobile-example-title">
@@ -597,7 +595,7 @@ function updateScroll() {
 }
 function update() {
   const options = choices.map(select => select.selectedOptions[0]);
-  const direct = options.some(option => option.dataset.custom === '1');
+  const direct = document.getElementById('order').dataset.forceMessage === '1' || options.some(option => option.dataset.custom === '1');
   custom.hidden = !direct;
   message.disabled = !direct;
   message.required = direct;

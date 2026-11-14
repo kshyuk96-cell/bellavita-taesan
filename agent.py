@@ -30,6 +30,7 @@ import development_queue
 import invitation
 import owner_alerts
 import shop
+import shop_catalog
 import order_ops
 import order_sample
 import production_files
@@ -1117,6 +1118,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        catalog_product=shop_catalog.PRODUCT_PATH.fullmatch(path)
+        if catalog_product:return self.catalog_order(catalog_product[1],submit=True)
         customer_confirm=re.fullmatch(r'/invitation-orders/([a-f0-9]{32})/delivery-confirm',path)
         if customer_confirm:
             if self.headers.get('Origin')!=os.getenv('TAESAN_PUBLIC_URL','').rstrip('/'):return self.order_message('고객 주문 화면을 다시 열어 주세요.',403)
@@ -1131,7 +1134,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({'error': 'handoff_not_authorized'}, 401)
             try:
                 size = int(self.headers.get('Content-Length', '0'))
-                if not 0 < size <= 16384 or self.headers.get_content_type() != 'application/json':
+                if not 0 < size <= 65536 or self.headers.get_content_type() != 'application/json':
                     raise ValueError('invalid_request')
                 fields = json.loads(self.rfile.read(size).decode())
                 if not isinstance(fields, dict):
@@ -1391,6 +1394,29 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as error:return self.order_message(str(error),422,back=True)
         return self.send_order_html(page, referrer_policy='same-origin')
 
+    def catalog_order(self, identity, *, submit=False):
+        origin=os.getenv('TAESAN_PUBLIC_URL','').rstrip('/')
+        config=checkout.payment_config()
+        can_pay=os.getenv('SHOP_CHECKOUT_ENABLED')=='1' and all(config.values()) and invitation.https_url(origin)
+        if not submit:
+            with db() as c:
+                row,product=shop_catalog.read(c,identity)
+                if product:product=dict(shop_catalog.snapshot(identity,product),revision=row['revision'])
+            if not product:return self.order_message('상품을 찾을 수 없습니다.',404)
+            return self.send_order_html(checkout.render(product,'/shop/products/'+identity,can_pay and product.get('available',True)),referrer_policy='same-origin')
+        if not can_pay:return self.order_message('현재 결제를 이용할 수 없습니다.',503)
+        if self.headers.get('Origin')!=origin:return self.order_message('주문서를 다시 열어 주세요.',403)
+        try:
+            fields=self.read_order_form()
+            with db() as c:
+                c.execute('BEGIN IMMEDIATE');offer,product=shop_catalog.prepare(c,identity,fields)
+            location=checkout.start_order(db,offer,product['price'],product,fields,origin,config)
+        except ValueError as error:return self.order_message(str(error),422,back=True)
+        except Exception as error:
+            print('상품 결제 연결 실패:',type(error).__name__,file=sys.stderr,flush=True)
+            return self.order_message('결제 요청 상태를 확인해 주세요. 결과가 불명확하면 새 결제를 요청하지 마세요.',502)
+        self.send_response(303);self.send_header('Location',location);self.send_header('Cache-Control','no-store');self.send_header('Referrer-Policy','no-referrer');self.end_headers()
+
     def shop_order(self, offer_id, *, submit=False):
         with db() as connection:
             product, active = shop.read_offer(connection, offer_id)
@@ -1469,6 +1495,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        if path in ('/shop','/shop/'):
+            with db() as c:page=shop_catalog.page(c)
+            return self.send_order_html(page,referrer_policy='same-origin')
+        if path.startswith('/shop-art/'):
+            name=path.removeprefix('/shop-art/')
+            if name not in ('store.css','thumbnails-v3.png'):return self.order_message('파일이 없습니다.',404)
+            content=(shop_catalog.ASSETS/name).read_bytes()
+            self.send_response(200);self.send_header('Content-Type','text/css; charset=utf-8' if name.endswith('.css') else 'image/png');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
+        catalog_product=shop_catalog.PRODUCT_PATH.fullmatch(path)
+        if catalog_product:return self.catalog_order(catalog_product[1])
         service_photo=re.fullmatch(r'/shop/service-photo/([a-f0-9]{32})/([a-f0-9]{32})/([a-f0-9]{32})/([0-9]{10})/([a-f0-9]{64})\.jpg',path)
         if service_photo:
             order_id,case_id,photo_id,expiry,signed=service_photo.groups()

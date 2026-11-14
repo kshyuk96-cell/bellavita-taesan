@@ -234,6 +234,9 @@ def render(product, action, can_pay):
     pictures = ''.join(f'<img src="{escape(src)}" alt="쌀빛그림화환 상품 사진"'
                        + (' loading="lazy"' if index else '') + '>'
                        for index, src in enumerate(product['images']))
+    if product.get('thumbnail'):
+        import shop_catalog
+        pictures='<div>'+shop_catalog.thumbnail(product)+'<details><summary>원본 상품 사진 보기</summary><div class="gallery">'+pictures+'</div></details></div>'
     preview = wedding_preview(product)
     if preview:
         pictures = f'''<figure class="wreath-preview" id="wreath-preview">
@@ -250,16 +253,24 @@ def render(product, action, can_pay):
           </div>
           <figcaption>예식 당일 신랑신부 사진 및<br>풍경사진으로 설치해드립니다.</figcaption>
         </figure><div class="gallery" id="wreath-fallback" role="group" aria-label="상품 사진" tabindex="0" hidden>{pictures}</div>'''
-    else:
+    elif not product.get('thumbnail'):
         pictures = f'<div class="gallery" role="group" aria-label="상품 사진" tabindex="0">{pictures}</div>'
+    detail_content='\n<p><strong>쌀(쌀빛그림)화환 관련</strong></p>\n<p>신청해주신 쌀빛그림화환은 친환경 웨딩갤러리를 만들기 위해 액자를 설치하고<br>예식 후 쌀로 교환하여 혼주님께 드리거나 필요한 시설에 기부합니다.</p>\n<p>필요한 웨딩액자나 작품액자는 준비된 액자를 사용하니<br>전화나 문자를 이용하시거나 주문시스템에서 시청하시면 됩니다.</p>\n<p>문의 전화 031-8067-8580</p>\n<img src="https://bellavita1004.blogpay.io/img/editor/bellavita1004/temp/0524251001759278768.jpg" alt="쌀빛그림화환 상세 안내" loading="lazy">'
+    if product.get('detail_text'):
+        detail_content='<p style="white-space:pre-wrap">'+escape(product['detail_text'])+'</p>'+''.join('<img src="'+escape(url)+'" alt="상품 상세 안내" loading="lazy">' for url in product.get('detail_images',[]))
+    extra_fields=''.join('<label>'+escape(spec['label'])+'<input name="extra'+str(i)+'" maxlength="'+str(spec.get('max',200))+'" required></label>' for i,spec in enumerate(product.get('extra_fields',[])))
+    if product.get('customer_event_input'):
+        installation='<label>행事장·홀<input name="venue" maxlength="120" required></label><label>설치 주소<input name="address" maxlength="200" required></label><label>행사 일시(한국 시간)<input name="event_time" type="datetime-local" required></label>'
+        installation=installation.replace('행事','행사')
+    else:installation='<p class="venue">'+escaped['venue']+' <span>'+escaped['address']+'</span><span>'+escaped['date']+' '+escaped['clock']+'</span></p>'
     return Template(TEMPLATE.read_text(encoding='utf-8')).substitute(
-        escaped, action=escape(action), groups=''.join(groups), pictures=pictures,
+        escaped, checkout_heading='액자화환 주문서' if product.get('thumbnail') else '쌀빛그림화환 주문서', detail_content=detail_content, action=escape(action), groups=''.join(groups), pictures=pictures, extra_fields=extra_fields, installation=installation, product_revision=escape(str(product.get('revision',''))), force_message='1' if product.get('force_message') else '0', catalog_style='<link rel="stylesheet" href="/shop-art/store.css">' if product.get('customer_event_input') else '',
         base=str(product['price']), base_display=f'{product["price"]:,}',
         receipt_section_state='' if 'cash_tax_type' in product else 'hidden',
         receipt_controls_state='' if 'cash_tax_type' in product else 'disabled',
         attempt=secrets.token_hex(16),
         button_state='' if can_pay else 'disabled', can_submit='true' if can_pay else 'false',
-        notice='' if can_pay else '<p class="hint">현재 결제를 이용할 수 없습니다. 문의 031-8067-8580</p>')
+        notice=('<p class="hint">독립 검증 환경 · 모의 결제만 실행하며 실제 결제·발송·현금영수증 발급은 없습니다.</p>' if os.getenv('SHOP_VERIFICATION_MODE')=='1' else '') + ('' if can_pay else '<p class="hint">현재 결제를 이용할 수 없습니다. 문의 031-8067-8580</p>'))
 
 
 def normalize_order(product, fields):
@@ -272,7 +283,7 @@ def normalize_order(product, fields):
     if fields.get('consent') != 'yes':
         raise ValueError('주문 정보 수집에 동의해 주세요.')
     selected, amount = [], product['price']
-    custom = False
+    custom = bool(product.get('force_message'))
     for index, group in enumerate(product['groups']):
         choice = group['choices'].get(fields.get(f'choice{index}'))
         if not choice:
@@ -280,6 +291,8 @@ def normalize_order(product, fields):
         amount += choice['amount']
         selected.append([group['label'], choice['label']])
         custom |= choice['custom']
+    for i,spec in enumerate(product.get('extra_fields',[])):
+        selected.append([spec['label'],value('extra'+str(i),spec.get('max',200))])
     buyer_phone = re.sub(r'[\s-]', '', value('buyer_phone', 20))
     if not re.fullmatch(r'01[016789]\d{7,8}', buyer_phone):
         raise ValueError('주문자 휴대폰 번호를 확인해 주세요.')

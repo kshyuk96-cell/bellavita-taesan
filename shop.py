@@ -81,8 +81,8 @@ def choices(text, *, priced=False):
             label = label.strip()
         else:
             label, amount = line, 0
-        if not label or len(label) > 120 or len(result) >= 20:
-            raise ValueError('옵션은 최대 20개, 이름은 120자까지 입력할 수 있어요.')
+        if not label or len(label) > 300 or len(result) >= 60:
+            raise ValueError('옵션은 최대 60개, 이름은 300자까지 입력할 수 있어요.')
         result[str(len(result) + 1)] = {'label': label, 'amount': amount, 'custom': False}
     if not result:
         raise ValueError('옵션을 한 개 이상 입력해 주세요.')
@@ -90,25 +90,49 @@ def choices(text, *, priced=False):
 
 
 def save_product(connection, fields):
-    details = {
+    product_id=fields.get('product_id','')
+    existing=connection.execute('SELECT * FROM shop_products WHERE id=?',(product_id,)).fetchone() if product_id else None
+    if product_id and (not existing or str(existing['revision'])!=fields.get('revision')):raise ValueError('상품이 변경됐어요. 최신 화면에서 다시 수정해 주세요.')
+    old=json.loads(existing['details']) if existing else {}
+    advanced=fields.get('groups_mode')=='1'
+    details = {**old,
         'title': required(fields, 'title', 100),
         'price': money(required(fields, 'price', 9)),
         'images': [image_url(url.strip()) for url in required(fields, 'images', 3000).splitlines() if url.strip()],
-        'options': required(fields, 'options', 2400),
-        'greetings': required(fields, 'greetings', 2400),
+        'options': old.get('options','') if advanced else required(fields, 'options', 2400),
+        'greetings': old.get('greetings','') if advanced else required(fields, 'greetings', 2400),
         'cash_tax_type': fields.get('cash_tax_type', ''),
     }
     if details['cash_tax_type'] not in ('', 'TG01', 'TG02'):
         raise ValueError('현금영수증 과세 구분을 확인해 주세요.')
     if not details['price'] or len(details['images']) > 5:
         raise ValueError('기본 가격과 상품 사진(최대 5장)을 확인해 주세요.')
-    greetings = choices(details['greetings'])
-    greetings['custom'] = {'label': '직접 입력', 'amount': 0, 'custom': True}
-    details['groups'] = [
-        {'label': '상품 선택', 'choices': choices(details['options'], priced=True)},
-        {'label': '축하 문구', 'choices': greetings},
-        {'label': '받으시는 분', 'choices': choices('신랑측\n신부측\n행사 주최측')},
-    ]
+    if advanced:
+        groups=[]
+        count=fields.get('group_count','')
+        if not count.isdigit() or not 1<=int(count)<=8:raise ValueError('옵션 묶음 수를 확인해 주세요.')
+        for i in range(int(count)):
+            if fields.get('remove_group'+str(i))=='yes':continue
+            label=required(fields,'group_label'+str(i),120)
+            values=choices(required(fields,'group_choices'+str(i),15000),priced=True)
+            # Keep direct-input meaning after edits instead of relying on label spelling.
+            if fields.get('group_custom'+str(i))=='yes':values['custom']={'label':'직접 입력','amount':0,'custom':True}
+            groups.append({'label':label,'choices':values})
+        if fields.get('new_group_label','').strip():
+            groups.append({'label':required(fields,'new_group_label',120),'choices':choices(required(fields,'new_group_choices',15000),priced=True)})
+        if not 1<=len(groups)<=8:raise ValueError('옵션 묶음은 1~8개로 등록해 주세요.')
+        if details['price']+sum(max(v['amount'] for v in g['choices'].values()) for g in groups)>PRICE_LIMIT:raise ValueError('옵션을 포함한 최대 금액을 확인하세요.')
+        details['groups']=groups
+    else:
+        greetings = choices(details['greetings'])
+        greetings['custom'] = {'label': '직접 입력', 'amount': 0, 'custom': True}
+        details['groups'] = [
+            {'label': '상품 선택', 'choices': choices(details['options'], priced=True)},
+            {'label': '축하 문구', 'choices': greetings},
+            {'label': '받으시는 분', 'choices': choices('신랑측\n신부측\n행사 주최측')},
+        ]
+    if fields.get('catalog_edit')=='1':
+        details.update(public=fields.get('public')=='yes',available=fields.get('available')=='yes',category=fields.get('category','').strip()[:80],description=fields.get('description','').strip()[:1200])
     data = json.dumps(details, ensure_ascii=False)
     product_id = fields.get('product_id', '')
     if not product_id:
@@ -137,13 +161,14 @@ def issue_offers(connection, fields):
         raise ValueError('앞으로 열릴 행사만 등록할 수 있어요.')
     raw_prices = fields.get('prices', '').strip()
     prices = list(dict.fromkeys(money(price.strip()) for price in raw_prices.split(','))) if raw_prices else [product['price']]
-    max_extra = max(choice['amount'] for choice in product['groups'][0]['choices'].values())
+    max_extra = sum(max(choice['amount'] for choice in group['choices'].values()) for group in product['groups'])
     if len(prices) > 5 or any(not price or price + max_extra > PRICE_LIMIT for price in prices):
         raise ValueError('판매가는 최대 5개까지 지정할 수 있어요. 가격과 추가금을 확인해 주세요.')
     recipient = {'wedding': '신랑측\n신부측', 'event': '행사 주최측'}.get(fields.get('kind'))
     if not recipient:
         raise ValueError('행사 구분을 선택해 주세요.')
-    product['groups'][2]['choices'] = choices(recipient)
+    for group in product['groups']:
+        if group['label']=='받으시는 분':group['choices']=choices(recipient)
     snapshot = {
         'number': product_id, 'title': event + ' · ' + product['title'],
         'images': product['images'], 'groups': product['groups'],
@@ -152,6 +177,8 @@ def issue_offers(connection, fields):
         'event_time': when.isoformat(), 'event_name':event,'product_title':product['title'],
         'cash_tax_type': product.get('cash_tax_type', ''),
     }
+    for key in ('thumbnail','extra_fields','force_message','detail_images','description','detail_text','proportion_evidence'):
+        if key in product:snapshot[key]=product[key]
     photo = fields.get('wedding_photo', '').strip()
     if photo and fields.get('kind') == 'wedding':
         snapshot['wedding_photo'] = image_url(photo)
@@ -218,6 +245,7 @@ def record_payment_check(connection, fields):
 def admin_page(connection, path, origin, fields=None, root=None):
     fields=fields or {}
     selected_order=fields.get('order','')
+    query=fields.get('q','').strip()[:100]
     if selected_order and not re.fullmatch(r'[a-f0-9]{32}',selected_order):raise ValueError('전체 주문 조회에는 정확한 주문번호를 입력해 주세요.')
     def form(action, fields, button):
         return (f'<form method="post" action="{escape(path)}">'
@@ -237,14 +265,20 @@ def admin_page(connection, path, origin, fields=None, root=None):
         tax_options = ''.join(f'<option value="{code}"' + (' selected' if product.get('cash_tax_type', '') == code else '')
                               + f'>{label}</option>' for code, label in
                               [('', '미설정 · 자동 발급 보류'), ('TG01', '과세'), ('TG02', '면세')])
-        return (field('상품명', 'title', product.get('title', ''))
-                + field('기본 판매가(원)', 'price', product.get('price', ''), input_type='number')
-                + field('상품 사진 HTTPS 주소 · 한 줄에 하나', 'images',
-                        '\n'.join(product.get('images', [])), multiline=True)
-                + field('상품 옵션 · 옵션명 | 추가금', 'options', product.get('options', '쌀 10kg | 0'), multiline=True)
-                + field('기본 축하 문구 · 한 줄에 하나', 'greetings',
-                        product.get('greetings', '결혼을 진심으로 축하합니다'), multiline=True)
-                + '<label>현금영수증 과세 구분<select name="cash_tax_type">' + tax_options + '</select></label>')
+        option_fields=''
+        if product.get('source_id'):
+            option_fields=hidden('groups_mode','1')+hidden('group_count',len(product['groups']))
+            for i,group in enumerate(product['groups']):
+                option_fields+='<fieldset><legend>옵션 묶음 '+str(i+1)+'</legend>'+field('묶음 이름','group_label'+str(i),group['label'])+field('선택지 · 옵션명 | 추가금 (한 줄에 하나)','group_choices'+str(i),'\n'.join(v['label']+' | '+str(v['amount']) for v in group['choices'].values() if not v['custom']),multiline=True)
+                checked=' checked' if any(v['custom'] for v in group['choices'].values()) else ''
+                option_fields+='<label><input type="checkbox" name="group_custom'+str(i)+'" value="yes"'+checked+'>직접 입력 선택지 제공</label><label><input type="checkbox" name="remove_group'+str(i)+'" value="yes">이 묶음 삭제</label></fieldset>'
+            option_fields+=field('추가할 묶음 이름','new_group_label',optional=True)+field('추가할 선택지 · 옵션명 | 추가금','new_group_choices',multiline=True,optional=True)
+        else:
+            option_fields=field('상품 옵션 · 옵션명 | 추가금','options',product.get('options','쌀 10kg | 0'),multiline=True)+field('기본 축하 문구 · 한 줄에 하나','greetings',product.get('greetings','결혼을 진심으로 축하합니다'),multiline=True)
+        catalog_fields=hidden('catalog_edit','1')+field('상품 분류','category',product.get('category',''),optional=True)+field('상품 안내','description',product.get('description',''),multiline=True,optional=True)
+        for key,label,default in [('public','쇼핑몰에 전시',False),('available','주문 가능',True)]:
+            catalog_fields+='<label><input type="checkbox" name="'+key+'" value="yes"'+(' checked' if product.get(key,default) else '')+'>'+label+'</label>'
+        return (field('상품명','title',product.get('title',''))+field('기본 판매가(원)','price',product.get('price',''),input_type='number')+field('상품 사진 HTTPS 주소 · 한 줄에 하나','images','\n'.join(product.get('images',[])),multiline=True)+option_fields+catalog_fields+'<label>현금영수증 과세 구분<select name="cash_tax_type">'+tax_options+'</select></label><p>수정은 새 주문에 적용됩니다. 기존 주문·발급 링크의 가격과 선택지는 유지합니다.</p>')
 
     products = []
     for row in connection.execute('SELECT * FROM shop_products ORDER BY rowid DESC'):
@@ -278,8 +312,8 @@ def admin_page(connection, path, origin, fields=None, root=None):
 
     orders = []
     for row in connection.execute('''SELECT o.* FROM invitation_orders o
-            JOIN shop_offers s ON s.id=o.job WHERE (?='' OR o.id=?)
-            ORDER BY (o.state='requesting') DESC, o.created DESC LIMIT 200''',(selected_order,selected_order)):
+            JOIN shop_offers s ON s.id=o.job WHERE (?='' OR o.id=?) AND (?='' OR instr(lower(o.id||o.details),lower(?))>0)
+            ORDER BY (o.state='requesting') DESC, o.created DESC LIMIT 200''',(selected_order,selected_order,query,query)):
         order = json.loads(row['details'])
         details = [
             ('주문번호', row['id']), ('접수 시각', row['created'][:16].replace('T', ' ')),
@@ -345,12 +379,12 @@ def admin_page(connection, path, origin, fields=None, root=None):
       input[type=checkbox]{display:inline;width:auto}
       a{color:#204c36}summary{cursor:pointer;padding:6px 0}small{overflow-wrap:anywhere}li{margin-bottom:12px}
       dd{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 8px}dt{font-weight:bold}</style>
-      <main><h1>벨라비타 쇼핑몰 관리</h1>''' + shop_dashboard.panel(connection) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + assignment_batches.panel(connection,path) + shop_sales.panel(connection,path,fields) + '''<section><h2>새 상품 등록</h2>'''
+      <main><h1>벨라비타 쇼핑몰 관리</h1><p><a href="/shop">고객 쇼핑몰 보기</a></p>''' + shop_dashboard.panel(connection) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + assignment_batches.panel(connection,path) + shop_sales.panel(connection,path,fields) + '''<section><h2>새 상품 등록</h2>'''
       + form('save_product', product_fields({}), '상품 등록') + '</section>' + notification_settings
       + ''.join(products) + '<section><h2>행사별 주문 링크</h2>'
       + ('<ul>' + ''.join(offers) + '</ul>' if offers else '<p>발급된 링크가 없어요.</p>')
       + '</section><section><h2>쇼핑몰 주문·결제 내역</h2>'
-      + f'<form method="get" action="{escape(path)}"><label>전체 기록에서 주문번호로 열기<input name="order" pattern="[a-f0-9]{{32}}" maxlength="32" required></label><button>고유 주문번호 조회</button></form><p><a href="{escape(path)}">최근 주문 목록</a></p>'
+      + f'<form method="get" action="{escape(path)}"><label>전체 주문 검색<input name="q" value="{escape(query)}" maxlength="100" placeholder="주문번호·주문자·휴대폰·문구·상품"></label><button>검색</button></form><form method="get" action="{escape(path)}"><label>전체 기록에서 주문번호로 열기<input name="order" pattern="[a-f0-9]{{32}}" maxlength="32" required></label><button>고유 주문번호 조회</button></form><p><a href="{escape(path)}">최근 주문 목록</a></p>'
       + '<p>결제 요청 확인 필요 주문은 페이앱 대조 후 통보 재전송으로 확인합니다. 취소는 페이앱 판매자 화면에서 실행합니다.</p>'
       + ('<ul>' + ''.join(orders) + '</ul>' if orders else '<p>접수된 주문이 없어요.</p>')
       + '''</section></main><script>
