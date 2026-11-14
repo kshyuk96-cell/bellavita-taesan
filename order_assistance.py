@@ -94,29 +94,9 @@ def _command_locked(db,owner,message):
     import order_operations as ops
     if message=='주문 공유 대기':
         with db() as c:return order_sharing.pending_summary(c,owner)
-    if message=='주문 검토 대기':
-        with db() as c:
-            rows=c.execute("SELECT * FROM order_operations WHERE owner=? AND kind='kakao' ORDER BY created DESC LIMIT 100",(owner,)).fetchall()
-            lines=[]
-            for row in rows:
-                data=json.loads(row['details']) or explicit_details(row['raw']);review=assess(data)
-                prior=c.execute('SELECT assessment FROM order_triage WHERE order_id=?',(row['id'],)).fetchone()
-                issues=review['issues']+(json.loads(prior[0])['issues'] if prior else [])
-                if row['state']=='cancel_requested':reason='취소 요청 / 현장 취소 미확인'
-                elif row['state']=='review_hold':reason='재시도 한도·검토 보류'
-                elif review['missing'] or issues:reason='누락: '+', '.join(review['missing']) if review['missing'] else ''
-                elif row['state'] in ('pending','update'):reason='원장 반영 대기'
-                elif row['state']=='saved' and not c.execute('SELECT 1 FROM order_transmissions WHERE order_id=? AND receipt IS NOT NULL AND verified_at IS NOT NULL',(row['id'],)).fetchone():reason='카톡 공유 미확인'
-                else:continue
-                messages=list(dict.fromkeys(i['message'] for i in issues))
-                reason=' / '.join(filter(None,(reason,*messages)))
-                ref='주문 '+str(row['order_number']) if row['order_number'] else '접수 '+row['id']
-                line=ref+' — '+reason[:230]
-                if sum(len(item)+1 for item in lines)+len(line)>800:
-                    lines.append('추가 항목은 개별 주문 상태로 확인해 주세요.');break
-                lines.append(line)
-                if len(lines)>=10:break
-        return '검토 대기 (최근 접수 100건 중 최대 10건)\n'+'\n'.join(lines) if lines else '최근 접수 100건에서 확인할 검토 대기가 없어요.'
+    import order_backlog
+    with db() as c:backlog=order_backlog.command(c,owner,message)
+    if backlog is not None:return backlog
     match=REF.fullmatch(message)
     if not match:return None
     kind,action,ref,body=match.groups();body=body or ''

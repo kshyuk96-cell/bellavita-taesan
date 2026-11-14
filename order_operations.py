@@ -34,6 +34,7 @@ def setup(c):
     c.execute('''CREATE TABLE IF NOT EXISTS order_changes (order_id TEXT, owner TEXT, changed TEXT,
                  before TEXT, after TEXT)''')
     c.execute('CREATE TABLE IF NOT EXISTS order_review (order_id TEXT PRIMARY KEY, owner TEXT, checked TEXT)')
+    c.execute('CREATE INDEX IF NOT EXISTS order_owner_created ON order_operations(owner,kind,created DESC,id DESC)')
     import order_assistance
     order_assistance.setup(c)
     import order_sharing

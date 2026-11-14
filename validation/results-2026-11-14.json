@@ -230,7 +230,10 @@
     "invitation_metadata_stubbed": false,
     "network_disabled_during_replay": true
   },
-  "unit_tests": 114,
+  "unit_tests": 133,
   "synthetic_complete_flows": 1000,
-  "full_flow_phase_assertions": 8000
+  "full_flow_phase_assertions": 8000,
+  "local_synthetic_ci_scripts_completed": 6,
+  "automatic_ledger_guard_enabled": false,
+  "main_direct_merge_ready": false
 }

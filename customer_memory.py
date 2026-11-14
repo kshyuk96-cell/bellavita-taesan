@@ -4,6 +4,7 @@ No field other than sender is reused. History is evidence for review, never an i
 """
 import json,re,sqlite3
 from dataclasses import dataclass
+from customer_config import ConfigChanges,atomic_change
 
 @dataclass(frozen=True)
 class SenderDecision:
@@ -13,7 +14,7 @@ class SenderDecision:
     reason: str
     evidence: tuple = ()
 
-class CustomerMemory:
+class CustomerMemory(ConfigChanges):
     def __init__(self,path):
         self.db=sqlite3.connect(path)
         self.db.execute('CREATE TABLE IF NOT EXISTS customer_profiles (id TEXT PRIMARY KEY, name TEXT, default_sender TEXT, default_source TEXT)')
@@ -21,25 +22,36 @@ class CustomerMemory:
         self.db.execute('CREATE TABLE IF NOT EXISTS sender_variants (id TEXT PRIMARY KEY, customer_id TEXT, sender TEXT, cue TEXT, confirmed_by TEXT)')
         self.db.execute('CREATE TABLE IF NOT EXISTS sender_evidence (customer_id TEXT, row_id TEXT, sender TEXT, evidence_type TEXT, PRIMARY KEY(customer_id,row_id,evidence_type))')
         self.db.execute('CREATE TABLE IF NOT EXISTS customer_order_rooms (room TEXT PRIMARY KEY, confirmed_by TEXT NOT NULL)')
+        self.db.execute('CREATE TABLE IF NOT EXISTS customer_config_audit (id INTEGER PRIMARY KEY, action TEXT, entity TEXT, actor TEXT, before TEXT, after TEXT, changed TEXT)')
         self.db.commit()
+    @atomic_change
     def confirm_profile(self,customer_id,name,sender,confirmed_by):
         if not all(isinstance(v,str) and v.strip() for v in [customer_id,name,sender,confirmed_by]):raise ValueError('Verified profile fields required')
-        self.db.execute('INSERT INTO customer_profiles VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,default_sender=excluded.default_sender,default_source=excluded.default_source',(customer_id,name,sender,confirmed_by));self.db.commit()
+        before=self.db.execute('SELECT * FROM customer_profiles WHERE id=?',(customer_id,)).fetchone()
+        self.audit('profile',customer_id,confirmed_by,before,(customer_id,name,sender,confirmed_by))
+        self.db.execute('INSERT INTO customer_profiles VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,default_sender=excluded.default_sender,default_source=excluded.default_source',(customer_id,name,sender,confirmed_by))
+    @atomic_change
     def bind(self,scope,external_id,customer_id,confirmed_by):
         if not all(isinstance(v,str) and v.strip() for v in [scope,external_id,confirmed_by]):raise ValueError('Confirmed source binding required')
         if not self.db.execute('SELECT 1 FROM customer_profiles WHERE id=?',(customer_id,)).fetchone():raise ValueError('Unknown customer profile')
         previous=self.db.execute('SELECT customer_id FROM customer_bindings WHERE scope=? AND external_id=?',(scope,external_id)).fetchone()
         if previous and previous[0]!=customer_id:raise ValueError('Binding belongs to a different customer; review before replacing')
-        self.db.execute('INSERT OR IGNORE INTO customer_bindings VALUES (?,?,?,?)',(scope,external_id,customer_id,confirmed_by));self.db.commit()
+        before=self.db.execute('SELECT * FROM customer_bindings WHERE scope=? AND external_id=?',(scope,external_id)).fetchone()
+        self.audit('binding',scope+':'+external_id,confirmed_by,before,(scope,external_id,customer_id,confirmed_by))
+        self.db.execute('INSERT OR REPLACE INTO customer_bindings VALUES (?,?,?,?)',(scope,external_id,customer_id,confirmed_by))
+    @atomic_change
     def confirm_variant(self,variant_id,customer_id,sender,cue,confirmed_by):
         if not all(isinstance(v,str) and v.strip() for v in [variant_id,customer_id,sender,cue,confirmed_by]):raise ValueError('Confirmed variant required')
         if not self.db.execute('SELECT 1 FROM customer_profiles WHERE id=?',(customer_id,)).fetchone():raise ValueError('Unknown customer profile')
         prior=self.db.execute('SELECT customer_id FROM sender_variants WHERE id=?',(variant_id,)).fetchone()
         if prior and prior[0]!=customer_id:raise ValueError('Variant belongs to another customer')
-        self.db.execute('INSERT INTO sender_variants VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET sender=excluded.sender,cue=excluded.cue,confirmed_by=excluded.confirmed_by',(variant_id,customer_id,sender,cue,confirmed_by));self.db.commit()
+        before=self.db.execute('SELECT * FROM sender_variants WHERE id=?',(variant_id,)).fetchone()
+        self.audit('variant',variant_id,confirmed_by,before,(variant_id,customer_id,sender,cue,confirmed_by))
+        self.db.execute('INSERT INTO sender_variants VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET sender=excluded.sender,cue=excluded.cue,confirmed_by=excluded.confirmed_by',(variant_id,customer_id,sender,cue,confirmed_by))
+    @atomic_change
     def record_history(self,customer_id,row_id,sender):
         # Do not promote other people's inscriptions ordered by this customer into defaults.
-        self.db.execute('INSERT OR IGNORE INTO sender_evidence VALUES (?,?,?,?)',(customer_id,str(row_id),sender,'sheet_history'));self.db.commit()
+        self.db.execute('INSERT OR IGNORE INTO sender_evidence VALUES (?,?,?,?)',(customer_id,str(row_id),sender,'sheet_history'))
     def resolve(self,scope,external_id,*,current_text='',explicit_sender='',sender_fragments=(),selected_variant=''):
         # Explicit current-order text does not need an inferred identity.
         if explicit_sender.strip():return SenderDecision('auto',explicit_sender.strip(),'current_order','이번 주문에 명시한 보내는분')

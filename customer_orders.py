@@ -35,11 +35,18 @@ def prepare(message, path):
     finally:
         memory.db.close()
 
-def allow_room(memory, room, confirmed_by):
-    if not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', room) or not confirmed_by.strip():
-        raise ValueError('Confirmed room ID required')
-    memory.db.execute('INSERT OR REPLACE INTO customer_order_rooms VALUES (?,?)', (room,confirmed_by))
-    memory.db.commit()
+def allow_room(memory,room,confirmed_by):
+    memory.allow_room(room,confirmed_by)
+
+def apply_config(memory,config):
+    with memory.atomic():
+        for profile in config['profiles']:
+            memory.confirm_profile(profile['id'],profile['name'],profile['sender'],profile['confirmed_by'])
+        for room in config['rooms']:memory.allow_room(room['id'],room['confirmed_by'])
+        for binding in config['bindings']:
+            memory.bind(binding['room'],binding['sender_id'],binding['customer_id'],binding['confirmed_by'])
+        for variant in config.get('variants',[]):
+            memory.confirm_variant(variant['id'],variant['customer_id'],variant['sender'],variant['cue'],variant['confirmed_by'])
 
 if __name__ == '__main__':
     import argparse,json
@@ -51,11 +58,6 @@ if __name__ == '__main__':
     config=json.loads(Path(args.confirmed_config).read_text())
     memory=CustomerMemory(args.db)
     try:
-        for profile in config['profiles']:
-            memory.confirm_profile(profile['id'],profile['name'],profile['sender'],profile['confirmed_by'])
-        for room in config['rooms']:
-            allow_room(memory,room['id'],room['confirmed_by'])
-        for binding in config['bindings']:
-            memory.bind(binding['room'],binding['sender_id'],binding['customer_id'],binding['confirmed_by'])
+        apply_config(memory,config)
         print('Confirmed configuration imported. No orders sent or written.')
     finally:memory.db.close()
