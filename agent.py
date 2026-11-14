@@ -32,6 +32,7 @@ import customer_orders
 import order_ledger
 import order_operations
 import order_lifecycle
+import order_assistance
 import order_sms
 import staff_features
 
@@ -610,7 +611,7 @@ def run_order(message, owner):
     if duplicate:
         return {'summary': duplicate}
     if not os.getenv('TAESAN_ORDER_SHEET_ID'):
-        return {'summary': '주문 내용을 보관했어요. 원장 연결이 끝나면 등록할 수 있어요.', 'order_status': True}
+        return {'summary': '주문 내용을 보관했어요. 원장 연결이 끝나면 등록할 수 있어요.\n접수ID: ' + key, 'order_status': True}
     try:
         with ORDER_LOCK:
             number, data = order_operations.save(db, key, order_intake.extract, write_order, order_saved)
@@ -618,8 +619,8 @@ def run_order(message, owner):
         with db() as c:
             order_operations.defer(c, key)
         detail = str(error) if isinstance(error, ValueError) else '행사 정보나 시트 연결을 확인해 주세요.'
-        return {'summary': '주문을 보관했어요. 원장 등록은 확인이 필요해요.\n' + detail[:130], 'order_status': True}
-    return {'summary': '원장에 등록했어요.\n' + order_intake.report(number, data)}
+        return {'summary': '주문을 보관했어요. 원장 등록은 확인이 필요해요.\n' + detail[:130] + '\n접수ID: ' + key, 'order_status': True}
+    return {'summary': '원장에 등록했어요.\n' + order_assistance.question(data) + '\n' + order_intake.report(number, data)}
 
 
 def order_saved(connection, row, number, details):
@@ -917,6 +918,10 @@ def dispatch(body, defer_callback=None):
     if message == '승인 대기' or re.fullmatch(
             r'(?:승인 검토|구조 변경 승인|구조 변경 반려) [a-f0-9]{12}', message):
         return approval_command(owner, message)
+    with ORDER_LOCK:
+        assistance_reply = order_assistance.command(db, owner, message)
+    if assistance_reply is not None:
+        return kakao(assistance_reply)
     with ORDER_LOCK:
         lifecycle_reply = order_lifecycle.command(db, owner, message)
     if lifecycle_reply is not None:

@@ -29,6 +29,8 @@ def setup(c):
     c.execute('''CREATE TABLE IF NOT EXISTS order_changes (order_id TEXT, owner TEXT, changed TEXT,
                  before TEXT, after TEXT)''')
     c.execute('CREATE TABLE IF NOT EXISTS order_review (order_id TEXT PRIMARY KEY, owner TEXT, checked TEXT)')
+    import order_assistance
+    order_assistance.setup(c)
 
 
 def now():
@@ -105,13 +107,26 @@ def save(db, key, extract, write, after_save=None):
         raise ValueError('취소 요청 또는 보류 상태의 주문은 자동 등록하지 않아요.')
     data = json.loads(row['details'])
     if not data and row['kind'] == 'kakao':
-        data = extract(row['raw'])
+        try:data = extract(row['raw'])
+        except Exception:
+            import order_assistance
+            with db() as c:order_assistance.record(c,key,order_assistance.explicit_details(row['raw']),error=True)
+            raise
         with db() as c:
             c.execute('UPDATE order_operations SET details=? WHERE id=?', (dump(data), key))
-    number, verified = write(key, data, row['created'], update=row['state'] == 'update')
+    import order_assistance
+    with db() as c:review=order_assistance.record(c,key,data)
+    if review['hold']:
+        raise ValueError(order_assistance.question(data))
+    try:
+        number, verified = write(key, data, row['created'], update=row['state'] == 'update')
+    except Exception:
+        with db() as c:order_assistance.record(c,key,data,error=True)
+        raise
     with db() as c:
         c.execute("UPDATE order_operations SET details=?,order_number=?,state='saved' WHERE id=?",
                   (dump(verified), number, key))
+        order_assistance.record(c,key,verified)
         if after_save:
             after_save(c, row, number, verified)
     return number, verified
