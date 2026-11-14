@@ -40,7 +40,11 @@ async def recognize(path,*,include_lines=False,save_text=True):
                 boxes=[word.bounding_rect for word in line.words]
                 if not boxes:continue
                 lines.append({'text':line.text,'top':min(b.y for b in boxes),
-                              'bottom':max(b.y+b.height for b in boxes)})
+                              'bottom':max(b.y+b.height for b in boxes),
+                              'left':min(b.x for b in boxes),'right':max(b.x+b.width for b in boxes),
+                              'words':[{'text':word.text,'left':word.bounding_rect.x,'top':word.bounding_rect.y,
+                                        'right':word.bounding_rect.x+word.bounding_rect.width,
+                                        'bottom':word.bounding_rect.y+word.bounding_rect.height} for word in line.words]})
             report['lines']=lines
         return report
     finally:

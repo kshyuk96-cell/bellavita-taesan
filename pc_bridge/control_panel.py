@@ -102,13 +102,14 @@ class Panel:
                     if database.exists():
                         with sqlite3.connect(database,timeout=.2) as c:
                             rows=c.execute('SELECT id,scope,changed_text,result,sightings FROM ocr_reviews ORDER BY rowid DESC LIMIT 20').fetchall()
-                        allowed={json.dumps([e['id'],e['window_title']],ensure_ascii=False) for e in validate_config(self.config())}
+                        allowed={json.dumps([e['id'],e['window_title'],'bubbles-v3'],ensure_ascii=False) for e in validate_config(self.config())}
                         rows=[r for r in rows if r[1] in allowed]
                         signature=tuple((r[0],r[4]) for r in rows)
                         if signature!=self.review_signature:
                             self.review_signature=signature
                             self.show('\n\n'.join('방: '+json.loads(r[1])[1]+' / OCR 검토 필요\n'+
-                                json.loads(r[3])['text']+'\n'+json.loads(r[3])['warning'] for r in rows) or '새 주문 후보 대기 중')
+                                json.loads(r[3])['text']+'\n'+json.loads(r[3])['warning']+
+                                '\n[감지한 OCR 변화 원문 / 오인식 가능]\n'+r[2] for r in rows) or '새 주문 후보 대기 중')
         except Exception:
             self.status.set('감시 상태 갱신 대기 · 설정 또는 읽기 오류 확인 필요')
         finally:self.root.after(1000,self.watch_status)

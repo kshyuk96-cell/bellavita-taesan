@@ -23,6 +23,12 @@ def capture(config,room,destination):
     left,top,right,bottom=win32gui.GetWindowRect(window.handle)
     width,height=right-left,bottom-top
     if not 0<width<=4096 or not 0<height<=4096:raise ValueError('창 크기를 확인해야 합니다.')
+    lists=[c for c in window.descendants(class_name='EVA_VH_ListControl_Dblclk') if c.is_visible()]
+    if len(lists)!=1:raise ValueError('Chat list bounds unavailable')
+    chat=win32gui.GetWindowRect(lists[0].handle)
+    bounds={'left':chat[0]-left,'top':chat[1]-top,'right':chat[2]-left,'bottom':chat[3]-top}
+    if not (0<=bounds['left']<bounds['right']<=width and 0<=bounds['top']<bounds['bottom']<=height):
+        raise ValueError('Chat list bounds outside capture')
     dc_handle=win32gui.GetWindowDC(window.handle)
     if not dc_handle:raise RuntimeError('window_dc_unavailable')
     source=None;memory=None;bitmap=None;old=None
@@ -37,12 +43,14 @@ def capture(config,room,destination):
         user.PrintWindow.restype=wintypes.BOOL
         ok=user.PrintWindow(window.handle,memory.GetSafeHdc(),2)
         check_window(window,entry)
+        if win32gui.GetWindowRect(window.handle)!=(left,top,right,bottom) or win32gui.GetWindowRect(lists[0].handle)!=chat:
+            raise ValueError('Window layout changed during capture')
         if not ok:raise RuntimeError('background_render_unavailable')
         pixels=bitmap.GetBitmapBits(True)
         info=bitmap.GetInfo();step=max(4,(len(pixels)//4096)//4*4)
         colors={pixels[i:i+3] for i in range(0,len(pixels)-3,step)} if info['bmBitsPixel']==32 else set()
         bitmap.SaveBitmapFile(memory,str(destination))
-        return {'capture_returned':True,'width':width,'height':height,
+        return {'capture_returned':True,'width':width,'height':height,'chat_bounds':bounds,
                 'sampled_colors':len(colors),'nonblank_candidate':len(colors)>8,
                 'focus_keys_clipboard_used':False,'ocr_verified':False,
                 'image_path':str(destination),'image_uploaded':False}
