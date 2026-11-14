@@ -23,6 +23,7 @@ import cash_receipts
 import shop_admin_layout
 import shop_readiness
 import external_backups
+import shop_admin_queries
 
 ADMIN_PATH = re.compile(r'/shop/admin/([0-9]{10})/([a-f0-9]{64})')
 ORDER_PATH = re.compile(r'/shop/order/([a-f0-9]{32})')
@@ -249,7 +250,8 @@ def record_payment_check(connection, fields):
 def admin_page(connection, path, origin, fields=None, root=None):
     fields=fields or {}
     selected_order=fields.get('order','')
-    query=fields.get('q','').strip()[:100]
+    selected_rows,result_meta=shop_admin_queries.select(connection,fields)
+    query=result_meta['filters']['q']
     if selected_order and not re.fullmatch(r'[a-f0-9]{32}',selected_order):raise ValueError('전체 주문 조회에는 정확한 주문번호를 입력해 주세요.')
     def form(action, fields, button):
         return (f'<form method="post" action="{escape(path)}">'
@@ -296,7 +298,7 @@ def admin_page(connection, path, origin, fields=None, root=None):
             + field('판매가(원) · 예: 93500,99000 · 공란이면 기본가', 'prices', optional=True)
             + field('신랑신부 사진 HTTPS 주소', 'wedding_photo', optional=True)
         )
-        products.append(f'<section><h2>{escape(product["title"])}</h2>'
+        products.append(f'<section id="product-{row["id"]}" data-admin-product="{row["id"]}"><h2>{escape(product["title"])}</h2>'
                         '<details><summary>상품 수정</summary>'
                         + form('save_product', identity + product_fields(product), '상품 수정 저장')
                         + '</details><details><summary>행사별 주문 링크 발급</summary>'
@@ -315,9 +317,7 @@ def admin_page(connection, path, origin, fields=None, root=None):
                              '판매 중지' if row['active'] else '판매 재개') + '</li>')
 
     orders = []
-    for row in connection.execute('''SELECT o.* FROM invitation_orders o
-            JOIN shop_offers s ON s.id=o.job WHERE (?='' OR o.id=?) AND (?='' OR instr(lower(o.id||o.details),lower(?))>0)
-            ORDER BY (o.state='requesting') DESC, o.created DESC LIMIT 200''',(selected_order,selected_order,query,query)):
+    for row in selected_rows:
         order = json.loads(row['details'])
         details = [
             ('주문번호', row['id']), ('접수 시각', row['created'][:16].replace('T', ' ')),
@@ -360,9 +360,10 @@ def admin_page(connection, path, origin, fields=None, root=None):
                                  + field('페이앱 확인 상태·대조 근거·재전송 요청 결과', 'note', multiline=True)
                                  + '<label><input type="checkbox" name="compared" value="yes" required>'
                                    '페이앱 원거래와 주문을 직접 대조했습니다</label>', '대조 기록 저장'))
-        orders.append(f'<li id="order-{row["id"]}" data-shop-order="{row["id"]}" data-queues="{",".join(shop_dashboard.categories(connection,row))}"><details><summary>{escape(order["title"])} · {order["amount"]:,}원 · '
-                      f'{STATES.get(row["state"], "확인 필요")} · 주문 {row["id"]}</summary>'
-                      f'<dl>{content}</dl>{check_form}' + order_ops.controls(connection, row, path) + '</details></li>')
+        search_text=' '.join(str(value) for value in (row['id'],order['buyer'],order['buyer_phone'],order['sender'],order['message'],order['title'],order['venue']))
+        orders.append(f'<li id="order-{row["id"]}" data-shop-order="{row["id"]}" data-search="{escape(search_text)}" data-queues="{",".join(shop_dashboard.categories(connection,row))}"><details><summary>{escape(order["title"])} · {order["amount"]:,}원 · '
+                      f'{STATES.get(row["state"], "확인 필요")} · 주문 {row["id"]}<small class="order-identity">주문자 {escape(order["buyer"])} · 행사 {escape(order["event_time"][:16].replace("T"," "))}</small><span class="order-next">{escape(shop_dashboard.next_action(connection,row))}</span></summary>'
+                      f'<div class="order-tools"><button type="button" data-copy-order="{row["id"]}">주문번호 복사</button><button type="button" data-copy-link="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}">고객 상태 링크 복사</button><input class="copy-source" readonly aria-label="복사할 값" value="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}"></div><dl>{content}</dl>{check_form}' + order_ops.controls(connection, row, path) + '</details></li>')
 
     notification_settings = ('<section><h2>직원 주문 알림</h2>'
         + form('save_notifications', field('알림 받을 직원 휴대폰 · 쉼표 또는 줄바꿈으로 구분', 'staff_phones',
@@ -383,14 +384,14 @@ def admin_page(connection, path, origin, fields=None, root=None):
       input[type=checkbox]{display:inline;width:auto}
       a{color:#204c36}summary{cursor:pointer;padding:6px 0}small{overflow-wrap:anywhere}li{margin-bottom:12px}
       dd{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 8px}dt{font-weight:bold}</style>
-      <main><h1>벨라비타 쇼핑몰 관리</h1><p><a href="/shop">고객 쇼핑몰 보기</a></p>''' + shop_dashboard.panel(connection) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + assignment_batches.panel(connection,path) + shop_sales.panel(connection,path,fields) + '''<section><h2>새 상품 등록</h2>'''
+      <main><h1>벨라비타 쇼핑몰 관리</h1><p><a href="/shop">고객 쇼핑몰 보기</a></p>''' + shop_dashboard.panel(connection,selected_rows) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + assignment_batches.panel(connection,path) + shop_sales.panel(connection,path,fields) + '''<section><h2>새 상품 등록</h2>'''
       + form('save_product', product_fields({}), '상품 등록') + '</section>' + notification_settings
       + ''.join(products) + '<section><h2>행사별 주문 링크</h2>'
       + ('<ul>' + ''.join(offers) + '</ul>' if offers else '<p>발급된 링크가 없어요.</p>')
       + '</section><section><h2>쇼핑몰 주문·결제 내역</h2>'
-      + f'<form method="get" action="{escape(path)}"><label>전체 주문 검색<input name="q" value="{escape(query)}" maxlength="100" placeholder="주문번호·주문자·휴대폰·문구·상품"></label><button>검색</button></form><form method="get" action="{escape(path)}"><label>전체 기록에서 주문번호로 열기<input name="order" pattern="[a-f0-9]{{32}}" maxlength="32" required></label><button>고유 주문번호 조회</button></form><p><a href="{escape(path)}">최근 주문 목록</a></p>'
+      + shop_admin_queries.controls(path,result_meta) + f'<form method="get" action="{escape(path)}"><label>전체 기록에서 주문번호로 열기<input name="order" pattern="[a-f0-9]{{32}}" maxlength="32" required></label><button>고유 주문번호 조회</button></form><p><a href="{escape(path)}">최근 주문 목록</a></p>'
       + '<p>결제 요청 확인 필요 주문은 페이앱 대조 후 통보 재전송으로 확인합니다. 취소는 페이앱 판매자 화면에서 실행합니다.</p>'
-      + ('<ul>' + ''.join(orders) + '</ul>' if orders else '<p>접수된 주문이 없어요.</p>')
+      + ('<ul>' + ''.join(orders) + '</ul>' if orders else '<p>조건에 맞는 주문이 없습니다. 검색어·결제/배송 상태·행사일을 확인하거나 조건을 초기화하세요.</p>')
       + '''</section></main><script>
       for (const review of document.querySelectorAll('.shop-photo-review')) {
         const image = review.querySelector('img');
@@ -401,4 +402,4 @@ def admin_page(connection, path, origin, fields=None, root=None):
         loaded();
       }
       </script>''' + shop_dashboard.SCRIPT + '</html>')
-    return shop_admin_layout.render(page,shop_readiness.panel(connection))
+    return shop_admin_layout.render(page,shop_readiness.panel(connection),path=path,filters=result_meta['filters'],saved=fields.get('saved')=='1')

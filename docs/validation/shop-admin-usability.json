@@ -1,0 +1,37 @@
+{
+  "scenarios": [
+    {
+      "width": 375,
+      "all_record_search": true,
+      "combined_filters": true,
+      "pagination_30": true,
+      "next_action_visible": true,
+      "clipboard_fallback": true,
+      "saved_context_preserved": true,
+      "manual_search": true,
+      "overflow": false
+    },
+    {
+      "width": 1280,
+      "all_record_search": true,
+      "combined_filters": true,
+      "pagination_30": true,
+      "next_action_visible": true,
+      "clipboard_fallback": true,
+      "saved_context_preserved": true,
+      "manual_search": true,
+      "overflow": false
+    }
+  ],
+  "javascript_errors": [],
+  "live_side_effects": false,
+  "unit_tests": {
+    "passed": 138
+  },
+  "focused_tests": {
+    "passed": 3
+  },
+  "existing_catalog_browser": "passed: 375/1280",
+  "existing_growth_browser": "passed: 375",
+  "hosted_verification": "pending"
+}

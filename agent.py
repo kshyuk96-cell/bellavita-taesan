@@ -31,6 +31,8 @@ import invitation
 import owner_alerts
 import shop
 import shop_catalog
+import shop_admin_queries
+import shop_admin_manual
 import order_ops
 import order_sample
 import production_files
@@ -1358,6 +1360,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.order_message('태산이에서 쇼핑몰 관리를 다시 열어 주세요.', 403)
             try:
                 fields = self.read_order_form()
+                return_location=shop_admin_queries.redirect(match[0],fields) if '_return_query' in fields else match[0]
                 action = {'save_product': shop.save_product, 'issue_offers': shop.issue_offers,
                           'change_offer': shop.change_offer,
                           'record_payment_check': shop.record_payment_check,
@@ -1383,9 +1386,11 @@ class Handler(BaseHTTPRequestHandler):
                     connection.execute('BEGIN IMMEDIATE')
                     action(connection, fields)
             except (ValueError, UnicodeError) as error:
-                return self.order_message(str(error), 422, back=True)
+                from html import escape
+                return self.send_order_html('<!doctype html><html lang="ko"><meta name="viewport" content="width=device-width,initial-scale=1"><main><h1>저장하지 못했습니다</h1><p>'+escape(str(error))+'</p><p>기존 기록을 먼저 확인하세요. 결과가 불명확하면 반복 저장하지 마세요.</p><button type="button" onclick="history.back()">입력 화면으로 돌아가기</button><p><a href="'+escape(match[0])+'">최신 관리자 화면 열기</a></p></main></html>',422)
+
             self.send_response(303)
-            self.send_header('Location', match[0])
+            self.send_header('Location', return_location)
             self.send_header('Cache-Control', 'no-store')
             self.end_headers()
             return
@@ -1495,6 +1500,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        for suffix in ('/manual','/manual.md'):
+            manual=shop.ADMIN_PATH.fullmatch(path.removesuffix(suffix)) if path.endswith(suffix) else None
+            if manual:
+                if not shop.admin_authorized(*manual.groups(),os.environ['TAESAN_WEBHOOK_SECRET']):return self.order_message('관리자 링크가 만료됐습니다.',403)
+                if suffix=='/manual':return self.send_order_html(shop_admin_manual.page(manual[0]),referrer_policy='same-origin')
+                content=shop_admin_manual.SOURCE.read_bytes();self.send_response(200);self.send_header('Content-Type','text/markdown; charset=utf-8');self.send_header('Content-Disposition','attachment; filename=bellavita-admin-manual.md');self.send_header('Cache-Control','private, no-store');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
         if path in ('/shop','/shop/'):
             with db() as c:page=shop_catalog.page(c)
             return self.send_order_html(page,referrer_policy='same-origin')

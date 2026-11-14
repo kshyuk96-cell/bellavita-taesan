@@ -32,7 +32,7 @@ def main():
                 page.screenshot(path='test-artifacts/catalog-order-'+str(width)+'.png',full_page=True)
                 # Validate real form/DOM without navigating to the mocked merchant's URL.
                 assert page.locator('#order').evaluate('form=>form.reportValidity()')
-                page.goto(ORIGIN+fixture.admin);assert page.locator('.admin-nav a').count()==5;page.locator('.admin-nav a[href="#admin-products"]').click();assert page.locator('#admin-products').count()==1;assert page.locator('#admin-settings').get_by_text('운영 연결 준비',exact=True).count()==1;assert page.evaluate('document.documentElement.scrollWidth<=innerWidth');page.locator('.admin-nav a[href="#admin-orders"]').click();page.screenshot(path='test-artifacts/admin-'+str(width)+'.png',full_page=False)
+                page.goto(ORIGIN+fixture.admin);assert page.locator('.admin-nav a').count()==6;page.locator('.admin-nav a[href="#admin-products"]').click();assert page.locator('#admin-products').count()==1;assert page.locator('#admin-settings').get_by_text('운영 연결 준비',exact=True).count()==1;assert page.evaluate('document.documentElement.scrollWidth<=innerWidth');page.locator('.admin-nav a[href="#admin-orders"]').click();page.screenshot(path='test-artifacts/admin-'+str(width)+'.png',full_page=False)
                 results.append({'width':width,'four_products':True,'frame_ratio':round(frame['width']/frame['height'],3),'scroll_ratio':round(scroll['width']/scroll['height'],3),'same_buyer':True,'server_price_preview':165000,'long_message_visible':True,'overflow':False})
                 context.close()
             browser.close()
