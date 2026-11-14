@@ -1,0 +1,172 @@
+{
+  "checked_on": "2026-11-14",
+  "release_ready": false,
+  "development_scope_frozen": true,
+  "new_product_features_added": 0,
+  "status": "implementation_and_mock_rehearsals_passed_real_integration_pending",
+  "frozen_runtime_commit": "21ddc31d07f385056a5c623c19088c1103eb4ba1",
+  "source_head_before_release_docs": "0965a1bfb0832e2955fc2bcfcb483765ee4cc40f",
+  "main_base": "9348afabf049322b2bf3f061d511f5848d7aa1bf",
+  "milestones": {
+    "scope_freeze": "complete",
+    "screen_validation": "technical_pass_owner_review_pending",
+    "real_provider_integration": "unverified",
+    "operator_rehearsal": "automated_mock_pass_human_review_pending",
+    "production_transition": "planned_not_executed"
+  },
+  "existing_regression_evidence": {
+    "tests_passed": 166,
+    "commit": "21ddc31d07f385056a5c623c19088c1103eb4ba1",
+    "report": "docs/validation/shop-admin-launch.json",
+    "rerun_this_documentation_only_turn": false
+  },
+  "rerun_native_catalog_rehearsal": {
+    "products": 4,
+    "server_amount": 165000,
+    "mock_payment": true,
+    "duplicate_paid_once": true,
+    "duplicate_partial_once": true,
+    "late_paid_does_not_undo_cancel": true,
+    "process_restart_preserved": true,
+    "backup_restore": "passed",
+    "live_payment": false,
+    "live_messages": false,
+    "live_receipts": false,
+    "render_disk_verification": "not_run"
+  },
+  "rerun_business_rehearsal": {
+    "result": "passed",
+    "offer_prices": [
+      93500,
+      99000
+    ],
+    "mock_cash_receipt": "issued",
+    "mock_notifications_provider_accepted": 4,
+    "amendment_original_preserved": true,
+    "new_artifact_version": 2,
+    "assignment_rows_applied": 2,
+    "customer_photo_confirmed": true,
+    "restore_integrity": "ok",
+    "restored_factory_orders": 2,
+    "restored_factory_duplicate_orders": 0,
+    "pending_hold_recovered": true,
+    "outbound_network_requests": 0,
+    "actual_payment": false,
+    "actual_messages": false,
+    "actual_printing": false,
+    "live_sheet_writes": false
+  },
+  "live_readonly_audit": {
+    "public_statuses": {
+      "/healthz": 200,
+      "/shop": 200,
+      "/verification": 200
+    },
+    "public_products": 4,
+    "mock_order_count": 3,
+    "integrity": "ok",
+    "mount_verified": true,
+    "data_under_var_data": true,
+    "mock_mode_forced": true,
+    "manual_matches_frozen_source": true,
+    "new_orders_created": 0,
+    "new_deploys_triggered": 0
+  },
+  "verification_configuration_only": {
+    "real_account_settings_inferred": false,
+    "actual_merchant_account_examined": false,
+    "alimtalk_missing_field_names": [
+      "SOLAPI_API_KEY",
+      "SOLAPI_API_SECRET",
+      "SOLAPI_KAKAO_PFID",
+      "SHOP_ALIMTALK_TEMPLATE_ID"
+    ],
+    "staff_recipients_configured": false,
+    "public_products_without_tax_type": 4,
+    "external_automatic_credentials_configured": false
+  },
+  "verification_deployment": {
+    "auto_deploy": "no",
+    "branch": "codex/shop-backend",
+    "disk_mount": "/var/data",
+    "disk_gb": 1,
+    "instances": 1,
+    "deployment_status": "live"
+  },
+  "existing_main_service_readonly": {
+    "auto_deploy": "yes",
+    "branch": "main",
+    "disk_attached": true,
+    "actual_data_path_verified": false,
+    "changed": false
+  },
+  "monitoring": {
+    "cpu_latest_percent": 0.24,
+    "memory_latest_percent": 13.47,
+    "p95_latency_available": false,
+    "nonzero_5xx_buckets": [
+      {
+        "timestamp": "2026-11-14T12:49:02.512Z",
+        "value": 1
+      },
+      {
+        "timestamp": "2026-11-14T12:51:02.512Z",
+        "value": 1
+      }
+    ],
+    "application_error_log_count": 0,
+    "scope": "low_traffic_observation_not_load_test"
+  },
+  "stabilized_http": {
+    "since_utc": "2026-11-14T12:52:00Z",
+    "requests_5xx": 0,
+    "requests_2xx": 16,
+    "p95_samples_available": false,
+    "load_test": false
+  },
+  "launch_blockers": [
+    {
+      "id": "owner_acceptance",
+      "status": "pending",
+      "required": "final four-product price/options/design and sample delivery channel acceptance"
+    },
+    {
+      "id": "real_payapp",
+      "status": "unverified",
+      "required": "merchant test method or specifically authorized transaction and callback/cancellation evidence"
+    },
+    {
+      "id": "real_notifications",
+      "status": "unverified",
+      "required": "approved channel/templates, staff/customer handset receipt; distinguish MMS attachment from Kakao image link"
+    },
+    {
+      "id": "real_receipts",
+      "status": "unverified",
+      "required": "actual product tax types, single issuer and eligible-payment issue/cancel evidence"
+    },
+    {
+      "id": "operational_storage_and_seed",
+      "status": "pending",
+      "required": "verify actual main data path, backup before any migration, approved four-product seeding and display"
+    },
+    {
+      "id": "automatic_external_backup",
+      "status": "not_verified",
+      "required": "server authentication and upload/download/restore result; manual backup evidence is separate"
+    },
+    {
+      "id": "human_rehearsal_and_release_approval",
+      "status": "pending",
+      "required": "operator rehearsal and explicit production rollout request"
+    }
+  ],
+  "production_changes": {
+    "merged": false,
+    "deploys_triggered": 0,
+    "actual_transactions": 0,
+    "actual_message_deliveries": 0,
+    "actual_receipts": 0,
+    "operational_database_writes": false
+  }
+}
