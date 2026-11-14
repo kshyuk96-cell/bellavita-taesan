@@ -55,21 +55,23 @@ def key(schedule, place, sender):
     return day, time, place, sender
 
 
-def check(number, read_ranges, *, resolver=None):
+def check(number, read_ranges, *, resolver=None, reviewed=None, details=False):
+    def finish(summary, pairs=None):
+        return {'summary': summary, 'duplicate_pairs': pairs or []} if details else summary
     if number < 5:
-        return '액자화환 원장에 적힌 주문번호를 알려주세요.'
+        return finish('액자화환 원장에 적힌 주문번호를 알려주세요.')
     schedules, places, senders = read_ranges(RANGES)
     headers = [value(value(rows, 0), i) for rows, i in ((schedules, 0), (schedules, 1), (places, 0), (senders, 0))]
     if [normalized(header).replace(' ', '') for header in headers] != ['배송일', '행사시간', '설치장소', '보내는분요약']:
-        return '액자화환 원장 제목이 달라 중복을 확인하지 못했어요.'
+        return finish('액자화환 원장 제목이 달라 중복을 확인하지 못했어요.')
     target = number - 4
     fields = (value(schedules, target), value(places, target), value(senders, target))
     if not any(fields):
-        return f'액자화환 원장에서 {number}번 주문을 찾지 못했어요. 현재 주문번호를 확인해 주세요.'
+        return finish(f'액자화환 원장에서 {number}번 주문을 찾지 못했어요. 현재 주문번호를 확인해 주세요.')
     expected = key(*fields)
     if expected is None:
-        return f'{number}번 주문의 배송일, 행사시간, 설치장소, 보내는 분 요약을 확인해 주세요. 값이 비었거나 읽을 수 없어요.'
-    matches, uncertain = [], []
+        return finish(f'{number}번 주문의 배송일, 행사시간, 설치장소, 보내는 분 요약을 확인해 주세요. 값이 비었거나 읽을 수 없어요.')
+    matches, uncertain, suppressed = [], [], []
     candidates = []
     for index, schedule in enumerate(schedules[1:], 1):
         if index == target:
@@ -81,11 +83,17 @@ def check(number, read_ranges, *, resolver=None):
         if candidate and (candidate[0], candidate[1], candidate[3]) == (expected[0], expected[1], expected[3]):
             candidates.append(index)
     if len(candidates) > 40:
-        return '동일 조건 주문이 많아 장소 대조를 보류했어요. 날짜·행사시간·보내는 분 요약을 원장에서 확인해 주세요.'
+        return finish('동일 조건 주문이 많아 장소 대조를 보류했어요. 날짜·행사시간·보내는 분 요약을 원장에서 확인해 주세요.')
     for index in candidates:
         outcome = compare_locations(value(fields[1], 0), value(value(places, index), 0), resolver=resolver)
         if outcome['status'] == 'same':
-            matches.append(index + 4)
+            ignored = False
+            if callable(reviewed):
+                try:
+                    ignored = reviewed(number, index + 4) is True
+                except Exception:
+                    pass  # A failed review lookup must never suppress a warning.
+            (suppressed if ignored else matches).append(index + 4)
         elif outcome['status'] == 'needs_review':
             uncertain.append(index + 4)
     lines = []
@@ -95,6 +103,8 @@ def check(number, read_ranges, *, resolver=None):
         lines.append(f'중복 의심 · {number}번과 같은 배송일·행사시간·실제 장소·보내는 분 DB 요약 {len(matches)}건\n원장 {rows_text(matches)}을 확인해 주세요.')
     if uncertain:
         lines.append(f'장소 확인 필요 · 원장 {rows_text(uncertain)}\n배송일·행사시간·보내는 분 요약은 같지만 주소 또는 층·홀을 하나로 확인하지 못했어요.')
+    if suppressed:
+        lines.append(f'본인이 별개 주문으로 확인한 {len(suppressed)}건은 이번 경고에서 제외했어요. 내용 변경·만료 시 다시 확인해요.')
     if not lines:
         lines.append(f'{number}번과 배송일·행사시간·실제 장소·보내는 분 DB 요약이 모두 같은 주문은 확인되지 않았어요.')
-    return '\n'.join(lines)
+    return finish('\n'.join(lines), [[number, row] for row in matches])
