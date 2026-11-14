@@ -66,3 +66,19 @@ Google Drive 폴더: https://drive.google.com/drive/folders/1WxBszLzEoGHphfE88AA
 python external_backups.py restore --file downloaded.bvbackup --destination /새/복구/디렉터리
 ```
 키는 비밀 환경변수나 화면에 표시되지 않는 입력으로 제공한다. 명령 인수나 저장소 파일에 넣지 않는다.
+
+## 이번 실행 결과
+
+코드 d0da05a, Render dep-dbs3p5brjlhs73d329ag가 live 된 뒤 검증했다.
+전체 135개 테스트, 375/1280px 관리자 메뉴·주문서, 기존 정정/AS/CSV/집계 브라우저 흐름과 암호화 내보내기 HTTP 리허설이 통과했다.
+
+Drive 백업 파일: https://drive.google.com/file/d/1su8lndnYiCyn8e4VBppIn_Jya0cJjJNe/view
+비공개 64,513바이트 암호화 파일을 저장하고 원본 바이트 재다운로드, SHA-256 비교, 실제 Render에서 복호화·임시 경로 복구를 확인했다. 기존 주문 3건·상품 4개와 무결성 검사가 통과했고 검증 이력을 관리자에 기록했다. 원본 DB를 덮어쓰지 않았다.
+
+실가맹점 키와 알림톡 4개 필수 설정·승인 템플릿·직원 번호, 4개 상품의 과세/면세 구분은 미확정으로 표시한다. 설정 완료로 가정해 실제 성공을 꾸미지 않는다. 실거래·실발송·국세청 발급은 실행하지 않았다.
+
+서버의 자동 업로드 인증은 미연결이고 이번 외부 저장은 연결된 Drive 앱을 통한 수동 검증이다. 개인 My Drive의 무인 자동화에는 사용자 OAuth 등 쓰기·저장 용량 권한이 있는 별도 서버 인증이 필요하며, 서비스 계정에 폴더만 공유하는 것으로 충분하다고 가정하지 않는다. 공유 드라이브를 사용하는 경우에도 권한·API 옵션을 실제 계정에서 검증한 뒤 활성화한다.
+
+발견 오류: 준비 화면에서 직원 번호 테이블의 컬럼을 잘못 참조한 오류를 기존 order_ops.phones 조회로 수정하고 같은 관리자 경로를 재검증했다. 시스템 Python에 google-auth가 없어 실패한 추가 테스트는 requirements가 설치된 프로젝트 .venv 환경에서 다시 실행해 전체 통과했다.
+
+증거: docs/validation/shop-operational-readiness.json.
