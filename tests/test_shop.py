@@ -307,6 +307,10 @@ class ShopTest(ShopFixture):
         shop_page = self.http(self.admin)[2]
         self.assertIn('a' * 32, shop_page)
         self.assertNotIn('c' * 32, shop_page)
+        with agent.db() as c:
+            staff_orders = agent.order_operations.list_orders(c)
+            self.assertEqual(['c' * 32], [row['id'] for row in staff_orders])
+            self.assertEqual(1, c.execute("SELECT COUNT(*) FROM order_operations WHERE kind='payapp'").fetchone()[0])
 
     def test_backup_restore_restart_and_corrupt_backup(self):
         self.place()
