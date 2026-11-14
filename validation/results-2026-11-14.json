@@ -1,0 +1,143 @@
+{
+  "tested_base_commit": "a5349a95dd17d2d9a0eefdd060805fc7b02e70bd",
+  "baseline": {
+    "revision_scope": "local offline parser",
+    "source_ledger_records": 3951,
+    "ledger_derived_syntax_cases": {
+      "cases": 19375,
+      "passed": 6107,
+      "failed": 13268,
+      "failed_compact": 3875,
+      "failed_heading-block": 3875,
+      "failed_spoken-labels": 3875,
+      "failed_canonical": 821,
+      "failed_wide-colon": 822
+    },
+    "by_event_type": {
+      "결혼": {
+        "cases": 9730,
+        "passed": 3100,
+        "failed": 6630
+      },
+      "생일/공연": {
+        "cases": 605,
+        "passed": 202,
+        "failed": 403
+      },
+      "개업/이전": {
+        "cases": 490,
+        "passed": 127,
+        "failed": 363
+      },
+      "취임/영전": {
+        "cases": 215,
+        "passed": 66,
+        "failed": 149
+      },
+      "근조": {
+        "cases": 7765,
+        "passed": 2446,
+        "failed": 5319
+      },
+      "기념/선물": {
+        "cases": 570,
+        "failed": 404,
+        "passed": 166
+      }
+    },
+    "raw_kakao": {
+      "total": 12,
+      "eligible": 0,
+      "passed": 0,
+      "needs_link_or_context": 12,
+      "failed": 0
+    },
+    "seconds": 0.262,
+    "live_side_effects": false,
+    "limitations": [
+      "Ledger-derived inputs are generated syntax variations, not independent human conversations.",
+      "Invitation URL extraction and true customer identity/context require separate integration tests."
+    ]
+  },
+  "after_fixes": {
+    "revision_scope": "local offline parser",
+    "source_ledger_records": 3951,
+    "ledger_derived_syntax_cases": {
+      "cases": 19375,
+      "passed": 19369,
+      "strict_mismatch_but_information_preserved": 6,
+      "failed": 6,
+      "failed_heading-block": 2,
+      "failed_canonical": 1,
+      "failed_compact": 1,
+      "failed_wide-colon": 1,
+      "failed_spoken-labels": 1
+    },
+    "by_event_type": {
+      "결혼": {
+        "cases": 9730,
+        "passed": 9730
+      },
+      "생일/공연": {
+        "cases": 605,
+        "passed": 605
+      },
+      "개업/이전": {
+        "cases": 490,
+        "passed": 489,
+        "failed": 1
+      },
+      "취임/영전": {
+        "cases": 215,
+        "passed": 215
+      },
+      "근조": {
+        "cases": 7765,
+        "passed": 7760,
+        "failed": 5
+      },
+      "기념/선물": {
+        "cases": 570,
+        "passed": 570
+      }
+    },
+    "raw_kakao": {
+      "total": 12,
+      "eligible": 0,
+      "passed": 0,
+      "needs_link_or_context": 12,
+      "failed": 0
+    },
+    "seconds": 0.935,
+    "live_side_effects": false,
+    "limitations": [
+      "Ledger-derived inputs are generated syntax variations, not independent human conversations.",
+      "Invitation URL extraction and true customer identity/context require separate integration tests."
+    ]
+  },
+  "edge_cases": {
+    "synthetic_edge_cases": {
+      "regional_cases": 5100,
+      "regional_passed": 5100,
+      "ambiguous_cases": 2000,
+      "ambiguous_held": 2000,
+      "invalid_shipping_cases": 1000,
+      "invalid_shipping_held": 1000
+    },
+    "errors": [],
+    "error_count": 0,
+    "live_side_effects": false
+  },
+  "recorded_sender_checks": {
+    "recorded_raw_sender_text": {
+      "total": 12,
+      "held": 7,
+      "sender_matched": 5
+    },
+    "invitation_metadata_stubbed": true,
+    "live_invitation_extraction_tested": false,
+    "scope": "sender text only; unsupported vendor detection retained"
+  },
+  "privacy": "No customer text, names, addresses, contacts, or invitation URLs are included in this report.",
+  "external_pages": "Not fetched: automatic approval review blocked external requests to customer-specific invitation URLs; user decision is pending."
+}

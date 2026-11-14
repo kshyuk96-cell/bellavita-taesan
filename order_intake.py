@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlsplit
 from lxml import html
 
 import invitation
+from delivery_regions import delivery_alert
 
 LINK = re.compile(r'https://[^\s<>"\[\]]+')
 REQUEST = re.compile(r'^(?:주문\s*(?:접수|등록|입력)|(?:카톡|화환)\s*주문)\s*[:：]?\s*')
@@ -72,45 +73,79 @@ def wedding(link):
             'recipient': ' · '.join(family[2] for family in event['families']), 'source': link}
 
 
+LABEL_ALIASES = {
+    '보내시는분':'sender','보내는분':'sender','보내는사람':'sender','발신자':'sender',
+    '받는분':'recipient','받으시는분':'recipient','수신자':'recipient',
+    '배송일':'delivery_date','배송날짜':'delivery_date','배송일자':'delivery_date',
+    '배송시간':'delivery_time','배송시각':'delivery_time',
+    '작품':'artwork','규격':'size','사이즈':'size','액자사이즈':'size',
+    '축하문구':'message','축하·위로문구':'message','문구':'message',
+    '행사구분':'event_type','행사종류':'event_type',
+    '설치장소':'venue','설치주소':'address','설치장소주소':'address','배송지':'address','주소':'address',
+    '사진보낼곳':'photo_phone','사진보내실곳':'photo_phone','청첩장':'source','부고장':'source','초대장':'source'}
+LABEL_NAMES=sorted(LABEL_ALIASES,key=len,reverse=True)
+LABEL_TOKEN='|'.join('[ \t]*'.join(re.escape(c) for c in label) for label in LABEL_NAMES)
+INLINE_SEPARATOR=re.compile(r'[ \t]*[,;|/][ \t]*(?=(?:'+LABEL_TOKEN+r')[ \t]*(?:[:：]|[은는][ \t]+))')
+LABEL_PATTERN=re.compile(r'^[ \t]*(?P<label>'+ '|'.join('[ \t]*'.join(re.escape(c) for c in label) for label in LABEL_NAMES)+r')[ \t]*(?:(?:[:：])[ \t]*(?P<colon>.*)|(?:은|는)[ \t]+(?P<spoken>.*)|$)')
+
+
+def parse_fields(details):
+    details=INLINE_SEPARATOR.sub('\n',details)
+    fields={};unlabelled=[];active=None;lines=[]
+    def finish():
+        if active is None:return
+        value='\n'.join(lines).strip()
+        if active in fields and fields[active] and value and fields[active]!=value:
+            raise ValueError('같은 항목에 서로 다른 내용이 있어 이번 주문의 문구를 확인해 주세요.')
+        fields[active]=value or fields.get(active,'')
+    for line in details.splitlines():
+        match=LABEL_PATTERN.fullmatch(line)
+        if match:
+            candidate=LABEL_ALIASES[re.sub(r'[ \t]+','',match['label'])]
+            if candidate==active and not any(line.strip() for line in lines) and match['colon'] is None and match['spoken'] is None:
+                lines.append(line);continue
+            finish();active=LABEL_ALIASES[re.sub(r'[ \t]+','',match['label'])]
+            lines=[match['colon'] if match['colon'] is not None else match['spoken'] or '']
+        elif active is not None:lines.append(line)
+        else:unlabelled.append(line)
+    finish()
+    return fields,unlabelled
+
+
 def extract(message):
-    urls = source(message)
-    if len(urls) > 1 or (not urls and LINK.search(message)):
+    preliminary,unlabelled_source=parse_fields(REQUEST.sub('',message))
+    # URLs printed inside sender/message/address fields are not automatically new invitations.
+    link_text='\n'.join(unlabelled_source+[preliminary.get('source','')])
+    urls = source(link_text)
+    if len(urls)>1 or (not urls and LINK.search(link_text)):
         raise ValueError('주문마다 청첩장 또는 부고장 주소 하나와 보내는 분을 적어주세요.')
-    link = urls[0] if urls else ''
+    link=urls[0] if urls else ''
     if link:
-        parsed = urlsplit(link)
-        if parsed.hostname.removeprefix('www.') == 'e-baro.co.kr':
-            if parsed.path != '/bugo.php' or not re.fullmatch(r'[A-Za-z0-9]{4,32}', parse_qs(parsed.query).get('code', [''])[0]):
+        parsed=urlsplit(link)
+        if parsed.hostname.removeprefix('www.')=='e-baro.co.kr':
+            if parsed.path!='/bugo.php' or not re.fullmatch(r'[A-Za-z0-9]{4,32}',parse_qs(parsed.query).get('code',[''])[0]):
                 raise ValueError('부고장 주소를 다시 확인해 주세요.')
-            result = bugo(link, invitation.get_page(link, hosts={'e-baro.co.kr'}))
-        else:
-            result = wedding(link)
-    else:
-        result = {'event_type': '', 'venue': '', 'address': '', 'recipient': '', 'source': ''}
-    details = REQUEST.sub('', message).replace(link, '').strip()
-    labels = {label: value.strip() for label, value in re.findall(
-        r'(?m)^[ \t]*(보내시는 분|보내는 분|받는 분|배송[ \t]*일|배송[ \t]*(?:시간|시각)|작품|규격|축하문구|축하 문구|행사 구분|설치장소|설치 장소|주소)[ \t]*[:：][ \t]*([^\n]+)$', details)}
+            result=bugo(link,invitation.get_page(link,hosts={'e-baro.co.kr'}))
+        else:result=wedding(link)
+    else:result={'event_type':'','venue':'','address':'','recipient':'','source':''}
+    details=REQUEST.sub('',message).replace(link,'').strip()
+    fields,unlabelled=parse_fields(details)
     if not link:
-        result.update(event_type=labels.get('행사 구분', ''), venue=labels.get('설치장소') or labels.get('설치 장소', ''),
-                      address=labels.get('주소', ''), recipient=labels.get('받는 분', ''))
-        if not (result['venue'] or result['address']):
-            raise ValueError('청첩장·부고장 주소나 설치 장소를 적어주세요.')
-    elif not result.get('address'):
-        result['address'] = labels.get('주소', '')
-    sender = labels.get('보내시는 분') or labels.get('보내는 분')
+        result.update({key:fields.get(key,'') for key in ('event_type','venue','address','recipient')})
+        if not (result['venue'] or result['address']):raise ValueError('청첩장·부고장 주소나 설치 장소를 적어주세요.')
+    elif not result.get('address'):result['address']=fields.get('address','')
+    sender=fields.get('sender','')
     if not sender:
-        lines = [line.strip() for line in details.splitlines() if line.strip() and ':' not in line
-                 and not re.search(r'화환.*(?:부탁|보내|주세요)|^(?:신랑|신부)\s*측', line)]
-        if len(lines) == 1 and re.search('[가-힣A-Za-z]', lines[0]):
-            sender = lines[0]
-    if not sender or len(sender) > 140:
-        raise ValueError('보내시는 분의 이름과 직함을 한 줄로 적어주세요.')
-    side = re.search(r'(신랑|신부)\s*측', details) if result['event_type'] == '결혼' else None
-    delivery_fields = {re.sub(r'[ \t]+', '', label): value for label, value in labels.items() if label.startswith('배송')}
-    result.update(sender=sender, recipient=labels.get('받는 분') or (result['recipient'] + (' ' + side[1] + '측' if side else '')),
-                  delivery_date=delivery_fields.get('배송일', ''),
-                  delivery_time=delivery_fields.get('배송시간') or delivery_fields.get('배송시각', ''), artwork=labels.get('작품', ''),
-                  size=labels.get('규격', ''), message=labels.get('축하문구') or labels.get('축하 문구', ''))
+        lines=[line.strip() for line in unlabelled if line.strip() and ':' not in line
+               and not re.search(r'화환.*(?:부탁|보내|주세요)|^(?:신랑|신부)\s*측',line)
+               and not re.fullmatch(r'(?:안녕하세요|안녕하십니까|감사합니다|감사해요|고맙습니다|네\s*감사합니다)[\s~!.,😊🙏]*',line)]
+        if len(lines)==1 and re.search('[가-힣A-Za-z]',lines[0]):sender=lines[0]
+        elif lines and all(re.search(r'대표|회장|군수|CFO|CEO|지회장|사무총장',line,re.I) for line in lines):sender='\n'.join(lines)
+    if not sender or len(sender)>1000:raise ValueError('보내시는 분의 이름과 직함을 확인해 주세요.')
+    side=re.search(r'(신랑|신부)\s*측',details) if result['event_type']=='결혼' else None
+    result.update(sender=sender,recipient=fields.get('recipient') or (result['recipient']+(' '+side[1]+'측' if side else '')),
+                  delivery_date=fields.get('delivery_date',''),delivery_time=fields.get('delivery_time',''),
+                  artwork=fields.get('artwork',''),size=fields.get('size',''),message=fields.get('message',''),photo_phone=fields.get('photo_phone',''))
     return result
 
 
@@ -139,4 +174,6 @@ def report(number, details):
              f'문구 : {display("message")}', f'사진 보낼 곳 : {display("photo_phone")}']
     if delivery != '확인 필요':
         lines.extend(('', f'[{delivery[:5]} {clock[:2]}시{clock[3:]}분], [배송지= {address}, {display("recipient")}], [보내는분= {display("sender")}]'))
+    alert=delivery_alert(' / '.join(filter(None,(details.get('venue'),details.get('address')))))
+    if alert['message']:lines.extend(('',alert['message']))
     return '\n'.join(lines)

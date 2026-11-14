@@ -4,6 +4,7 @@ from datetime import date, datetime
 from urllib.parse import quote
 
 import order_intake
+from delivery_regions import delivery_alert
 
 EPOCH = date(1899, 12, 30)
 HEADER = ['주문일시', '배송일', '행사시간', '작품', '액자 사이즈(호수)', '설치장소', '행사 구분', '주문 채널', '배송 채널', '비고', '받는분']
@@ -53,6 +54,9 @@ def details_for_sheet(details, cells, mapping):
     event = ' '.join(filter(None, (data['event_date'], data['event_time'])))
     data['notes'] = ' / '.join(filter(None, (data.get('note'), f'행사 {event}' if event else '',
                                            '·'.join(missing) + ' 확인 필요' if missing else '')))
+    alert=delivery_alert(data['location'])
+    data['delivery_region']=alert['region'];data['regional_alert']=alert['message']
+    if alert['message']:data['notes']=' / '.join(filter(None,(data['notes'],alert['message'])))
     return data
 
 
@@ -113,8 +117,6 @@ class Ledger:
             if cells[column].get('userEnteredValue', {}).get('formulaValue'):
                 raise ValueError('원장 수식이 있는 칸을 확인해 주세요.')
             value = data.get(key)
-            if key == 'delivery_time' and not value:
-                value = data.get('event_time')
             if value and key == 'delivery_date':
                 value = (date.fromisoformat(value) - EPOCH).days
             if value and key == 'delivery_time':
