@@ -33,5 +33,17 @@
   },
   "existing_catalog_browser": "passed: 375/1280",
   "existing_growth_browser": "passed: 375",
-  "hosted_verification": "pending"
+  "hosted_verification": {
+    "public_url": "https://bellavita-shop-verification-v3b4.onrender.com",
+    "admin_search": true,
+    "manual_html": true,
+    "manual_download_matches_source": true,
+    "invalid_dates_rejected": true,
+    "integrity": "ok",
+    "mount_verified": true,
+    "previous_order_states_preserved": true,
+    "order_count": 3,
+    "live_side_effects": false
+  },
+  "verified_commit": "9e88eb746684a5917a2f07db7061555f4789bf2f"
 }
