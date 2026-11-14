@@ -25,6 +25,7 @@ from zoneinfo import ZoneInfo
 import checkout
 import delivery_reports
 import delivery_routes
+import development_queue
 import invitation
 import owner_alerts
 import order_intake
@@ -96,6 +97,7 @@ def db():
     owner_alerts.setup(connection)
     staff_features.setup(connection)
     order_operations.setup(connection)
+    development_queue.setup(connection)
     return connection
 
 
@@ -190,6 +192,8 @@ def role_of(owner):
 def approval_command(owner, message):
     if role_of(owner) != 'admin':
         return kakao('대표 계정만 승인 요청을 관리할 수 있어요.')
+    if development_queue.INBOX.fullmatch(message) or development_queue.APPROVE.fullmatch(message):
+        return development_approval(owner, message)
     with db() as c:
         if message == '승인 대기':
             rows = c.execute("""SELECT j.id,j.result FROM jobs j LEFT JOIN approvals a ON a.job=j.id
@@ -208,15 +212,63 @@ def approval_command(owner, message):
         if row['decision']:
             return kakao(f'{job}은 이미 {row["decision"]} 처리됐어요.')
         if command == '승인 검토':
-            return kakao(json.loads(row['result'])['summary'], buttons=[
-                ('승인', '구조 변경 승인 '+job), ('반려', '구조 변경 반려 '+job)])
+            request = json.loads(row['result'])
+            if request.get('development'):
+                c.execute('INSERT OR REPLACE INTO development_focus VALUES (?,?)', (owner, job))
+            return kakao(request['summary'], buttons=[
+                ('승인', '승인' if request.get('development') else '구조 변경 승인 '+job),
+                ('반려', '구조 변경 반려 '+job)])
         decision = '승인' if command == '구조 변경 승인' else '반려'
         c.execute('INSERT INTO approvals VALUES (?,?,?,?)', (job, decision, owner, time.time()))
+        request = json.loads(row['result'])
+        if request.get('development') and decision == '승인':
+            development_queue.enqueue(c, job, development_detail(request))
     request = json.loads(row['result'])
     if request.get('development'):
         return kakao(f'개선 요청을 {decision}했어요.' +
-                     (' 개발 작업에서 수정과 확인이 필요해요.' if decision == '승인' else ''))
+                     (' 다음 개발 작업에 넣었어요.' if decision == '승인' else ''))
     return kakao(f'{job} 요청을 {decision}으로 기록했어요. 운영 시트 반영은 아직 진행하지 않았어요.')
+
+
+def development_detail(request):
+    return request.get('detail') or request['summary'].partition('\n')[2] or request['summary']
+
+
+def development_approval(owner, message):
+    with db() as c:
+        c.execute('BEGIN IMMEDIATE')
+        rows = c.execute("""SELECT j.id,j.result FROM jobs j LEFT JOIN approvals a ON a.job=j.id
+            WHERE j.state='done' AND a.job IS NULL AND json_extract(j.result,'$.approval')='pending'
+            AND json_extract(j.result,'$.development')=1 ORDER BY j.created DESC,j.id DESC LIMIT 6""").fetchall()
+        if development_queue.INBOX.fullmatch(message):
+            c.execute('DELETE FROM development_focus WHERE owner=?', (owner,))
+        else:
+            focus = c.execute('SELECT job FROM development_focus WHERE owner=?', (owner,)).fetchone()
+            if focus:
+                chosen = c.execute("""SELECT j.id,j.result FROM jobs j LEFT JOIN approvals a ON a.job=j.id
+                    WHERE j.id=? AND j.state='done' AND a.job IS NULL
+                    AND json_extract(j.result,'$.approval')='pending'
+                    AND json_extract(j.result,'$.development')=1""", (focus['job'],)).fetchone()
+                if not chosen:
+                    return kakao('선택한 요청은 이미 처리됐어요.', buttons=[('개발 요청 보기', '개발 요청 보기')])
+            else:
+                chosen = rows[0] if len(rows) == 1 else None
+            if chosen:
+                job = chosen['id']
+                detail = development_detail(json.loads(chosen['result']))
+                c.execute('INSERT INTO approvals VALUES (?,?,?,?)', (job, '승인', owner, time.time()))
+                c.execute('INSERT OR REPLACE INTO development_focus VALUES (?,?)', (owner, job))
+                development_queue.enqueue(c, job, detail)
+                return kakao('승인했어요. 다음 개발 작업에 넣었어요.\n' + detail)
+    if not rows:
+        return kakao(development_queue.EMPTY)
+    details = [development_detail(json.loads(row['result'])) for row in rows]
+    if len(rows) == 1:
+        return kakao(details[0] + '\n“승인”이라고 보내면 다음 개발 작업에 넣어요.', buttons=[('승인', '승인')])
+    return kakao('개발 요청이 여러 건이에요. 확인할 요청을 눌러 주세요.\n'
+                 + '\n'.join(f'{i}. {s[:100]}' for i, s in enumerate(details, 1)),
+                 buttons=[(f'{i}. {s[:11]}', '승인 검토 '+row['id'])
+                          for i, (row, s) in enumerate(zip(rows, details), 1)])
 
 
 def json_text(value):
@@ -525,7 +577,13 @@ def handle(message, history, owner):
         return {'summary': stock(stock_request[1])}
     if message == '자유 문의':
         return {'summary': '궁금한 내용을 편하게 적어주세요.'}
-    action = choose(message, history)
+    explicit_development = development_queue.REQUEST.fullmatch(message)
+    if explicit_development:
+        action = {'action': 'development', 'message': explicit_development[1]}
+    elif development_queue.DUPLICATE_ALERT_REQUEST.fullmatch(message):
+        action = {'action': 'development', 'message': message}
+    else:
+        action = choose(message, history)
     if not isinstance(action, dict) or action.get('action') not in ACTIONS:
         raise ValueError('어떤 업무인지 한 번 더 말씀해 주세요.')
     route = action['action']
@@ -554,8 +612,7 @@ def handle(message, history, owner):
             return {'summary': write_inventory(action, message, os.getenv('TAESAN_LIVE_WRITE') == '1')}
     if route == 'development':
         detail = str(action.get('message') or message)[:400]
-        return {'summary': '태산이 개선 요청 · 대표 승인 대기\n' + detail,
-                'approval': 'pending', 'development': True}
+        return {'development': True, 'detail': detail}
     if route == 'structure':
         return {'summary': '시트 구조 변경 · 대표 승인 대기\n' + str(action.get('message', ''))[:650],
                 'approval': 'pending'}
@@ -693,10 +750,20 @@ def run_job(job, message, owner, kind=''):
         else:
             result = {'summary': '처리 결과를 확인하지 못했어요. 입고 요청이었다면 시트에서 반영 여부를 먼저 확인해 주세요.'}
     with db() as c:
+        if result.get('development'):
+            detail = result['detail']
+            if role_of(owner) == 'admin':
+                development_queue.enqueue(c, job, detail)
+                result['summary'] = '대표님 개발 요청을 다음 개발 작업에 바로 넣었어요.\n' + detail
+            else:
+                result.update(summary='개발 요청을 접수했어요. 대표님 승인 후 진행해요.\n' + detail,
+                              approval='pending')
         c.execute("UPDATE jobs SET state='done',result=? WHERE id=?", (json_text(result), job))
         if result.get('approval') == 'pending':
             title, _, summary = result['summary'].partition('\n')
-            owner_alerts.enqueue(c, 'job:'+job, f'{title}\n{summary[:95]}\n태산이 채널에서 승인 대기를 확인해 주세요.')
+            next_step = ('태산이 채널에서 “개발 요청 보기”를 열고 “승인”이라고 보내주세요.'
+                         if result.get('development') else '태산이 채널에서 승인 대기를 확인해 주세요.')
+            owner_alerts.enqueue(c, 'job:'+job, f'{title}\n{summary[:75]}\n{next_step}')
     return result
 
 
@@ -749,6 +816,8 @@ def present(job, result, owner=None):
         ]}}
     if result.get('guide'):
         return menu(owner)
+    if result.get('development'):
+        return kakao(result['summary'])
     if result.get('order_status'):
         return kakao(result['summary'], buttons=[('주문 접수 상태', '주문 접수 상태')])
     outputs = result.get('outputs') or {}
@@ -924,7 +993,8 @@ def dispatch(body, defer_callback=None):
         if check[2]:
             result['selected'] = int(check[2])
         return present(check[1], result, owner)
-    if message == '승인 대기' or re.fullmatch(
+    if (message == '승인 대기' or development_queue.INBOX.fullmatch(message)
+            or development_queue.APPROVE.fullmatch(message)) or re.fullmatch(
             r'(?:승인 검토|구조 변경 승인|구조 변경 반려) [a-f0-9]{12}', message):
         return approval_command(owner, message)
     with LOCK, db() as c:
@@ -933,6 +1003,9 @@ def dispatch(body, defer_callback=None):
         route_context = delivery_routes.session(db, owner)
         if order_intake.wants_order(message, explicit_only=True):
             kind = 'order'
+        elif (development_queue.REQUEST.fullmatch(message)
+              or development_queue.DUPLICATE_ALERT_REQUEST.fullmatch(message)):
+            kind = 'development'
         elif delivery_routes.wants_route(message, route_context):
             kind = 'route'
         elif pending:
@@ -1012,6 +1085,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        if path == '/development-queue':
+            if not development_queue.authorized(self.headers.get('Authorization', '')):
+                return self.send_json({'error': 'unauthorized'}, 401)
+            try:
+                fields = self.read_order_form()
+            except (UnicodeError, ValueError):
+                return self.send_json({'error': 'invalid request'}, 400)
+            with db() as c:
+                done = development_queue.complete(c, fields.get('job', ''), fields.get('result', ''))
+            return self.send_json({'completed': done}, 200 if done else 409)
         if path == '/staff-orders':
             owner = self.staff_web_owner()
             if not owner or self.headers.get('Origin') != os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'):
@@ -1202,6 +1285,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        if path == '/development-queue':
+            if not development_queue.authorized(self.headers.get('Authorization', '')):
+                return self.send_json({'error': 'unauthorized'}, 401)
+            with db() as c:
+                return self.send_json({'requests': development_queue.read(c)})
         login = re.fullmatch(r'/staff-orders/login/([a-zA-Z0-9_-]{32})', path)
         if login:
             with db() as c:
