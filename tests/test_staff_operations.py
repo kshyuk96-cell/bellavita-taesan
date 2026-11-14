@@ -140,6 +140,31 @@ class StaffOperationsTests(unittest.TestCase):
             self.assertIn('동의', text(agent.dispatch(body)))
             self.assertEqual(extract.call_count, 1)
 
+    def test_short_status_reads_with_previous_date_and_center(self):
+        with patch.object(agent, 'delivery_count', wraps=agent.delivery_count) as lookup, \
+             patch.object(agent, 'read_delivery_ranges', side_effect=TimeoutError), patch.object(agent, 'choose') as choose:
+            for question in ('내일 구로센터 배송 미완료 몇 건?', '완료만', '그럼 수원만', '모레는?', '전체만'):
+                agent.dispatch(payload(question))
+            self.assertEqual([call.args for call in lookup.call_args_list], [
+                (1, '구로', 'pending'), (1, '구로', 'complete'), (1, '수원', 'complete'),
+                (2, '수원', 'complete'), (2, '수원', 'total'),
+            ])
+            choose.assert_not_called()
+
+    def test_ai_stock_suggestion_requires_explicit_intent_and_write_permission(self):
+        with patch.object(agent, 'choose', return_value={'action': 'stock_write'}), \
+             patch.object(agent, 'write_inventory', return_value='가상 입고 검증') as write:
+            write_request = '입고 등록 구로 3번 2개'
+            self.assertIn('권한을 요청', text(agent.dispatch(payload(write_request))))
+            write.assert_not_called()
+            with agent.db() as conn:
+                conn.execute("UPDATE staff SET role='writer' WHERE owner='employee'")
+            for message in ('구로 3번 입고됐어?', '아직 재고 입고 등록하지 마', '구로 3번 입고 등록 여부 조회'):
+                self.assertIn('실제로 등록하시려면', text(agent.dispatch(payload(message))))
+            write.assert_not_called()
+            self.assertIn('가상 입고 검증', text(agent.dispatch(payload(write_request + '요청'))))
+            self.assertEqual(write.call_count, 1)
+
     def test_mock_vision_only_returns_numeric_order_ids(self):
         stream = BytesIO()
         Image.new('RGB', (6, 6)).save(stream, format='PNG')
@@ -179,9 +204,26 @@ class StaffOperationsTests(unittest.TestCase):
         with patch.dict(sys.modules, {'openai': SimpleNamespace(OpenAI=Mock())}), \
              patch.object(staff_photo, 'extract_numbers', side_effect=[[], ['101']]), \
              patch.object(agent, 'read_staff_delivery', side_effect=TimeoutError) as read:
-            self.assertIn('주문번호가 잘 보이도록', agent.photo_order_status([URL], '전체 상태')['summary'])
+            self.assertIn('주문번호만 적어', agent.photo_order_status([URL], '전체 상태')['summary'])
             read.assert_not_called()
             self.assertIn('배송관리를 조회하지 못했어요', agent.photo_order_status([URL], '전체 상태')['summary'])
+
+    def test_photo_reasks_only_for_order_number_and_uses_the_same_filter(self):
+        body = payload('미완료만 보여줘')
+        body['action'] = {'params': {'secureimage': {'privacyAgreement': 'Y', 'secureUrls': [URL]}}}
+        with patch.dict(sys.modules, {'openai': SimpleNamespace(OpenAI=Mock())}), \
+             patch.object(staff_photo, 'extract_numbers', return_value=[]) as extract:
+            self.assertIn('주문번호만 적어', text(agent.dispatch(body)))
+            with agent.db() as conn:
+                conn.execute("INSERT INTO staff VALUES ('second','staff',0)")
+            self.assertIsNone(agent.photo_reply_mode(agent.recent('second')))
+            self.assertIn('배송 미완료 1건 · 102번', text(agent.dispatch(payload('102번'))))
+            self.assertIsNone(agent.photo_reply_mode(agent.recent('employee')))
+            self.assertIn('주문번호만 적어', text(agent.dispatch(body)))
+            with agent.db() as conn:
+                conn.execute('UPDATE jobs SET created=?', (time.time() - 901,))
+            self.assertIsNone(agent.photo_reply_mode(agent.recent('employee')))
+            self.assertEqual(extract.call_count, 2)
 
     def test_slow_read_hands_off_to_kakao_callback_without_transmitting(self):
         release = threading.Event()

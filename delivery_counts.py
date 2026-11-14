@@ -18,6 +18,7 @@ REPLACEMENT = re.compile(r'말고|대신')
 EXCLUDED = re.compile(r'개발|기능|수정|바꿔|버그|개선|늘려|줄여|체크해|처리해|완료해|지난|어제|이번\s*주|다음\s*주|'
                       r'\d+\s*(?:월|일)|[월화수목금토일]요일|택배|재고|제작|미배정|이미지|엑셀|보고서|루트')
 SHORT_STATUS = re.compile(r'(?:배송\s*)?(?:미\s*완료|완료|남은\s*건)(?:만|도)?[.!?]?')
+CONTEXT_STATUS = re.compile(r'(?:그럼\s*)?(?:배송\s*)?(미\s*완료|완료|남은\s*건|전체)(?:\s*건)?\s*(?:만|도)[.!?]?')
 COUNT_CHALLENGE = re.compile(r'(?:뭔|무슨|왜|어떻게)\s*\d+\s*(?:건|개)|이렇게\s*밖에.*남')
 PHOTO_MESSAGE = re.compile(r'(?:\[\s*(?:사진|이미지)\s*\]|사진|이미지|사진을 보냈습니다\.?|이미지를 보냈습니다\.?)')
 COUNT_BUTTONS = (
