@@ -1,7 +1,7 @@
 """Local text-only review. No HTTP, invitation fetch, customer defaults or Sheet writes."""
 import datetime as dt
 import re
-from preview_fields import parse_fields
+from preview_fields import parse_fields,LABEL_TOKEN,LABEL_ALIASES
 from order_review_rules import split_orders,sender_text
 from delivery_regions import delivery_alert
 
@@ -10,13 +10,34 @@ LABELS={'event_type':'행사 구분','sender':'보내는 분','recipient':'받�
         'artwork':'작품','size':'규격','message':'문구'}
 
 
-def preview(text):
+def normalize_ocr_labels(text):
+    lines=[];changed=False
+    for line in text.splitlines():
+        match=re.match(r'^\s*(?P<label>'+LABEL_TOKEN+r')(?P<suffix>.*)$',line)
+        if match:
+            suffix=match['suffix']
+            key=LABEL_ALIASES[re.sub(r'\s+','',match['label'])]
+            if suffix and not re.match(r'^\s*(?:[:：]|[은는](?:\s|$))',suffix) and (
+                re.match(r'^[\s.·;,|]+\S',suffix) or
+                (key in {'delivery_date','delivery_time'} and re.match(r'^\d',suffix))):
+                value=re.sub(r'^[\s.·;,|]+','',suffix)
+                line=match['label']+': '+value;changed=True
+        lines.append(line)
+    return '\n'.join(lines),changed
+
+
+def preview(text,*,ocr=False):
     if not isinstance(text,str) or not text.strip() or len(text)>35000:
         raise ValueError('분석할 주문 내용을 35000자 이내로 입력해 주세요.')
     if len(split_orders(text))!=1:raise ValueError('주문을 하나씩 나눠 분석해 주세요.')
+    if ocr:text,labels_normalized=normalize_ocr_labels(text)
     fields,_=parse_fields(re.sub(r'^주문\s*(?:접수|등록|입력)\s*[:：]?\s*','',text))
     warnings=[]
+    if ocr and labels_normalized:warnings.append('OCR에서 빠진 항목 구분 기호를 보정했습니다. 원문 대조가 필요합니다.')
     fields['sender']=sender_text(fields.get('sender',''))
+    if ocr and re.search(r'\n[^\n]*(?:20\d{2}[-./]\d{1,2}[-./]\d{1,2}|(?:배송일|배송시각|설치주소|사이즈)\s*[:：])',fields['sender']):
+        fields['sender_unverified_ocr']=fields['sender'];fields['sender']=''
+        warnings.append('보내는 분에 다른 항목이 섞여 있어 문구를 확정하지 않았습니다. 감지 원문을 확인해 주세요.')
     if not fields.get('event_type'):
         candidates=[]
         for kind,pattern in [('근조',r'근조|부고|장례'),('결혼',r'결혼|청첩장|신랑측|신부측'),('일반 행사',r'개업|취임|준공|행사')]:

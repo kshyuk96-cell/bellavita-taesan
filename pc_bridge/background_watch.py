@@ -23,6 +23,18 @@ class Store:
         self.db.execute('''CREATE TABLE IF NOT EXISTS ocr_reviews (
             id TEXT PRIMARY KEY,scope TEXT NOT NULL,changed_text TEXT NOT NULL,
             result TEXT NOT NULL,sightings INTEGER NOT NULL DEFAULT 1)''');self.db.commit()
+        self.db.execute('CREATE TABLE IF NOT EXISTS ocr_analysis_version (id INTEGER PRIMARY KEY CHECK(id=1),version TEXT)')
+        version=self.db.execute('SELECT version FROM ocr_analysis_version WHERE id=1').fetchone()
+        if not version or version[0]!='readability-v4':
+            with self.db:
+                for key,body,old in self.db.execute('SELECT id,changed_text,result FROM ocr_reviews').fetchall():
+                    try:result=preview(body,ocr=True)
+                    except ValueError as error:result={'text':str(error),'sheet_written':False}
+                    result['ocr_review_required']=True
+                    result['warning']=json.loads(old).get('warning','OCR 원문을 확인해야 합니다.')
+                    result['reanalysis']=True
+                    self.db.execute('UPDATE ocr_reviews SET result=? WHERE id=?',(json.dumps(result,ensure_ascii=False),key))
+                self.db.execute('INSERT OR REPLACE INTO ocr_analysis_version VALUES (1,?)',('readability-v4',))
     def observe(self,scope,lines):
         old=self.db.execute('SELECT lines FROM ocr_frames WHERE scope=?',(scope,)).fetchone()
         before=json.loads(old[0]) if old else []
@@ -63,7 +75,7 @@ class Store:
                 fresh=self.db.execute('INSERT OR IGNORE INTO bubble_seen VALUES (?,?)',(scope,key)).rowcount
                 if not old or not fresh:continue
                 if not re.search(r'주문|화환|근조|부고|청첩|결혼|신랑|신부|보내는\s*분|행사|개업|취임|준공|https?|www\.',body,re.I):continue
-                try:result=preview(body)
+                try:result=preview(body,ocr=True)
                 except ValueError as error:result={'text':str(error),'sheet_written':False}
                 result['ocr_review_required']=True
                 result['warning']='말풍선 전체 OCR 후보입니다. 오인식·잘린 링크·발신자·새 주문 여부는 확인해야 합니다. 자동 확정하지 않습니다.'

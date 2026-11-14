@@ -6,13 +6,20 @@ import os
 from pathlib import Path
 
 
+def scaled_size(width,height,limit):
+    if min(width,height,limit)<=0:raise ValueError('Invalid OCR dimensions')
+    factor=min(3,limit/max(width,height))
+    return max(1,round(width*factor)),max(1,round(height*factor))
+
+
 async def recognize(path,*,include_lines=False,save_text=True):
     import winrt.windows.foundation
     import winrt.windows.foundation.collections
     import winrt.windows.globalization
     import winrt.windows.storage.streams
     from winrt.windows.storage import StorageFile,FileAccessMode
-    from winrt.windows.graphics.imaging import BitmapDecoder,SoftwareBitmap,BitmapPixelFormat,BitmapAlphaMode
+    from winrt.windows.graphics.imaging import (BitmapDecoder,BitmapPixelFormat,BitmapAlphaMode,
+        BitmapTransform,BitmapInterpolationMode,ExifOrientationMode,ColorManagementMode)
     from winrt.windows.media.ocr import OcrEngine
     languages=list(OcrEngine.available_recognizer_languages)
     korean=next((language for language in languages if language.language_tag.lower().startswith('ko')),None)
@@ -26,8 +33,14 @@ async def recognize(path,*,include_lines=False,save_text=True):
     bitmap=None;converted=None
     try:
         decoder=await BitmapDecoder.create_async(stream)
-        bitmap=await decoder.get_software_bitmap_async()
-        converted=SoftwareBitmap.convert_with_alpha(bitmap,BitmapPixelFormat.BGRA8,BitmapAlphaMode.PREMULTIPLIED)
+        transform=BitmapTransform()
+        transform.scaled_width,transform.scaled_height=scaled_size(decoder.pixel_width,decoder.pixel_height,OcrEngine.max_image_dimension)
+        transform.interpolation_mode=BitmapInterpolationMode.CUBIC
+        converted=await decoder.get_software_bitmap_transformed_async(BitmapPixelFormat.BGRA8,
+            BitmapAlphaMode.PREMULTIPLIED,transform,ExifOrientationMode.IGNORE_EXIF_ORIENTATION,
+            ColorManagementMode.DO_NOT_COLOR_MANAGE)
+        scale_x=decoder.pixel_width/converted.pixel_width
+        scale_y=decoder.pixel_height/converted.pixel_height
         result=await engine.recognize_async(converted)
         output=path.with_name('background-ocr-test.txt')
         if save_text:output.write_text('\n'.join(line.text for line in result.lines),encoding='utf-8-sig')
@@ -39,12 +52,12 @@ async def recognize(path,*,include_lines=False,save_text=True):
             for line in result.lines:
                 boxes=[word.bounding_rect for word in line.words]
                 if not boxes:continue
-                lines.append({'text':line.text,'top':min(b.y for b in boxes),
-                              'bottom':max(b.y+b.height for b in boxes),
-                              'left':min(b.x for b in boxes),'right':max(b.x+b.width for b in boxes),
-                              'words':[{'text':word.text,'left':word.bounding_rect.x,'top':word.bounding_rect.y,
-                                        'right':word.bounding_rect.x+word.bounding_rect.width,
-                                        'bottom':word.bounding_rect.y+word.bounding_rect.height} for word in line.words]})
+                lines.append({'text':line.text,'top':min(b.y for b in boxes)*scale_y,
+                              'bottom':max(b.y+b.height for b in boxes)*scale_y,
+                              'left':min(b.x for b in boxes)*scale_x,'right':max(b.x+b.width for b in boxes)*scale_x,
+                              'words':[{'text':word.text,'left':word.bounding_rect.x*scale_x,'top':word.bounding_rect.y*scale_y,
+                                        'right':(word.bounding_rect.x+word.bounding_rect.width)*scale_x,
+                                        'bottom':(word.bounding_rect.y+word.bounding_rect.height)*scale_y} for word in line.words]})
             report['lines']=lines
         return report
     finally:
