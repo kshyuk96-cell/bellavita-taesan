@@ -33,6 +33,7 @@ import order_intake
 import order_ledger
 import order_operations
 import order_sms
+import parcel_review
 import staff_features
 
 ROOT = Path(os.getenv('TAESAN_DATA', 'taesan-data')).resolve()
@@ -732,7 +733,11 @@ def start_order_queue():
 
 def run_job(job, message, owner, kind=''):
     try:
-        if kind == 'route':
+        if kind == 'parcel_review':
+            summary = parcel_review.summarize(lambda ranges: read_delivery_ranges(
+                ranges, spreadsheet=delivery_read_sheet()))
+            result = {'summary': summary}
+        elif kind == 'route':
             result = delivery_routes.run(message, owner, db, read_delivery_ranges, datetime.now(SEOUL))
         elif kind == 'invitation':
             result = run_invitation(message, owner)
@@ -743,7 +748,10 @@ def run_job(job, message, owner, kind=''):
     except ValueError as error:
         result = {'summary': str(error)[:300]}
     except Exception as error:
-        if kind == 'route':
+        if kind == 'parcel_review':
+            print('택배 미분류 조회 실패:', type(error).__name__, file=sys.stderr, flush=True)
+            result = {'summary': '택배 미분류 목록을 읽지 못했어요. 잠시 뒤 다시 확인해 주세요.'}
+        elif kind == 'route':
             print('배송루트 계산 실패:', type(error).__name__, file=sys.stderr, flush=True)
             result = {'summary': '배송루트 자료를 확인하지 못했어요. 잠시 뒤 “다시 계산”이라고 말씀해 주세요.'}
         elif kind == 'order':
@@ -1016,6 +1024,8 @@ def dispatch(body, defer_callback=None):
             kind = 'order'
         elif development_queue.request_detail(message):
             kind = 'development'
+        elif parcel_review.REQUEST.fullmatch(message):
+            kind = 'parcel_review'
         elif delivery_counts.request(message) or delivery_counts.follow_up(message):
             kind = 'delivery_count'
         elif delivery_routes.wants_route(message, route_context):
@@ -1030,7 +1040,7 @@ def dispatch(body, defer_callback=None):
         fingerprint = hashlib.sha256(fingerprint_input.encode()).hexdigest()
         for old in [key for key, future in ACTIVE.items() if future.done()]:
             ACTIVE.pop(old, None)
-        row = None if kind in ('route', 'delivery_count') else c.execute(
+        row = None if kind in ('route', 'delivery_count', 'parcel_review') else c.execute(
             'SELECT * FROM jobs WHERE owner=? AND fingerprint=? AND created>? ORDER BY created DESC LIMIT 1',
             (owner, fingerprint, time.time()-180)).fetchone()
         if row:
@@ -1042,7 +1052,7 @@ def dispatch(body, defer_callback=None):
             future = ACTIVE[job]
         else:
             running = c.execute("SELECT id FROM jobs WHERE owner=? AND state='running' ORDER BY created DESC LIMIT 1", (owner,)).fetchone()
-            if running and running['id'] in ACTIVE and kind != 'delivery_count':
+            if running and running['id'] in ACTIVE and kind not in ('delivery_count', 'parcel_review'):
                 return kakao('앞에서 말씀하신 일을 확인하고 있어요.')
             job = secrets.token_hex(6)
             c.execute('INSERT INTO jobs VALUES (?,?,?,?,?,?,NULL)',
@@ -1063,6 +1073,8 @@ def dispatch(body, defer_callback=None):
             return kakao('배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {job}')])
         if kind == 'delivery_count':
             return kakao('배송 건수를 확인하고 있어요.', buttons=[('배송 건수 확인', f'결과 {job}')])
+        if kind == 'parcel_review':
+            return kakao('택배 미분류 목록을 확인하고 있어요.', buttons=[('미분류 결과 보기', f'결과 {job}')])
         if kind == 'invitation':
             return kakao('초대장과 주문 주소를 준비하고 있어요.', buttons=[('초대장 확인', f'결과 {job}')])
         return kakao('답을 바로 보내기 어려워요. 잠시 뒤 다시 말씀해 주세요.')
