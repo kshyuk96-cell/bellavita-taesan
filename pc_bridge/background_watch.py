@@ -4,9 +4,20 @@ No foreground activation, keyboard, clipboard, URL fetch, Sheet write or chat se
 Closed/minimized/unreadable rooms are reported as errors rather than silently read.
 """
 import argparse,asyncio,difflib,hashlib,json,os,re,sqlite3,subprocess,sys,time
+from collections import Counter
 from pathlib import Path
 from room_access import validate_config
 from order_preview import preview
+from order_review_checks import relationship
+
+
+def review_result(body):
+    try:result=preview(body,ocr=True)
+    except ValueError as error:result={'text':str(error),'sheet_written':False}
+    result['relationship']=relationship(body)
+    result['ocr_review_required']=True
+    result['warning']='말풍선 전체 OCR 후보입니다. 오인식·잘린 링크·발신자·새 주문 여부는 확인해야 합니다. 자동 확정하지 않습니다.'
+    return result
 
 
 def body_lines(lines,height,chat_bounds=None):
@@ -25,16 +36,14 @@ class Store:
             result TEXT NOT NULL,sightings INTEGER NOT NULL DEFAULT 1)''');self.db.commit()
         self.db.execute('CREATE TABLE IF NOT EXISTS ocr_analysis_version (id INTEGER PRIMARY KEY CHECK(id=1),version TEXT)')
         version=self.db.execute('SELECT version FROM ocr_analysis_version WHERE id=1').fetchone()
-        if not version or version[0]!='readability-v5':
+        if not version or version[0]!='review-v6':
             with self.db:
                 for key,body,old in self.db.execute('SELECT id,changed_text,result FROM ocr_reviews').fetchall():
-                    try:result=preview(body,ocr=True)
-                    except ValueError as error:result={'text':str(error),'sheet_written':False}
-                    result['ocr_review_required']=True
-                    result['warning']=json.loads(old).get('warning','OCR 원문을 확인해야 합니다.')
+                    result=review_result(body)
+                    if 'repeat_observation' in json.loads(old):result['repeat_observation']=json.loads(old)['repeat_observation']
                     result['reanalysis']=True
                     self.db.execute('UPDATE ocr_reviews SET result=? WHERE id=?',(json.dumps(result,ensure_ascii=False),key))
-                self.db.execute('INSERT OR REPLACE INTO ocr_analysis_version VALUES (1,?)',('readability-v5',))
+                self.db.execute('INSERT OR REPLACE INTO ocr_analysis_version VALUES (1,?)',('review-v6',))
     def observe(self,scope,lines):
         old=self.db.execute('SELECT lines FROM ocr_frames WHERE scope=?',(scope,)).fetchone()
         before=json.loads(old[0]) if old else []
@@ -63,22 +72,35 @@ class Store:
     def observe_bubbles(self,scope,messages):
         # Compare whole message candidates, never fill fields with another bubble.
         self.db.execute('CREATE TABLE IF NOT EXISTS bubble_seen (scope TEXT,id TEXT,PRIMARY KEY(scope,id))')
-        old=self.db.execute('SELECT 1 FROM ocr_frames WHERE scope=?',(scope,)).fetchone()
+        old=self.db.execute('SELECT lines FROM ocr_frames WHERE scope=?',(scope,)).fetchone()
         if not messages:
             if not old:
                 with self.db:self.db.execute('INSERT OR IGNORE INTO ocr_frames VALUES (?,?)',(scope,'[]'))
             return {'state':'unreadable','new_orders':0}
         added=0
+        previous=Counter(json.loads(old[0])) if old else Counter()
+        counts=Counter(messages)
         with self.db:
-            for body in messages:
+            for body in dict.fromkeys(messages):
                 key=hashlib.sha256((scope+'\n'+body).encode()).hexdigest()
                 fresh=self.db.execute('INSERT OR IGNORE INTO bubble_seen VALUES (?,?)',(scope,key)).rowcount
-                if not old or not fresh:continue
-                if not re.search(r'주문|화환|근조|부고|청첩|결혼|신랑|신부|보내는\s*분|행사|개업|취임|준공|https?|www\.',body,re.I):continue
-                try:result=preview(body,ocr=True)
-                except ValueError as error:result={'text':str(error),'sheet_written':False}
-                result['ocr_review_required']=True
-                result['warning']='말풍선 전체 OCR 후보입니다. 오인식·잘린 링크·발신자·새 주문 여부는 확인해야 합니다. 자동 확정하지 않습니다.'
+                if not old:continue
+                if not fresh:
+                    extra=counts[body]-previous[body]
+                    row=self.db.execute('SELECT result FROM ocr_reviews WHERE id=?',(key,)).fetchone()
+                    if extra>0 and row:
+                        result=json.loads(row[0]);result['repeat_observation']={'requires_review':True,
+                            'message':'동일 문구가 다시 보입니다. 재전송·스크롤 재등장·별도 추가 주문을 자동 구분하지 않았습니다.'}
+                        self.db.execute('UPDATE ocr_reviews SET result=?,sightings=sightings+? WHERE id=?',
+                            (json.dumps(result,ensure_ascii=False),extra,key))
+                    continue
+                if not re.search(r'주문|화환|근조|부고|청첩|결혼|신랑|신부|보내는\s*분|행사|개업|취임|준공|수정|변경|취소|환불|바꿔|https?|www\.',body,re.I):continue
+                result=review_result(body)
+                if counts[body]>1:result['repeat_observation']={'requires_review':True,'message':'같은 문구의 말풍선이 여러 개입니다. 중복인지 별도 주문인지 확인해야 합니다.'}
+                compact=re.sub(r'\s+','',body)
+                variants=[r[0] for r in self.db.execute('SELECT id,changed_text FROM ocr_reviews WHERE scope=? ORDER BY rowid DESC LIMIT 20',(scope,))
+                          if re.sub(r'\s+','',r[1])==compact]
+                if variants:result['possible_ocr_variant_of']=variants[0]
                 added+=self.db.execute('INSERT OR IGNORE INTO ocr_reviews(id,scope,changed_text,result) VALUES (?,?,?,?)',
                     (key,scope,body,json.dumps(result,ensure_ascii=False))).rowcount
             self.db.execute('INSERT OR REPLACE INTO ocr_frames VALUES (?,?)',(scope,json.dumps(messages,ensure_ascii=False)))
