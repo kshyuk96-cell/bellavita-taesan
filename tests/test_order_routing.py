@@ -8,6 +8,21 @@ import agent
 
 
 class OrderRoutingTests(unittest.TestCase):
+    def test_partial_release_keeps_order_writes_and_sms_off_even_with_credentials(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(agent, 'ROOT', Path(temporary)):
+            with patch.dict(agent.os.environ, {'TAESAN_ORDER_SHEET_ID': 'fixture', 'SOLAPI_API_KEY': 'fixture',
+                                               'SOLAPI_API_SECRET': 'fixture', 'SOLAPI_FROM': '01000000000'}), \
+                 patch.object(agent, 'sheets_service') as sheets, patch.object(agent.threading, 'Thread') as worker:
+                reply = agent.run_order('주문 접수\n보내는 분: 모의 직원', 'qa-order')
+                self.assertIn('원장에는 아직 등록되지 않았어요', reply['summary'])
+                with agent.db() as connection:
+                    self.assertEqual(agent.order_operations.latest_intake(connection, 'qa-order')['state'], 'pending')
+                with self.assertRaisesRegex(RuntimeError, '원장 자동 등록'):
+                    agent.write_order('fixture', {}, '2026-11-14T09:00:00+09:00')
+                agent.start_order_queue()
+                sheets.assert_not_called()
+                worker.assert_not_called()
+
     def test_explicit_order_keeps_invitation_draft_open(self):
         with tempfile.TemporaryDirectory() as temporary, patch.object(agent, 'ROOT', Path(temporary)):
             owner = 'qa-order-routing'

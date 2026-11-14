@@ -91,7 +91,7 @@ class ResilienceTests(unittest.TestCase):
         self.assertIn('원장 저장값 불일치: 작품',assist.command(self.db,'staff','주문 상태 21380'))
 
     def test_process_lock_blocks_and_releases_after_crash(self):
-        ctx=multiprocessing.get_context('fork');ready=ctx.Event();release=ctx.Event();acquired=ctx.Event()
+        ctx=multiprocessing.get_context('spawn');ready=ctx.Event();release=ctx.Event();acquired=ctx.Event()
         holder=ctx.Process(target=hold_lock,args=(str(self.path),ready,release));waiter=ctx.Process(target=acquire_lock,args=(str(self.path),acquired))
         try:
             holder.start();self.assertTrue(ready.wait(3));waiter.start();self.assertFalse(acquired.wait(.15))
@@ -121,7 +121,7 @@ class ConcurrentSaveTests(unittest.TestCase):
         with self.db() as c:
             c.execute('CREATE TABLE synthetic_writes (id TEXT PRIMARY KEY)')
             c.execute("UPDATE order_operations SET state='pending' WHERE id='parent'")
-        ctx=multiprocessing.get_context('fork');start=ctx.Event();results=ctx.Queue()
+        ctx=multiprocessing.get_context('spawn');start=ctx.Event();results=ctx.Queue()
         workers=[ctx.Process(target=concurrent_save,args=(str(self.path),start,results)) for _ in range(2)]
         try:
             for process in workers:process.start()

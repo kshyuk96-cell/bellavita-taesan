@@ -80,7 +80,8 @@ def iris_bugo(link, raw):
 
 
 def wedding(link):
-    event = invitation.parse_page(link, invitation.get_page(link))
+    from order_invitation import parse_order_page
+    event = parse_order_page(link, invitation.get_page(link))
     when = event['when']
     return {'event_type': '결혼', 'event_date': when.date().isoformat(), 'event_time': when.strftime('%H:%M'),
             'venue': event['venue'], 'address': event['address'],

@@ -1,5 +1,5 @@
 """CI uses synthetic fixtures only; no credentials, private source files or outbound sockets."""
-import argparse,json,runpy,socket,sys,unittest
+import argparse,ipaddress,json,runpy,socket,sys,unittest
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -15,10 +15,17 @@ def run_script(path):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--output',required=True);args=parser.parse_args()
     output=Path(args.output);output.mkdir(parents=True,exist_ok=True)
-    socket.create_connection=denied
+    def local(address):
+        try:return address[0]=='localhost' or ipaddress.ip_address(address[0]).is_loopback
+        except (ValueError,TypeError,IndexError):return False
+    original_create=socket.create_connection
+    def create(address,*args,**kwargs):
+        if local(address):return original_create(address,*args,**kwargs)
+        return denied()
+    socket.create_connection=create
     original=socket.socket.connect
     def connect(sock,address):
-        if sock.family==socket.AF_UNIX:return original(sock,address)
+        if sock.family==socket.AF_UNIX or local(address):return original(sock,address)
         return denied()
     socket.socket.connect=connect
     result=unittest.TextTestRunner(verbosity=1).run(unittest.defaultTestLoader.discover(str(ROOT/'tests')))
