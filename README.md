@@ -17,6 +17,7 @@ python agent.py
 | TAESAN_WEBHOOK_SECRET | 32자 이상 난수. 카카오 스킬 URL의 끝 경로에 사용 |
 | TAESAN_STAFF_IDS / TAESAN_ADMIN_IDS | 승인된 카카오 스킬 사용자 식별자 목록. 쉼표 구분 |
 | TAESAN_SHEET_ID | 우선 테스트 사본의 스프레드시트 ID |
+| TAESAN_DELIVERY_READ_SHEET_ID | 배송 건수 전용 읽기 파일 ID. 미설정 시 액자화환 주문 통합관리 운영 파일을 읽습니다. 사본을 쓰는 환경에서는 사본 ID를 지정합니다. |
 | TAESAN_GOOGLE_CREDENTIALS | 필요할 때 Google 서비스 계정 자격증명 파일 경로. 관리형 환경에서는 기본 자격증명 사용 가능 |
 | TAESAN_SCROLL_DIR / TAESAN_SCROLL_PYTHON | 기존 자동족자와 연결 모듈이 설치된 폴더 / 해당 Python 실행 파일 |
 | TAESAN_PUBLIC_URL | 카카오에서 접근 가능한 HTTPS 서버 주소. 서류 링크 생성에 사용 |

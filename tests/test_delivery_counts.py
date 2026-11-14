@@ -36,7 +36,7 @@ class DeliveryCountTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp, patch.object(agent, 'ROOT', Path(tmp)), \
              patch.object(agent, 'datetime', wraps=datetime) as clock, patch.object(agent, 'choose') as choose, \
-             patch.object(agent, 'read_delivery_ranges', side_effect=lambda ranges: [data[key] for key in ranges]) as read:
+             patch.object(agent, 'read_delivery_ranges', side_effect=lambda ranges, **kwargs: [data[key] for key in ranges]) as read:
             clock.now.return_value = DAY
             with agent.db() as c:
                 c.execute('INSERT INTO staff VALUES (?,?,0)', ('fixture-staff', 'staff'))
@@ -56,11 +56,15 @@ class DeliveryCountTests(unittest.TestCase):
                 ('오늘 배송 몇 건 완료했어?', '11월 14일 전체 배송완료는 1건'),
                 ('구로센터에서 오늘 배송완료 몇 건?', '11월 14일 구로 배송완료는 1건'),
                 ('전체 말고 구로센터 배송 몇 건 남았어?', '11월 14일 구로 배송 미완료는 0건'),
+                ('지금 미완료가 이렇게밖에 안남았는데 뭔 44개야', '11월 14일 전체 배송 미완료는 1건'),
+                ('사진에서 미완료 몇 건?', '11월 14일 전체 배송 미완료는 1건'),
+                ('배송 미완료', '11월 14일 전체 배송 미완료는 1건'),
             ]
             for question, expected in scenarios:
                 with self.subTest(question=question):
                     self.assertIn(expected, dispatch(question))
             self.assertIn(([DATES],), [call.args for call in read.call_args_list])
+            self.assertTrue(all(call.kwargs['spreadsheet'] == delivery_counts.OPERATIONS_SHEET_ID for call in read.call_args_list))
             data[FLAGS][1] = [True]
             self.assertIn('배송완료는 2건', dispatch('배송완료 체크된건 몇개야?'))
             read.side_effect = TimeoutError
@@ -68,6 +72,30 @@ class DeliveryCountTests(unittest.TestCase):
             choose.assert_not_called()
             with agent.db() as c:
                 self.assertIsNotNone(c.execute('SELECT * FROM invitation_input').fetchone())
+
+    def test_photo_hint_has_no_background_job_and_buttons_use_fresh_count(self):
+        data = fixture()
+
+        def dispatch(message):
+            return agent.dispatch({'userRequest': {'user': {'id': 'fixture-staff'}, 'utterance': message}})['template']
+
+        with tempfile.TemporaryDirectory() as tmp, patch.object(agent, 'ROOT', Path(tmp)), \
+             patch.object(agent, 'datetime', wraps=datetime) as clock, \
+             patch.object(agent, 'choose') as choose, \
+             patch.dict(agent.os.environ, {'TAESAN_SHEET_ID': 'old-sample', 'TAESAN_DELIVERY_READ_SHEET_ID': 'count-fixture'}), \
+             patch.object(agent, 'read_delivery_ranges', side_effect=lambda ranges, **kwargs: [data[key] for key in ranges]) as read:
+            clock.now.return_value = DAY
+            with agent.db() as c:
+                c.execute('INSERT INTO staff VALUES (?,?,0)', ('fixture-staff', 'staff'))
+            buttons = dispatch('[사진]')['quickReplies']
+            self.assertEqual([b['label'] for b in buttons], ['오늘 배송 미완료', '오늘 배송 완료', '오늘 배송 전체'])
+            self.assertIn(buttons[0], dispatch('메뉴')['quickReplies'])
+            with agent.db() as c:
+                self.assertEqual(c.execute('SELECT COUNT(*) FROM jobs').fetchone()[0], 0)
+            count = dispatch(buttons[0]['messageText'])
+            self.assertIn('배송 미완료는 1건', count['outputs'][0]['simpleText']['text'])
+            self.assertEqual(read.call_args.kwargs['spreadsheet'], 'count-fixture')
+            choose.assert_not_called()
 
     def test_unmatched_duplicate_or_invalid_flags_do_not_count_as_pending(self):
         data = fixture()
@@ -79,6 +107,16 @@ class DeliveryCountTests(unittest.TestCase):
         data[FLAGS][1] = []
         text = delivery_counts.count(DAY.date(), None, 'pending', lambda ranges: [data[key] for key in ranges])
         self.assertIn('1건은 배송관리에서 상태 확인', text)
+
+    def test_today_overview_keeps_unknown_separate_from_unchecked(self):
+        with patch.object(agent, 'datetime', wraps=datetime) as clock, \
+             patch.object(agent, 'read_delivery_ranges', return_value=(
+                 [['주문번호', '배송일'], [5, SERIAL], [6, SERIAL], [7, SERIAL]],
+                 [['제작 완료', '배송 완료'], [True, True], [False, False], [True]],
+                 [['배송원'], ['가상 직원']],
+             )):
+            clock.now.return_value = DAY
+            self.assertIn('배송 미완료 1건 · 배송 상태 확인 필요 1건', agent.today())
 
     def test_smart_routing_preserves_non_count_intents(self):
         for question in ('배송완료 몇 건인지 알려주는 기능 개발해', '오늘 제작 배송 몇 건', '다음 주 배송 몇 건?',
