@@ -39,5 +39,21 @@
     "order_count": 3,
     "task_count": 1
   },
-  "hosted_verification": "pending"
+  "hosted_verification": {
+    "hosted_ui": true,
+    "prechange_backup_restore": "passed",
+    "priority_template_note_after_redeploy": true,
+    "old_task_default_priority": "normal",
+    "customer_template_uses_order_state": true,
+    "private_product_note_hidden_from_storefront": true,
+    "shift_summary_owner_filter": true,
+    "existing_order_states_preserved": true,
+    "order_count": 3,
+    "integrity": "ok",
+    "mount_verified": true,
+    "new_tables_restore_verified": true,
+    "manual_matches_source": true,
+    "live_side_effects": false
+  },
+  "verified_commit": "e708eaeef8e6a291f01531c5fe3199c8c0d66bb8"
 }
