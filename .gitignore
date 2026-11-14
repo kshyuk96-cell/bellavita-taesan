@@ -4,3 +4,6 @@ taesan-data/
 .env.*
 *.sqlite*
 credentials*.json
+*.token
+auth.json
+manager-private/
