@@ -86,12 +86,15 @@ def explicit_details(raw):
     try:return order_intake.parse_fields(order_intake.REQUEST.sub('',raw))[0]
     except ValueError:return {}
 
-def command(db,owner,message):
+def command(db,owner,message,*,config_path=None):
     from order_lock import writer_lock
-    with writer_lock(db):return _command_locked(db,owner,message)
+    with writer_lock(db):return _command_locked(db,owner,message,config_path)
 
-def _command_locked(db,owner,message):
+def _command_locked(db,owner,message,config_path=None):
     import order_operations as ops
+    import order_recovery
+    recovered=order_recovery.command(db,owner,message,config_path)
+    if recovered is not None:return recovered
     if message=='주문 공유 대기':
         with db() as c:return order_sharing.pending_summary(c,owner)
     import order_backlog
@@ -108,7 +111,7 @@ def _command_locked(db,owner,message):
         if action=='재시도':
             return '검토 보류 주문의 재시도를 요청했어요. 반영 완료는 아직 미확인입니다.' if ops.resume(c,row) else '재시도 한도로 보류된 주문만 재개할 수 있어요.'
         if action=='상태':
-            labels={'pending':'접수·원장 등록 대기','update':'수정·원장 반영 대기','saved':'원장 반영 확인','cancel_requested':'취소 요청·현장 취소 미확인','review_hold':'재시도 한도·검토 보류','source_hold':'고객방 연결 해제·자동 처리 중지','cancel_confirmed':'배송 취소 확인을 직원이 수동 기록함'}
+            labels={'pending':'접수·원장 등록 대기','update':'수정·원장 반영 대기','saved':'원장 반영 확인','cancel_requested':'취소 요청·현장 취소 미확인','review_hold':'재시도 한도·검토 보류','source_hold':'고객방 연결 해제·자동 처리 중지','origin_hold':'기존 주문 출처 미확인·자동 처리 보류','cancel_confirmed':'배송 취소 확인을 직원이 수동 기록함'}
             receipts=c.execute('SELECT destination FROM order_transmissions WHERE order_id=? AND receipt IS NOT NULL AND verified_at IS NOT NULL',(row['id'],)).fetchall()
             shared=', '.join(r[0] for r in receipts) if receipts else '미확인'
             phase=labels.get(row['state'],'처리 상태 확인 필요')
@@ -121,7 +124,7 @@ def _command_locked(db,owner,message):
                 phase+='\n'+order_cancellation.status(c,row['id'])
             return phase+'\n카톡 공유: '+shared+'\n'+question(details)+('\n'+'\n'.join(errors) if errors else '')
         if action=='확인질문':return question(details)
-        if row['state'] in ('source_hold','cancel_confirmed'):return '연결 해제 또는 취소 확인 상태라 메시지를 합치지 않았어요.'
+        if row['state'] in ('source_hold','origin_hold','cancel_confirmed'):return '연결 해제 또는 취소 확인 상태라 메시지를 합치지 않았어요.'
         if row['state']=='cancel_requested':return '취소 요청 중이라 메시지를 합치지 않았어요.'
         message_id=None
         if action=='문구추가':

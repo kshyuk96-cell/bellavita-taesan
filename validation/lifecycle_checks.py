@@ -3,6 +3,7 @@ import contextlib,json,sqlite3,sys
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import order_operations as ops
+import order_origin
 import order_lifecycle as life
 
 def run():
@@ -15,7 +16,7 @@ def run():
         owner=f'staff{i}';key=f'parent{i}';number=10000+i
         details={'sender':'모의회사','venue':'모의홀','address':'서울특별시 강남구','event_time':'14:00'}
         with db() as con:
-            ops.stage(con,key,owner,'kakao','synthetic',details,ops.now())
+            ops.stage(con,key,owner,'kakao','synthetic',details,ops.now());order_origin.record_manual(con,key,owner,'synthetic staff confirmation')
             con.execute("UPDATE order_operations SET state='saved',order_number=? WHERE id=?",(number,key))
         life.command(db,owner,f'주문 수정 {number}\n설치장소: 모의홀\n주소: 부산광역시 해운대구')
         life.command(db,owner,f'주문 수정 {number}\n설치장소: 모의홀\n주소: 부산광역시 해운대구')

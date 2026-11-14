@@ -31,9 +31,9 @@ def main():
     result=unittest.TextTestRunner(verbosity=1).run(unittest.defaultTestLoader.discover(str(ROOT/'tests')))
     (output/'unit-tests.json').write_text(json.dumps({'tests':result.testsRun,'failures':len(result.failures),'errors':len(result.errors),'external_python_sockets_disabled':True,'loopback_tests_allowed':True})+'\n')
     if not result.wasSuccessful():return 1
-    for name in ('edge_cases','context_checks','lifecycle_checks','assistance_checks','review_rules_checks','full_flow_checks','integration_safety_checks'):
+    for name in ('edge_cases','context_checks','lifecycle_checks','assistance_checks','review_rules_checks','full_flow_checks','integration_safety_checks','origin_recovery_checks'):
         sys.argv=[name,str(output/(name+'.json'))]
         run_script(ROOT/'validation'/(name+'.py'))
-    (output/'completed.json').write_text(json.dumps({'synthetic_scripts_completed':7,'unit_tests_passed':True,'no_private_source_files':True})+'\n')
+    (output/'completed.json').write_text(json.dumps({'synthetic_scripts_completed':8,'unit_tests_passed':True,'no_private_source_files':True})+'\n')
     return 0
 if __name__=='__main__':raise SystemExit(main())

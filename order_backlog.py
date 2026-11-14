@@ -1,8 +1,8 @@
 """Owner-bound keyset pagination over review reasons, without a latest-100 cutoff."""
 import base64,hashlib,json,re
 
-FILTERS={'연결','전체','누락','일정','지역','오류','취소','공유','재시도'}
-REQUEST=re.compile(r'^주문 검토 대기(?: (전체|누락|일정|지역|오류|취소|공유|재시도|연결))?(?: 다음 ([A-Za-z0-9_-]{1,700}))?$')
+FILTERS={'출처','연결','전체','누락','일정','지역','오류','취소','공유','재시도'}
+REQUEST=re.compile(r'^주문 검토 대기(?: (전체|누락|일정|지역|오류|취소|공유|재시도|연결|출처))?(?: 다음 ([A-Za-z0-9_-]{1,700}))?$')
 
 def token(owner,category,after):
     payload={'owner':hashlib.sha256(owner.encode()).hexdigest()[:16],'filter':category,'after':list(after)}
@@ -29,10 +29,11 @@ def reason(c,row,category):
     sharing=row['state']=='saved' and not shared
     schedule=any(code.startswith(('delivery_','event_')) and not code.startswith('delivery_region_') for code in codes)
     region=any(code.startswith('delivery_region_') for code in codes)
-    flags={'연결':row['state']=='source_hold','누락':missing,'취소':cancel,'재시도':retry,'공유':sharing,'일정':schedule,'지역':region,'오류':'parse_or_write_error' in codes}
+    flags={'출처':row['state']=='origin_hold','연결':row['state']=='source_hold','누락':missing,'취소':cancel,'재시도':retry,'공유':sharing,'일정':schedule,'지역':region,'오류':'parse_or_write_error' in codes}
     if category!='전체' and not flags[category]:return None
     if not any(flags.values()) and row['state'] not in ('pending','update'):return None
     parts=[]
+    if row['state']=='origin_hold':parts.append('기존 주문 출처 미확인·자동 처리 보류')
     if row['state']=='source_hold':parts.append('고객방 연결 해제·자동 처리 중지')
     if cancel:
         from order_cancellation import status

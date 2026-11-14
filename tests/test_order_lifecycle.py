@@ -2,6 +2,7 @@ import contextlib,json,sqlite3,tempfile,unittest
 from pathlib import Path
 from unittest.mock import Mock
 import order_operations as ops
+import order_origin
 import order_lifecycle as life
 
 class LifecycleTests(unittest.TestCase):
@@ -16,7 +17,7 @@ class LifecycleTests(unittest.TestCase):
         self.db=db
         self.original={'sender':'모의회사','venue':'모의홀','address':'서울특별시 강남구','event_time':'14:00','delivery_time':'10:00','recipient':'모의수신자'}
         with db() as c:
-            ops.setup(c);ops.stage(c,'parent','staff','kakao','raw',self.original,ops.now())
+            ops.setup(c);ops.stage(c,'parent','staff','kakao','raw',self.original,ops.now());order_origin.record_manual(c,'parent','staff','synthetic staff confirmation')
             c.execute("UPDATE order_operations SET state='saved',order_number=21380 WHERE id='parent'")
     def command(self,text,owner='staff'):return life.command(self.db,owner,text)
     def row(self):

@@ -32,6 +32,7 @@ import owner_alerts
 import order_intake
 import customer_orders
 import customer_sources
+import order_origin
 import order_ledger
 import order_operations
 import order_lifecycle
@@ -680,7 +681,7 @@ def write_order(marker, data, created, *, update=False):
 
 
 def run_order(message, owner, source_context=None):
-    key, duplicate = order_operations.intake(db, owner, message, source_context)
+    key, duplicate = order_operations.intake(db, owner, message, source_context, trusted_manual=source_context is None and bool(role_of(owner)))
     if duplicate:
         return {'summary': duplicate}
     if not ORDER_LEDGER_ENABLED:
@@ -709,6 +710,7 @@ def order_saved(connection, row, number, details):
 
 def process_order_queue():
     if not ORDER_LEDGER_ENABLED:return
+    order_origin.classify_untracked(db)
     with ORDER_LOCK:
         with db() as c:
             row = c.execute("""SELECT o.* FROM order_operations o LEFT JOIN invitation_orders i ON i.id=replace(o.id,'-','')
@@ -948,6 +950,8 @@ def dispatch(body, defer_callback=None):
             return kakao('최근 주문의 배송 취소 확인을 직원이 수동 기록했어요. 원장·공유·청구 취소는 각각 별도 확인해 주세요.')
         if order['state'] == 'cancel_requested':
             return kakao('최근 카톡 주문은 취소 요청 상태예요. 시트·배송 취소 완료는 아직 미확인입니다.')
+        if order['state'] == 'origin_hold':
+            return kakao('기존 주문의 출처를 확인하지 못해 자동 처리를 보류했어요. 접수ID로 원본 연결 또는 직원 직접입력을 확인해 주세요.')
         if order['state'] == 'source_hold':
             return kakao('고객방 연결 해제로 자동 처리를 중지했어요. 기존 원장·실배송의 취소를 뜻하지는 않습니다.')
         if order['state'] == 'review_hold':
@@ -1027,6 +1031,7 @@ def dispatch(body, defer_callback=None):
             r'(?:승인 검토|구조 변경 승인|구조 변경 반려) [a-f0-9]{12}', message):
         return approval_command(owner, message)
     with ORDER_LOCK:
+        order_origin.classify_untracked(db)
         customer_sources.suspend_revoked(db,ROOT / 'customer-memory.sqlite3')
     try:
         split_preview = order_review_rules.preview(message)
@@ -1035,7 +1040,7 @@ def dispatch(body, defer_callback=None):
     if split_preview is not None:
         return kakao(split_preview)
     with ORDER_LOCK:
-        assistance_reply = order_assistance.command(db, owner, message)
+        assistance_reply = order_assistance.command(db, owner, message, config_path=ROOT / 'customer-memory.sqlite3')
     if assistance_reply is not None:
         return kakao(assistance_reply)
     with ORDER_LOCK:

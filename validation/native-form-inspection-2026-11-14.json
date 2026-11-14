@@ -2,11 +2,12 @@
   "ready_for_final_share": false,
   "hazards": [
     {
-      "code": "event_clock_in_shipping_label",
-      "message": "배송 일시 수식이 행사시간 열을 참조합니다. 배송시각과 분리 검토 필요"
+      "code": "test_order_data_incomplete",
+      "message": "수식은 적용했지만 배송·필수 항목이 미확인이라 최종 공유는 보류합니다."
     }
   ],
   "source": "native formatted values / first form block only; not a visual clipboard copy",
   "formula_count": 22,
-  "duplicate_block_detected": true
+  "duplicate_block_detected": true,
+  "shipping_formula_applied_in_test_copy": true
 }

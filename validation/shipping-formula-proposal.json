@@ -1,5 +1,5 @@
 {
-  "status": "NOT_APPLIED",
+  "status": "APPLIED_TO_AUTHORIZED_TEST_COPY_C8_I8",
   "sheet_title": "기획방_주문서테스트",
   "cell_formulas": {
     "C8": "=IFERROR(LET(d,INDIRECT(\"액자화환!B\"&$C$5),n,INDIRECT(\"액자화환!J\"&$C$5),k,(LEN(n)-LEN(SUBSTITUTE(n,\"배송시각 \",\"\")))/LEN(\"배송시각 \"),t,IFERROR(REGEXEXTRACT(n,\"(?:^|[ /])배송시각 ((?:[01][0-9]|2[0-3]):[0-5][0-9])(?:$|[ /])\"),\"\"),IF(OR(d=\"\",k=0),\"미확인\",IF(OR(k<>1,t=\"\"),\"확인 필요\",TEXT(d,\"mm.dd\")&\" \"&t))),\"확인 필요\")",
@@ -11,5 +11,5 @@
     "If shipping notes contain no clock or multiple clocks, do not substitute event time.",
     "Final native sharing also requires exact verified current-order field comparison."
   ],
-  "validation": "Reference model only; native Sheets formula execution still unverified."
+  "validation": "Post-read verified exact formulas and missing-data output in Sheets; other branches remain reference-model tests."
 }

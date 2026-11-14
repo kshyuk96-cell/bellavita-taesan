@@ -9,6 +9,7 @@ def setup(c):
         id TEXT PRIMARY KEY,order_id TEXT NOT NULL,revision TEXT NOT NULL,destination TEXT NOT NULL,
         kind TEXT NOT NULL,body TEXT NOT NULL,body_digest TEXT NOT NULL,state TEXT NOT NULL,
         receipt_id TEXT,verified_at TEXT,UNIQUE(destination,receipt_id))''')
+    c.execute('CREATE INDEX IF NOT EXISTS share_order_state ON order_share_jobs(order_id,state)')
     if 'native_checked' not in {row[1] for row in c.execute('PRAGMA table_info(order_share_jobs)')}:
         c.execute('ALTER TABLE order_share_jobs ADD COLUMN native_checked INTEGER NOT NULL DEFAULT 0')
 
@@ -37,6 +38,9 @@ def source_permission(c,key,source_guard):
     import customer_sources
     row=c.execute('SELECT context FROM order_sources WHERE order_id=?',(key,)).fetchone()
     if row and source_guard is None:raise customer_sources.SourceRevoked('원본 고객방 연결을 먼저 검증해야 합니다.')
+    if not row:
+        import order_origin
+        if not order_origin.approved(c,key):raise order_origin.OriginUnverified('원본 출처 또는 직원 직접입력을 먼저 확인해야 합니다.')
     with source_guard(json.loads(row['context'])) if row else contextlib.nullcontext():yield
 
 

@@ -17,9 +17,9 @@ def run():
     counts={key:0 for key in ('intake_full_verification','duplicate_no_new_row','same_row_amendment','fragment_replay','both_sharing_receipts','additional_replay','cancellation_invalidates_share','cancelled_save_blocked')}
     for i in range(1000):
         owner=f'staff{i}';text=f'주문 접수\n설치장소: 모의홀{i}\n주소: 서울특별시 강남구\n보내는분: 모의회사{i}\n받는분: 모의수신자{i}\n행사구분: 결혼\n작품: 모의작품{i}\n규격: 2호\n배송일: 2099-12-01\n배송시간: {i%24:02d}:{i%60:02d}\n문구: 모의문구{i}'
-        key,_=ops.intake(db,owner,text);number,data=ops.save(db,key,order_intake.extract,book.save)
+        key,_=ops.intake(db,owner,text,trusted_manual=True);number,data=ops.save(db,key,order_intake.extract,book.save)
         assert data['sender']==f'모의회사{i}' and book.rows[number][3]['stringValue']==f'모의작품{i}';counts['intake_full_verification']+=1
-        before=len(book.rows);again,_=ops.intake(db,owner,text);ops.save(db,again,order_intake.extract,book.save)
+        before=len(book.rows);again,_=ops.intake(db,owner,text,trusted_manual=True);ops.save(db,again,order_intake.extract,book.save)
         assert len(book.rows)==before;counts['duplicate_no_new_row']+=1
         life.command(db,owner,f'주문 수정 {number}\n설치장소: 새 모의홀{i}\n주소: 부산광역시 해운대구')
         saved,_=ops.save(db,key,order_intake.extract,book.save);assert saved==number and len(book.rows)==before;counts['same_row_amendment']+=1

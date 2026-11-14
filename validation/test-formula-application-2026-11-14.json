@@ -1,0 +1,21 @@
+{
+  "status": "APPLIED_AND_POST_READ_VERIFIED",
+  "sheet_title": "기획방_주문서테스트",
+  "formula_cells": [
+    "C8",
+    "I8"
+  ],
+  "actual_display_values": [
+    "미확인",
+    "미확인"
+  ],
+  "effective_formula_errors": false,
+  "native_formats_and_validation_preserved": true,
+  "checked_selectors_and_ledger_inputs_preserved": true,
+  "existing_order_reregistered": false,
+  "actual_sheets_branch_tested": "current missing explicit shipping-data case",
+  "positive_and_invalid_clock_branches_in_real_sheets_tested": false,
+  "final_native_sharing_ready": false,
+  "reason": "Shipping and core test-order inputs remain unconfirmed.",
+  "visual_evidence": "Native formats and displayed text read; no interactive render performed."
+}

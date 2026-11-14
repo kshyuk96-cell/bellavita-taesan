@@ -28,10 +28,10 @@ class FullFlowTests(unittest.TestCase):
     def test_intake_write_amend_fragments_additional_receipts_cancel(self):
         book=MemoryLedger()
         text='주문 접수\n설치장소: 모의홀\n주소: 서울특별시 강남구\n보내는분: 모의회사\n받는분: 모의수신자\n행사구분: 결혼\n작품: 모의작품\n규격: 2호\n배송일: 2099-12-01\n배송시간: 10:00'
-        key,_=ops.intake(self.db,'staff',text)
+        key,_=ops.intake(self.db,'staff',text,trusted_manual=True)
         number,data=ops.save(self.db,key,order_intake.extract,book.save)
         self.assertEqual(number,5)
-        key_again,_=ops.intake(self.db,'staff',text);self.assertEqual(key_again,key)
+        key_again,_=ops.intake(self.db,'staff',text,trusted_manual=True);self.assertEqual(key_again,key)
         ops.save(self.db,key_again,Mock(),book.save);self.assertEqual(book.posts,1)
         life.command(self.db,'staff','주문 수정 5\n설치장소: 새 모의홀\n주소: 부산광역시 해운대구')
         ops.save(self.db,key,Mock(),book.save);self.assertEqual(len(book.rows),1)

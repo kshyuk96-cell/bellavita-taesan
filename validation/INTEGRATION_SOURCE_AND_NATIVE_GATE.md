@@ -10,7 +10,7 @@ The integration branch includes main as an ancestor and has no unresolved confli
 
 shipping-formula-proposal.json contains concrete C8/I8 formulas for the test form only. They read the delivery DATE from ledger B and exactly one explicit `배송시각 HH:MM` token from notes J. They never substitute event-time C. No clock becomes 미확인; duplicate or invalid clocks require confirmation. The native gate also independently compares the displayed value against the explicit shipping date/time in the verified current order. Tests enumerate all 1,440 valid minutes and invalid/duplicate cases.
 
-No formula was applied to a Sheet. The formula is validated against a Python reference model, not executed by the Google Sheets engine. Before any future application, re-read the test copy selectors/formulas, preserve the original order-form selector and ledger C, and verify the actual calculated result. The current real test form still uses the old event-time reference and remains blocked for final native sharing.
+The original draft was model-tested only. A later authorized bundle applied only test-copy C8/I8 and post-read verified the current missing-shipping-data output in Sheets. Other clock branches remain model-tested. Before any future application, re-read the test copy selectors/formulas, preserve the original order-form selector and ledger C, and verify the actual calculated result. The test form now uses the approved delivery-clock proposal but remains blocked because required order data is unconfirmed. See LEGACY_RECONFIRMATION_AND_PC_DIAGNOSTICS.md.
 
 ## Native form and outbox
 

@@ -31,7 +31,7 @@ def _command_locked(db,owner,message):
             if body.strip():return '취소 요청에는 주문번호만 적어주세요.'
             if row['state']=='cancel_confirmed':return '배송 취소 확인이 직원 수동 기록으로 남아 있어요. 다른 대상의 취소 상태는 별도 확인해 주세요.'
             if row['state']=='cancel_requested':return '이미 취소 요청을 기록했어요. 현장·배송 취소 완료는 아직 미확인입니다.'
-            if row['state'] not in ('saved','update','review_hold','source_hold'):return '처리 상태를 확인한 뒤 취소를 요청해 주세요.'
+            if row['state'] not in ('saved','update','review_hold','source_hold','origin_hold'):return '처리 상태를 확인한 뒤 취소를 요청해 주세요.'
             order_sharing.invalidate(c,row['id'])
             after={**before,'cancellation_requested':True}
             c.execute('INSERT INTO order_changes VALUES (?,?,?,?,?)',(row['id'],owner,ops.now(),ops.dump(before),ops.dump(after)))
@@ -43,10 +43,14 @@ def _command_locked(db,owner,message):
             if not request:return '같은 행사에 추가하는 주문은 요청ID: 고유번호를 다음 줄에 적어주세요. 재전송은 같은 ID, 별도 추가는 다른 ID를 사용해 주세요.'
             key=str(uuid.uuid5(uuid.NAMESPACE_URL,'bellavita:additional:'+owner+':'+row['id']+':'+request[1]))
             if c.execute('SELECT 1 FROM order_operations WHERE id=?',(key,)).fetchone():return '이 요청ID의 추가 주문은 이미 보관했어요. 중복 등록하지 않았습니다.'
+            import order_origin
+            original_source=c.execute('SELECT context FROM order_sources WHERE order_id=?',(row['id'],)).fetchone()
+            if not original_source and not order_origin.approved(c,row['id']):return '원주문의 원본 출처 또는 직원 직접입력을 먼저 확인해 주세요.'
             after={k:v for k,v in before.items() if k not in ('order_number','cancellation_requested','regional_alert','delivery_region')}
             after['note']=' · '.join(filter(None,(before.get('note'),f'같은 행사 추가 요청 / 원주문 {number}')))
             ops.stage(c,key,owner,'kakao','',after,ops.now())
             c.execute('INSERT OR IGNORE INTO order_sources SELECT ?,context FROM order_sources WHERE order_id=?',(key,row['id']))
+            if not original_source:order_origin.record_manual(c,key,owner,'직원이 확인된 원주문의 동일 행사 추가를 요청')
             c.execute('INSERT INTO order_changes VALUES (?,?,?,?,?)',(key,owner,ops.now(),ops.dump({'parent_order':row['id']}),ops.dump(after)))
             return '같은 행사·장소·문구의 별도 추가 주문을 보관했어요. 원장 등록 완료 여부는 주문 접수 상태로 확인해 주세요.'
         try:fields,unlabelled=order_intake.parse_fields(body)

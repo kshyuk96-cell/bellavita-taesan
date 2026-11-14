@@ -2,6 +2,7 @@
 import hashlib
 import contextlib
 import customer_sources
+import order_origin
 import json
 import os
 import re
@@ -42,6 +43,7 @@ def setup(c):
     import order_sharing
     order_sharing.setup(c)
     customer_sources.setup(c)
+    order_origin.setup(c)
     import order_cancellation
     order_cancellation.setup(c)
 
@@ -64,18 +66,24 @@ def stage(c, key, owner, kind, raw, details, created):
     return c.execute('SELECT * FROM order_operations WHERE id=?', (key,)).fetchone()
 
 
-def intake(db, owner, message, source_context=None):
+def intake_key(message,source_context=None):
     from order_intake import REQUEST
-
-    canonical = '\n'.join(line.strip() for line in REQUEST.sub('', message).splitlines() if line.strip())
+    canonical='\n'.join(line.strip() for line in REQUEST.sub('',message).splitlines() if line.strip())
     suffix='\0'+json.dumps(source_context,sort_keys=True,ensure_ascii=False) if source_context is not None else ''
-    key = str(uuid.uuid5(uuid.NAMESPACE_URL, 'bellavita:kakao:' + canonical+suffix))
+    return str(uuid.uuid5(uuid.NAMESPACE_URL,'bellavita:kakao:'+canonical+suffix))
+
+
+def intake(db, owner, message, source_context=None, *, trusted_manual=False):
+    key=intake_key(message,source_context)
     with db() as c:
-        row = stage(c, key, owner, 'kakao', message, {}, now())
+        alias=c.execute('SELECT order_id FROM order_intake_aliases WHERE alias_key=?',(key,)).fetchone()
+        if alias:key=alias[0]
+        existing=c.execute('SELECT 1 FROM order_operations WHERE id=?',(key,)).fetchone()
+        row=stage(c,key,owner,'kakao',message,{},now())
         if source_context is not None:c.execute('INSERT OR IGNORE INTO order_sources VALUES (?,?)',(key,dump(source_context)))
-    if row['owner'] != owner:
-        return None, '같은 내용의 주문을 이미 접수했어요.'
-    return key, None
+        elif trusted_manual and not existing:order_origin.record_manual(c,key,owner,'직원이 현재 요청으로 직접 접수')
+    if row['owner']!=owner:return None,'같은 내용의 주문을 이미 접수했어요.'
+    return key,None
 
 
 def latest_intake(c, owner):
@@ -116,6 +124,14 @@ def ledger_key(payment_id):
 def save(db, key, extract, write, after_save=None, *, source_guard=None):
     with writer_lock(db):
         with db() as c:row=c.execute('SELECT context FROM order_sources WHERE order_id=?',(key,)).fetchone()
+        if row is None:
+            with db() as c:
+                operation=c.execute('SELECT * FROM order_operations WHERE id=?',(key,)).fetchone()
+                if operation and operation['kind']=='kakao' and order_origin.unfinished(c,operation) and not order_origin.approved(c,key):
+                    order_origin.hold(c,key)
+                    unverified=True
+                else:unverified=False
+            if unverified:raise order_origin.OriginUnverified('출처가 기록되지 않은 기존 주문을 보류했어요. 원본 연결 또는 직원 직접입력을 명시적으로 확인해 주세요.')
         try:
             if row and source_guard is None:raise customer_sources.SourceRevoked('원본 고객방 연결을 검증하지 못해 자동 처리를 중지했어요.')
             guard=source_guard(json.loads(row['context'])) if row else contextlib.nullcontext()
