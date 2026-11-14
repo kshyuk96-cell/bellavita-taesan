@@ -40,6 +40,8 @@ ACTIVE = {}
 LOCK = threading.Lock()
 STOCK_LOCK = threading.Lock()
 ORDER_LOCK = threading.Lock()
+# This release keeps order intake local pending ledger validation on a sheet copy.
+ORDER_LEDGER_ENABLED = False
 SEOUL = ZoneInfo('Asia/Seoul')
 ACTIONS = ['answer', 'guide', 'clarify', 'today', 'stock', 'stock_write', 'scroll', 'revise', 'structure', 'development']
 PROMPT = """너는 벨라비타 내부 업무비서 강태산 대리다. 자연어를 이해하여 아래 허용된 행동을 고른다.
@@ -596,6 +598,8 @@ def run_invitation(message, owner):
 
 
 def write_order(marker, data, created, *, update=False):
+    if not ORDER_LEDGER_ENABLED:
+        raise RuntimeError('원장 자동 등록을 준비하고 있어요.')
     spreadsheet = os.getenv('TAESAN_ORDER_SHEET_ID', '')
     if not spreadsheet:
         raise RuntimeError('원장 쓰기 연결이 필요해요.')
@@ -607,8 +611,8 @@ def run_order(message, owner):
     key, duplicate = order_operations.intake(db, owner, message)
     if duplicate:
         return {'summary': duplicate}
-    if not os.getenv('TAESAN_ORDER_SHEET_ID'):
-        return {'summary': '주문 내용을 보관했어요. 원장 연결이 끝나면 등록할 수 있어요.', 'order_status': True}
+    if not ORDER_LEDGER_ENABLED or not os.getenv('TAESAN_ORDER_SHEET_ID'):
+        return {'summary': '주문 내용을 보관했어요. 원장에는 아직 등록되지 않았어요.', 'order_status': True}
     try:
         with ORDER_LOCK:
             number, data = order_operations.save(db, key, order_intake.extract, write_order, order_saved)
@@ -646,6 +650,9 @@ def process_order_queue():
 
 
 def start_order_queue():
+    if not ORDER_LEDGER_ENABLED:
+        return
+
     def loop():
         while True:
             try:
