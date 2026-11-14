@@ -732,7 +732,16 @@ def start_order_queue():
 
 def run_job(job, message, owner, kind=''):
     try:
-        if kind == 'route':
+        if kind == 'route_compare':
+            with db() as c:
+                row = c.execute("""SELECT result FROM jobs WHERE owner=? AND state='done'
+                                   AND json_type(result,'$.route_report')='object'
+                                   ORDER BY created DESC LIMIT 1""", (owner,)).fetchone()
+            if row:
+                result = {'summary': delivery_routes.compare_saved(json.loads(row['result']), read_delivery_ranges)}
+            else:
+                result = {'summary': '아직 만든 배송루트가 없어요. 먼저 배송 날짜를 말씀해 주세요.'}
+        elif kind == 'route':
             result = delivery_routes.run(message, owner, db, read_delivery_ranges, datetime.now(SEOUL))
         elif kind == 'invitation':
             result = run_invitation(message, owner)
@@ -743,7 +752,10 @@ def run_job(job, message, owner, kind=''):
     except ValueError as error:
         result = {'summary': str(error)[:300]}
     except Exception as error:
-        if kind == 'route':
+        if kind == 'route_compare':
+            print('배송관리 변경 조회 실패:', type(error).__name__, file=sys.stderr, flush=True)
+            result = {'summary': '배송관리의 변경 내용을 읽지 못했어요. 잠시 뒤 다시 확인해 주세요.'}
+        elif kind == 'route':
             print('배송루트 계산 실패:', type(error).__name__, file=sys.stderr, flush=True)
             result = {'summary': '배송루트 자료를 확인하지 못했어요. 잠시 뒤 “다시 계산”이라고 말씀해 주세요.'}
         elif kind == 'order':
@@ -997,6 +1009,8 @@ def dispatch(body, defer_callback=None):
                 kind = json.loads(row['input']).get('kind')
                 if kind == 'route':
                     return kakao('아직 배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {check[1]}')])
+                if kind == 'route_compare':
+                    return kakao('아직 배송관리 변경 내용을 확인하고 있어요.', buttons=[('변경 결과 보기', f'결과 {check[1]}')])
                 if kind == 'invitation':
                     return kakao('아직 초대장을 준비하고 있어요.', buttons=[('초대장 확인', f'결과 {check[1]}')])
             return kakao('해당 결과가 아직 없거나 처리 중이에요.')
@@ -1018,6 +1032,8 @@ def dispatch(body, defer_callback=None):
             kind = 'development'
         elif delivery_counts.request(message) or delivery_counts.follow_up(message):
             kind = 'delivery_count'
+        elif delivery_routes.COMPARE.fullmatch(message):
+            kind = 'route_compare'
         elif delivery_routes.wants_route(message, route_context):
             kind = 'route'
         elif pending:
@@ -1030,7 +1046,7 @@ def dispatch(body, defer_callback=None):
         fingerprint = hashlib.sha256(fingerprint_input.encode()).hexdigest()
         for old in [key for key, future in ACTIVE.items() if future.done()]:
             ACTIVE.pop(old, None)
-        row = None if kind in ('route', 'delivery_count') else c.execute(
+        row = None if kind in ('route', 'delivery_count', 'route_compare') else c.execute(
             'SELECT * FROM jobs WHERE owner=? AND fingerprint=? AND created>? ORDER BY created DESC LIMIT 1',
             (owner, fingerprint, time.time()-180)).fetchone()
         if row:
@@ -1042,7 +1058,7 @@ def dispatch(body, defer_callback=None):
             future = ACTIVE[job]
         else:
             running = c.execute("SELECT id FROM jobs WHERE owner=? AND state='running' ORDER BY created DESC LIMIT 1", (owner,)).fetchone()
-            if running and running['id'] in ACTIVE and kind != 'delivery_count':
+            if running and running['id'] in ACTIVE and kind not in ('delivery_count', 'route_compare'):
                 return kakao('앞에서 말씀하신 일을 확인하고 있어요.')
             job = secrets.token_hex(6)
             c.execute('INSERT INTO jobs VALUES (?,?,?,?,?,?,NULL)',
@@ -1061,6 +1077,8 @@ def dispatch(body, defer_callback=None):
             return kakao('주문을 확인하고 있어요.', buttons=[('주문 확인', f'결과 {job}')])
         if kind == 'route':
             return kakao('배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {job}')])
+        if kind == 'route_compare':
+            return kakao('배송관리 변경 내용을 확인하고 있어요.', buttons=[('변경 결과 보기', f'결과 {job}')])
         if kind == 'delivery_count':
             return kakao('배송 건수를 확인하고 있어요.', buttons=[('배송 건수 확인', f'결과 {job}')])
         if kind == 'invitation':
