@@ -12,10 +12,10 @@ def render(page,readiness,*,path='',filters=None,saved=False):
     for section in list(main.xpath('./section')):
         heading=''.join(section.xpath('./h2[1]//text()')).strip()
         product_form=bool(section.xpath('.//input[@name="action" and (@value="save_product" or @value="issue_offers")]'))
-        key=('products' if product_form else 'orders' if heading in ('운영 현황판','쇼핑몰 주문·결제 내역') else
+        key=('products' if product_form else 'orders' if heading in ('운영 현황판','쇼핑몰 주문·결제 내역','저장 검색') else
             'delivery' if heading in ('배송 일정표','담당자 일괄 배정 · CSV 사전 검토','담당 배정 CSV · 사전 검토') or '배정' in heading or '일정' in heading else
             'reports' if '정산' in heading or '집계' in heading else
-            'settings' if heading in ('직원 주문 알림','외부 연동 진단') else 'products')
+            'settings' if heading in ('직원 주문 알림','외부 연동 진단','백업 누락·실패 안내') else 'products')
         groups[key].append(section)
     groups['settings'].insert(1,html.fragment_fromstring(readiness))
     nav=html.Element('nav',attrib={'class':'admin-nav','aria-label':'관리 업무 바로가기'})
@@ -42,6 +42,7 @@ def render(page,readiness,*,path='',filters=None,saved=False):
     @media(max-width:600px){main{padding:16px 12px!important}.admin-nav{gap:6px;padding:10px 0}.admin-nav a{font-size:12px;padding:9px 10px}.admin-group section{padding:15px}.admin-group-title{font-size:19px!important}}
     '''
     style.text+='\n.admin-search{border:1px solid #dce3d8;padding:16px;border-radius:8px;background:#fafbf8}.search-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.order-tools{display:flex;gap:8px;flex-wrap:wrap;padding:10px 0}.copy-source{font-size:12px!important}.order-identity{display:block;font-size:13px;font-weight:400;color:#526351}.order-next{display:block;font-size:14px}.order-next,.admin-saved{border-left:3px solid #315840;padding:10px 12px;background:#edf3e9}.order-pagination{display:flex;gap:18px;padding:12px 0}@media(max-width:600px){.search-grid{grid-template-columns:1fr}}'
+    style.text+='\n.saved-search{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.comparison-wrap{overflow-x:auto;max-width:100%}.comparison-wrap table{border-collapse:collapse;width:100%;table-layout:fixed}.comparison-wrap th,.comparison-wrap td{border:1px solid #dce3d8;padding:8px;vertical-align:top;overflow-wrap:anywhere;white-space:pre-wrap}.order-timeline,.operator-handover{border-top:1px solid #dce3d8;margin-top:18px;padding:12px 0}.product-diff{padding:12px;background:#f3f7ef;margin:12px 0}'
     tree.append(style)
     script=html.Element('script');script.text=SCRIPT;tree.append(script)
     return '<!doctype html>'+html.tostring(tree,encoding='unicode',method='html')
@@ -57,6 +58,19 @@ for(const button of document.querySelectorAll('[data-copy-order],[data-copy-link
  try{if(!navigator.clipboard)throw Error('clipboard');await navigator.clipboard.writeText(value);status.textContent='복사했습니다. 해당 주문 담당자·주문자에게만 전달하세요.';button.textContent='복사 완료';}
  catch(error){const source=button.closest('.order-tools').querySelector('.copy-source');if(source){source.value=value;source.focus();source.select();}status.textContent='복사할 내용을 선택했습니다. 직접 복사해 주세요.';}
 });
+for(const input of document.querySelectorAll('input[name=action][value=save_product]')){
+ const form=input.form;if(!form.querySelector('[name=product_id]'))continue;
+ const fields=()=>Array.from(form.elements).filter(el=>el.name&&!['hidden','submit','button'].includes(el.type)&&!el.disabled);
+ const value=el=>el.type==='checkbox'?(el.checked?'선택':'해제'):el.value;
+ const initial=new Map(fields().map(el=>[el.name,value(el)]));
+ const preview=document.createElement('button');preview.type='button';preview.textContent='변경 전후 비교';preview.className='preview-product';
+ const panel=document.createElement('div');panel.className='product-diff';panel.hidden=true;panel.setAttribute('role','status');form.append(preview,panel);
+ preview.addEventListener('click',()=>{panel.replaceChildren();panel.hidden=false;let count=0;
+ for(const el of fields()){const before=initial.get(el.name)||'';const after=value(el);if(before===after)continue;count++;const p=document.createElement('p');const label=el.closest('label')?.firstChild?.textContent?.trim()||el.name;p.textContent=label+' · 변경 전: '+(before||'(없음)')+' → 변경 후: '+(after||'(없음)');panel.append(p);}
+ const p=document.createElement('p');p.textContent=count?count+'개 변경 항목 · 아직 저장하지 않았습니다. 내용을 확인한 뒤 상품 수정 저장을 누르세요.':'변경 항목 없음';panel.prepend(p);
+ });
+ form.addEventListener('input',()=>{panel.hidden=true;});
+}
 for(const form of document.querySelectorAll('form[method=post]'))form.addEventListener('submit',event=>{if(form.dataset.submitting==='1'){event.preventDefault();return;}form.dataset.submitting='1';form.setAttribute('aria-busy','true');setTimeout(()=>{for(const button of form.querySelectorAll('button[type=submit],button:not([type])'))if(!button.disabled){button.dataset.disabledSubmit='1';button.disabled=true;}},0);});
 window.addEventListener('pageshow',()=>{for(const form of document.querySelectorAll('form[method=post]')){delete form.dataset.submitting;form.removeAttribute('aria-busy');for(const button of form.querySelectorAll('button[data-disabled-submit]')){button.disabled=false;delete button.dataset.disabledSubmit;}}});
 })();

@@ -32,6 +32,7 @@ import owner_alerts
 import shop
 import shop_catalog
 import shop_admin_queries
+import shop_admin_workflow
 import shop_admin_manual
 import order_ops
 import order_sample
@@ -1361,7 +1362,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 fields = self.read_order_form()
                 return_location=shop_admin_queries.redirect(match[0],fields) if '_return_query' in fields else match[0]
-                action = {'save_product': shop.save_product, 'issue_offers': shop.issue_offers,
+                action = {'save_search':shop_admin_workflow.save_search,'delete_search':shop_admin_workflow.delete_search,'save_operator_handover':shop_admin_workflow.save_handover,
+                          'save_product': shop.save_product, 'issue_offers': shop.issue_offers,
                           'change_offer': shop.change_offer,
                           'record_payment_check': shop.record_payment_check,
                           'save_notifications': order_ops.save_settings,

@@ -1,0 +1,47 @@
+{
+  "scenarios": [
+    {
+      "width": 375,
+      "saved_search_persists": true,
+      "handover_saved": true,
+      "timeline_groups": 4,
+      "product_preview_and_audit": true,
+      "backup_warning": true,
+      "all_record_search": true,
+      "combined_filters": true,
+      "pagination_30": true,
+      "next_action_visible": true,
+      "clipboard_fallback": true,
+      "saved_context_preserved": true,
+      "manual_search": true,
+      "overflow": false
+    },
+    {
+      "width": 1280,
+      "saved_search_persists": true,
+      "handover_saved": true,
+      "timeline_groups": 4,
+      "product_preview_and_audit": true,
+      "backup_warning": true,
+      "all_record_search": true,
+      "combined_filters": true,
+      "pagination_30": true,
+      "next_action_visible": true,
+      "clipboard_fallback": true,
+      "saved_context_preserved": true,
+      "manual_search": true,
+      "overflow": false
+    }
+  ],
+  "javascript_errors": [],
+  "live_side_effects": false,
+  "unit_tests": {
+    "passed": 144
+  },
+  "focused_tests": {
+    "passed": 6
+  },
+  "catalog_browser": "passed: 375/1280",
+  "existing_admin_growth_browser": "passed: 375",
+  "hosted_verification": "pending"
+}

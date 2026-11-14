@@ -24,6 +24,7 @@ import shop_admin_layout
 import shop_readiness
 import external_backups
 import shop_admin_queries
+import shop_admin_workflow
 
 ADMIN_PATH = re.compile(r'/shop/admin/([0-9]{10})/([a-f0-9]{64})')
 ORDER_PATH = re.compile(r'/shop/order/([a-f0-9]{32})')
@@ -43,6 +44,7 @@ def admin_authorized(expiry, signature, secret):
 
 def setup(connection):
     external_backups.setup(connection)
+    shop_admin_workflow.setup(connection)
     connection.execute("""CREATE TABLE IF NOT EXISTS shop_products (
         id TEXT PRIMARY KEY, details TEXT NOT NULL, revision INTEGER NOT NULL)""")
     connection.execute("""CREATE TABLE IF NOT EXISTS shop_offers (
@@ -146,6 +148,8 @@ def save_product(connection, fields):
                                    WHERE id=? AND revision=?''',
                                  (data, product_id, fields.get('revision'))).rowcount:
         raise ValueError('상품이 변경됐어요. 최신 화면에서 다시 수정해 주세요.')
+    if existing:
+        connection.execute('INSERT INTO shop_product_changes VALUES (?,?,?,?,?)',(product_id,existing['revision']+1,existing['details'],data,shop_admin_workflow.now()))
 
 
 def issue_offers(connection, fields):
@@ -301,7 +305,7 @@ def admin_page(connection, path, origin, fields=None, root=None):
         products.append(f'<section id="product-{row["id"]}" data-admin-product="{row["id"]}"><h2>{escape(product["title"])}</h2>'
                         '<details><summary>상품 수정</summary>'
                         + form('save_product', identity + product_fields(product), '상품 수정 저장')
-                        + '</details><details><summary>행사별 주문 링크 발급</summary>'
+                        + '</details>'+shop_admin_workflow.product_history(connection,row['id'])+'<details><summary>행사별 주문 링크 발급</summary>'
                         + form('issue_offers', identity + event_fields, '링크 발급') + '</details></section>')
 
     offers = []
@@ -363,7 +367,7 @@ def admin_page(connection, path, origin, fields=None, root=None):
         search_text=' '.join(str(value) for value in (row['id'],order['buyer'],order['buyer_phone'],order['sender'],order['message'],order['title'],order['venue']))
         orders.append(f'<li id="order-{row["id"]}" data-shop-order="{row["id"]}" data-search="{escape(search_text)}" data-queues="{",".join(shop_dashboard.categories(connection,row))}"><details><summary>{escape(order["title"])} · {order["amount"]:,}원 · '
                       f'{STATES.get(row["state"], "확인 필요")} · 주문 {row["id"]}<small class="order-identity">주문자 {escape(order["buyer"])} · 행사 {escape(order["event_time"][:16].replace("T"," "))}</small><span class="order-next">{escape(shop_dashboard.next_action(connection,row))}</span></summary>'
-                      f'<div class="order-tools"><button type="button" data-copy-order="{row["id"]}">주문번호 복사</button><button type="button" data-copy-link="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}">고객 상태 링크 복사</button><input class="copy-source" readonly aria-label="복사할 값" value="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}"></div><dl>{content}</dl>{check_form}' + order_ops.controls(connection, row, path) + '</details></li>')
+                      f'<div class="order-tools"><button type="button" data-copy-order="{row["id"]}">주문번호 복사</button><button type="button" data-copy-link="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}">고객 상태 링크 복사</button><input class="copy-source" readonly aria-label="복사할 값" value="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}"></div><dl>{content}</dl>{check_form}' + shop_admin_workflow.timeline(connection,row) + order_ops.controls(connection, row, path) + shop_admin_workflow.handover(connection,row,path) + '</details></li>')
 
     notification_settings = ('<section><h2>직원 주문 알림</h2>'
         + form('save_notifications', field('알림 받을 직원 휴대폰 · 쉼표 또는 줄바꿈으로 구분', 'staff_phones',
@@ -384,7 +388,7 @@ def admin_page(connection, path, origin, fields=None, root=None):
       input[type=checkbox]{display:inline;width:auto}
       a{color:#204c36}summary{cursor:pointer;padding:6px 0}small{overflow-wrap:anywhere}li{margin-bottom:12px}
       dd{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 8px}dt{font-weight:bold}</style>
-      <main><h1>벨라비타 쇼핑몰 관리</h1><p><a href="/shop">고객 쇼핑몰 보기</a></p>''' + shop_dashboard.panel(connection,selected_rows) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + assignment_batches.panel(connection,path) + shop_sales.panel(connection,path,fields) + '''<section><h2>새 상품 등록</h2>'''
+      <main><h1>벨라비타 쇼핑몰 관리</h1><p><a href="/shop">고객 쇼핑몰 보기</a></p>''' + shop_dashboard.panel(connection,selected_rows) + shop_admin_workflow.searches(connection,path,result_meta['filters']) + shop_admin_workflow.backups(connection) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + assignment_batches.panel(connection,path) + shop_sales.panel(connection,path,fields) + '''<section><h2>새 상품 등록</h2>'''
       + form('save_product', product_fields({}), '상품 등록') + '</section>' + notification_settings
       + ''.join(products) + '<section><h2>행사별 주문 링크</h2>'
       + ('<ul>' + ''.join(offers) + '</ul>' if offers else '<p>발급된 링크가 없어요.</p>')
