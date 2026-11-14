@@ -51,5 +51,24 @@
   "actual_payments": false,
   "actual_messages": false,
   "actual_receipts": false,
-  "remaining": "production DB/file inspection, provider access and real receipt/delivery verification"
+  "remaining": "production DB/file inspection, provider access and real receipt/delivery verification",
+  "verification_deployment": {
+    "commit": "d423e89f14603001b506b708734beda8b55a16d2",
+    "status": "live",
+    "live_at_kst": "2026-11-14T23:57:46+09:00",
+    "public_url": "https://bellavita-shop-verification-v3b4.onrender.com/shop",
+    "products_preserved": 4,
+    "existing_receipt_pages_preserved": 2,
+    "before_after_content_hashes_equal": true,
+    "persistent_mount_verified": true,
+    "live_flags_forced_off": true,
+    "app_error_logs": {
+      "count": 0,
+      "start_utc": "2026-11-14T14:57:46Z",
+      "end_utc": "2026-11-14T14:58:13Z"
+    },
+    "hosted_authenticated_admin_check": false,
+    "admin_browser_scope": "local independent fixture at 375px and 1280px",
+    "production_changed": false
+  }
 }
