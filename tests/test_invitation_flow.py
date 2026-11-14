@@ -77,6 +77,20 @@ class InvitationFlowTest(unittest.TestCase):
         self.assertNotIn('3단화환', text)
         self.assertIn('김영남·장미연 올림', text)
 
+    def test_structured_general_event_and_existing_product_name(self):
+        data = '''<html><head><script type="application/ld+json">
+        {"@type":"Event","name":"푸르지오 완공식","startDate":"2026-12-12T14:30:00+09:00",
+         "location":{"name":"중앙광장","address":{"addressLocality":"수원시","streetAddress":"예시로 12"}},
+         "image":"https://example.org/event.jpg"}
+        </script></head></html>'''
+        event = invitation.parse_page('https://example.org/notice', data)
+        self.assertEqual((event['name'], event['venue'], event['address']),
+                         ('푸르지오 완공식', '중앙광장', '수원시 예시로 12'))
+        self.assertEqual(event['when'], dt.datetime(2026, 12, 12, 14, 30))
+        self.assertEqual(event['photos'], ['https://example.org/event.jpg'])
+        self.assertEqual(BlogPay.normalized_title('정영욱 이노하라 나오 결혼 축하 쌀빛그림화환 (일시 장소)'),
+                         BlogPay.normalized_title('정영욱 이노하라나오 결혼 축하 쌀빛그림화환 (일시 장소)'))
+
     def test_timed_out_copy_reconciles_without_second_copy(self):
         client = BlogPay('example', 'test')
         template = {'goodName':'쌀빛그림화환', 'goodPrice':99000, 'goodNum':1, 'isShow':0,

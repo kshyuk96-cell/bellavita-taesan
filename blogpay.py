@@ -1,10 +1,10 @@
 """Server-side BlogPay product lookup and copying for invitation checkout links."""
 import argparse
 import hashlib
-import secrets
-import sqlite3
 import json
 import os
+import secrets
+import sqlite3
 import time
 from urllib.parse import urlencode, urljoin, urlsplit
 from urllib.error import HTTPError, URLError
@@ -89,7 +89,7 @@ class BlogPay:
     def existing_products(self, title, products=None):
         matches = {}
         for product in self.products(all_pages=True) if products is None else products:
-            if product['goodName'] != title:
+            if self.normalized_title(product['goodName']) != self.normalized_title(title):
                 continue
             price = int(product['goodPrice'])
             if (price in PRICES and str(product.get('isShow')) == '1'
@@ -99,6 +99,12 @@ class BlogPay:
                     raise RuntimeError(f'{price:,}원 판매 상품이 중복 등록되어 있습니다.')
                 matches[price] = product
         return matches
+
+    @staticmethod
+    def normalized_title(title):
+        # Older products join a multi-syllable surname directly to the given name.
+        name, marker, rest = title.partition(' 결혼 축하 쌀빛그림화환 (')
+        return ''.join(name.split()) + marker + rest if marker else title
 
     def copy_product(self, template_number):
         """Copy a product and identify its new ID from the product list.
@@ -198,10 +204,13 @@ class BlogPay:
                     continue
                 key = hashlib.sha256(f'{title}\0{price}'.encode()).hexdigest()
                 record = db.execute('SELECT number,before FROM copies WHERE key=?',(key,)).fetchone()
-                if any(p.get('goodName') == title and int(p.get('goodPrice',0)) == price
+                if any(self.normalized_title(p.get('goodName', '')) == self.normalized_title(title)
+                       and int(p.get('goodPrice', 0)) == price
                        and (not record or str(p['goodNum']) != record[0]) for p in rows):
                     raise ValueError(f'{price:,}원 상품이 이미 있어요. 쇼핑몰에서 판매와 메인진열 상태를 확인해 주세요.')
                 if record is None:
+                    if db.execute('SELECT 1 FROM copies WHERE number IS NULL LIMIT 1').fetchone():
+                        raise ValueError('직전 상품 복제 결과를 관리자에서 확인한 뒤 다시 진행해 주세요.')
                     before = {str(x['goodNum']) for x in rows}
                     db.execute('INSERT INTO copies VALUES (?,NULL,?)',(key,json.dumps(sorted(before))))
                     db.commit()

@@ -8,7 +8,6 @@ import os
 import re
 import secrets
 import threading
-import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlsplit
@@ -24,7 +23,6 @@ SEOUL = ZoneInfo('Asia/Seoul')
 HOSTS = {'bojagicard.com', 'feelcard.co.kr', 'salondeletter.com', 'toourguest.com', 'itscard.co.kr', 'itscard.com', 'mcard.itscard.co.kr', 'happyceo.kr'}
 WHEN = re.compile(r'(20\d\d)[년./-]\s*(\d{1,2})[월./-]\s*(\d{1,2})일?[T\s]*[ (]*(?:[월화수목금토일](?:요일)?\)?)?\s*(오전|오후)?\s*(\d{1,2})(?:\s*시\s*(?:(\d{1,2})\s*분)?|:(\d{1,2}))')
 PRODUCT_LOCK = threading.Lock()
-PRODUCT_CACHE = {}
 
 
 class MissingInformation(ValueError):
@@ -176,7 +174,9 @@ def parse_page(source, raw, extract=None):
         links = [link for link in tree.xpath('//a/@href') if https_url(link)
                  and urlsplit(link).hostname == 'mcard.itscard.co.kr']
         if len(set(links)) == 1:
-            return parse_page(links[0], get_page(links[0]), extract)
+            event = parse_page(links[0], get_page(links[0]), extract)
+            event['source'] = source
+            return event
     if host in ('mcard.itscard.co.kr', 'itscard.co.kr') and (card := itscard_record(source)):
         date, venue, address, families, photos = itscard_fields(card)
         cover = photos[0] if photos else cover
@@ -230,11 +230,11 @@ def parse_page(source, raw, extract=None):
             # The site's ornamental chrysanthemum icon alone is not a memorial flag.
             parents = []
             for role in ('Dad', 'Mom'):
-                field = name(role)
+                parent_name = name(role)
                 marker = tree.xpath('//*[@var=$key]/../*[normalize-space(text())="故" and not(@hidden) and not(contains(translate(@style," ",""),"display:none"))]',
                                     key=f'{side}{role}LastName')
-                if field:
-                    parents.append(('故 ' if marker else '') + field)
+                if parent_name:
+                    parents.append(('故 ' if marker else '') + parent_name)
             families.append(('·'.join(parents), get(side+'RelationName'), name('')))
     elif host == 'toourguest.com' and (record := to_our_guest(tree)):
         day = record['weddingDay']
@@ -253,12 +253,45 @@ def parse_page(source, raw, extract=None):
         address = place.get('address', '')
     else:
         date = description
+        for script in tree.xpath('//script[@type="application/ld+json"]/text()'):
+            try:
+                structured = json.loads(script)
+            except ValueError:
+                continue
+            entries = structured if isinstance(structured, list) else [structured]
+            entries = [child for entry in entries if isinstance(entry, dict)
+                       for child in (entry.get('@graph') or [entry])]
+            record = next((entry for entry in entries if isinstance(entry, dict)
+                           and 'Event' in str(entry.get('@type', '')) and entry.get('startDate')), None)
+            if not record:
+                continue
+            title = field(record, 'name', 80) or title
+            date = record['startDate']
+            place = record.get('location')
+            if isinstance(place, dict):
+                venue = field(place, 'name', 140)
+                address = place.get('address', '')
+                if isinstance(address, dict):
+                    address = ' '.join(filter(None, (field(address, key, 100) for key in
+                                                      ('addressRegion', 'addressLocality', 'streetAddress'))))
+                if not isinstance(address, str):
+                    address = ''
+            elif isinstance(place, str):
+                venue = place[:140]
+            media = record.get('image')
+            photos = [media] if isinstance(media, str) else media if isinstance(media, list) else []
+            photos = [item for item in photos if isinstance(item, str)]
+            break
 
     wedding = bool(families) or bool(re.search(r'결혼|웨딩|wedding', title, re.I))
     valid_families = len(families) == 2 and all(all(family) for family in families)
     when = parse_time(date, required=False)
     details = {}
-    if extract and (not when or not venue or (wedding and not valid_families) or host in ('happyceo.kr',)):
+    if extract and (not when or not venue or (wedding and not valid_families)):
+        if wedding and not families:
+            names = re.search(r'([가-힣 ]{2,30})\s*[♡♥❤&💍]+\s*([가-힣 ]{2,30})', title)
+            if names:
+                families = [('', '', name.strip().split('의 결혼')[0].split(' 결혼')[0]) for name in names.groups()]
         # Read only visible invitation text. Provider configuration can contain private data.
         for element in tree.xpath('//script|//style|//noscript|//*[@hidden]'):
             element.drop_tree()
@@ -316,9 +349,11 @@ def parse_source(source, extract):
     if source_url and not https_url(source_url):
         raise MissingInformation('초대장 주소를 확인해 주세요.')
     supplement = source.replace(urls[0], '', 1).strip() if urls else source
-    if source_url and urlsplit(source_url).hostname.removeprefix('www.') in HOSTS:
+    configured = set(filter(None, (host.strip().lower() for host in os.getenv('INVITATION_PUBLIC_HOSTS', '').split(','))))
+    hosts = HOSTS | configured
+    if source_url and urlsplit(source_url).hostname.removeprefix('www.') in hosts:
         try:
-            event = parse_page(source_url, get_page(source_url), lambda text: extract(text + '\n' + supplement))
+            event = parse_page(source_url, get_page(source_url, hosts=hosts), lambda text: extract(text + '\n' + supplement))
             if supplement:
                 fields = extract(supplement)
                 for key, size in (('address', 200), ('host_side', 8), ('note', 500)):
@@ -467,15 +502,10 @@ def find_links(product, root):
     if not shop or not token:
         raise ValueError('쇼핑몰 연결을 확인해야 해요. 관리자에게 알려주세요.')
     with PRODUCT_LOCK:
-        cached = PRODUCT_CACHE.get(product)
-        if cached and cached[0] > time.monotonic():
-            return cached[1]
         template = os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID', '').strip()
         if template and (not template.isascii() or not template.isdecimal()):
             raise ValueError('블로그페이 원본 상품 번호를 확인해 주세요.')
         links = BlogPay(shop, token).ensure_links(product, root, int(template) if template else None)
-        if set(links) == set(PRICES):
-            PRODUCT_CACHE[product] = (time.monotonic() + 300, links)
         return links
 
 

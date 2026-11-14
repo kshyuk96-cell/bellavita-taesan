@@ -913,8 +913,12 @@ def dispatch(body, defer_callback=None):
     if check:
         row = load_job(owner, check[1])
         if not row or row['state'] != 'done':
-            if row and json.loads(row['input']).get('kind') == 'route':
-                return kakao('아직 배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {check[1]}')])
+            if row:
+                kind = json.loads(row['input']).get('kind')
+                if kind == 'route':
+                    return kakao('아직 배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {check[1]}')])
+                if kind == 'invitation':
+                    return kakao('아직 초대장을 준비하고 있어요.', buttons=[('초대장 확인', f'결과 {check[1]}')])
             return kakao('해당 결과가 아직 없거나 처리 중이에요.')
         result = json.loads(row['result'])
         if check[2]:
@@ -972,6 +976,8 @@ def dispatch(body, defer_callback=None):
             return kakao('주문을 확인하고 있어요.', buttons=[('주문 확인', f'결과 {job}')])
         if kind == 'route':
             return kakao('배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {job}')])
+        if kind == 'invitation':
+            return kakao('초대장과 주문 주소를 준비하고 있어요.', buttons=[('초대장 확인', f'결과 {job}')])
         return kakao('답을 바로 보내기 어려워요. 잠시 뒤 다시 말씀해 주세요.')
     finally:
         if future.done():
