@@ -22,7 +22,7 @@ class LifecycleTests(unittest.TestCase):
     def row(self):
         with self.db() as c:return dict(c.execute("SELECT * FROM order_operations WHERE id='parent'").fetchone())
     def test_amend_same_id_then_save_updates_existing_row(self):
-        self.command('주문 수정 21380\n주소: 부산광역시 해운대구')
+        self.command('주문 수정 21380\n설치장소: 모의홀\n주소: 부산광역시 해운대구')
         row=self.row();self.assertEqual(row['state'],'update');self.assertEqual(row['order_number'],21380)
         writer=Mock(side_effect=lambda key,data,created,update:(21380,data))
         number,data=ops.save(self.db,'parent',Mock(side_effect=AssertionError('do not reparse')),writer)
@@ -34,7 +34,7 @@ class LifecycleTests(unittest.TestCase):
         with self.assertRaises(ValueError):ops.save(self.db,'parent',Mock(),Mock())
         with self.db() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM order_changes').fetchone()[0],1)
     def test_wrong_owner_cannot_change_or_copy(self):
-        for cmd in ('주문 취소 21380','주문 수정 21380\n주소: 다른주소','추가 주문 21380\n요청ID: abcd'):
+        for cmd in ('주문 취소 21380','주문 수정 21380\n설치장소: 다른홀\n주소: 다른주소','추가 주문 21380\n요청ID: abcd'):
             self.command(cmd,'other')
         self.assertEqual(self.row()['state'],'saved')
         with self.db() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM order_operations').fetchone()[0],1)
@@ -54,7 +54,7 @@ class LifecycleTests(unittest.TestCase):
             self.assertIsNotNone(self.command(cmd));self.assertEqual(self.row()['state'],'saved')
     def test_ordinary_order_unchanged(self):self.assertIsNone(self.command('주문 접수\n설치장소: 모의홀\n보내는분: 모의회사'))
     def test_cancel_pending_amendment_prevents_write(self):
-        self.command('주문 수정 21380\n주소: 다른주소');self.command('주문 취소 21380')
+        self.command('주문 수정 21380\n설치장소: 다른홀\n주소: 다른주소');self.command('주문 취소 21380')
         self.assertEqual(self.row()['state'],'cancel_requested')
     def test_cancelled_order_cannot_be_copied(self):
         self.command('주문 취소 21380');self.command('추가 주문 21380\n요청ID: request1')

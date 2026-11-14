@@ -6,6 +6,7 @@ from lxml import html
 
 import invitation
 from delivery_regions import delivery_alert
+import order_review_rules
 
 LINK = re.compile(r'https://[^\s<>"\[\]]+')
 REQUEST = re.compile(r'^(?:주문\s*(?:접수|등록|입력)|(?:카톡|화환)\s*주문)\s*[:：]?\s*')
@@ -128,7 +129,10 @@ def parse_fields(details):
 
 
 def extract(message):
+    if len(order_review_rules.split_orders(message))>1:
+        raise ValueError('여러 주문이 섞여 있어 각각 분리해 확인해 주세요.')
     preliminary,unlabelled_source=parse_fields(REQUEST.sub('',message))
+    if preliminary.get('sender'):order_review_rules.sender_text(preliminary['sender'])
     quantity=preliminary.get('quantity','')
     if quantity and not re.fullmatch(r'1\s*(?:개|건|점)?',quantity.strip()):
         raise ValueError('여러 개 또는 불명확한 수량은 주문을 나눠 확인해 주세요.')
@@ -154,7 +158,7 @@ def extract(message):
         result.update({key:fields.get(key,'') for key in ('event_type','venue','address','recipient')})
         if not (result['venue'] or result['address']):raise ValueError('청첩장·부고장 주소나 설치 장소를 적어주세요.')
     elif not result.get('address'):result['address']=fields.get('address','')
-    sender=fields.get('sender','')
+    sender=order_review_rules.sender_text(fields.get('sender',''))
     if not sender:
         # A separated final signature block is distinct from an invitation's host
         # greeting. Preserve a company line followed by a named role as one inscription.

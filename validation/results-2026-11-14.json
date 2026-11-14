@@ -152,7 +152,7 @@
     "health": "ok",
     "automatic_ledger_writes_enabled": false
   },
-  "publish_status": "Prepared for user-authorized feature-branch upload; no deployment or merge.",
+  "publish_status": "User-authorized code/test/aggregate-only review publication; repository public; no main merge or deployment.",
   "expanded_after_fixes": {
     "revision_scope": "local offline parser",
     "source_ledger_records": 3951,
@@ -210,106 +210,6 @@
       "needs_link_or_context": 12,
       "failed": 0
     },
-    "failure_samples_without_customer_text": [
-      {
-        "row": 108,
-        "style": "heading-block",
-        "event_type": "개업/이전",
-        "error": "AssertionError",
-        "fields": "recipient"
-      },
-      {
-        "row": 4844,
-        "style": "canonical",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      },
-      {
-        "row": 4844,
-        "style": "compact",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      },
-      {
-        "row": 4844,
-        "style": "wide-colon",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      },
-      {
-        "row": 4844,
-        "style": "heading-block",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      },
-      {
-        "row": 4844,
-        "style": "spoken-labels",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      },
-      {
-        "row": 4844,
-        "style": "reversed",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      },
-      {
-        "row": 4844,
-        "style": "crlf",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      },
-      {
-        "row": 4844,
-        "style": "nbsp",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      },
-      {
-        "row": 4844,
-        "style": "bullets",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      },
-      {
-        "row": 4844,
-        "style": "inline-colon",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      },
-      {
-        "row": 4844,
-        "style": "inline-spoken",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      },
-      {
-        "row": 4844,
-        "style": "greeting",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      },
-      {
-        "row": 4844,
-        "style": "spoken-joined",
-        "event_type": "근조",
-        "error": "AssertionError",
-        "fields": "venue"
-      }
-    ],
     "seconds": 2.753,
     "live_side_effects": false,
     "limitations": [
@@ -327,117 +227,8 @@
       "reference_time_checked": 10,
       "reference_time_matched": 10
     },
-    "cases_without_customer_text": [
-      {
-        "row": 2,
-        "parsed": true,
-        "sender_matched": true,
-        "event_type": "결혼",
-        "has_date": true,
-        "has_time": true,
-        "has_address": true
-      },
-      {
-        "row": 3,
-        "parsed": true,
-        "sender_matched": true,
-        "event_type": "결혼",
-        "has_date": true,
-        "has_time": true,
-        "has_address": true
-      },
-      {
-        "row": 4,
-        "parsed": true,
-        "sender_matched": true,
-        "event_type": "결혼",
-        "has_date": true,
-        "has_time": true,
-        "has_address": true
-      },
-      {
-        "row": 5,
-        "parsed": true,
-        "sender_matched": true,
-        "event_type": "결혼",
-        "has_date": true,
-        "has_time": true,
-        "has_address": true
-      },
-      {
-        "row": 6,
-        "parsed": true,
-        "sender_matched": true,
-        "event_type": "결혼",
-        "has_date": true,
-        "has_time": true,
-        "has_address": true
-      },
-      {
-        "row": 7,
-        "parsed": true,
-        "sender_matched": true,
-        "event_type": "근조",
-        "has_date": false,
-        "has_time": false,
-        "has_address": true
-      },
-      {
-        "row": 8,
-        "parsed": true,
-        "sender_matched": true,
-        "event_type": "결혼",
-        "has_date": true,
-        "has_time": true,
-        "has_address": true
-      },
-      {
-        "row": 9,
-        "parsed": true,
-        "sender_matched": true,
-        "event_type": "결혼",
-        "has_date": true,
-        "has_time": true,
-        "has_address": true
-      },
-      {
-        "row": 10,
-        "parsed": true,
-        "sender_matched": true,
-        "event_type": "결혼",
-        "has_date": true,
-        "has_time": true,
-        "has_address": true
-      },
-      {
-        "row": 11,
-        "parsed": true,
-        "sender_matched": true,
-        "event_type": "결혼",
-        "has_date": true,
-        "has_time": true,
-        "has_address": true
-      },
-      {
-        "row": 12,
-        "parsed": true,
-        "sender_matched": true,
-        "event_type": "결혼",
-        "has_date": true,
-        "has_time": true,
-        "has_address": true
-      },
-      {
-        "row": 13,
-        "parsed": true,
-        "sender_matched": true,
-        "event_type": "결혼",
-        "has_date": true,
-        "has_time": true,
-        "has_address": true
-      }
-    ],
     "invitation_metadata_stubbed": false,
     "network_disabled_during_replay": true
-  }
+  },
+  "unit_tests": 100
 }

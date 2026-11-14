@@ -2,6 +2,8 @@
 
 Base under test: PR #19 commit `a5349a95dd17d2d9a0eefdd060805fc7b02e70bd`. These changes are prepared on a separate branch; they are not a deployment.
 
+Current review bundles: [customer connection](CUSTOMER_CONNECTION.md), [lifecycle](ORDER_LIFECYCLE.md), [assistance](ORDER_ASSISTANCE.md), [rules and recovery](REVIEW_RULES_AND_RECOVERY.md). Read those scope notes before integration. GitHub metadata confirms this repository is public; only code, synthetic fixtures and aggregate reports are published.
+
 ## Evidence
 
 The test workbook supplied 3,951 sampled ledger records. Of those, 3,875 were funeral, wedding or general-event records with a location and sender. Five syntax forms produced **19,375 ledger-derived messages**. They are generated input variations, not 19,375 independently observed Kakao conversations.
@@ -21,7 +23,7 @@ The expanded suite uses **13 syntax variations per eligible record: 50,375 gener
 
 The user authorized external invitation reads. **12 recorded raw orders referencing 9 unique actual pages** now parse with sender text matching all 12 references. All **10 available reference wedding dates and times** match independently stored sheet values. Another wedding has no reference date/time, so those values are not independently verified. Funeral departure is never substituted for delivery time. Replay uses saved real HTML and the vendor's read-only wedding-view response, not fabricated invitation metadata. No customer page or payload is published.
 
-The earlier sender-only stub run (5 matched, 7 held) is retained as historical baseline in the JSON report; it is superseded by the real-page checks above. **36 unit tests** pass. No chat posting or sheet write was performed by this validation suite.
+The earlier sender-only stub run (5 matched, 7 held) is retained as historical baseline in the JSON report; it is superseded by the real-page checks above. **100 unit tests** pass. No chat posting or sheet write was performed by this validation suite.
 
 ## What changed
 

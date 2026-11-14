@@ -3,6 +3,7 @@ import datetime as dt
 import json,re
 from zoneinfo import ZoneInfo
 import order_intake
+import order_review_rules
 from delivery_regions import delivery_alert
 
 SEOUL=ZoneInfo('Asia/Seoul')
@@ -137,6 +138,10 @@ def command(db,owner,message):
         if not fields or any(line.strip() for line in unlabelled) or set(fields)-set(ops.EDIT):return '보완할 항목을 이름: 값 형식으로 적어주세요.'
         if any(not present(v) for v in fields.values()):return '보완할 실제 값을 확인해 주세요.'
         if action=='문구추가' and set(fields)!={'sender'}:return '문구추가는 보내는분 직함만 합칠 수 있어요. 다른 항목은 보완으로 적어주세요.'
+        try:
+            order_review_rules.check_location_change(details,fields)
+            if 'sender' in fields:fields['sender']=order_review_rules.sender_text(fields['sender'])
+        except ValueError as error:return str(error)
         after={**details,**fields}
         if action=='문구추가':after['sender']='\n'.join(dict.fromkeys(str(details.get('sender') or '').splitlines()+fields['sender'].splitlines()))
         if assess(after)['hold']:return '일정 확인이 필요해 저장을 보류했어요.\n'+question(after)

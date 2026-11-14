@@ -3,6 +3,7 @@ import datetime as dt
 import json,re,uuid
 import order_operations as ops
 import order_intake
+import order_review_rules
 
 COMMAND=re.compile(r'^(주문 수정|주문 취소|추가 주문) ([1-9][0-9]*)(?:\n([\s\S]+))?$')
 
@@ -42,6 +43,10 @@ def command(db,owner,message):
         if any(line.strip() for line in unlabelled) or not fields or set(fields)-set(ops.EDIT):
             return '수정할 항목만 이름: 값 형식으로 적어주세요. 예: 주소: 부산광역시 해운대구 …'
         if any(not value.strip() for value in fields.values()):return '비어 있는 수정값을 확인해 주세요.'
+        try:
+            order_review_rules.check_location_change(before,fields)
+            if 'sender' in fields:fields['sender']=order_review_rules.sender_text(fields['sender'])
+        except ValueError as error:return str(error)
         after={**before,**fields}
         try:
             if after.get('delivery_date'):dt.date.fromisoformat(after['delivery_date'])

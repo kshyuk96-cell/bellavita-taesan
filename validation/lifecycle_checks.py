@@ -17,8 +17,8 @@ def run():
         with db() as con:
             ops.stage(con,key,owner,'kakao','synthetic',details,ops.now())
             con.execute("UPDATE order_operations SET state='saved',order_number=? WHERE id=?",(number,key))
-        life.command(db,owner,f'주문 수정 {number}\n주소: 부산광역시 해운대구')
-        life.command(db,owner,f'주문 수정 {number}\n주소: 부산광역시 해운대구')
+        life.command(db,owner,f'주문 수정 {number}\n설치장소: 모의홀\n주소: 부산광역시 해운대구')
+        life.command(db,owner,f'주문 수정 {number}\n설치장소: 모의홀\n주소: 부산광역시 해운대구')
         assert c.execute('SELECT COUNT(*) FROM order_changes WHERE order_id=?',(key,)).fetchone()[0]==1
         counts['repeat_amendment_held']+=1
         def writer(marker,data,created,update):

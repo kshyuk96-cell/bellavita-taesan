@@ -33,6 +33,7 @@ import order_ledger
 import order_operations
 import order_lifecycle
 import order_assistance
+import order_review_rules
 import order_sms
 import staff_features
 
@@ -918,6 +919,12 @@ def dispatch(body, defer_callback=None):
     if message == '승인 대기' or re.fullmatch(
             r'(?:승인 검토|구조 변경 승인|구조 변경 반려) [a-f0-9]{12}', message):
         return approval_command(owner, message)
+    try:
+        split_preview = order_review_rules.preview(message)
+    except ValueError as error:
+        return kakao(str(error))
+    if split_preview is not None:
+        return kakao(split_preview)
     with ORDER_LOCK:
         assistance_reply = order_assistance.command(db, owner, message)
     if assistance_reply is not None:
