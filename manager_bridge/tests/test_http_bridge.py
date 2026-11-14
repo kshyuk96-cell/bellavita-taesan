@@ -10,6 +10,7 @@ from manager_bridge.store import Store
 from manager_bridge.session_dispatch import SessionTarget
 from manager_bridge.session_worker import SessionRunner
 from manager_bridge.worker import WorkerClient
+from manager_bridge.native_handoff import NativeHandoff
 
 
 class HttpBridgeTests(unittest.TestCase):
@@ -123,3 +124,25 @@ class HttpBridgeTests(unittest.TestCase):
         checks = {check['name']: check['passed'] for check in saved['report']['checks']}
         self.assertTrue(checks['session_message_queued'])
         self.assertFalse(checks['session_execution_verified'])
+
+    def test_native_receipts_reconcile_over_real_http_and_release_after_review(self):
+        task = self.submit()
+        approval = {'version': task['version'], 'digest': task['manifest_digest']}
+        self.post(self.owner, '/v1/tasks/'+task['id']+'/approve', approval)
+        root = Path(self.folder.name)
+        token_file = root / 'native-worker.token'
+        write_secret(token_file, self.worker)
+        client = WorkerClient(self.base, token_file, 'bellavita')
+        native = NativeHandoff(root/'native-state.sqlite3', client, '/root/fixture_worker')
+        self.assertEqual(native.begin()['task_id'], task['id'])
+        self.assertNotIn('lease_token', json.dumps(native.prepare_dispatch()))
+        native.dispatched('fixture-platform:reported-reference')
+        report = {'summary': 'fixture callback only', 'head_sha': self.manifest['base_sha'],
+                  'checks': [{'name': 'fixture-only', 'passed': True}]}
+        self.assertEqual(native.finish(report)['phase'], 'reported')
+        reopened = NativeHandoff(root/'native-state.sqlite3', client, '/root/fixture_worker')
+        self.assertEqual(reopened.reconcile()['phase'], 'reported')
+        review = self.post(self.manager, '/v1/tasks/'+task['id']+'/review',
+                           {**approval, 'evidence_reference': 'fixture-independent-review'})
+        self.assertTrue(review['ok'])
+        self.assertEqual(reopened.release_reviewed()['phase'], 'idle')
