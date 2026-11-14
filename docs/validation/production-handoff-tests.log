@@ -1,3 +1,9 @@
+test_long_delivery_notes_wrap_and_keep_the_full_text (test_delivery_export.DeliveryExportTests.test_long_delivery_notes_wrap_and_keep_the_full_text) ... ok
+test_event_time_does_not_fill_missing_delivery_time_in_report (test_delivery_order_fields.DeliveryOrderFieldTests.test_event_time_does_not_fill_missing_delivery_time_in_report) ... ok
+test_linked_order_uses_explicit_address_when_invitation_has_none (test_delivery_order_fields.DeliveryOrderFieldTests.test_linked_order_uses_explicit_address_when_invitation_has_none) ... ok
+test_spaced_shipping_labels_survive_ledger_validation (test_delivery_order_fields.DeliveryOrderFieldTests.test_spaced_shipping_labels_survive_ledger_validation) ... ok
+test_sunday_quick_reply_calculates_and_saves_sunday_report (test_delivery_routes.WeekendDeliveryTests.test_sunday_quick_reply_calculates_and_saves_sunday_report) ... ok
+test_weekend_uses_only_dates_that_have_not_passed (test_delivery_routes.WeekendDeliveryTests.test_weekend_uses_only_dates_that_have_not_passed) ... ok
 test_auth_payload_tampering_and_reference_validation (test_order_handoff.HandoffTest.test_auth_payload_tampering_and_reference_validation) ... ok
 test_cancel_after_ack_and_late_ready_cannot_release_hold (test_order_handoff.HandoffTest.test_cancel_after_ack_and_late_ready_cannot_release_hold) ... ok
 test_cancel_between_claim_and_ack_holds_local_production (test_order_handoff.HandoffTest.test_cancel_between_claim_and_ack_holds_local_production) ... ok
@@ -25,6 +31,9 @@ test_receipt_timeout_recovery_and_reconciliation (test_order_operations.OrderOpe
 test_sample_reflects_saved_text_and_private_signature (test_order_operations.OrderOperationsTest.test_sample_reflects_saved_text_and_private_signature) ... ok
 test_staff_delivery_link_is_scoped_and_origin_checked (test_order_operations.OrderOperationsTest.test_staff_delivery_link_is_scoped_and_origin_checked) ... ok
 test_two_receipt_workers_issue_once (test_order_operations.OrderOperationsTest.test_two_receipt_workers_issue_once) ... ok
+test_explicit_order_keeps_invitation_draft_open (test_order_routing.OrderRoutingTests.test_explicit_order_keeps_invitation_draft_open) ... ok
+test_partial_release_keeps_order_writes_and_sms_off_even_with_credentials (test_order_routing.OrderRoutingTests.test_partial_release_keeps_order_writes_and_sms_off_even_with_credentials) ... ok
+test_employee_can_reissue_only_their_own_report (test_report_reissue.ReportReissueTests.test_employee_can_reissue_only_their_own_report) ... ok
 test_actual_payapp_response_parsing_and_uncertain_failures (test_shop.ShopTest.test_actual_payapp_response_parsing_and_uncertain_failures) ... 초대장 결제 연결 실패: OSError
 초대장 결제 연결 실패: OSError
 초대장 결제 연결 실패: OSError
@@ -48,6 +57,6 @@ test_timeout_reconciliation_no_retry_and_signed_recovery (test_shop.ShopTest.tes
 ok
 
 ----------------------------------------------------------------------
-Ran 41 tests in 22.241s
+Ran 50 tests in 22.631s
 
 OK

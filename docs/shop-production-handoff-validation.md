@@ -1,6 +1,8 @@
 # 후속 제작·원장 연결 검증 · 2026-11-14 UTC
 
-검증 코드: `3bda54fb74e112c90114b805ae8e345be615bbb6`.
+최종 검증 코드: `6f6dec1e329cad417d7bfbffb190917d933ffcde`.
+후속 연결 초기 검증 코드는 `3bda54fb74e112c90114b805ae8e345be615bbb6`이며,
+작업 중 갱신된 main `b3a514387d1a086d6cdf9b38b1821010be924f3d`를 PR 브랜치에 통합했다.
 기존 PR #20 / `codex/shop-backend`에 추가했다. 사용자 계정 설정을 기다리는 대신
 테스트 설정과 독립 사본 환경으로 후속 연결·장애 복구까지 진행했다.
 실계정 설정이나 실제 발송·발급이 완료됐다고 간주한 결과는 기록하지 않았다.
@@ -18,7 +20,10 @@
 
 ## 테스트 결과
 
-기존 30개와 새 연결 시나리오 11개, 합계 **41개 테스트 통과**.
+기존 30개와 새 연결 시나리오 11개, 합계 41개를 통과한 뒤 최신 main의
+배송 보고서·직원 주문관리 검사도 통합해 **최종 50개 테스트가 통과**했다.
+운영 원장·기존 주문 문자 자동 실행 제한은 그대로 유지했다.
+쇼핑몰 결제는 초대장 원장 대기열에 중복 등록하지 않으며, 직원용 초대장 관리 목록에서도 분리했다.
 
 | 시나리오 | 결과 |
 | --- | --- |
@@ -36,17 +41,19 @@
 
 모바일 Chromium에서도 사진 검토 → HTTPS 수신 API → 원장·제작 대기열 접수 →
 결제 취소 후 공장 보류까지 통과했다. 최종 브라우저 주문번호는
-`82f77cc19c23f1dada1ecdd39fd58b6b`, JavaScript 오류는 0건이다.
+`0ebf9f05adf92626edf72abb9447977e`, JavaScript 오류는 0건이다.
 
 검증 커밋을 새 폴더에 추출하고 기존 데이터로 새 프로세스를 시작했다.
 재기동 전 접수 2건과 수신 확인 2건의 내용이 일치했고 SQLite 무결성 검사도 통과했다.
-새 프로세스에서 같은 브라우저 시나리오를 다시 수행했다.
+새 프로세스에서 같은 브라우저 시나리오를 다시 수행했다. 최신 main 통합 커밋에서도
+원래 접수 기록 2건이 그대로 유지됐고 쇼핑몰 주문의 기존 초대장 대기열 중복은 0건이었다.
 수신기 CLI는 원장 사본 2행·제작 보류 2행·잔액 0원을 확인하고, 백업 DB 무결성도 통과했다.
 
 기록:
 [통합 테스트](validation/production-handoff-tests.log),
 [브라우저 결과](validation/production-handoff-browser.json),
-[재기동 결과](validation/production-handoff-restart.json).
+[재기동 결과](validation/production-handoff-restart.json),
+[main 통합 결과](validation/production-handoff-main-integration.json).
 작업 공간의 `test-artifacts/handoff-admin-accepted.png`에 관리자 화면을,
 `test-artifacts/ledger-copy.csv`에 합성 테스트 원장 사본을 남겼다.
 
