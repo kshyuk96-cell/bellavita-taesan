@@ -15,6 +15,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
+from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlsplit
@@ -22,8 +23,15 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from zoneinfo import ZoneInfo
 
 import checkout
+import delivery_reports
+import delivery_routes
 import invitation
 import owner_alerts
+import order_intake
+import order_ledger
+import order_operations
+import order_sms
+import staff_features
 
 ROOT = Path(os.getenv('TAESAN_DATA', 'taesan-data')).resolve()
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -31,6 +39,9 @@ POOL = ThreadPoolExecutor(max_workers=3)
 ACTIVE = {}
 LOCK = threading.Lock()
 STOCK_LOCK = threading.Lock()
+ORDER_LOCK = threading.Lock()
+# This release keeps order intake local pending ledger validation on a sheet copy.
+ORDER_LEDGER_ENABLED = False
 SEOUL = ZoneInfo('Asia/Seoul')
 ACTIONS = ['answer', 'guide', 'clarify', 'today', 'stock', 'stock_write', 'scroll', 'revise', 'structure', 'development']
 PROMPT = """너는 벨라비타 내부 업무비서 강태산 대리다. 자연어를 이해하여 아래 허용된 행동을 고른다.
@@ -81,7 +92,10 @@ def db():
     connection.execute('''CREATE TABLE IF NOT EXISTS invitation_input (
         owner TEXT PRIMARY KEY, expires REAL NOT NULL, details TEXT NOT NULL)''')
     checkout.setup(connection)
+    delivery_routes.setup(connection)
     owner_alerts.setup(connection)
+    staff_features.setup(connection)
+    order_operations.setup(connection)
     return connection
 
 
@@ -218,12 +232,17 @@ def kakao(message, images=(), buttons=()):
     ]}}
 
 
-def menu():
+def menu(owner=None):
     base = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
     images = [(base + '/guide.png', '오늘 할 일, 센터 재고, 입고 등록, 맞춤 족자 안내')] if base else []
     message = '어떤 일을 도와드릴까요? 버튼을 누르거나 편하게 말씀해 주세요.'
-    return kakao(message, images=images,
-                 buttons=[(x, x) for x in ['초대장', '오늘 할 일', '재고 조회', '재고 입고', '맞춤 족자', '자유 문의']])
+    labels = ['초대장', '초대장 주문관리', '배송루트', '주문 접수', '오늘 할 일',
+              '재고 조회', '재고 입고', '맞춤 족자', '자유 문의']
+    if owner:
+        with db() as c:
+            if staff_features.enabled(c, owner):
+                labels.insert(2, '최근 배송보고서')
+    return kakao(message, images=images, buttons=[(label, label) for label in labels])
 
 
 def recent(owner):
@@ -272,6 +291,18 @@ def read_values(rng, render='UNFORMATTED_VALUE'):
         r = session.get(sheet_url(rng), params={'valueRenderOption': render}, timeout=15)
         r.raise_for_status()
         return r.json().get('values', [])
+
+
+def read_delivery_ranges(ranges):
+    with sheets_service() as session:
+        result = []
+        url = sheet_url('').removesuffix('/values/') + '/values:batchGet'
+        for start in range(0, len(ranges), 40):
+            response = session.get(url, params={'ranges': ranges[start:start + 40],
+                                               'valueRenderOption': 'UNFORMATTED_VALUE'}, timeout=12)
+            response.raise_for_status()
+            result.extend(item.get('values', []) for item in response.json()['valueRanges'])
+    return result
 
 
 def center_name(value, headers):
@@ -566,13 +597,93 @@ def run_invitation(message, owner):
     return {'summary': '초대장 두 개를 준비했어요.', 'invitations': result['items']}
 
 
+def write_order(marker, data, created, *, update=False):
+    if not ORDER_LEDGER_ENABLED:
+        raise RuntimeError('원장 자동 등록을 준비하고 있어요.')
+    spreadsheet = os.getenv('TAESAN_ORDER_SHEET_ID', '')
+    if not spreadsheet:
+        raise RuntimeError('원장 쓰기 연결이 필요해요.')
+    with sheets_service(True) as session:
+        return order_ledger.Ledger(session, spreadsheet).save(marker, data, created, update=update)
+
+
+def run_order(message, owner):
+    key, duplicate = order_operations.intake(db, owner, message)
+    if duplicate:
+        return {'summary': duplicate}
+    if not ORDER_LEDGER_ENABLED or not os.getenv('TAESAN_ORDER_SHEET_ID'):
+        return {'summary': '주문 내용을 보관했어요. 원장에는 아직 등록되지 않았어요.', 'order_status': True}
+    try:
+        with ORDER_LOCK:
+            number, data = order_operations.save(db, key, order_intake.extract, write_order, order_saved)
+    except Exception as error:
+        with db() as c:
+            order_operations.defer(c, key)
+        detail = str(error) if isinstance(error, ValueError) else '행사 정보나 시트 연결을 확인해 주세요.'
+        return {'summary': '주문을 보관했어요. 원장 등록은 확인이 필요해요.\n' + detail[:130], 'order_status': True}
+    return {'summary': '원장에 등록했어요.\n' + order_intake.report(number, data)}
+
+
+def order_saved(connection, row, number, details):
+    report = order_intake.report(number, details)
+    if row['kind'] == 'payapp':
+        link = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/') + '/staff-orders?order=' + row['id'].replace('-', '')
+        owner_alerts.enqueue(connection, 'payapp:'+row['id'], '새 초대장 주문\n' + report, link)
+    else:
+        owner_alerts.enqueue(connection, 'kakao-order:'+row['id'], report)
+
+
+def process_order_queue():
+    with ORDER_LOCK:
+        with db() as c:
+            row = c.execute("""SELECT o.* FROM order_operations o LEFT JOIN invitation_orders i ON i.id=replace(o.id,'-','')
+                               WHERE o.state IN ('pending','update') AND o.retry_after<=?
+                               AND (o.kind='kakao' OR i.state='paid') ORDER BY o.attempts,o.created LIMIT 1""",
+                            (time.time(),)).fetchone()
+        if not row:
+            return
+        try:
+            order_operations.save(db, row['id'], order_intake.extract, write_order, order_saved)
+        except Exception:
+            with db() as c:
+                order_operations.defer(c, row['id'])
+
+
+def start_order_queue():
+    if not ORDER_LEDGER_ENABLED:
+        return
+
+    def loop():
+        while True:
+            try:
+                if os.getenv('TAESAN_ORDER_SHEET_ID'):
+                    process_order_queue()
+                    order_sms.send_pending(db, os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'))
+            except Exception as error:
+                print('주문 대기열 확인 실패:', type(error).__name__, file=sys.stderr, flush=True)
+            time.sleep(3)
+    threading.Thread(target=loop, daemon=True).start()
+
+
 def run_job(job, message, owner, kind=''):
     try:
-        result = run_invitation(message, owner) if kind == 'invitation' else handle(message, recent(owner), owner)
+        if kind == 'route':
+            result = delivery_routes.run(message, owner, db, read_delivery_ranges, datetime.now(SEOUL))
+        elif kind == 'invitation':
+            result = run_invitation(message, owner)
+        elif kind == 'order':
+            result = run_order(message, owner)
+        else:
+            result = handle(message, recent(owner), owner)
     except ValueError as error:
         result = {'summary': str(error)[:300]}
     except Exception as error:
-        if getattr(error, 'code', None) == 'credit_balance_exhausted':
+        if kind == 'route':
+            print('배송루트 계산 실패:', type(error).__name__, file=sys.stderr, flush=True)
+            result = {'summary': '배송루트 자료를 확인하지 못했어요. 잠시 뒤 “다시 계산”이라고 말씀해 주세요.'}
+        elif kind == 'order':
+            result = {'summary': '원장 등록을 확인하지 못했어요. 주문 내용을 보관하고 다시 확인할게요.'}
+        elif getattr(error, 'code', None) == 'credit_balance_exhausted':
             result = {'summary': 'AI 이용 잔액이 부족해 이 요청을 해석하지 못했어요. 메뉴의 오늘 할 일과 재고 조회는 이용할 수 있어요.'}
         else:
             result = {'summary': '처리 결과를 확인하지 못했어요. 입고 요청이었다면 시트에서 반영 여부를 먼저 확인해 주세요.'}
@@ -597,13 +708,44 @@ def signed_url(job, number, label):
     return f'{base}/file/{payload}/{sig}'
 
 
-def present(job, result):
+def present(job, result, owner=None):
+    if 'route_buttons' in result:
+        pages = result.get('route_pages', [result['summary']])
+        index = result.get('selected', 1) - 1
+        if not 0 <= index < len(pages):
+            return kakao('이 배정안에는 해당 쪽이 없어요.')
+        buttons = [(label, label) for label in result['route_buttons']]
+        if index > 0:
+            buttons.append(('이전 쪽', f'결과 {job} {index}'))
+        if index + 1 < min(len(pages), 99):
+            buttons.append(('다음 쪽', f'결과 {job} {index + 2}'))
+        base = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
+        secret = os.getenv('TAESAN_WEBHOOK_SECRET', '')
+        days = result.get('route_report')
+        if not (days and invitation.https_url(base) and secret):
+            return kakao(pages[index], buttons=buttons)
+        if index == 0 and not result.get('selected'):
+            buttons.append(('배정 자세히 보기', f'결과 {job} 1'))
+        if index == 0 and not result.get('selected'):
+            image = delivery_reports.url(base, secret, job, 'summary.png')
+            answer = kakao('구로센터 배송루트 배정안을 준비했어요.',
+                           images=[(image, '날짜별 배정과 미배정 요약')], buttons=buttons)
+        else:
+            answer = kakao(pages[index], buttons=buttons)
+        answer['template']['outputs'].append({'textCard': {
+            'title': '배송원별 일정', 'description': '한 시간 뒤에는 카톡에 “최근 배송보고서”라고 보내 새 주소를 받으세요.',
+            'buttons': [{'label': '엑셀 내려받기', 'action': 'webLink',
+                         'webLinkUrl': delivery_reports.url(base, secret, job, 'delivery.xlsx')}],
+        }})
+        return answer
     if result.get('invitations'):
         return {'version': '2.0', 'template': {'outputs': [
             {'simpleText': {'text': item['message']}} for item in result['invitations']
         ]}}
     if result.get('guide'):
-        return menu()
+        return menu(owner)
+    if result.get('order_status'):
+        return kakao(result['summary'], buttons=[('주문 접수 상태', '주문 접수 상태')])
     outputs = result.get('outputs') or {}
     selected = result.get('selected')
     if selected:
@@ -635,9 +777,9 @@ def callback_url(user_request):
     return None
 
 
-def send_callback(url, job, future):
+def send_callback(url, job, future, owner):
     try:
-        answer = present(job, future.result())
+        answer = present(job, future.result(), owner)
     except Exception:
         answer = kakao('답을 준비하지 못했어요. 잠시 뒤 다시 말씀해 주세요.')
     request = Request(url, data=json_text(answer).encode(), headers={'Content-Type': 'application/json'})
@@ -679,7 +821,65 @@ def dispatch(body, defer_callback=None):
         return access_command(owner, message)
     if not message or message in ('메뉴', '시작', '처음으로',
                                   '네가 도와줄 수 있는 업무를 알려줘', '할 수 있는 일 소개해줘'):
-        return menu()
+        return menu(owner)
+    change = staff_features.requested_change(message)
+    if change is not None:
+        with db() as c:
+            staff_features.update(c, owner, change)
+        if change:
+            return kakao('내 메뉴에 최근 배송보고서 버튼을 추가했어요.',
+                         buttons=[('최근 배송보고서', '최근 배송보고서'), ('메뉴', '메뉴')])
+        return kakao('내 메뉴에서 최근 배송보고서 버튼을 뺐어요.', buttons=[('메뉴', '메뉴')])
+    if staff_features.REPORT_REQUEST.fullmatch(message):
+        with db() as c:
+            row = c.execute("""SELECT id,result FROM jobs WHERE owner=? AND state='done'
+                               AND json_type(result,'$.route_report')='object'
+                               ORDER BY created DESC LIMIT 1""", (owner,)).fetchone()
+        if row:
+            return present(row['id'], json.loads(row['result']), owner)
+        return kakao('아직 만든 배송보고서가 없어요.', buttons=[('배송루트', '배송루트')])
+    if order_intake.REQUEST.fullmatch(message):
+        return kakao(
+            '주문 접수라고 쓰고 같은 메시지에 주문 내용을 적어 주세요.\n'
+            '청첩장이나 부고장이 있으면 링크와 보내는 분을 함께 보내 주세요.\n'
+            '링크가 없으면 아래처럼 보내 주세요.\n\n'
+            '주문 접수\n설치장소: 예식장 이름과 주소\n보내는 분: 이름 또는 업체명',
+            buttons=[('주문 접수 상태', '주문 접수 상태'), ('메뉴', '메뉴')],
+        )
+    if re.fullmatch(r'(?:내\s*)?(?:최근\s*)?주문\s*(?:접수\s*상태|등록\s*상태)(?:\s*(?:확인|알려|보여)\s*(?:해\s*)?(?:줘|주세요)?)?[.!?]?', message):
+        with db() as c:
+            order = order_operations.latest_intake(c, owner)
+        if not order:
+            return kakao('아직 직접 접수한 카톡 주문이 없어요.')
+        if order['state'] == 'saved':
+            return kakao(f'최근 카톡 주문을 원장에 등록했어요. 주문번호는 {order["order_number"]}번이에요.')
+        return kakao('최근 카톡 주문은 접수됐어요. 원장 등록은 아직 확인되지 않았어요.')
+    if message == '초대장 주문관리':
+        base = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
+        if not invitation.https_url(base):
+            return kakao('초대장 주문관리 주소를 준비하고 있어요.')
+        with db() as c:
+            path = order_operations.issue_web(c, owner)
+        return {'version': '2.0', 'template': {'outputs': [{'textCard': {
+            'title': '초대장 주문관리', 'description': '직원 로그인 주소는 5분 동안 한 번 열 수 있어요.',
+            'buttons': [{'label': '주문관리 열기', 'action': 'webLink', 'webLinkUrl': base + path}],
+        }}]}}
+    notify = re.fullmatch(r'직원\s*알림\s*설정\s+([a-f0-9]{8})\s+(구로|수원)\s+(01[016789][0-9]{7,8})', message)
+    if notify:
+        if role_of(owner) != 'admin':
+            return kakao('대표 계정에서만 직원 알림을 설정할 수 있어요.')
+        try:
+            with db() as c:
+                staff = c.execute("""SELECT a.owner FROM access_requests a JOIN staff s ON s.owner=a.owner
+                                   WHERE a.id=? AND a.decision='승인'""", (notify[1],)).fetchone()
+                if not staff:
+                    return kakao('승인된 직원의 신청번호를 확인해 주세요.')
+                c.execute("""INSERT INTO order_staff_notify VALUES (?,?,?)
+                             ON CONFLICT(owner) DO UPDATE SET center=excluded.center,phone=excluded.phone""",
+                          (staff['owner'], notify[2], notify[3]))
+        except sqlite3.IntegrityError:
+            return kakao('이미 다른 직원에게 등록된 전화번호예요.')
+        return kakao(f'{notify[2]} 직원으로 알림 설정을 저장했어요.')
     if message == '초대장':
         with db() as c:
             c.execute('INSERT OR REPLACE INTO invitation_input VALUES (?,?,?)', (owner, time.time()+1800, ''))
@@ -708,30 +908,41 @@ def dispatch(body, defer_callback=None):
     if check:
         row = load_job(owner, check[1])
         if not row or row['state'] != 'done':
+            if row and json.loads(row['input']).get('kind') == 'route':
+                return kakao('아직 배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {check[1]}')])
             return kakao('해당 결과가 아직 없거나 처리 중이에요.')
         result = json.loads(row['result'])
         if check[2]:
             result['selected'] = int(check[2])
-        return present(check[1], result)
+        return present(check[1], result, owner)
     if message == '승인 대기' or re.fullmatch(
             r'(?:승인 검토|구조 변경 승인|구조 변경 반려) [a-f0-9]{12}', message):
         return approval_command(owner, message)
     with LOCK, db() as c:
         pending = c.execute('SELECT details FROM invitation_input WHERE owner=? AND expires>?',
                             (owner, time.time())).fetchone()
-        kind = 'invitation' if pending else ''
-        if pending and pending['details'] and not message.startswith(('https://', 'http://')):
+        route_context = delivery_routes.session(db, owner)
+        if order_intake.wants_order(message, explicit_only=True):
+            kind = 'order'
+        elif delivery_routes.wants_route(message, route_context):
+            kind = 'route'
+        elif pending:
+            kind = 'invitation'
+        else:
+            kind = 'order' if order_intake.wants_order(message) else ''
+        if kind == 'invitation' and pending['details'] and not message.startswith(('https://', 'http://')):
             message = (pending['details'] + '\n' + message)[-6000:]
-        fingerprint_input = 'invitation\0' + message if kind else message
+        fingerprint_input = kind + '\0' + message if kind else message
         fingerprint = hashlib.sha256(fingerprint_input.encode()).hexdigest()
         for old in [key for key, future in ACTIVE.items() if future.done()]:
             ACTIVE.pop(old, None)
-        row = c.execute('SELECT * FROM jobs WHERE owner=? AND fingerprint=? AND created>? ORDER BY created DESC LIMIT 1',
-                        (owner, fingerprint, time.time()-180)).fetchone()
+        row = None if kind == 'route' else c.execute(
+            'SELECT * FROM jobs WHERE owner=? AND fingerprint=? AND created>? ORDER BY created DESC LIMIT 1',
+            (owner, fingerprint, time.time()-180)).fetchone()
         if row:
             job = row['id']
             if row['state'] == 'done':
-                return present(job, json.loads(row['result']))
+                return present(job, json.loads(row['result']), owner)
             if job not in ACTIVE:
                 return kakao(f'{job}은 처리 여부 확인이 필요해요. 중복 입력을 막기 위해 자동 재실행하지 않습니다.')
             future = ACTIVE[job]
@@ -750,14 +961,18 @@ def dispatch(body, defer_callback=None):
     except TimeoutError:
         url = callback_url(user_request)
         if url and defer_callback:
-            defer_callback(url, job, future)
+            defer_callback(url, job, future, owner)
             return {'version': '2.0', 'useCallback': True}
+        if kind == 'order':
+            return kakao('주문을 확인하고 있어요.', buttons=[('주문 확인', f'결과 {job}')])
+        if kind == 'route':
+            return kakao('배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {job}')])
         return kakao('답을 바로 보내기 어려워요. 잠시 뒤 다시 말씀해 주세요.')
     finally:
         if future.done():
             with LOCK:
                 ACTIVE.pop(job, None)
-    return present(job, result)
+    return present(job, result, owner)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -771,8 +986,40 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def staff_web_owner(self):
+        try:
+            cookie = SimpleCookie(self.headers.get('Cookie', ''))
+        except CookieError:
+            return None
+        token = cookie.get('taesan_orders')
+        with db() as c:
+            owner = order_operations.web_owner(c, token.value if token else None)
+        return owner if owner and role_of(owner) else None
+
+    def staff_order_response(self):
+        return self.order_message('카톡에서 “초대장 주문관리”를 열어 직원 로그인을 해 주세요.', 401)
+
     def do_POST(self):
         path = urlsplit(self.path).path
+        if path == '/staff-orders':
+            owner = self.staff_web_owner()
+            if not owner or self.headers.get('Origin') != os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'):
+                return self.staff_order_response()
+            order = parse_qs(urlsplit(self.path).query).get('order', [''])[0]
+            if not re.fullmatch(r'[a-f0-9]{32}', order):
+                return self.order_message('주문을 다시 열어 주세요.', 400)
+            try:
+                fields = self.read_order_form()
+                with ORDER_LOCK, db() as c:
+                    if not order_operations.edit(c, order, owner, fields):
+                        return self.order_message('주문 내용을 다시 확인해 주세요.', 409)
+            except (ValueError, UnicodeError):
+                return self.order_message('주문 내용을 다시 확인해 주세요.', 400)
+            self.send_response(303)
+            self.send_header('Location', '/staff-orders?order=' + order)
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            return
         if path == '/checkout-sender':
             if self.headers.get('Origin') != os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'):
                 return self.send_json({'error': '주문서를 다시 열어 주세요.'}, 403)
@@ -845,10 +1092,10 @@ class Handler(BaseHTTPRequestHandler):
                              lambda *args: callbacks.append(args))
             self.send_json(reply)
             self.wfile.flush()
-            for url, job, future in callbacks:
+            for url, job, future, owner in callbacks:
                 future.add_done_callback(
-                    lambda done, url=url, job=job: threading.Thread(
-                        target=send_callback, args=(url, job, done), daemon=True).start()
+                    lambda done, url=url, job=job, owner=owner: threading.Thread(
+                        target=send_callback, args=(url, job, done, owner), daemon=True).start()
                 )
         except (ValueError, KeyError, AttributeError, TypeError):
             self.send_json({'error': 'invalid request'}, 400)
@@ -911,8 +1158,62 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Referrer-Policy', 'no-referrer')
         self.end_headers()
 
+    def send_route_report(self, path, job, filename):
+        if not delivery_reports.authorized(path, os.getenv('TAESAN_WEBHOOK_SECRET', '')):
+            return self.send_json({'error': '이 주소를 열 수 없어요. 카톡에 “최근 배송보고서”라고 보내 새 주소를 받으세요.'}, 403)
+        with db() as c:
+            row = c.execute("SELECT owner,result FROM jobs WHERE id=? AND state='done'", (job,)).fetchone()
+        days = json.loads(row['result']).get('route_report') if row and role_of(row['owner']) else None
+        if not days:
+            return self.send_json({'error': '배송루트 보고서를 찾지 못했어요.'}, 404)
+        try:
+            if filename == 'summary.png':
+                data = delivery_reports.image(days)
+                content_type = 'image/png'
+            else:
+                data = delivery_reports.excel(days)
+                content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        except Exception as error:
+            print('배송루트 보고서 생성 실패:', type(error).__name__, file=sys.stderr, flush=True)
+            return self.send_json({'error': '보고서를 만들지 못했어요.'}, 500)
+        self.send_response(200)
+        self.send_header('Content-Type', content_type)
+        self.send_header('Cache-Control', 'private, no-store')
+        self.send_header('Referrer-Policy', 'no-referrer')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('X-Robots-Tag', 'noindex, nofollow')
+        if filename == 'delivery.xlsx':
+            korean_name = quote(f'구로센터-배송루트-{next(iter(days))}.xlsx')
+            self.send_header('Content-Disposition', f"attachment; filename=delivery-routes.xlsx; filename*=UTF-8''{korean_name}")
+        self.send_header('Content-Length', str(len(data)))
+        self.end_headers()
+        return self.wfile.write(data)
+
     def do_GET(self):
         path = urlsplit(self.path).path
+        login = re.fullmatch(r'/staff-orders/login/([a-zA-Z0-9_-]{32})', path)
+        if login:
+            with db() as c:
+                token = order_operations.login(c, login[1])
+            if not token:
+                return self.staff_order_response()
+            self.send_response(303)
+            self.send_header('Location', '/staff-orders')
+            self.send_header('Set-Cookie', f'taesan_orders={token}; Path=/staff-orders; Max-Age=14400; Secure; HttpOnly; SameSite=Strict')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Referrer-Policy', 'no-referrer')
+            self.end_headers()
+            return
+        if path == '/staff-orders':
+            if not self.staff_web_owner():
+                return self.staff_order_response()
+            selected = parse_qs(urlsplit(self.path).query).get('order', [''])[0]
+            with db() as c:
+                orders = order_operations.list_orders(c, selected)
+            return self.send_order_html(order_operations.page(orders, selected), referrer_policy='same-origin')
+        report = delivery_reports.LINK.fullmatch(path)
+        if report:
+            return self.send_route_report(path, report[1], report[2])
         if path.startswith('/checkout-art/') and (filename := path.removeprefix('/checkout-art/')) in checkout.ARTWORK_FILES:
             data = (checkout.ARTWORK / filename).read_bytes()
             self.send_response(200)
@@ -1038,5 +1339,6 @@ if __name__ == '__main__':
     if len(os.getenv('TAESAN_WEBHOOK_SECRET', '')) < 32:
         raise SystemExit('TAESAN_WEBHOOK_SECRET에 32자 이상의 임의 문자열이 필요합니다.')
     owner_alerts.start(db)
+    start_order_queue()
     ThreadingHTTPServer((os.getenv('TAESAN_BIND', '127.0.0.1'), int(os.getenv('PORT', '8080'))),
                         Handler).serve_forever()
