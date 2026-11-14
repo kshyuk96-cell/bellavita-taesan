@@ -139,5 +139,18 @@
     "scope": "sender text only; unsupported vendor detection retained"
   },
   "privacy": "No customer text, names, addresses, contacts, or invitation URLs are included in this report.",
-  "external_pages": "Not fetched: automatic approval review blocked external requests to customer-specific invitation URLs; user decision is pending."
+  "external_pages": "Not fetched: automatic approval review blocked external requests to customer-specific invitation URLs; user decision is pending.",
+  "event_time_alignment": {
+    "reference_pr": 21,
+    "reference_commit": "b43c6d484f093e3e4c0b9768dc7cf1ad540fb873",
+    "event_column": "C",
+    "shipping_time_location": "notes",
+    "staff_updates_preserve_event_time": true
+  },
+  "deployment_recheck": {
+    "live_commit": "b3a514387d1a086d6cdf9b38b1821010be924f3d",
+    "health": "ok",
+    "automatic_ledger_writes_enabled": false
+  },
+  "publish_status": "local only: automatic approval review rejected external branch upload; user decision pending"
 }

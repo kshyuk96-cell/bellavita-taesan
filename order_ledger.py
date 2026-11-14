@@ -8,7 +8,7 @@ from delivery_regions import delivery_alert
 
 EPOCH = date(1899, 12, 30)
 HEADER = ['주문일시', '배송일', '행사시간', '작품', '액자 사이즈(호수)', '설치장소', '행사 구분', '주문 채널', '배송 채널', '비고', '받는분']
-FIELDS = {0: 'created', 1: 'delivery_date', 2: 'delivery_time', 3: 'artwork', 4: 'size', 5: 'location', 6: 'event_type',
+FIELDS = {0: 'created', 1: 'delivery_date', 2: 'event_time', 3: 'artwork', 4: 'size', 5: 'location', 6: 'event_type',
           8: 'channel', 9: 'notes', 10: 'recipient', 11: 'photo_phone', 15: 'sender', 17: 'message', 19: 'source', 28: 'uuid'}
 
 
@@ -52,11 +52,15 @@ def details_for_sheet(details, cells, mapping):
                ('artwork', '작품'), ('size', '규격'), ('channel', '배송채널'), ('location', '설치장소'),
                ('recipient', '받는 분'), ('event_type', '행사 구분')) if not data.get(key)]
     event = ' '.join(filter(None, (data['event_date'], data['event_time'])))
+    delivery_time = data['delivery_time']
     data['notes'] = ' / '.join(filter(None, (data.get('note'), f'행사 {event}' if event else '',
+                                           f'배송시각 {delivery_time}' if delivery_time else '',
                                            '·'.join(missing) + ' 확인 필요' if missing else '')))
-    alert=delivery_alert(data['location'])
-    data['delivery_region']=alert['region'];data['regional_alert']=alert['message']
-    if alert['message']:data['notes']=' / '.join(filter(None,(data['notes'],alert['message'])))
+    alert = delivery_alert(data['location'])
+    data['delivery_region'] = alert['region']
+    data['regional_alert'] = alert['message']
+    if alert['message']:
+        data['notes'] = ' / '.join(filter(None, (data['notes'], alert['message'])))
     return data
 
 
@@ -112,14 +116,16 @@ class Ledger:
         fields = FIELDS.items() if not existing or update else ()
         requests = []
         for column, key in fields:
-            if update and column in (0, 28):
+            if update and column in (0, 2, 28):  # Staff edits do not include the event time.
+                continue
+            value = data.get(key)
+            if key == 'event_time' and not value:
                 continue
             if cells[column].get('userEnteredValue', {}).get('formulaValue'):
                 raise ValueError('원장 수식이 있는 칸을 확인해 주세요.')
-            value = data.get(key)
             if value and key == 'delivery_date':
                 value = (date.fromisoformat(value) - EPOCH).days
-            if value and key == 'delivery_time':
+            if value and key == 'event_time':
                 hour, minute = map(int, value.split(':'))
                 value = (hour * 60 + minute) / 1440
             entered = ({'numberValue': value} if type(value) in (int, float) else {'stringValue': str(value)}) if value is not None and value != '' else {}

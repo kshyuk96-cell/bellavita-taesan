@@ -27,7 +27,7 @@ Only **12 recorded raw Kakao messages** were available. A sender-only check with
 - Do not interpret a URL printed in an inscription/message/address as an event invitation.
 - Ignore standalone greetings when selecting an unlabeled sender.
 - Add a regional delivery notice to order reports and ledger notes.
-- Do not write an event time into the delivery-time column when delivery time is missing.
+- Align with PR #21: column C is event time, never shipping time. Keep separately provided shipping time in notes and preserve event time during staff edits.
 
 Regional alert scope defaults to **outside Seoul/Gyeonggi/Incheon**, pending the user's clarification. `TAESAN_REGIONAL_SCOPE=outside_gyeonggi` narrows the exempt area to Gyeonggi only. The code reads location fields, not sender/customer names. Ambiguous `광주시`, `고성군`, venue names without addresses, and conflicting regions stay unknown. The notice requests delivery/installation/fee review; it never adds a fee or assigns a driver.
 
@@ -43,3 +43,9 @@ python validation/raw_sender_checks.py /path/to/private/source-orders.json /tmp/
 The private input file must stay outside the repository. No customer raw text, names, addresses, phone numbers or invitation URLs are committed. Aggregate results are in `results-2026-11-14.json`.
 
 This suite does not establish that arbitrary Kakao language is fully supported. Add genuinely observed, human-labeled failures separately from generated variations. Deployment, source-customer binding, invitation vendor support, UI capture and target-chat delivery still require integration validation in the test workbook and planning room.
+
+## Deployment recheck
+
+The 09:20 Asia/Seoul recheck found Render deploy `dep-dbrqg26q1p3s73e3lgmg` live at commit `b3a514387d1a086d6cdf9b38b1821010be924f3d`, finished 09:16:11. The public health endpoint returned `{"status":"ok"}`. This is a partial deployment with automatic ledger writes disabled. PR #19 remained open. PR #21 (`b43c6d484f093e3e4c0b9768dc7cf1ad540fb873`) separately corrects event/shipping time; its verified ledger changes were incorporated locally with the regional notice. No remote merge or deployment was performed here.
+
+Branch upload was rejected by automatic approval review because external-repository upload authorization/trust was not confirmed. A user decision was requested. The local commits and review patch are retained; no workaround upload was attempted.
