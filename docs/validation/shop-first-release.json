@@ -266,5 +266,41 @@
     "actual_messages": false,
     "actual_receipts": false,
     "production_changed": false
+  },
+  "live_integration_protocol_review": {
+    "checked_on_kst": "2026-11-14",
+    "reference": "https://www.payapp.kr/dev_center/dev_center01.html",
+    "callback_fields_compared": [
+      "hash",
+      "responsedate",
+      "pay_state",
+      "orig_mul_no",
+      "orig_price",
+      "mul_no",
+      "price"
+    ],
+    "callback_states_compared": [
+      "1",
+      "4",
+      "8",
+      "32",
+      "9",
+      "64",
+      "10",
+      "70",
+      "71"
+    ],
+    "response_compared": "SUCCESS",
+    "evidence_scope": "official documentation versus implementation and existing regression cases; no new provider executions",
+    "runbook": "docs/shop-live-verification-runbook.md",
+    "runtime_changes": false,
+    "new_tests_run": false,
+    "remaining_access": [
+      "merchant API settings and test method",
+      "SOLAPI account and approved template",
+      "actual production TAESAN_DATA",
+      "actual product tax classification"
+    ],
+    "real_provider_executions": 0
   }
 }
