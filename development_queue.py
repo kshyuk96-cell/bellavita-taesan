@@ -39,6 +39,7 @@ def setup(c):
         completed REAL, result TEXT)''')
     c.execute('CREATE TABLE IF NOT EXISTS development_focus (owner TEXT PRIMARY KEY, job TEXT NOT NULL)')
     c.execute('CREATE TABLE IF NOT EXISTS development_signatures (nonce TEXT PRIMARY KEY, expires INTEGER NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS development_releases (job TEXT PRIMARY KEY, revision TEXT NOT NULL, recorded REAL NOT NULL)')
 
 
 def enqueue(c, job, detail):
@@ -71,12 +72,15 @@ def read(c):
 
 
 def latest_status(c, owner):
-    row = c.execute('''SELECT w.job, w.completed FROM jobs j
+    row = c.execute('''SELECT w.job, w.completed, r.revision FROM jobs j
                        LEFT JOIN development_work w ON w.job=j.id
+                       LEFT JOIN development_releases r ON r.job=w.job
                        WHERE j.owner=? AND j.state='done' AND json_extract(j.result,'$.development')=1
                        ORDER BY j.created DESC LIMIT 1''', (owner,)).fetchone()
     if not row:
         return '최근에 접수한 개발 요청이 없어요.'
+    if row['revision']:
+        return '최근 개발 요청은 운영에 반영됐어요.'
     if row['completed'] is not None:
         return '최근 개발 요청은 검증을 마쳤어요. 운영 반영 상태는 별도로 확인해 주세요.'
     if row['job']:
@@ -91,3 +95,12 @@ def complete(c, job, result):
     return bool(c.execute('''UPDATE development_work SET completed=COALESCE(completed,?),result=?
                              WHERE job=? AND (completed IS NULL OR result=?)''',
                           (time.time(), result, job, result)).rowcount)
+
+
+def record_release(c, job, revision):
+    if not re.fullmatch(r'[a-f0-9]{12}', job) or not re.fullmatch(r'[a-f0-9]{40}', revision):
+        return False
+    return bool(c.execute('''INSERT INTO development_releases
+                             SELECT job,?,? FROM development_work WHERE job=? AND completed IS NOT NULL
+                             ON CONFLICT(job) DO UPDATE SET revision=excluded.revision,recorded=excluded.recorded''',
+                          (revision, time.time(), job)).rowcount)

@@ -37,6 +37,8 @@ import order_ledger
 import order_operations
 import order_sms
 import staff_features
+import staff_delivery
+import staff_photo
 
 ROOT = Path(os.getenv('TAESAN_DATA', 'taesan-data')).resolve()
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -311,12 +313,18 @@ def menu(owner=None):
 
 def recent(owner):
     with db() as c:
-        rows = c.execute("""SELECT id,input,result FROM jobs WHERE owner=? AND state='done'
+        rows = c.execute("""SELECT id,input,result,created FROM jobs WHERE owner=? AND state='done'
                              AND COALESCE(json_extract(input,'$.kind'),'') != 'invitation'
                              ORDER BY created DESC LIMIT 5""",
                          (owner,)).fetchall()
-    return [{'id': r['id'], 'input': json.loads(r['input']), 'result': json.loads(r['result'])}
+    return [{'id': r['id'], 'input': json.loads(r['input']), 'result': json.loads(r['result']), 'created': r['created']}
             for r in rows]
+
+
+def current_read_query(history):
+    if history and history[0].get('created', 0) >= time.time() - 900:
+        return history[0]['result'].get('read_query')
+    return None
 
 
 def choose(message, history):
@@ -440,7 +448,7 @@ def delivery_count(offset, center, metric):
     except Exception as error:
         print('배송 건수 조회 실패:', type(error).__name__, file=sys.stderr, flush=True)
         summary = '배송 건수를 읽지 못했어요. 아래 버튼으로 다시 확인해 주세요.'
-    return {'summary': summary, 'delivery_count': True}
+    return {'summary': summary, 'delivery_count': True, 'read_query': ['delivery_count', offset, center, metric]}
 
 
 def venue_rank(offset, center):
@@ -453,7 +461,7 @@ def venue_rank(offset, center):
     except Exception as error:
         print('설치장소별 주문 조회 실패:', type(error).__name__, file=sys.stderr, flush=True)
         summary = '설치장소별 주문을 읽지 못했어요. 잠시 뒤 다시 물어봐 주세요.'
-    return {'summary': summary}
+    return {'summary': summary, 'read_query': ['venue_rank', offset, center, None]}
 
 
 def inventory_rows(action, original, headers):
@@ -581,15 +589,70 @@ def scroll(action, history):
             'items': items, 'outputs': outputs, 'selected': index}
 
 
+def delivery_report(offset, center):
+    day = datetime.now(SEOUL).date() + timedelta(days=offset)
+    rows = staff_delivery.rows_for(day, center, read_staff_delivery)
+    pending = sum(row['checked'] is False for row in rows)
+    done = sum(row['checked'] is True for row in rows)
+    unknown = len(rows) - pending - done
+    label = center or '전체 센터'
+    return {'summary': f'{day:%m/%d} {label} 배송관리 기준 {len(rows)}건 · 완료 {done}건 · 미완료 {pending}건'
+                       + (f' · 확인 필요 {unknown}건' if unknown else ''),
+            'staff_report': {'day': day.isoformat(), 'center': center},
+            'read_query': ['staff_report', offset, center, None]}
+
+
+def read_staff_delivery(ranges):
+    return read_delivery_ranges(ranges, spreadsheet=delivery_read_sheet())
+
+
+def photo_order_status(image_urls):
+    from openai import OpenAI
+    client = OpenAI(timeout=12, max_retries=0)
+    numbers = staff_photo.extract_numbers(image_urls, client,
+                                         os.getenv('TAESAN_VISION_MODEL') or os.environ['TAESAN_MODEL'])
+    if not numbers:
+        return {'summary': '주문번호가 잘 보이도록 사진을 잘라 다시 보내 주세요.'}
+    date_rows, checks = read_staff_delivery(["'배송관리'!A3:C", "'배송관리'!K3:K"])
+    if date_rows[:1] != [['주문번호', '배송일', '행사시간']] or checks[:1] != [['배송 완료']]:
+        return {'summary': '배송관리 열 제목을 확인해 주세요.'}
+    result = {number: [] for number in numbers}
+    for i, row in enumerate(date_rows[1:], 1):
+        number = str(delivery_routes.value(row, 0))
+        if number in result:
+            checked = delivery_routes.value(delivery_routes.value(checks, i), 0)
+            result[number].append({True: '완료', False: '미완료'}.get(checked, '확인 필요')
+                                  if type(checked) is bool else '확인 필요')
+    lines = [f"{number}번 · {states[0] if len(states) == 1 else '주문번호 확인 필요' if states else '배송관리에서 찾을 수 없음'}"
+             for number, states in result.items()]
+    return {'summary': '사진에서 읽은 주문번호를 배송관리에서 확인했어요.\n'+'\n'.join(lines)}
+
+
 def handle(message, history, owner):
     if message in ('오늘 할 일', '오늘 현황'):
         return {'summary': today(), 'delivery_count': True}
+    if query := staff_delivery.request(message):
+        return delivery_report(*query)
     if query := delivery_venues.request(message):
         return venue_rank(*query)
     query = delivery_counts.request(message) or delivery_counts.follow_up(message)
     if query:
         return delivery_count(*query)
-    if message in ('전체', 'ㅇㅇ', '응', '네', '맞아', '그래') and history:
+    if follow := staff_delivery.FOLLOW.fullmatch(message):
+        previous = current_read_query(history)
+        if previous:
+            kind, offset, center, mode = previous
+            if follow[1]:
+                offset = delivery_counts.DAYS.index(follow[1])
+            else:
+                center = follow[2] or None
+            if kind == 'staff_report':
+                return delivery_report(offset, center)
+            if kind == 'venue_rank':
+                return venue_rank(offset, center)
+            if kind == 'delivery_count':
+                return delivery_count(offset, center, mode)
+    if message in ('전체', 'ㅇㅇ', '응', '네', '맞아', '그래') and history and history[0].get('created', time.time()) >= time.time() - 900:
         last = history[0]
         previous = last['input'].get('message', '')
         summary = last['result'].get('summary', '')
@@ -601,8 +664,9 @@ def handle(message, history, owner):
         confirms_all = confirms_all or bool(re.search(r'전체.*(?:맞|원하시|원하시는지|확인)', summary))
         if count_question and confirms_all:
             return delivery_count(count_question[0], None, count_question[2])
-        if message != '전체' and last['input'].get('kind') in ('venue_rank', 'delivery_count'):
-            return {'summary': '다른 날짜나 센터도 필요하시면 말씀해 주세요.'}
+        if message != '전체' and (last['result'].get('read_query') or last['input'].get('kind') in ('venue_rank', 'delivery_count')):
+            return {'summary': '다른 날짜나 센터도 필요하시면 말씀해 주세요.',
+                    'read_query': current_read_query(history)}
     if message == '재고 조회':
         return {'summary': '어느 센터 재고를 확인할까요? 예를 들어 “울산 재고 조회”라고 보내주세요.'}
     stock_request = re.fullmatch(r'([가-힣A-Za-z0-9]+) 재고 조회', message)
@@ -756,9 +820,11 @@ def start_order_queue():
     threading.Thread(target=loop, daemon=True).start()
 
 
-def run_job(job, message, owner, kind=''):
+def run_job(job, message, owner, kind='', photo_urls=None):
     try:
-        if kind == 'route':
+        if kind == 'photo':
+            result = photo_order_status(photo_urls)
+        elif kind == 'route':
             result = delivery_routes.run(message, owner, db, read_delivery_ranges, datetime.now(SEOUL))
         elif kind == 'invitation':
             result = run_invitation(message, owner)
@@ -777,7 +843,9 @@ def run_job(job, message, owner, kind=''):
     except ValueError as error:
         result = {'summary': str(error)[:300]}
     except Exception as error:
-        if kind == 'route':
+        if kind == 'photo':
+            result = {'summary': '사진을 확인하지 못했어요. 주문번호가 보이는 부분을 다시 보내 주세요.'}
+        elif kind == 'route':
             print('배송루트 계산 실패:', type(error).__name__, file=sys.stderr, flush=True)
             result = {'summary': '배송루트 자료를 확인하지 못했어요. 잠시 뒤 “다시 계산”이라고 말씀해 주세요.'}
         elif kind == 'order':
@@ -857,10 +925,23 @@ def present(job, result, owner=None):
         return menu(owner)
     if result.get('development'):
         return kakao(result['summary'], buttons=[('내 개발 요청 상태', '내 개발 요청 상태')])
+    if result.get('staff_report'):
+        base = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
+        secret = os.getenv('TAESAN_WEBHOOK_SECRET', '')
+        if not (invitation.https_url(base) and secret):
+            return kakao(result['summary'])
+        answer = kakao(result['summary'], images=[(delivery_reports.url(base, secret, job, 'pending.png'),
+                                                   '배송 미완료 목록')])
+        answer['template']['outputs'].append({'textCard': {
+            'title': '배송 현황', 'description': '엑셀을 열면 최신 배송 현황을 내려받아요.',
+            'buttons': [{'label': '엑셀 내려받기', 'action': 'webLink',
+                         'webLinkUrl': delivery_reports.url(base, secret, job, 'status.xlsx')}],
+        }})
+        return answer
     if result.get('order_status'):
         return kakao(result['summary'], buttons=[('주문 접수 상태', '주문 접수 상태')])
     if result.get('delivery_count'):
-        return kakao(result['summary'], buttons=delivery_counts.COUNT_BUTTONS)
+        return kakao(result['summary'], buttons=(*delivery_counts.COUNT_BUTTONS, ('미완료 목록', '오늘 배송 미완료 목록')))
     outputs = result.get('outputs') or {}
     selected = result.get('selected')
     if selected:
@@ -912,13 +993,19 @@ def dispatch(body, defer_callback=None):
     owner = user.get('id')
     if not isinstance(owner, str) or not owner or len(owner) > 512:
         return kakao('직원 계정을 확인할 수 없어요.')
-    message = body['userRequest'].get('utterance', '').strip()
+    photo_urls = staff_photo.urls(body)
+    message = user_request.get('utterance') or ''
+    if not isinstance(message, str):
+        return kakao('요청 내용을 확인해 주세요.')
+    message = '사진으로 배송 확인' if photo_urls is not None else message.strip()
     registration = re.fullmatch(r'직원 등록 ([a-zA-Z0-9_-]{16})', message)
     if registration:
         return kakao('직원 등록이 완료됐어요. 메뉴라고 입력해 보세요.' if enroll(owner, registration[1])
                      else '등록 코드가 틀렸거나 만료됐어요.')
     if not role_of(owner):
         return request_access(owner, message)
+    if photo_urls == []:
+        return kakao('사진 전송 동의와 사진을 다시 확인해 주세요. 한 번에 3장까지 보내 주세요.')
     if delivery_counts.PHOTO_MESSAGE.fullmatch(message):
         return kakao('사진 내용은 받지 못했어요. 오늘 배송 현황은 아래 버튼을 눌러 바로 확인하세요.',
                      buttons=delivery_counts.COUNT_BUTTONS)
@@ -1033,7 +1120,7 @@ def dispatch(body, defer_callback=None):
                 kind = json.loads(row['input']).get('kind')
                 if kind == 'route':
                     return kakao('아직 배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {check[1]}')])
-                if kind == 'venue_rank':
+                if kind in ('venue_rank', 'staff_report', 'photo'):
                     return kakao('아직 설치장소별 주문을 확인하고 있어요.',
                                  buttons=[('집계 결과 보기', f'결과 {check[1]}')])
                 if kind == 'invitation':
@@ -1052,9 +1139,13 @@ def dispatch(body, defer_callback=None):
         pending = c.execute('SELECT details FROM invitation_input WHERE owner=? AND expires>?',
                             (owner, time.time())).fetchone()
         route_context = delivery_routes.session(db, owner)
-        if duplicate_check:
+        if photo_urls:
+            kind = 'photo'
+        elif duplicate_check:
             message = duplicate_check['first'] or duplicate_check['last']
             kind = 'order_duplicate'
+        elif staff_delivery.request(message):
+            kind = 'staff_report'
         elif order_intake.wants_order(message, explicit_only=True):
             kind = 'order'
         elif development_queue.request_detail(message):
@@ -1063,6 +1154,8 @@ def dispatch(body, defer_callback=None):
             kind = 'venue_rank'
         elif delivery_counts.request(message) or delivery_counts.follow_up(message):
             kind = 'delivery_count'
+        elif (staff_delivery.FOLLOW.fullmatch(message) or message in ('ㅇㅇ', '응', '네', '맞아', '그래')) and current_read_query(recent(owner)):
+            kind = 'staff_report'
         elif delivery_routes.wants_route(message, route_context):
             kind = 'route'
         elif pending:
@@ -1075,7 +1168,7 @@ def dispatch(body, defer_callback=None):
         fingerprint = hashlib.sha256(fingerprint_input.encode()).hexdigest()
         for old in [key for key, future in ACTIVE.items() if future.done()]:
             ACTIVE.pop(old, None)
-        row = None if kind in ('route', 'delivery_count', 'venue_rank', 'order_duplicate') else c.execute(
+        row = None if kind in ('route', 'delivery_count', 'venue_rank', 'staff_report', 'photo', 'order_duplicate') else c.execute(
             'SELECT * FROM jobs WHERE owner=? AND fingerprint=? AND created>? ORDER BY created DESC LIMIT 1',
             (owner, fingerprint, time.time()-180)).fetchone()
         if row:
@@ -1087,13 +1180,14 @@ def dispatch(body, defer_callback=None):
             future = ACTIVE[job]
         else:
             running = c.execute("SELECT id FROM jobs WHERE owner=? AND state='running' ORDER BY created DESC LIMIT 1", (owner,)).fetchone()
-            if running and running['id'] in ACTIVE and kind not in ('delivery_count', 'venue_rank', 'order_duplicate'):
+            if running and running['id'] in ACTIVE and kind not in ('delivery_count', 'venue_rank', 'staff_report', 'photo', 'order_duplicate'):
                 return kakao('앞에서 말씀하신 일을 확인하고 있어요.')
             job = secrets.token_hex(6)
             c.execute('INSERT INTO jobs VALUES (?,?,?,?,?,?,NULL)',
                       (job, owner, fingerprint, time.time(), 'running', json_text({'message': message, 'kind': kind})))
             c.commit()
-            future = POOL.submit(run_job, job, message, owner, kind)
+            future = (POOL.submit(run_job, job, message, owner, kind, photo_urls) if photo_urls
+                      else POOL.submit(run_job, job, message, owner, kind))
             ACTIVE[job] = future
     try:
         result = future.result(timeout=2.5)
@@ -1110,8 +1204,8 @@ def dispatch(body, defer_callback=None):
             return kakao('배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {job}')])
         if kind == 'delivery_count':
             return kakao('배송 건수를 확인하고 있어요.', buttons=[('배송 건수 확인', f'결과 {job}')])
-        if kind == 'venue_rank':
-            return kakao('설치장소별 주문을 확인하고 있어요.', buttons=[('집계 결과 보기', f'결과 {job}')])
+        if kind in ('venue_rank', 'staff_report', 'photo'):
+            return kakao('요청한 내용을 확인하고 있어요.', buttons=[('집계 결과 보기', f'결과 {job}')])
         if kind == 'invitation':
             return kakao('초대장과 주문 주소를 준비하고 있어요.', buttons=[('초대장 확인', f'결과 {job}')])
         return kakao('답을 바로 보내기 어려워요. 잠시 뒤 다시 말씀해 주세요.')
@@ -1180,6 +1274,11 @@ class Handler(BaseHTTPRequestHandler):
             with db() as c:
                 if not development_queue.authorized(c, self.headers.get('Authorization', ''), 'POST', body):
                     return self.send_json({'error': 'unauthorized'}, 401)
+                if 'revision' in fields:
+                    revision = fields['revision']
+                    recorded = (revision == os.getenv('RENDER_GIT_COMMIT') and
+                                development_queue.record_release(c, fields.get('job', ''), revision))
+                    return self.send_json({'deployed': recorded}, 200 if recorded else 409)
                 done = development_queue.complete(c, fields.get('job', ''), fields.get('result', ''))
             return self.send_json({'completed': done}, 200 if done else 409)
         if path == '/staff-orders':
@@ -1344,15 +1443,22 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({'error': '이 주소를 열 수 없어요. 카톡에 “최근 배송보고서”라고 보내 새 주소를 받으세요.'}, 403)
         with db() as c:
             row = c.execute("SELECT owner,result FROM jobs WHERE id=? AND state='done'", (job,)).fetchone()
-        days = json.loads(row['result']).get('route_report') if row and role_of(row['owner']) else None
+        result = json.loads(row['result']) if row and role_of(row['owner']) else {}
+        staff = filename in ('pending.png', 'status.xlsx')
+        days = result.get('staff_report' if staff else 'route_report')
         if not days:
             return self.send_json({'error': '배송루트 보고서를 찾지 못했어요.'}, 404)
         try:
-            if filename == 'summary.png':
-                data = delivery_reports.image(days)
+            if staff:
+                date = datetime.fromisoformat(days['day']).date()
+                center = days['center']
+                days = {**days, 'center': center or '전체 센터',
+                        'rows': staff_delivery.rows_for(date, center, read_staff_delivery)}
+            if filename.endswith('.png'):
+                data = staff_delivery.image(days) if staff else delivery_reports.image(days)
                 content_type = 'image/png'
             else:
-                data = delivery_reports.excel(days)
+                data = staff_delivery.excel(days) if staff else delivery_reports.excel(days)
                 content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         except Exception as error:
             print('배송루트 보고서 생성 실패:', type(error).__name__, file=sys.stderr, flush=True)
@@ -1363,8 +1469,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Referrer-Policy', 'no-referrer')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('X-Robots-Tag', 'noindex, nofollow')
-        if filename == 'delivery.xlsx':
-            korean_name = quote(f'구로센터-배송루트-{next(iter(days))}.xlsx')
+        if filename.endswith('.xlsx'):
+            korean_name = quote(f'배송현황-{days["day"]}.xlsx' if staff else f'구로센터-배송루트-{next(iter(days))}.xlsx')
             self.send_header('Content-Disposition', f"attachment; filename=delivery-routes.xlsx; filename*=UTF-8''{korean_name}")
         self.send_header('Content-Length', str(len(data)))
         self.end_headers()
@@ -1530,5 +1636,8 @@ if __name__ == '__main__':
         raise SystemExit('TAESAN_WEBHOOK_SECRET에 32자 이상의 임의 문자열이 필요합니다.')
     owner_alerts.start(db)
     start_order_queue()
+    staff_delivery.start_alerts(db, read_staff_delivery, lambda: datetime.now(SEOUL),
+                               time.sleep, threading.Thread,
+                               os.getenv('TAESAN_IMMINENT_ALERTS') == '1' and owner_alerts.configured())
     ThreadingHTTPServer((os.getenv('TAESAN_BIND', '127.0.0.1'), int(os.getenv('PORT', '8080'))),
                         Handler).serve_forever()

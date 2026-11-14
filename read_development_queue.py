@@ -29,12 +29,16 @@ def signature(key, method, body=b''):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('key_file', type=Path)
-    parser.add_argument('--complete', nargs=2, metavar=('JOB', 'PR_URL'))
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument('--complete', nargs=2, metavar=('JOB', 'PR_URL'))
+    action.add_argument('--deployed', nargs=2, metavar=('JOB', 'LIVE_SHA'))
     args = parser.parse_args()
     key = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(args.key_file.read_text().strip()))
-    method = 'POST' if args.complete else 'GET'
-    body = urlencode(dict(zip(('job', 'result'), args.complete))).encode() if args.complete else b''
-    request = Request(ORIGIN + PATH, data=body if args.complete else None, method=method,
+    fields = (dict(zip(('job', 'result'), args.complete)) if args.complete else
+              dict(zip(('job', 'revision'), args.deployed)) if args.deployed else None)
+    method = 'POST' if fields else 'GET'
+    body = urlencode(fields).encode() if fields else b''
+    request = Request(ORIGIN + PATH, data=body if fields else None, method=method,
                       headers={'Authorization': signature(key, method, body)})
     with build_opener(NoRedirect).open(request, timeout=15) as response:
         print(response.read().decode())
