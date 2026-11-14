@@ -64,6 +64,30 @@ class DevelopmentQueueTests(unittest.TestCase):
         with agent.db() as c:
             self.assertEqual([item['detail'] for item in development_queue.read(c)], ['첫 번째 요청'])
 
+    def test_owner_can_follow_request_through_verification(self):
+        self.assertIn('없어요', str(self.send('staff', '내 개발 요청 상태')))
+        reply = self.send('staff', '기능 개발: 예시 요청')
+        self.assertIn('내 개발 요청 상태', [button['label'] for button in reply['quickReplies']])
+        self.assertIn('대표님 승인 대기', str(self.send('staff', '내 개발 요청 상태')))
+        self.assertIn('없어요', str(self.send('representative', '내 개발 요청 상태')))
+        self.send('representative', '승인')
+        self.assertIn('작업 대기', str(self.send('staff', '내 개발 요청 상태')))
+        with agent.db() as c:
+            item = development_queue.read(c)[0]
+            self.assertTrue(development_queue.complete(c, item['job'], 'https://github.com/kshyuk96-cell/bellavita-taesan/pull/1'))
+        self.assertIn('검증을 마쳤어요', str(self.send('staff', '내 개발 요청 상태')))
+
+    def test_natural_development_request_does_not_overwrite_invitation_draft(self):
+        self.send('representative', '초대장')
+        detail = '배송완료 처리 안 된 건이 몇 건인지 보는 기능이 필요해'
+        with patch.object(agent, 'choose') as choose, patch.object(agent, 'run_invitation') as invitation:
+            self.assertIn('바로 넣었어요', str(self.send('representative', detail + '. 개발해')))
+            choose.assert_not_called()
+            invitation.assert_not_called()
+        with agent.db() as c:
+            self.assertEqual([row['detail'] for row in development_queue.read(c)], [detail])
+            self.assertIsNotNone(c.execute('SELECT 1 FROM invitation_input').fetchone())
+
     def test_worker_http_reads_and_completes_an_authorized_request(self):
         self.send('representative', '개발 요청: 예시 요청')
         key = Ed25519PrivateKey.generate()
