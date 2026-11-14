@@ -28,6 +28,7 @@ import shop
 import order_ops
 import order_sample
 import cash_receipts
+import order_handoff
 
 ROOT = Path(os.getenv('TAESAN_DATA', 'taesan-data')).resolve()
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -781,6 +782,24 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        if path in ('/shop/handoff/claim', '/shop/handoff/ack'):
+            if not order_handoff.authorize(self.headers.get('Authorization', '')):
+                return self.send_json({'error': 'handoff_not_authorized'}, 401)
+            try:
+                size = int(self.headers.get('Content-Length', '0'))
+                if not 0 < size <= 16384 or self.headers.get_content_type() != 'application/json':
+                    raise ValueError('invalid_request')
+                fields = json.loads(self.rfile.read(size).decode())
+                if not isinstance(fields, dict):
+                    raise ValueError('invalid_request')
+                with db() as c:
+                    if path.endswith('/claim'):
+                        result, status = order_handoff.claim(c, fields), 200
+                    else:
+                        result, status = order_handoff.acknowledge(c, fields)
+            except (ValueError, UnicodeError):
+                return self.send_json({'error': 'invalid_request'}, 400)
+            return self.send_json(result, status)
         delivery = order_ops.DELIVERY_PATH.fullmatch(path)
         if delivery:
             return self.delivery(delivery, write=True)
@@ -947,6 +966,7 @@ class Handler(BaseHTTPRequestHandler):
                           'save_notifications': order_ops.save_settings,
                           'change_stage': order_ops.change_stage, 'retry_message': order_ops.retry_message,
                           'reconcile_message': order_ops.reconcile_message,
+                          'prepare_handoff': order_handoff.prepare, 'review_shop_photo': order_handoff.review_photo,
                           'reconcile_receipt': cash_receipts.reconcile}.get(fields.get('action'))
                 if action is None:
                     raise ValueError('요청 내용을 확인해 주세요.')

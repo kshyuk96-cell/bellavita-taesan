@@ -11,6 +11,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import cash_receipts
+import order_handoff
 
 SEOUL = ZoneInfo('Asia/Seoul')
 STAGES = {'confirmed': '주문 확인', 'shipping': '배송 중', 'delivered': '배송 완료'}
@@ -41,6 +42,7 @@ def setup(c):
         id INTEGER PRIMARY KEY, message_id TEXT NOT NULL, decision TEXT NOT NULL,
         note TEXT NOT NULL, checked TEXT NOT NULL)''')
     cash_receipts.setup(c)
+    order_handoff.setup(c)
 
 
 def phones(c):
@@ -87,6 +89,7 @@ def on_payment(c, order_id, state, fields):
             event = ('refund:' if fields.get('orig_mul_no') else 'cancel:') + fields.get('mul_no', '')
             queue(c, order_id, event)
     cash_receipts.on_payment(c, row, fields)
+    order_handoff.on_payment(c, row, fields)
 
 
 def change_stage(c, fields, actor='admin-link'):
@@ -150,7 +153,7 @@ def recover(c):
 def controls(c, row, path, *, staff=False):
     fulfillment = c.execute('SELECT * FROM shop_fulfillment WHERE order_id=?', (row['id'],)).fetchone()
     if not fulfillment:
-        return '<p>결제 확인 후 주문·배송 관리가 시작됩니다.</p>'
+        return '<p>결제 확인 후 주문·배송 관리가 시작됩니다.</p>' + order_handoff.panel(c, row, path)
     stage, version = fulfillment['stage'], fulfillment['version']
     image = signed_path('sample', row['id'], os.environ['TAESAN_WEBHOOK_SECRET'])
     content = f'<h3>주문·배송: {STAGES[stage]}</h3><img src="{escape(image)}" alt="고객 입력 문구 샘플" style="width:100%;max-width:320px;height:auto">'
@@ -207,6 +210,7 @@ def controls(c, row, path, *, staff=False):
                     '<button>영수증 대조 기록</button></form>')
     for check in c.execute('SELECT * FROM shop_receipt_checks WHERE order_id=? ORDER BY id', (row['id'],)):
         content += '<p>영수증 대조 기록: ' + escape(check['checked'][:16] + ' · ' + check['decision'] + ' · ' + check['note']) + '</p>'
+    content += order_handoff.panel(c, row, path)
     return content
 
 

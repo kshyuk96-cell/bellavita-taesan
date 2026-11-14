@@ -335,4 +335,13 @@ def admin_page(connection, path, origin):
       + '</section><section><h2>쇼핑몰 주문·결제 내역</h2>'
       + '<p>결제 요청 확인 필요 주문은 페이앱 대조 후 통보 재전송으로 확인합니다. 취소는 페이앱 판매자 화면에서 실행합니다.</p>'
       + ('<ul>' + ''.join(orders) + '</ul>' if orders else '<p>접수된 주문이 없어요.</p>')
-      + '</section></main></html>')
+      + '''</section></main><script>
+      for (const review of document.querySelectorAll('.shop-photo-review')) {
+        const image = review.querySelector('img');
+        const button = review.querySelector('button');
+        const loaded = () => { button.disabled = !image.naturalWidth; };
+        image.addEventListener('load', loaded);
+        image.addEventListener('error', loaded);
+        loaded();
+      }
+      </script></html>''')
