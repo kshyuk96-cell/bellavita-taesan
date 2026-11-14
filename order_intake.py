@@ -93,7 +93,7 @@ LABEL_ALIASES = {
     '배송시간':'delivery_time','배송시각':'delivery_time',
     '작품':'artwork','규격':'size','사이즈':'size','액자사이즈':'size',
     '축하문구':'message','축하·위로문구':'message','문구':'message',
-    '행사구분':'event_type','행사종류':'event_type',
+    '행사구분':'event_type','행사종류':'event_type','수량':'quantity','개수':'quantity',
     '설치장소':'venue','설치주소':'address','설치장소주소':'address','배송지':'address','주소':'address',
     '사진보낼곳':'photo_phone','사진보내실곳':'photo_phone','청첩장':'source','부고장':'source','초대장':'source'}
 LABEL_NAMES=sorted(LABEL_ALIASES,key=len,reverse=True)
@@ -129,6 +129,9 @@ def parse_fields(details):
 
 def extract(message):
     preliminary,unlabelled_source=parse_fields(REQUEST.sub('',message))
+    quantity=preliminary.get('quantity','')
+    if quantity and not re.fullmatch(r'1\s*(?:개|건|점)?',quantity.strip()):
+        raise ValueError('여러 개 또는 불명확한 수량은 주문을 나눠 확인해 주세요.')
     # URLs printed inside sender/message/address fields are not automatically new invitations.
     link_text='\n'.join(unlabelled_source+[preliminary.get('source','')])
     urls = source(link_text)

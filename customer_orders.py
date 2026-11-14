@@ -1,7 +1,7 @@
 """Authenticated staff forwarding with separately confirmed source-room bindings."""
 import re
 import order_intake
-from customer_memory import CustomerMemory, SenderDecision
+from customer_memory import CustomerMemory
 
 FORWARD = re.compile(r'^고객 주문 ([A-Za-z0-9_-]{1,100}) ([A-Za-z0-9_-]{1,100})\n([\s\S]+)$')
 
@@ -24,6 +24,8 @@ def prepare(message, path):
             residual = order_intake.LINK.sub('', order_intake.REQUEST.sub('', text)).strip()
             if residual:
                 raise ValueError('이번 주문의 보내는 분 문구를 확인해 주세요. 기본값으로 덮어쓰지 않았어요.')
+            if len(order_intake.source(text)) != 1 or len(order_intake.LINK.findall(text)) != 1:
+                raise ValueError('현재 주문의 청첩장·부고장 링크 하나를 확인해 주세요.')
             decision = memory.resolve(room, sender_id, current_text=text)
         if decision.status != 'auto':
             raise ValueError('이 방의 발신자와 고객 연결을 확인해 주세요.')

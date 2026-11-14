@@ -1,0 +1,11 @@
+{
+  "synthetic_cases": 5600,
+  "passed": {
+    "bound_defaults": 200,
+    "identity_held": 2200,
+    "negative_instructions_held": 2000,
+    "quantity_held": 1200
+  },
+  "network_calls": 0,
+  "live_side_effects": false
+}

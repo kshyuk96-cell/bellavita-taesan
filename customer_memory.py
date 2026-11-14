@@ -34,6 +34,8 @@ class CustomerMemory:
     def confirm_variant(self,variant_id,customer_id,sender,cue,confirmed_by):
         if not all(isinstance(v,str) and v.strip() for v in [variant_id,customer_id,sender,cue,confirmed_by]):raise ValueError('Confirmed variant required')
         if not self.db.execute('SELECT 1 FROM customer_profiles WHERE id=?',(customer_id,)).fetchone():raise ValueError('Unknown customer profile')
+        prior=self.db.execute('SELECT customer_id FROM sender_variants WHERE id=?',(variant_id,)).fetchone()
+        if prior and prior[0]!=customer_id:raise ValueError('Variant belongs to another customer')
         self.db.execute('INSERT INTO sender_variants VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET sender=excluded.sender,cue=excluded.cue,confirmed_by=excluded.confirmed_by',(variant_id,customer_id,sender,cue,confirmed_by));self.db.commit()
     def record_history(self,customer_id,row_id,sender):
         # Do not promote other people's inscriptions ordered by this customer into defaults.
@@ -57,6 +59,8 @@ class CustomerMemory:
             return SenderDecision('auto',variant[1],'confirmed_variant','이번 주문에서 지정한 직함', (variant[3],))
         # A URL's path, preview, or event guest's name is not an instruction about sender identity.
         context=re.sub(r'https?://[^\s]+','',current_text)
+        if re.search(r'말고|아니고|제외|빼고|쓰지|넣지|하지|취소',context):
+            return SenderDecision('review','','negative_instruction','제외·취소 지시가 있어 이번 문구 확인 필요')
         cues=[row for row in variants if row[2] in context]
         if len(cues)==1:return SenderDecision('auto',cues[0][1],'confirmed_context','이번 주문에서 확인된 직함 단서', (cues[0][3],))
         if len(cues)>1:return SenderDecision('review','','multiple_titles','직함 단서가 여러 개라 선택 필요')
