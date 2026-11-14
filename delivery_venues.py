@@ -2,6 +2,7 @@
 import csv
 import os
 import re
+from read_resilience import SchemaReadError
 import unicodedata
 from collections import Counter
 from pathlib import Path
@@ -65,11 +66,11 @@ def rank(day, center, read):
         ranges.append("'액자화환'!I4:I")
     dates, venues, *source = read(ranges)
     if dates[:1] != [['배송일']] or venues[:1] != [['설치장소']]:
-        raise ValueError('원장의 배송일과 설치장소 열을 확인해 주세요.')
+        raise SchemaReadError('원장의 배송일과 설치장소 열을 확인해 주세요.')
     if filtered:
         channels = [re.sub(r'\s+', '', str(value(row, 0))) for row in source[0]]
         if channels[:1] != ['배송채널']:
-            raise ValueError('원장의 배송채널 열을 확인해 주세요.')
+            raise SchemaReadError('원장의 배송채널 열을 확인해 주세요.')
         if not any(center_key in key for key in channels[1:]):
             raise ValueError('배송센터 이름을 확인해 주세요.')
     serial = (day - EPOCH).days

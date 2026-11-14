@@ -354,18 +354,20 @@ def format_result(day, result, settings):
     return lines
 
 
-def run(message, owner, db, read, now):
+def run(message, owner, db, read, now, *, defer_session=False):
     previous = session(db, owner)
     settings = settings_for(message, previous, now.date())
     if any(day < now.date().isoformat() for day in settings['days']):
         raise ValueError('오늘 이후 배송 날짜를 말씀해 주세요.')
     result = calculate(settings, now.date(), now.hour * 60 + now.minute, read, db) if settings['days'] else None
-    with db() as conn:
-        conn.execute('''INSERT INTO route_sessions VALUES (?, ?, ?)
-            ON CONFLICT(owner) DO UPDATE SET changed=excluded.changed,settings=excluded.settings''',
-                     (owner, time.time(), json.dumps(settings, ensure_ascii=False)))
+    if not defer_session:
+        with db() as conn:
+            conn.execute('''INSERT INTO route_sessions VALUES (?, ?, ?)
+                ON CONFLICT(owner) DO UPDATE SET changed=excluded.changed,settings=excluded.settings''',
+                         (owner, time.time(), json.dumps(settings, ensure_ascii=False)))
+    pending = {'_route_settings': settings} if defer_session else {}
     if result is None:
-        return {'summary': '어느 날 구로 배송루트를 짤까요? “다음 주 토요일”처럼 말씀해 주세요.',
+        return {**pending, 'summary': '어느 날 구로 배송루트를 짤까요? “다음 주 토요일”처럼 말씀해 주세요.',
                 'route_buttons': ['이번 주말', '다음 주말']}
     lines = [line for day, plan in result.items() for line in format_result(day, plan, settings)]
     pages, page = [], ''
@@ -376,5 +378,5 @@ def run(message, owner, db, read, now):
         page = f'{page}\n{line}' if page else line
     if page:
         pages.append(page)
-    return {'summary': pages[0], 'route_pages': pages, 'route_report': result,
+    return {**pending, 'summary': pages[0], 'route_pages': pages, 'route_report': result,
             'route_buttons': ['다시 계산', '이동시간 10분 추가']}

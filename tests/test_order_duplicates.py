@@ -85,13 +85,15 @@ class OrderDuplicateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, patch.object(agent, 'ROOT', Path(temporary)):
             with agent.db() as c:
                 c.execute("INSERT INTO staff VALUES ('employee','staff',0)")
+                c.execute('INSERT INTO jobs VALUES (?,?,?,?,?,?,NULL)',
+                    ('a'*12, 'employee', 'b'*64, time.time(), 'running', '{"kind":"order_duplicate"}'))
             def revoke(*_):
                 with agent.db() as c:
                     c.execute("DELETE FROM staff WHERE owner='employee'")
                 return ledger()
             with patch.object(agent, 'read_delivery_ranges', side_effect=revoke), \
                  patch.object(agent.order_location_provider, 'make_resolver', return_value=evidence):
-                answer = agent.run_job('fixture', '5', 'employee', 'order_duplicate')
+                answer = agent.run_job('a'*12, '5', 'employee', 'order_duplicate')
             self.assertIn('권한이 변경', answer['summary'])
             self.assertNotIn('원장 7번', answer['summary'])
 

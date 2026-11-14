@@ -1,5 +1,6 @@
 """Read-only delivery counts for the ledger and the dispatch board."""
 import re
+from read_resilience import SchemaReadError
 
 from delivery_routes import EPOCH, value
 
@@ -83,7 +84,7 @@ def count(day, center, kind, read):
     dates, *data = read(ranges)
     channels = data.pop(0) if selected_center else []
     if dates[:1] != [['배송일']] or (selected_center and channels[:1] != [['배송 채널']]):
-        raise ValueError('주문 원장의 배송 열 제목을 확인해 주세요.')
+        raise SchemaReadError('주문 원장의 배송 열 제목을 확인해 주세요.')
     if selected_center:
         keys = {re.sub(r'\s+', '', str(value(row, 0))) for row in channels[1:]}
         if not any(center_key in key for key in keys):
@@ -96,7 +97,7 @@ def count(day, center, kind, read):
         return f'{label} 배송은 {len(orders)}건이에요.'
     visible, flags = data
     if visible[:1] != [['주문번호', '배송일']] or flags[:1] != [['배송 완료']]:
-        raise ValueError('배송관리의 배송완료 열 제목을 확인해 주세요.')
+        raise SchemaReadError('배송관리의 배송완료 열 제목을 확인해 주세요.')
     states = {}
     uncertain = set()
     for index, row in enumerate(visible[1:], 1):

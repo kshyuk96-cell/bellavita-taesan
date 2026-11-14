@@ -1,5 +1,6 @@
 """Read delivery rows once for reports, follow-ups and imminent-installation checks."""
 import re
+from read_resilience import SchemaReadError
 from collections import Counter
 from io import BytesIO
 
@@ -14,7 +15,7 @@ def rows_for(day, center, read):
     primary, channels, statuses, workers = read(RANGES)
     headers = tuple(cell for group in (primary, channels, statuses, workers) for cell in value(group, 0))
     if headers != COLUMNS:
-        raise ValueError('배송관리 열 제목을 확인해 주세요.')
+        raise SchemaReadError('배송관리 열 제목을 확인해 주세요.')
     key = re.sub(r'\s+', '', center or '')
     if key not in ALL_CENTERS and not any(key in re.sub(r'\s+', '', str(value(row, 0))) for row in channels[1:]):
         raise ValueError('배송센터 이름을 확인해 주세요.')
