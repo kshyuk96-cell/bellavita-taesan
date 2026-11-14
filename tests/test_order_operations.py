@@ -186,6 +186,25 @@ class OrderOperationsTest(ShopFixture):
             c.execute("UPDATE shop_cash_receipts SET state='cancelling'");order_ops.recover(c)
         self.assertEqual('uncertain',self.rows('shop_cash_receipts')[0]['state'])
 
+    def test_existing_provider_receipt_requires_comparison_without_retry(self):
+        self.paid(cash=True)
+        with self.receipt_env(),patch.object(cash_receipts,'build_opener') as opener:
+            opener.return_value.open.return_value=io.BytesIO(b'state=0&errorCode=20021')
+            cash_receipts.process_one(agent.db)
+            cash_receipts.process_one(agent.db)
+            opener.return_value.open.assert_called_once()
+        receipt=self.rows('shop_cash_receipts')[0]
+        self.assertEqual('uncertain',receipt['state'])
+        self.assertEqual('provider_already_issued',receipt['error'])
+        self.assertIsNone(receipt['receipt_no'])
+        self.assertIn('기발급 영수증 확인 필요',self.http(self.admin)[2])
+        self.post_admin(action='reconcile_receipt',order_id='a'*32,generation='1',receipt_decision='issued',
+                        receipt_compared='yes',receipt_note='모의 기발급 승인 내역 금액 대조',cashstno='123',receipt_no='EXISTING',receipt_amount='93500')
+        with self.receipt_env(),patch.object(cash_receipts,'request') as request:
+            cash_receipts.process_one(agent.db)
+            request.assert_not_called()
+        self.assertEqual('issued',self.rows('shop_cash_receipts')[0]['state'])
+
     def test_receipt_input_validation(self):
         self.assertEqual(422,self.place(cash_receipt_type='business',cash_receipt_identifier='123')[0])
         self.assertEqual(422,self.place(cash_receipt_type='unknown')[0])
@@ -256,3 +275,6 @@ class AdapterTest(unittest.TestCase):
             self.assertEqual([CONFIG['LINK_KEY']],body['linkkey']);self.assertIn('hash',body)
             opener.return_value.open.return_value=io.BytesIO(b'state=0&errorCode=9040')
             with self.assertRaises(OSError):cash_receipts.request({'cmd':'cashStRegist'})
+            for field in ('errorCode','errno'):
+                opener.return_value.open.return_value=io.BytesIO(('state=0&'+field+'=20021').encode())
+                with self.assertRaises(cash_receipts.AlreadyIssued):cash_receipts.request({'cmd':'cashStRegist'})

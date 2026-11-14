@@ -69,6 +69,8 @@ def request(fields):
     with build_opener(NoRedirect).open(Request('https://api.payapp.kr/oapi/v2',
                                                urlencode(payload).encode('ascii')), timeout=12) as reply:
         result = parse_qs(reply.read(32768).decode('utf-8'), keep_blank_values=True)
+    if result.get('state') == ['0'] and (result.get('errno') == ['20021'] or result.get('errorCode') == ['20021']):
+        raise AlreadyIssued('provider_already_issued')
     if result.get('state') == ['0'] and result.get('errno') != ['9040'] and result.get('errorCode') != ['9040']:
         raise Rejected('provider_rejected')
     if result.get('state') != ['1']:
@@ -80,11 +82,17 @@ class Rejected(Exception):
     pass
 
 
+class AlreadyIssued(Exception):
+    """The provider has an existing receipt; reconcile before further action."""
+
+
 def status(c, row):
     latest = c.execute('SELECT * FROM shop_cash_receipts WHERE order_id=? ORDER BY generation DESC LIMIT 1',
                        (row['id'],)).fetchone()
     if latest:
         text = LABELS[latest['state']] + f' · {latest["amount"]:,}원'
+        if latest['error'] == 'provider_already_issued':
+            text += ' · 페이앱 기발급 영수증 확인 필요 · 재발급 차단'
         if latest['receipt_no']:
             text += ' · 승인번호 ' + latest['receipt_no']
         return text
@@ -171,6 +179,7 @@ def process_one(db):
     if task is None:
         return
     order, generation, amount, payload = task
+    error = 'provider_result_check_required'
     try:
         result = request(payload)
         if payload['cmd'] == 'cashStRegist':
@@ -182,6 +191,8 @@ def process_one(db):
             state = 'issued'
         else:
             state = 'cancelled'
+    except AlreadyIssued:
+        state, result, error = 'uncertain', {}, 'provider_already_issued'
     except Rejected:
         state, result = 'failed', {}
     except Exception:
@@ -195,7 +206,7 @@ def process_one(db):
             receipt_no=COALESCE(?,receipt_no),url=COALESCE(?,url),error=?,updated=?
             WHERE order_id=? AND generation=?''',
                   (state, result.get('cashstno'), result.get('receipt_no'), result.get('cashsturl'),
-                   '' if state in ('issued','cancelled') else 'provider_result_check_required',
+                   '' if state in ('issued','cancelled') else error,
                    dt.datetime.now(SEOUL).isoformat(), order['id'], generation))
 
 

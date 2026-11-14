@@ -224,5 +224,17 @@
     "seconds": 82.8,
     "production_deployed": false,
     "actual_provider_calls": false
+  },
+  "next_review_20261114_kst": {
+    "receipt_20021": "uncertain; explicit existing-receipt notice; no automatic retry; manual number/amount comparison required",
+    "targeted_regression": {
+      "passed": 22,
+      "seconds": 11.009,
+      "command": "PYTHONPATH=tests .venv/bin/python -m unittest test_order_operations test_storage_probe test_shop_followup.FollowupTest.test_alimtalk_template_links_poll_and_no_duplicate_on_payment test_shop_followup.FollowupTest.test_alimtalk_timeout_no_fallback_and_channel_snapshot test_shop_delivery_suite.DeliverySuiteTest.test_revoked_staff_assignment_link_and_customer_ata_never_get_staff_capability"
+    },
+    "existing_service_readonly": "disk /var/data 1GB and main autodeploy reconfirmed; actual TAESAN_DATA inaccessible",
+    "real_payment_message_receipt_calls": false,
+    "production_deployed": false,
+    "verification_server_redeployed": false
   }
 }
