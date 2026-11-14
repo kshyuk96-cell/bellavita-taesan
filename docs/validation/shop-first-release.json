@@ -9,7 +9,7 @@
   "main_base": "9474f6d1d5cd0589ae09c360d90745cbe224d41a",
   "milestones": {
     "scope_freeze": "complete",
-    "screen_validation": "technical_pass_owner_review_pending",
+    "screen_validation": "product_conditions_owner_accepted_design_change_deferred",
     "real_provider_integration": "unverified",
     "operator_rehearsal": "automated_mock_pass_human_review_pending",
     "production_transition": "planned_not_executed"
@@ -127,8 +127,8 @@
   "launch_blockers": [
     {
       "id": "owner_acceptance",
-      "status": "pending",
-      "required": "final four-product price/options/design acceptance; notification channel confirmed as Kakao Alimtalk sample link"
+      "status": "accepted",
+      "required": "four-product conditions accepted by owner; design may change later; not a pending launch blocker"
     },
     {
       "id": "real_payapp",
@@ -236,5 +236,35 @@
     "real_payment_message_receipt_calls": false,
     "production_deployed": false,
     "verification_server_redeployed": false
+  },
+  "hosted_redeployment_20261114_kst": {
+    "runtime_commit": "4099e1464704b0dde2071643482b0c4c7d78cac7",
+    "live_at_kst": "2026-11-14T23:11:51+09:00",
+    "public_url": "https://bellavita-shop-verification-v3b4.onrender.com/shop",
+    "status": "live",
+    "public_products": 4,
+    "existing_receipt_pages_preserved": 2,
+    "product_and_receipt_content_hashes_equal": true,
+    "persistent_mount_verified": true,
+    "data_under_var_data": true,
+    "forced_live_flags_disabled": true,
+    "browser_viewport_widths": [
+      390,
+      1440
+    ],
+    "browser_product_pages_per_viewport": 4,
+    "horizontal_overflow": false,
+    "new_orders_created": 0,
+    "database_integrity_checked_this_turn": false,
+    "administrator_authenticated_audit_this_turn": false,
+    "app_error_logs": {
+      "count": 0,
+      "start_utc": "2026-11-14T14:11:51Z",
+      "end_utc": "2026-11-14T14:12:29Z"
+    },
+    "actual_payment": false,
+    "actual_messages": false,
+    "actual_receipts": false,
+    "production_changed": false
   }
 }
