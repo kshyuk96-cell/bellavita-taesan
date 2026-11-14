@@ -1,4 +1,3 @@
-import hashlib
 import json
 import tempfile
 import threading
@@ -9,8 +8,11 @@ from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
 import agent
 import development_queue
+from read_development_queue import signature
 
 
 class DevelopmentQueueTests(unittest.TestCase):
@@ -64,22 +66,30 @@ class DevelopmentQueueTests(unittest.TestCase):
 
     def test_worker_http_reads_and_completes_an_authorized_request(self):
         self.send('representative', '개발 요청: 예시 요청')
-        token = 'x' * 43
+        key = Ed25519PrivateKey.generate()
         server = agent.ThreadingHTTPServer(('127.0.0.1', 0), agent.Handler)
         self.addCleanup(server.server_close)
         worker = threading.Thread(target=server.serve_forever, daemon=True)
         worker.start()
         self.addCleanup(server.shutdown)
         endpoint = f'http://127.0.0.1:{server.server_port}/development-queue'
-        with patch.object(development_queue, 'READER_DIGEST', hashlib.sha256(token.encode()).hexdigest()):
+        with patch.object(development_queue, 'PUBLIC_KEY', key.public_key().public_bytes_raw().hex()):
             with self.assertRaises(HTTPError) as error:
                 urlopen(endpoint, timeout=3)
             self.assertEqual(error.exception.code, 401)
-            headers = {'Authorization': 'Bearer '+token}
+            headers = {'Authorization': signature(key, 'GET')}
             with urlopen(Request(endpoint, headers=headers), timeout=3) as response:
                 item = json.load(response)['requests'][0]
-            data = urlencode({'job': item['job'], 'result': 'https://github.com/kshyuk96-cell/bellavita-taesan/pull/1'})
-            with urlopen(Request(endpoint, data=data.encode(), headers=headers), timeout=3) as response:
+            with self.assertRaises(HTTPError) as replay:
+                urlopen(Request(endpoint, headers=headers), timeout=3)
+            self.assertEqual(replay.exception.code, 401)
+            data = urlencode({'job': item['job'], 'result': 'https://github.com/kshyuk96-cell/bellavita-taesan/pull/1'}).encode()
+            headers = {'Authorization': signature(key, 'POST', data)}
+            with self.assertRaises(HTTPError) as changed:
+                urlopen(Request(endpoint, data=data+b'2', headers=headers), timeout=3)
+            self.assertEqual(changed.exception.code, 401)
+            with urlopen(Request(endpoint, data=data, headers=headers), timeout=3) as response:
                 self.assertTrue(json.load(response)['completed'])
+            headers = {'Authorization': signature(key, 'GET')}
             with urlopen(Request(endpoint, headers=headers), timeout=3) as response:
                 self.assertEqual(json.load(response)['requests'], [])

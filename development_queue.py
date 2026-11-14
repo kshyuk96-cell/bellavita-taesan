@@ -1,11 +1,15 @@
 """Handoff for authorized Kakao development requests."""
 import hashlib
-import hmac
 import re
+import sqlite3
 import time
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-READER_DIGEST = '31bb0f39b2b47ca1643f6139436970e093275625b38e5c1907522fd002f72a19'
+
+PUBLIC_KEY = '4e2298ef0c0eaca4e4e6cbd2d84b6f22d910fab3ffdf898a85bc2603067680e1'
+REQUEST_LIFETIME = 90
 REQUEST = re.compile(r'(?:기능\s*(?:개발|개선)(?:\s*(?:요청|해\s*줘))?|개발\s*요청)(?:\s*[:：]\s*|\s+)(\S.*)', re.S)
 DUPLICATE_ALERT_REQUEST = re.compile(
     r'(?=.*배송\s*일시)(?=.*배송\s*장소)(?=.*보내는\s*분\s*요약)'
@@ -20,6 +24,7 @@ def setup(c):
         job TEXT PRIMARY KEY, detail TEXT NOT NULL, approved REAL NOT NULL,
         completed REAL, result TEXT)''')
     c.execute('CREATE TABLE IF NOT EXISTS development_focus (owner TEXT PRIMARY KEY, job TEXT NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS development_signatures (nonce TEXT PRIMARY KEY, expires INTEGER NOT NULL)')
 
 
 def enqueue(c, job, detail):
@@ -27,10 +32,22 @@ def enqueue(c, job, detail):
               (job, detail[:400], time.time()))
 
 
-def authorized(authorization):
-    secret = authorization.removeprefix('Bearer ')
-    return (secret != authorization and len(secret) == 43
-            and hmac.compare_digest(hashlib.sha256(secret.encode()).hexdigest(), READER_DIGEST))
+def authorized(c, authorization, method, body=b''):
+    match = re.fullmatch(r'Taesan-Signature ([0-9]{10})\.([a-f0-9]{32})\.([a-f0-9]{128})', authorization)
+    if not match or abs(time.time() - int(match[1])) > REQUEST_LIFETIME:
+        return False
+    timestamp, nonce, signature = match.groups()
+    payload = f'{method}\n/development-queue\n{timestamp}\n{nonce}\n{hashlib.sha256(body).hexdigest()}'
+    try:
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(PUBLIC_KEY)).verify(bytes.fromhex(signature), payload.encode())
+    except InvalidSignature:
+        return False
+    c.execute('DELETE FROM development_signatures WHERE expires<?', (int(time.time()),))
+    try:
+        c.execute('INSERT INTO development_signatures VALUES (?,?)', (nonce, int(timestamp) + REQUEST_LIFETIME + 1))
+    except sqlite3.IntegrityError:
+        return False
+    return True
 
 
 def read(c):

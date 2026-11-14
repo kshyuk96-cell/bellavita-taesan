@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, quote, urlsplit
+from urllib.parse import parse_qs, parse_qsl, quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from zoneinfo import ZoneInfo
 
@@ -1086,13 +1086,17 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = urlsplit(self.path).path
         if path == '/development-queue':
-            if not development_queue.authorized(self.headers.get('Authorization', '')):
-                return self.send_json({'error': 'unauthorized'}, 401)
             try:
-                fields = self.read_order_form()
+                length = int(self.headers.get('Content-Length', ''))
+                if not 0 < length <= 1024:
+                    raise ValueError('invalid length')
+                body = self.rfile.read(length)
+                fields = dict(parse_qsl(body.decode('utf-8'), strict_parsing=True, max_num_fields=2))
             except (UnicodeError, ValueError):
                 return self.send_json({'error': 'invalid request'}, 400)
             with db() as c:
+                if not development_queue.authorized(c, self.headers.get('Authorization', ''), 'POST', body):
+                    return self.send_json({'error': 'unauthorized'}, 401)
                 done = development_queue.complete(c, fields.get('job', ''), fields.get('result', ''))
             return self.send_json({'completed': done}, 200 if done else 409)
         if path == '/staff-orders':
@@ -1286,10 +1290,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlsplit(self.path).path
         if path == '/development-queue':
-            if not development_queue.authorized(self.headers.get('Authorization', '')):
-                return self.send_json({'error': 'unauthorized'}, 401)
             with db() as c:
-                return self.send_json({'requests': development_queue.read(c)})
+                if not development_queue.authorized(c, self.headers.get('Authorization', ''), 'GET'):
+                    return self.send_json({'error': 'unauthorized'}, 401)
+                work = development_queue.read(c)
+            return self.send_json({'requests': work})
         login = re.fullmatch(r'/staff-orders/login/([a-zA-Z0-9_-]{32})', path)
         if login:
             with db() as c:
