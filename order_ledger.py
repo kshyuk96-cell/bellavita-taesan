@@ -1,14 +1,22 @@
 """Write only confirmed order fields and preserve the sheet's existing validation and formulas."""
 import re
+import math
 from datetime import date, datetime
 from urllib.parse import quote
 
 import order_intake
+from delivery_regions import delivery_alert
 
 EPOCH = date(1899, 12, 30)
 HEADER = ['주문일시', '배송일', '행사시간', '작품', '액자 사이즈(호수)', '설치장소', '행사 구분', '주문 채널', '배송 채널', '비고', '받는분']
-FIELDS = {0: 'created', 1: 'delivery_date', 2: 'delivery_time', 3: 'artwork', 4: 'size', 5: 'location', 6: 'event_type',
+FIELDS = {0: 'created', 1: 'delivery_date', 2: 'event_time', 3: 'artwork', 4: 'size', 5: 'location', 6: 'event_type',
           8: 'channel', 9: 'notes', 10: 'recipient', 11: 'photo_phone', 15: 'sender', 17: 'message', 19: 'source', 28: 'uuid'}
+
+class VerificationError(ValueError):
+    def __init__(self,field):
+        self.field=field
+        super().__init__('원장 저장값이 달라 등록 완료를 보류했어요. 항목: '+field)
+
 
 
 def populated(row, index):
@@ -51,9 +59,30 @@ def details_for_sheet(details, cells, mapping):
                ('artwork', '작품'), ('size', '규격'), ('channel', '배송채널'), ('location', '설치장소'),
                ('recipient', '받는 분'), ('event_type', '행사 구분')) if not data.get(key)]
     event = ' '.join(filter(None, (data['event_date'], data['event_time'])))
+    delivery_time = data['delivery_time']
     data['notes'] = ' / '.join(filter(None, (data.get('note'), f'행사 {event}' if event else '',
+                                           f'배송시각 {delivery_time}' if delivery_time else '',
                                            '·'.join(missing) + ' 확인 필요' if missing else '')))
+    alert = delivery_alert(data['location'])
+    data['delivery_region'] = alert['region']
+    data['regional_alert'] = alert['message']
+    if alert['message']:
+        data['notes'] = ' / '.join(filter(None, (data['notes'], alert['message'])))
     return data
+
+
+def stored_value(key,value):
+    if value and key=='delivery_date':return (date.fromisoformat(value)-EPOCH).days
+    if value and key=='event_time':
+        hour,minute=map(int,value.split(':'));return (hour*60+minute)/1440
+    return value if value is not None else ''
+
+
+def same_value(actual,expected):
+    if actual is None:actual=''
+    if type(expected) in (int,float):
+        return type(actual) in (int,float) and math.isclose(actual,expected,rel_tol=0,abs_tol=1e-9)
+    return str(actual)==str(expected)
 
 
 class Ledger:
@@ -108,16 +137,16 @@ class Ledger:
         fields = FIELDS.items() if not existing or update else ()
         requests = []
         for column, key in fields:
-            if update and column in (0, 28):
+            if update and column in (0, 2, 28):  # Staff edits do not include the event time.
+                continue
+            value = data.get(key)
+            if key == 'event_time' and not value:
                 continue
             if cells[column].get('userEnteredValue', {}).get('formulaValue'):
                 raise ValueError('원장 수식이 있는 칸을 확인해 주세요.')
-            value = data.get(key)
-            if key == 'delivery_time' and not value:
-                value = data.get('event_time')
             if value and key == 'delivery_date':
                 value = (date.fromisoformat(value) - EPOCH).days
-            if value and key == 'delivery_time':
+            if value and key == 'event_time':
                 hour, minute = map(int, value.split(':'))
                 value = (hour * 60 + minute) / 1440
             entered = ({'numberValue': value} if type(value) in (int, float) else {'stringValue': str(value)}) if value is not None and value != '' else {}
@@ -130,7 +159,11 @@ class Ledger:
             response.raise_for_status()
         verified = self.find(marker)
         saved = self.values(f"'액자화환'!A{verified}:AC{verified}") if verified else []
-        if not saved or any(str(populated(saved[0], col) or '') != str(data.get(key) or '')
-                            for col, key in ((5,'location'),(8,'channel'),(10,'recipient'),(15,'sender'),(19,'source'))):
-            raise ValueError('원장 등록 결과를 확인하지 못했어요.')
+        if not saved:raise ValueError('원장 등록 결과를 확인하지 못했어요.')
+        for column,key in FIELDS.items():
+            if update and column in (0,2,28):continue
+            expected=stored_value(key,data.get(key))
+            if not update and expected=='':continue
+            if not same_value(populated(saved[0],column),expected):
+                raise VerificationError(key)
         return verified, data

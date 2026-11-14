@@ -1,0 +1,18 @@
+{
+  "synthetic_complete_flows": 1000,
+  "phase_checks": 8000,
+  "passed": {
+    "intake_full_verification": 1000,
+    "duplicate_no_new_row": 1000,
+    "same_row_amendment": 1000,
+    "fragment_replay": 1000,
+    "both_sharing_receipts": 1000,
+    "additional_replay": 1000,
+    "cancellation_invalidates_share": 1000,
+    "cancelled_save_blocked": 1000
+  },
+  "external_calls": 0,
+  "live_side_effects": false,
+  "sheet_transport": "in-memory; production Ledger.save logic",
+  "receipts": "synthetic test receipts, not actual Kakao delivery"
+}

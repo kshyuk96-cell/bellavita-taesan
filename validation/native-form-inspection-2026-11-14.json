@@ -1,0 +1,12 @@
+{
+  "ready_for_final_share": false,
+  "hazards": [
+    {
+      "code": "event_clock_in_shipping_label",
+      "message": "배송 일시 수식이 행사시간 열을 참조합니다. 배송시각과 분리 검토 필요"
+    }
+  ],
+  "source": "native formatted values / first form block only; not a visual clipboard copy",
+  "formula_count": 22,
+  "duplicate_block_detected": true
+}

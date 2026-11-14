@@ -1,0 +1,13 @@
+{
+  "synthetic_checks": 6000,
+  "passed": {
+    "partial_location_held": 1000,
+    "paired_location_allowed": 1000,
+    "explicit_orders_isolated": 1000,
+    "all_titles_preserved": 1000,
+    "single_title_selected": 1000,
+    "ambiguous_choice_held": 1000
+  },
+  "external_calls": 0,
+  "live_side_effects": false
+}

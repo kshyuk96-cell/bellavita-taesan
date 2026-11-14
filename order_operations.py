@@ -6,6 +6,7 @@ import re
 import secrets
 import time
 import uuid
+from order_lock import writer_lock
 from datetime import datetime
 from html import escape
 from urllib.parse import urlencode
@@ -13,6 +14,10 @@ from zoneinfo import ZoneInfo
 
 
 SEOUL = ZoneInfo('Asia/Seoul')
+MAX_ATTEMPTS = 5
+
+class RetryLater(ValueError):
+    pass
 EDIT = ('delivery_date', 'delivery_time', 'venue', 'address', 'sender', 'recipient', 'artwork', 'size', 'message')
 LABELS = ('배송일', '배송시각', '설치 장소', '주소', '보내시는 분', '받는 분', '작품', '규격', '축하 문구')
 
@@ -29,6 +34,11 @@ def setup(c):
     c.execute('''CREATE TABLE IF NOT EXISTS order_changes (order_id TEXT, owner TEXT, changed TEXT,
                  before TEXT, after TEXT)''')
     c.execute('CREATE TABLE IF NOT EXISTS order_review (order_id TEXT PRIMARY KEY, owner TEXT, checked TEXT)')
+    c.execute('CREATE INDEX IF NOT EXISTS order_owner_created ON order_operations(owner,kind,created DESC,id DESC)')
+    import order_assistance
+    order_assistance.setup(c)
+    import order_sharing
+    order_sharing.setup(c)
 
 
 def now():
@@ -97,26 +107,66 @@ def ledger_key(payment_id):
 
 
 def save(db, key, extract, write, after_save=None):
+    with writer_lock(db):
+        return _save_locked(db,key,extract,write,after_save)
+
+def _save_locked(db, key, extract, write, after_save=None):
     with db() as c:
         row = c.execute('SELECT * FROM order_operations WHERE id=?', (key,)).fetchone()
     if row['state'] == 'saved':
         return row['order_number'], json.loads(row['details'])
+    if row['attempts'] >= MAX_ATTEMPTS and row['state'] in ('pending','update'):
+        with db() as c:c.execute("UPDATE order_operations SET state='review_hold' WHERE id=?",(key,))
+        raise ValueError('재시도 한도에 도달해 검토 보류했어요.')
+    if row['state'] not in ('pending', 'update'):
+        raise ValueError('취소 요청 또는 보류 상태의 주문은 자동 등록하지 않아요.')
+    if row['retry_after']>time.time():raise RetryLater('아직 자동 재시도 대기 중이에요. 대기 시각 이후 다시 확인해 주세요.')
     data = json.loads(row['details'])
     if not data and row['kind'] == 'kakao':
-        data = extract(row['raw'])
+        try:data = extract(row['raw'])
+        except Exception:
+            import order_assistance
+            with db() as c:order_assistance.record(c,key,order_assistance.explicit_details(row['raw']),error=True)
+            raise
         with db() as c:
             c.execute('UPDATE order_operations SET details=? WHERE id=?', (dump(data), key))
-    number, verified = write(key, data, row['created'], update=row['state'] == 'update')
+    import order_assistance
+    with db() as c:review=order_assistance.record(c,key,data)
+    if review['hold']:
+        raise ValueError(order_assistance.question(data))
+    try:
+        number, verified = write(key, data, row['created'], update=row['state'] == 'update')
+    except Exception as error:
+        with db() as c:order_assistance.record(c,key,data,error=getattr(error,'field',True))
+        raise
     with db() as c:
-        c.execute("UPDATE order_operations SET details=?,order_number=?,state='saved' WHERE id=?",
+        c.execute("UPDATE order_operations SET details=?,order_number=?,state='saved',attempts=0,retry_after=0 WHERE id=?",
                   (dump(verified), number, key))
+        order_assistance.record(c,key,verified)
+        import order_sharing
+        order_sharing.enqueue(c,row,number,verified)
         if after_save:
             after_save(c, row, number, verified)
     return number, verified
 
 
-def defer(c, key):
-    c.execute('UPDATE order_operations SET attempts=attempts+1,retry_after=? WHERE id=?', (time.time()+60, key))
+def defer(c, key, error=None):
+    if isinstance(error,RetryLater):return
+    row=c.execute('SELECT attempts,state FROM order_operations WHERE id=?',(key,)).fetchone()
+    if not row or row['state'] not in ('pending','update'):return
+    attempts=row['attempts']+1
+    delay=min(1800,60*2**min(attempts-1,5))
+    c.execute('UPDATE order_operations SET attempts=?,retry_after=?,state=? WHERE id=?',
+              (attempts,time.time()+delay,'review_hold' if attempts>=MAX_ATTEMPTS else row['state'],key))
+
+
+def resume(c,row):
+    if row['state']!='review_hold':return False
+    c.execute('UPDATE order_operations SET state=?,attempts=0,retry_after=0 WHERE id=?',
+              ('update' if row['order_number'] is not None else 'pending',row['id']))
+    c.execute('INSERT INTO order_changes VALUES (?,?,?,?,?)',
+              (row['id'],row['owner'],now(),dump({'state':'review_hold'}),dump({'state':'retry_requested'})))
+    return True
 
 
 def issue_web(c, owner):
@@ -182,6 +232,8 @@ def edit(c, order_id, owner, fields):
     c.execute('INSERT INTO order_changes VALUES (?,?,?,?,?)', (key, owner, now(), dump(before), dump(after)))
     c.execute('UPDATE order_operations SET details=?,state=?,retry_after=0 WHERE id=?',
               (dump(after), 'update' if row['state'] == 'saved' else 'pending', key))
+    import order_sharing
+    order_sharing.invalidate(c,key)
     c.execute('DELETE FROM order_review WHERE order_id=?', (key,))
     return True
 

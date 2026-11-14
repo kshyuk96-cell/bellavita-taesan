@@ -28,8 +28,12 @@ import delivery_routes
 import invitation
 import owner_alerts
 import order_intake
+import customer_orders
 import order_ledger
 import order_operations
+import order_lifecycle
+import order_assistance
+import order_review_rules
 import order_sms
 import staff_features
 
@@ -40,6 +44,8 @@ ACTIVE = {}
 LOCK = threading.Lock()
 STOCK_LOCK = threading.Lock()
 ORDER_LOCK = threading.Lock()
+# Preserve the current main release guard during review.
+ORDER_LEDGER_ENABLED = False
 SEOUL = ZoneInfo('Asia/Seoul')
 ACTIONS = ['answer', 'guide', 'clarify', 'today', 'stock', 'stock_write', 'scroll', 'revise', 'structure', 'development']
 PROMPT = """너는 벨라비타 내부 업무비서 강태산 대리다. 자연어를 이해하여 아래 허용된 행동을 고른다.
@@ -596,6 +602,7 @@ def run_invitation(message, owner):
 
 
 def write_order(marker, data, created, *, update=False):
+    if not ORDER_LEDGER_ENABLED:raise RuntimeError('원장 자동 등록을 준비하고 있어요.')
     spreadsheet = os.getenv('TAESAN_ORDER_SHEET_ID', '')
     if not spreadsheet:
         raise RuntimeError('원장 쓰기 연결이 필요해요.')
@@ -607,17 +614,19 @@ def run_order(message, owner):
     key, duplicate = order_operations.intake(db, owner, message)
     if duplicate:
         return {'summary': duplicate}
+    if not ORDER_LEDGER_ENABLED:
+        return {'summary': '주문 내용만 보관했어요. 자동 원장 입력은 차단된 상태입니다.\n접수ID: ' + key, 'order_status': True}
     if not os.getenv('TAESAN_ORDER_SHEET_ID'):
-        return {'summary': '주문 내용을 보관했어요. 원장 연결이 끝나면 등록할 수 있어요.', 'order_status': True}
+        return {'summary': '주문 내용을 보관했어요. 원장 연결이 끝나면 등록할 수 있어요.\n접수ID: ' + key, 'order_status': True}
     try:
         with ORDER_LOCK:
             number, data = order_operations.save(db, key, order_intake.extract, write_order, order_saved)
     except Exception as error:
         with db() as c:
-            order_operations.defer(c, key)
+            order_operations.defer(c, key, error)
         detail = str(error) if isinstance(error, ValueError) else '행사 정보나 시트 연결을 확인해 주세요.'
-        return {'summary': '주문을 보관했어요. 원장 등록은 확인이 필요해요.\n' + detail[:130], 'order_status': True}
-    return {'summary': '원장에 등록했어요.\n' + order_intake.report(number, data)}
+        return {'summary': '주문을 보관했어요. 원장 등록은 확인이 필요해요.\n' + detail[:130] + '\n접수ID: ' + key, 'order_status': True}
+    return {'summary': '원장에 등록했어요.\n' + order_assistance.question(data) + '\n' + order_intake.report(number, data)}
 
 
 def order_saved(connection, row, number, details):
@@ -630,6 +639,7 @@ def order_saved(connection, row, number, details):
 
 
 def process_order_queue():
+    if not ORDER_LEDGER_ENABLED:return
     with ORDER_LOCK:
         with db() as c:
             row = c.execute("""SELECT o.* FROM order_operations o LEFT JOIN invitation_orders i ON i.id=replace(o.id,'-','')
@@ -640,12 +650,13 @@ def process_order_queue():
             return
         try:
             order_operations.save(db, row['id'], order_intake.extract, write_order, order_saved)
-        except Exception:
+        except Exception as error:
             with db() as c:
-                order_operations.defer(c, row['id'])
+                order_operations.defer(c, row['id'], error)
 
 
 def start_order_queue():
+    if not ORDER_LEDGER_ENABLED:return
     def loop():
         while True:
             try:
@@ -844,6 +855,12 @@ def dispatch(body, defer_callback=None):
             order = order_operations.latest_intake(c, owner)
         if not order:
             return kakao('아직 직접 접수한 카톡 주문이 없어요.')
+        if order['state'] == 'cancel_requested':
+            return kakao('최근 카톡 주문은 취소 요청 상태예요. 시트·배송 취소 완료는 아직 미확인입니다.')
+        if order['state'] == 'review_hold':
+            return kakao('최근 주문은 반복 실패로 검토 보류했어요. 접수ID 또는 주문번호로 상태를 확인해 주세요.')
+        if order['state'] == 'update':
+            return kakao('최근 카톡 주문은 수정 요청을 보관했어요. 원장 반영은 아직 미확인입니다.')
         if order['state'] == 'saved':
             return kakao(f'최근 카톡 주문을 원장에 등록했어요. 주문번호는 {order["order_number"]}번이에요.')
         return kakao('최근 카톡 주문은 접수됐어요. 원장 등록은 아직 확인되지 않았어요.')
@@ -911,6 +928,24 @@ def dispatch(body, defer_callback=None):
     if message == '승인 대기' or re.fullmatch(
             r'(?:승인 검토|구조 변경 승인|구조 변경 반려) [a-f0-9]{12}', message):
         return approval_command(owner, message)
+    try:
+        split_preview = order_review_rules.preview(message)
+    except ValueError as error:
+        return kakao(str(error))
+    if split_preview is not None:
+        return kakao(split_preview)
+    with ORDER_LOCK:
+        assistance_reply = order_assistance.command(db, owner, message)
+    if assistance_reply is not None:
+        return kakao(assistance_reply)
+    with ORDER_LOCK:
+        lifecycle_reply = order_lifecycle.command(db, owner, message)
+    if lifecycle_reply is not None:
+        return kakao(lifecycle_reply)
+    try:
+        message, customer_decision = customer_orders.prepare(message, ROOT / 'customer-memory.sqlite3')
+    except ValueError as error:
+        return kakao(str(error))
     with LOCK, db() as c:
         pending = c.execute('SELECT details FROM invitation_input WHERE owner=? AND expires>?',
                             (owner, time.time())).fetchone()

@@ -1,0 +1,14 @@
+{
+  "synthetic_checks": 7000,
+  "passed": {
+    "amend_existing_row": 1000,
+    "repeat_amendment_held": 1000,
+    "additional_idempotent": 1000,
+    "distinct_additional": 1000,
+    "wrong_owner_held": 1000,
+    "cancellation_idempotent": 1000,
+    "cancel_blocks_writer": 1000
+  },
+  "external_calls": 0,
+  "live_side_effects": false
+}

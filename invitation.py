@@ -18,10 +18,11 @@ from lxml import html as dom
 
 import checkout
 from blogpay import BlogPay, PRICES
+import invitation_vendors
 
 SEOUL = ZoneInfo('Asia/Seoul')
 WREATH = '쌀빛그림화환은 설치 후 쌀로 교환해 혼주님 명의로 도움이 필요한 곳에 기부하는 친환경 화환입니다.'
-HOSTS = {'bojagicard.com', 'feelcard.co.kr', 'salondeletter.com', 'toourguest.com', 'itscard.co.kr', 'itscard.com'}
+HOSTS = {'bojagicard.com', 'feelcard.co.kr', 'salondeletter.com', 'toourguest.com', 'itscard.co.kr', 'itscard.com', 'letterb.barunsoncard.com', 'makedear.com', 'mcard.itscard.co.kr'}
 WHEN = re.compile(r'(20\d\d)[년./-]\s*(\d{1,2})[월./-]\s*(\d{1,2})일?\s*[ (]*(?:[월화수목금토일](?:요일)?\)?)?\s*(오전|오후)?\s*(\d{1,2})(?:\s*시\s*(?:(\d{1,2})\s*분)?|:(\d{1,2}))')
 PRODUCT_LOCK = threading.Lock()
 PRODUCT_CACHE = {}
@@ -61,6 +62,19 @@ def text_at(tree, path, **variables):
     return matches[0].text_content().strip() if matches else ''
 
 
+def read_itscard_view(uid):
+    """Read the vendor's public view endpoint only, never RSVP/guestbook writes."""
+    if not isinstance(uid, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', uid):
+        raise ValueError('청첩장 식별자를 확인해 주세요.')
+    url = 'https://apis.itscard.co.kr:447/mcard/view/' + uid
+    request = Request(url, data=b'', headers={'User-Agent': 'Mozilla/5.0'})
+    with build_opener(NoRedirect()).open(request, timeout=9) as response:
+        raw = response.read(2_000_001)
+    if len(raw) > 2_000_000:
+        raise ValueError('청첩장 정보가 너무 커서 읽지 못했어요.')
+    return json.loads(raw)
+
+
 def parse_time(value):
     m = WHEN.search(value)
     if not m:
@@ -81,6 +95,12 @@ def parse_page(source, raw):
     tree = dom.fromstring(raw)
     host = urlsplit(source).hostname.removeprefix('www.')
     meta = {m.get('property'): m.get('content', '') for m in tree.xpath('//meta[@property]')}
+    if host == 'letterb.barunsoncard.com':
+        return invitation_vendors.barunson(source, tree, parse_time)
+    if host == 'makedear.com':
+        return invitation_vendors.makedear(source, tree)
+    if host == 'mcard.itscard.co.kr':
+        return invitation_vendors.itscard(source, tree, parse_time, read_itscard_view)
     image = urljoin(source, meta.get('og:image', '')) if meta.get('og:image') else ''
     if not https_url(image) or not (urlsplit(image).hostname == host or urlsplit(image).hostname.endswith('.' + host)):
         image = ''
@@ -120,7 +140,7 @@ def parse_page(source, raw):
         venue = get('placeName')
         if get('hallName') and get('hallName') not in venue:
             venue += ' ' + get('hallName')
-        address = get('placeAddrRoad')
+        address = get('placeAddrRoad') or text_at(tree, '//*[contains(@class,"locate_box")]//*[contains(concat(" ",normalize-space(@class)," ")," locate ")]')
         for side in ('groom','bride'):
             def name(role):
                 return get(f'{side}{role}LastName') + get(f'{side}{role}FirstName')

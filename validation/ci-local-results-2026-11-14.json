@@ -1,0 +1,14 @@
+{
+  "unit_tests": {
+    "tests": 133,
+    "failures": 0,
+    "errors": 0,
+    "outbound_python_sockets_disabled": true
+  },
+  "completion": {
+    "synthetic_scripts_completed": 6,
+    "unit_tests_passed": true,
+    "no_private_source_files": true
+  },
+  "status": "local success; remote CI not inferred"
+}
