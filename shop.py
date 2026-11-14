@@ -20,6 +20,9 @@ import shop_sales
 import assignment_batches
 import order_messages
 import cash_receipts
+import shop_admin_layout
+import shop_readiness
+import external_backups
 
 ADMIN_PATH = re.compile(r'/shop/admin/([0-9]{10})/([a-f0-9]{64})')
 ORDER_PATH = re.compile(r'/shop/order/([a-f0-9]{32})')
@@ -38,6 +41,7 @@ def admin_authorized(expiry, signature, secret):
 
 
 def setup(connection):
+    external_backups.setup(connection)
     connection.execute("""CREATE TABLE IF NOT EXISTS shop_products (
         id TEXT PRIMARY KEY, details TEXT NOT NULL, revision INTEGER NOT NULL)""")
     connection.execute("""CREATE TABLE IF NOT EXISTS shop_offers (
@@ -368,7 +372,7 @@ def admin_page(connection, path, origin, fields=None, root=None):
         + ('<p>실제 알림 발송 활성화</p>' if order_messages.configured() else '<p>실제 알림 발송 꺼짐 또는 설정 미완료 · 대기열만 보관</p>')
         + ('<p>직원 알림 번호가 없습니다.</p>' if not order_ops.phones(connection) else '') + '</section>')
 
-    return ('''<!doctype html><html lang="ko"><meta charset="utf-8">
+    page = ('''<!doctype html><html lang="ko"><meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1"><title>벨라비타 쇼핑몰 관리</title>
       <style>body{background:#f5f5ef;color:#243329;font:16px/1.5 system-ui;margin:0}
       main{max-width:850px;margin:auto;padding:24px;overflow-wrap:anywhere}section{background:white;border:1px solid #dadfd6;
@@ -397,3 +401,4 @@ def admin_page(connection, path, origin, fields=None, root=None):
         loaded();
       }
       </script>''' + shop_dashboard.SCRIPT + '</html>')
+    return shop_admin_layout.render(page,shop_readiness.panel(connection))

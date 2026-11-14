@@ -21,13 +21,14 @@ def run(destination):
     root=Path(destination).resolve();root.mkdir(parents=True,exist_ok=False)
     data=root/'data';secret=secrets.token_hex(32);origin='https://isolated-verification.test'
     with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
-    env=dict(os.environ,TAESAN_DATA=str(data),TAESAN_PUBLIC_URL=origin,TAESAN_WEBHOOK_SECRET=secret,SHOP_VERIFICATION_MODE='1',SHOP_REQUIRE_PERSISTENT_DISK='0',SHOP_BACKUP_ENABLED='0',SHOP_BACKUP_DIRECTORY=str(root/'snapshots'),SHOP_VERIFICATION_REVIEW_KEY='local-isolated-review-test-key-00001',TAESAN_BIND='127.0.0.1',PORT=str(port))
+    env=dict(os.environ,TAESAN_DATA=str(data),TAESAN_PUBLIC_URL=origin,TAESAN_WEBHOOK_SECRET=secret,SHOP_VERIFICATION_MODE='1',SHOP_REQUIRE_PERSISTENT_DISK='0',SHOP_BACKUP_ENABLED='0',SHOP_BACKUP_DIRECTORY=str(root/'snapshots'),SHOP_VERIFICATION_REVIEW_KEY='local-isolated-review-test-key-00001',SHOP_BACKUP_ENCRYPTION_KEY='ab'*32,TAESAN_BIND='127.0.0.1',PORT=str(port))
     log=(root/'server.log').open('w')
-    def call(path,fields=None,review=False):
+    def call(path,fields=None,review=False,raw=None):
         c=http.client.HTTPConnection('127.0.0.1',port,timeout=10);headers={'Origin':origin}
         if review:headers['Authorization']='Bearer '+env['SHOP_VERIFICATION_REVIEW_KEY']
         if fields is not None:headers['Content-Type']='application/x-www-form-urlencoded'
-        c.request('POST' if fields is not None else 'GET',path,urlencode(fields) if fields is not None else None,headers);r=c.getresponse();out=r.status,dict(r.getheaders()),r.read();c.close();return out
+        if raw is not None:headers['Content-Type']='application/octet-stream'
+        c.request('POST' if fields is not None or raw is not None else 'GET',path,raw if raw is not None else urlencode(fields) if fields is not None else None,headers);r=c.getresponse();out=r.status,dict(r.getheaders()),r.read();c.close();return out
     def start():
         p=subprocess.Popen([sys.executable,'shop_verification.py'],env=env,stdout=log,stderr=log)
         deadline=time.monotonic()+30
@@ -53,6 +54,9 @@ def run(destination):
                 row=c.execute('SELECT id,state,details FROM invitation_orders').fetchone();count=c.execute("SELECT count(*) FROM payment_events WHERE kind='partial'").fetchone()[0]
                 return row[0],row[1],json.loads(row[2]),count
         orderid,state,order,count=read();assert state=='cancelled' and order['amount']==165000 and count==1
+        encrypted=call('/verification/review',{'action':'export_backup'},review=True);assert encrypted[0]==200 and encrypted[2].startswith(b'BVBACKUP1\n')
+        decoded=call('/verification/restore-check',review=True,raw=encrypted[2]);assert decoded[0]==200 and json.loads(decoded[2])['restore_check']=='passed'
+        assert call('/verification/restore-check',review=True,raw=encrypted[2][:-1]+b'X')[0]==422
         checked=call('/verification/review',{'action':'backup_restore'},review=True);assert checked[0]==200 and json.loads(checked[2])['backup_restore']=='passed'
         process.terminate();process.wait(timeout=10);process=None
         backup=root/'backup';restored=root/'restored';manage_data.transfer(data,backup);manage_data.transfer(backup,restored,restore=True);assert manage_data.inspect(data)['counts']==manage_data.inspect(restored)['counts']

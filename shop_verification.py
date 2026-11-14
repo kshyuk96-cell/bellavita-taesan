@@ -45,10 +45,25 @@ def handler(agent,checkout):
         def review_authorized(self):
             key=os.getenv('SHOP_VERIFICATION_REVIEW_KEY','')
             return len(key)>=32 and hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+key)
-        def review(self,write=False,admin=False):
+        def review(self,write=False,admin=False,readiness=False,restore_check=False):
             if not self.review_authorized():return self.send_json({'error':'unauthorized'},401)
             import manage_data
             import scheduled_backups
+            import external_backups
+            import tempfile
+            if restore_check:
+                try:
+                    size=int(self.headers.get('Content-Length','0'))
+                    if not 0<size<=external_backups.MAX_BYTES:return self.send_json({'error':'invalid_size'},413)
+                    if self.headers.get_content_type()!='application/octet-stream':return self.send_json({'error':'invalid_type'},415)
+                    content=self.rfile.read(size)
+                    with tempfile.TemporaryDirectory(prefix='bv-review-restore-') as tmp:report=external_backups.restore(content,Path(tmp)/'restored')
+                    return self.send_json({'restore_check':'passed','integrity':report['integrity_check'],'counts':report['counts']})
+                except (ValueError,OSError):return self.send_json({'restore_check':'failed'},422)
+            if readiness:
+                import shop_readiness
+                with agent.db() as c:report=shop_readiness.report(c)
+                return self.send_json(report)
             if admin:
                 import shop
                 expiry=str(int(time.time())+600)
@@ -57,10 +72,17 @@ def handler(agent,checkout):
             if write:
                 try:
                     fields=self.read_order_form()
-                    if fields.get('action')!='backup_restore':return self.send_json({'error':'invalid_action'},422)
+                    if fields.get('action')=='record_external_backup':
+                        with agent.db() as c:external_backups.record(c,fields)
+                        return self.send_json({'external_backup_record':'saved','mode':'manual_verified'})
+                    if fields.get('action') not in ('backup_restore','export_backup'):return self.send_json({'error':'invalid_action'},422)
                     base=Path(os.environ['SHOP_BACKUP_DIRECTORY']).resolve()
                     base.mkdir(parents=True,exist_ok=True)
-                    report=scheduled_backups.snapshot(agent.ROOT,base/('review-'+str(time.time_ns())))
+                    target=base/('review-'+str(time.time_ns()))
+                    report=scheduled_backups.snapshot(agent.ROOT,target)
+                    if fields.get('action')=='export_backup':
+                        content=external_backups.pack(target)
+                        self.send_response(200);self.send_header('Content-Type','application/octet-stream');self.send_header('Content-Disposition','attachment; filename=bellavita-verification.bvbackup');self.send_header('Cache-Control','private, no-store');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
                 except (OSError,ValueError):return self.send_json({'backup_restore':'failed'},503)
                 return self.send_json({'backup_restore':'passed','integrity':report['integrity_check'],'restored_counts':report['counts']})
             report=manage_data.inspect(agent.ROOT)
@@ -74,6 +96,7 @@ def handler(agent,checkout):
         def do_GET(self):
             path=urlsplit(self.path).path
             if path=='/verification/review':return self.review()
+            if path=='/verification/review/readiness':return self.review(readiness=True)
             if path=='/verification/review/admin':return self.review(admin=True)
             if path=='/verification':return self.send_json({'mode':'isolated_mock','live_payment':False,'live_messages':False,'live_receipts':False,'storefront':'/shop','data_under_var_data':agent.ROOT.is_relative_to(Path('/var/data')),'mount_verified':os.path.ismount('/var/data')})
             match=re.fullmatch(r'/verification/pay/([a-f0-9]{32})/([a-f0-9]{64})',path)
@@ -82,6 +105,7 @@ def handler(agent,checkout):
                 return self.send_order_html('<!doctype html><html lang="ko"><meta name="viewport" content="width=device-width,initial-scale=1"><h1>페이앱 모의 결제</h1><p>실제 결제·영수증·메시지 전송이 없습니다.</p><form method="post"><button name="state" value="4">모의 결제 완료</button><button name="state" value="70">모의 부분취소 10,000원</button><button name="state" value="64">모의 전체취소</button></form><p><a href="/invitation-orders/'+match[1]+'/receipt">주문 상태 확인</a></p></html>')
             return super().do_GET()
         def do_POST(self):
+            if urlsplit(self.path).path=='/verification/restore-check':return self.review(restore_check=True)
             if urlsplit(self.path).path=='/verification/review':return self.review(write=True)
             match=re.fullmatch(r'/verification/pay/([a-f0-9]{32})/([a-f0-9]{64})',urlsplit(self.path).path)
             if not match:return super().do_POST()

@@ -88,11 +88,15 @@ def process_one(db,root,clock=time.time):
             target=base/('shop-'+str(time.time_ns()))
             cursor=c.execute("INSERT INTO shop_backup_runs(started,state,snapshot) VALUES (?,'running',?)",(current,str(target)))
             run_id=cursor.lastrowid
+        external={'state':'not_run'}
         try:
             staging=base/('.pending-'+target.name)
             report=snapshot(root,staging)
             staging.rename(target)
-            note=json.dumps({'integrity':'ok','restore_drill':'passed','counts':report['counts']},ensure_ascii=False)
+            import external_backups
+            try:external=external_backups.upload(target)
+            except Exception as error:external={'state':'failed','error_type':type(error).__name__}
+            note=json.dumps({'integrity':'ok','restore_drill':'passed','counts':report['counts'],'external_backup':external},ensure_ascii=False)
             state='verified'
         except Exception as error:
             # A failed directory is preserved for diagnosis, never offered as a
@@ -100,7 +104,9 @@ def process_one(db,root,clock=time.time):
             if 'staging' in locals() and staging.exists():
                 failed=base/('.failed-'+target.name);staging.rename(failed);target=failed
             note=type(error).__name__;state='failed'
-        with db() as c:c.execute('UPDATE shop_backup_runs SET state=?,finished=?,note=?,snapshot=? WHERE id=?',(state,clock(),note,str(target),run_id))
+        with db() as c:
+            if external.get('state')=='verified':external_backups.record(c,dict(external,mode='automatic_verified'))
+            c.execute('UPDATE shop_backup_runs SET state=?,finished=?,note=?,snapshot=? WHERE id=?',(state,clock(),note,str(target),run_id))
         return {'id':run_id,'state':state,'snapshot':str(target),'note':note}
 
 

@@ -27,7 +27,7 @@ def configuration(root):
         'alimtalk':group('SHOP_ALIMTALK_ENABLED',['SOLAPI_API_KEY','SOLAPI_API_SECRET','SOLAPI_KAKAO_PFID','SHOP_ALIMTALK_TEMPLATE_ID']),
         'handoff':group('SHOP_HANDOFF_ENABLED',['SHOP_HANDOFF_SECRET']),
         'backup_enabled':env.get('SHOP_BACKUP_ENABLED')=='1',
-        'data_under_var_data':Path(root).resolve().is_relative_to(Path('/var/data').resolve())}
+        'data_under_var_data':Path(root).resolve().is_relative_to(Path('/var/data').resolve()),'external_backup':__import__('external_backups').configuration()}
 
 
 def simulate():
