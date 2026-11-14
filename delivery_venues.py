@@ -1,7 +1,10 @@
 """Rank order volumes by the installation location entered in the ledger."""
+import csv
+import os
 import re
 import unicodedata
 from collections import Counter
+from pathlib import Path
 
 from delivery_counts import ALL_CENTERS, CENTER, DAYS
 from delivery_routes import EPOCH, value
@@ -26,6 +29,32 @@ def request(message):
     return offsets[0] if offsets else 0, centers[0] if centers else None
 
 
+def venue_key(label):
+    return re.sub(r'\s+', '', unicodedata.normalize('NFKC', label).casefold())
+
+
+def aliases():
+    """Use only aliases explicitly reviewed by the operator, never fuzzy names."""
+    file = os.getenv('TAESAN_VENUE_ALIASES')
+    if not file:
+        return {}
+    results = {}
+    with Path(file).open(encoding='utf-8-sig', newline='') as stream:
+        reader = csv.DictReader(stream)
+        if reader.fieldnames != ['alias', 'venue']:
+            raise ValueError('설치장소 별칭 파일의 열 제목을 확인해 주세요.')
+        for row in reader:
+            alias = (row['alias'] or '').strip()
+            venue = (row['venue'] or '').strip()
+            key = venue_key(alias)
+            if not key or not venue or len(venue) > 160 or (key in results and results[key] != venue):
+                raise ValueError('설치장소 별칭 파일에 빈 값이나 서로 다른 장소가 연결돼 있어요.')
+            results[key] = venue
+    if any(venue_key(venue) in results and results[venue_key(venue)] != venue for venue in results.values()):
+        raise ValueError('설치장소 별칭을 최종 행사장 이름에 바로 연결해 주세요.')
+    return results
+
+
 def rank(day, center, read):
     if center is not None and (not isinstance(center, str) or len(center) > 30):
         raise ValueError('어느 센터 설치를 확인할까요?')
@@ -47,6 +76,7 @@ def rank(day, center, read):
     counts = Counter()
     labels = {}
     missing = 0
+    confirmed_aliases = aliases()
     for i, row in enumerate(dates[1:], 1):
         if value(row, 0) != serial or (filtered and center_key not in value(channels, i)):
             continue
@@ -55,7 +85,8 @@ def rank(day, center, read):
             missing += 1
             continue
         label = ' '.join(unicodedata.normalize('NFKC', venue).split())
-        key = re.sub(r'\s+', '', label.casefold())
+        label = confirmed_aliases.get(venue_key(label), label)
+        key = venue_key(label)
         labels.setdefault(key, label[:160])
         counts[key] += 1
     prefix = f'{day.month}월 {day.day}일 {center.strip() if filtered else "전체 센터"}'
