@@ -1,0 +1,9 @@
+{
+  "real_interval_seconds": 60,
+  "elapsed_seconds": 60.1,
+  "scheduled_snapshots": 2,
+  "automatic_restore_drills": 2,
+  "service_writes_between_backups": true,
+  "sample_products": 5,
+  "real_payments": false
+}

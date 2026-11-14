@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>쌀빛그림화환 주문서 | 벨라비타</title>
+<title>$checkout_heading | 벨라비타</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&amp;family=Noto+Serif+KR:wght@600;700;900&amp;display=swap" rel="stylesheet">
@@ -149,7 +149,7 @@ summary { cursor: pointer; }
   .wreath-preview .wreath-viewport { width: min(100%, 245px); }
   .wreath-preview.is-close-up .wreath-stage { transform: none; }
   .scroll-greeting { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-  .scroll-greeting > svg { display: block; flex: none; width: 100%; height: 100%; overflow: hidden; fill: currentColor; }
+  .scroll-greeting > canvas { display: block; flex: none; width: 100%; height: 100%; object-fit: contain; }
   .mobile-preview:not([hidden]) {
     display: grid;
     grid-template-columns: 48px minmax(0, 1fr) auto;
@@ -182,13 +182,14 @@ summary { cursor: pointer; }
   .row { grid-template-columns: 1fr; gap: 11px; }
 }
 </style>
+$catalog_style
 </head>
 <body>
 <header>벨라비타</header>
 <main>
-<h1>쌀빛그림화환 주문서</h1>
-<form action="$action" method="post" id="order">
-<input type="hidden" name="attempt" value="$attempt">
+<h1>$checkout_heading</h1>
+<form action="$action" method="post" id="order" data-force-message="$force_message">
+<input type="hidden" name="attempt" value="$attempt"><input type="hidden" name="product_revision" value="$product_revision">
 <section class="product" aria-label="상품 정보">
 $pictures
 <div class="product-options">
@@ -200,6 +201,7 @@ $pictures
 <button type="button" id="open-mobile-example">설치 예시 크게 보기</button>
 </div>
 $groups
+$extra_fields
 <label>보내시는 분<input name="sender" maxlength="140" required placeholder="예: 벨라비타 대표 홍길동"></label>
 <label id="custom" hidden>직접 쓰는 축하 문구<textarea name="message" maxlength="200" rows="2" disabled></textarea></label>
 <p class="preview" id="preview" hidden></p>
@@ -218,7 +220,13 @@ $groups
 </section>
 <section>
 <h2>설치 장소</h2>
-<p class="venue">$venue <span>$address</span><span>$date $clock</span></p>
+$installation
+</section>
+<section $receipt_section_state>
+<h2>현금영수증</h2>
+<label>발급 구분<select name="cash_receipt_type" id="cash-receipt-type" $receipt_controls_state><option value="personal">소득공제 · 주문자 휴대폰</option><option value="business">지출증빙 · 사업자번호</option><option value="self">자진발급</option></select></label>
+<label id="cash-receipt-label">발급 번호<input name="cash_receipt_identifier" id="cash-receipt-identifier" $receipt_controls_state inputmode="numeric" maxlength="20" placeholder="공란이면 주문자 휴대폰 번호"></label>
+<p class="hint">현금성 결제에만 적용됩니다. 카드와 간편결제는 결제사 발급 내역을 따릅니다.</p>
 </section>
 <section>
 <h2>최종 결제정보</h2>
@@ -226,7 +234,7 @@ $groups
 </section>
 <section>
 <h2>주문 정보 수집 동의</h2>
-<details class="consent-details"><summary>수집 항목과 이용 목적 보기</summary><p>벨라비타는 주문 확인, 행사장 설치, 설치 사진 전송과 고객 문의 처리를 위해 주문자 이름·휴대폰 번호, 보내시는 분, 주문 옵션과 축하 문구를 수집합니다. 결제를 위해 상품명, 결제금액, 주문자 연락처를 페이앱에 전달합니다. 주문 정보는 거래 확인과 관련 법령에 따른 보관에 사용합니다. 필수 항목 수집을 거부할 수 있으며, 거부 시 주문을 진행할 수 없습니다. 문의 031-8067-8580</p></details>
+<details class="consent-details"><summary>수집 항목과 이용 목적 보기</summary><p>벨라비타는 주문 확인, 행사장 설치, 샘플 이미지·주문 및 배송 알림, 설치 사진 전송과 고객 문의 처리를 위해 주문자 이름·휴대폰 번호, 보내시는 분, 주문 옵션과 축하 문구를 수집합니다. 결제를 위해 상품명, 결제금액, 주문자 연락처를 페이앱에 전달합니다. 현금영수증 신청 시 발급용 휴대폰·사업자번호를 페이앱에 전달합니다. 주문·배송 담당 직원이 주문 정보를 확인하며, 문자 알림 발송을 위해 발송 대행사에 연락처·알림 내용·문구 샘플 이미지를 전달합니다. 주문 정보는 거래 확인과 관련 법령에 따른 보관에 사용합니다. 필수 항목 수집을 거부할 수 있으며, 거부 시 주문을 진행할 수 없습니다. 문의 031-8067-8580</p></details>
 <label><input type="checkbox" name="consent" value="yes" required>주문 정보 수집에 동의합니다.</label>
 $notice
 <button type="submit" $button_state>결제하기</button>
@@ -236,11 +244,7 @@ $notice
 <dialog class="product-detail" id="product-detail" aria-labelledby="detail-title">
 <div class="detail-head"><h2 id="detail-title">상품 설명</h2><form method="dialog"><button>닫기</button></form></div>
 <div class="detail-content">
-<p><strong>쌀(쌀빛그림)화환 관련</strong></p>
-<p>신청해주신 쌀빛그림화환은 친환경 웨딩갤러리를 만들기 위해 액자를 설치하고<br>예식 후 쌀로 교환하여 혼주님께 드리거나 필요한 시설에 기부합니다.</p>
-<p>필요한 웨딩액자나 작품액자는 준비된 액자를 사용하니<br>전화나 문자를 이용하시거나 주문시스템에서 시청하시면 됩니다.</p>
-<p>문의 전화 031-8067-8580</p>
-<img src="https://bellavita1004.blogpay.io/img/editor/bellavita1004/temp/0524251001759278768.jpg" alt="쌀빛그림화환 상세 안내" loading="lazy">
+$detail_content
 </div>
 </dialog>
 <dialog class="product-detail" id="mobile-example" aria-labelledby="mobile-example-title">
@@ -249,7 +253,7 @@ $notice
 </dialog>
 <script>
 const form = document.getElementById('order');
-const choices = Array.from(form.querySelectorAll('select'));
+const choices = Array.from(form.querySelectorAll('select[name^="choice"]'));
 const custom = document.getElementById('custom');
 const preview = document.getElementById('preview');
 const amount = document.getElementById('amount');
@@ -257,6 +261,14 @@ const message = form.elements.namedItem('message');
 const sender = form.elements.namedItem('sender');
 const buyer = form.elements.namedItem('buyer');
 const sameBuyer = form.elements.namedItem('same_buyer');
+const receiptType = document.getElementById('cash-receipt-type');
+const receiptIdentifier = document.getElementById('cash-receipt-identifier');
+receiptType.addEventListener('change', () => {
+  const business = receiptType.value === 'business';
+  document.getElementById('cash-receipt-label').hidden = receiptType.value === 'self';
+  receiptIdentifier.required = business;
+  receiptIdentifier.placeholder = business ? '사업자번호 10자리' : '공란이면 주문자 휴대폰 번호';
+});
 let separateBuyer = buyer.value;
 const wreath = document.getElementById('wreath-preview');
 const greetingChoice = document.getElementById('greeting-choice');
@@ -430,16 +442,14 @@ function greetingFits(rows) {
 }
 const greetingMeasure = document.createElement('canvas').getContext('2d');
 function layoutMobileGreeting(paragraphs, style) {
-  // Size the lettering in SVG units so mobile text enlargement cannot move it outside the paper.
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('aria-hidden', 'true');
-  const group = document.createElementNS(ns, 'g');
-  group.setAttribute('font-size', '32');
-  group.setAttribute('text-anchor', 'middle');
-  svg.append(group);
+  // Rasterize at a fixed high resolution. Chromium can enlarge tiny SVG text
+  // after viewBox measurement, clipping the first/last line of a 200-char entry.
+  const canvas = document.createElement('canvas');
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('aria-label', paragraphs.join('\n'));
   const maxWidth = 530;
   greetingMeasure.font = style.fontWeight + ' 32px ' + style.fontFamily;
+  greetingMeasure.textAlign = 'center';
   const measure = line => greetingMeasure.measureText(line).width;
   const rows = paragraphs.flatMap(paragraph => {
     const balanced = balancedLines(paragraph, measure, maxWidth, 5);
@@ -456,17 +466,19 @@ function layoutMobileGreeting(paragraphs, style) {
     if (line.trim()) lines.push(line.trim());
     return lines;
   });
-  rows.forEach((row, index) => {
-    const text = document.createElementNS(ns, 'text');
-    text.setAttribute('y', String(index * 39));
-    text.textContent = row;
-    group.append(text);
-  });
-  scrollGreeting.replaceChildren(svg);
-  const bounds = group.getBBox();
-  const width = Math.max(550, 2 * Math.max(-bounds.x, bounds.x + bounds.width) + 24);
-  const height = Math.max(79, bounds.height + 16);
-  svg.setAttribute('viewBox', [-width / 2, bounds.y + (bounds.height - height) / 2, width, height].join(' '));
+  const metrics = rows.map(row => greetingMeasure.measureText(row));
+  const ascent = Math.max(32, ...metrics.map(metric => metric.actualBoundingBoxAscent));
+  const descent = Math.max(8, ...metrics.map(metric => metric.actualBoundingBoxDescent));
+  const overhang = Math.max(275, ...metrics.map(metric =>
+    Math.max(metric.actualBoundingBoxLeft, metric.actualBoundingBoxRight, metric.width / 2)));
+  canvas.width = Math.ceil(2 * overhang + 24);
+  canvas.height = Math.ceil(ascent + descent + Math.max(0, rows.length - 1) * 39 + 16);
+  const context = canvas.getContext('2d');
+  context.font = greetingMeasure.font;
+  context.fillStyle = style.color;
+  context.textAlign = 'center';
+  rows.forEach((row, index) => context.fillText(row, canvas.width / 2, 8 + ascent + index * 39));
+  scrollGreeting.replaceChildren(canvas);
 }
 
 function layoutGreeting(text) {
@@ -583,7 +595,7 @@ function updateScroll() {
 }
 function update() {
   const options = choices.map(select => select.selectedOptions[0]);
-  const direct = options.some(option => option.dataset.custom === '1');
+  const direct = document.getElementById('order').dataset.forceMessage === '1' || options.some(option => option.dataset.custom === '1');
   custom.hidden = !direct;
   message.disabled = !direct;
   message.required = direct;

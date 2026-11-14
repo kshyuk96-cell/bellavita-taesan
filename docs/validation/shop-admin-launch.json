@@ -1,0 +1,52 @@
+{
+  "scenarios": [
+    {
+      "width": 375,
+      "done_owner_priority_search": true,
+      "due_soon_count_and_filter": true,
+      "feature_favorite_persists_and_navigates_without_post": true,
+      "launch_note_does_not_claim_merchant_ready": true,
+      "snapshot_save_and_frozen_download": true,
+      "financial_state_preserved": true,
+      "overflow": false
+    },
+    {
+      "width": 1280,
+      "done_owner_priority_search": true,
+      "due_soon_count_and_filter": true,
+      "feature_favorite_persists_and_navigates_without_post": true,
+      "launch_note_does_not_claim_merchant_ready": true,
+      "snapshot_save_and_frozen_download": true,
+      "financial_state_preserved": true,
+      "overflow": false
+    }
+  ],
+  "javascript_errors": [],
+  "live_side_effects": false,
+  "unit_tests": {
+    "passed": 166
+  },
+  "focused_tests": {
+    "passed": 6
+  },
+  "previous_shortcuts_browser": "passed: 375/1280",
+  "daily_admin_browser": "passed: 375/1280",
+  "catalog_browser": "passed: 375/1280",
+  "prechange_backup_restore": "passed",
+  "hosted_verification": {
+    "hosted_ui": true,
+    "completed_owner_priority_search": true,
+    "due_soon_search": true,
+    "feature_favorite_after_redeploy": true,
+    "snapshot_hash_preserved_after_redeploy": true,
+    "launch_check_records_remain_separate_from_actual_validation": true,
+    "existing_order_states_preserved": true,
+    "order_count": 3,
+    "integrity": "ok",
+    "mount_verified": true,
+    "new_tables_restore_verified": true,
+    "manual_matches_source": true,
+    "live_side_effects": false
+  },
+  "verified_commit": "21ddc31d07f385056a5c623c19088c1103eb4ba1"
+}

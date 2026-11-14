@@ -1,0 +1,12 @@
+{
+  "commit": "c370b43257023ed5676ebf7167b5994fe2ec9e59",
+  "preserved": {
+    "shop_products": 1,
+    "shop_offers": 2,
+    "invitation_orders": 4,
+    "payment_events": 8
+  },
+  "http_links_checked": 7,
+  "integrity_check": "ok",
+  "kind": "new process from git archive; same local data directory; not Render deploy"
+}

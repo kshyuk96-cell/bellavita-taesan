@@ -1,0 +1,26 @@
+test_actual_payapp_response_parsing_and_uncertain_failures (test_shop.ShopTest.test_actual_payapp_response_parsing_and_uncertain_failures) ... 초대장 결제 연결 실패: OSError
+초대장 결제 연결 실패: OSError
+초대장 결제 연결 실패: OSError
+초대장 결제 연결 실패: OSError
+초대장 결제 연결 실패: OSError
+ok
+test_authorization_origin_and_staff_approval (test_shop.ShopTest.test_authorization_origin_and_staff_approval) ... ok
+test_backup_restore_restart_and_corrupt_backup (test_shop.ShopTest.test_backup_restore_restart_and_corrupt_backup) ... ok
+test_callback_before_request_response_and_changed_replay (test_shop.ShopTest.test_callback_before_request_response_and_changed_replay) ... ok
+test_concurrent_form_submission_only_requests_payment_once (test_shop.ShopTest.test_concurrent_form_submission_only_requests_payment_once) ... ok
+test_cross_order_payment_reference_rejected (test_shop.ShopTest.test_cross_order_payment_reference_rejected) ... 초대장 결제 연결 실패: TimeoutError
+ok
+test_disabled_stopped_invalid_and_expired (test_shop.ShopTest.test_disabled_stopped_invalid_and_expired) ... ok
+test_duplicate_reordered_partial_and_full_cancellation (test_shop.ShopTest.test_duplicate_reordered_partial_and_full_cancellation) ... ok
+test_invalid_signature_amount_number_and_unknown_state (test_shop.ShopTest.test_invalid_signature_amount_number_and_unknown_state) ... ok
+test_invitation_paths_and_separate_order_history (test_shop.ShopTest.test_invitation_paths_and_separate_order_history) ... ok
+test_legacy_cancel_without_event_history_stays_cancelled (test_shop.ShopTest.test_legacy_cancel_without_event_history_stays_cancelled) ... ok
+test_price_snapshot_and_repeat_issue (test_shop.ShopTest.test_price_snapshot_and_repeat_issue) ... ok
+test_request_cancel_does_not_override_approval_in_either_order (test_shop.ShopTest.test_request_cancel_does_not_override_approval_in_either_order) ... ok
+test_timeout_reconciliation_no_retry_and_signed_recovery (test_shop.ShopTest.test_timeout_reconciliation_no_retry_and_signed_recovery) ... 초대장 결제 연결 실패: TimeoutError
+ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 8.112s
+
+OK

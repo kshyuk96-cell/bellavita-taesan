@@ -1,0 +1,49 @@
+# Independent PR #20 verification. Does not adopt/update the main service.
+services:
+  - type: web
+    name: bellavita-shop-verification
+    runtime: python
+    repo: https://github.com/kshyuk96-cell/bellavita-taesan
+    branch: codex/shop-backend
+    region: oregon
+    plan: 0.5c-512mb
+    numInstances: 1
+    autoDeployTrigger: 'off'
+    buildCommand: pip install -r requirements.txt
+    startCommand: python shop_verification.py
+    healthCheckPath: /healthz
+    disk:
+      name: shop-verification-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: '3.12.12'
+      - key: TAESAN_BIND
+        value: 0.0.0.0
+      - key: TAESAN_DATA
+        value: /var/data/shop-verification
+      - key: TAESAN_WEBHOOK_SECRET
+        generateValue: true
+      - key: SHOP_VERIFICATION_MODE
+        value: '1'
+      - key: SHOP_REQUIRE_PERSISTENT_DISK
+        value: '1'
+      - key: TAESAN_LIVE_WRITE
+        value: '0'
+      - key: SHOP_MESSAGES_ENABLED
+        value: '0'
+      - key: SHOP_ALIMTALK_ENABLED
+        value: '0'
+      - key: SHOP_CASH_RECEIPT_ENABLED
+        value: '0'
+      - key: SHOP_HANDOFF_ENABLED
+        value: '0'
+      - key: INVITATION_CHECKOUT_ENABLED
+        value: '0'
+      - key: SHOP_BACKUP_ENABLED
+        value: '1'
+      - key: SHOP_BACKUP_DIRECTORY
+        value: /var/data/shop-verification-backups
+      - key: SHOP_BACKUP_INTERVAL_SECONDS
+        value: '86400'

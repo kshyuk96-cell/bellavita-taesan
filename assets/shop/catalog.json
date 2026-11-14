@@ -1,0 +1,1473 @@
+{
+  "source": "https://bellavita1004.shop.blogpay.co.kr",
+  "collectedAt": "2026-11-14T09:27:56.061Z",
+  "listingPages": 3,
+  "total": 4,
+  "saleCount": 4,
+  "products": [
+    {
+      "id": "1454214",
+      "title": "(2~4호 선물형) 신랑신부 사진으로 액자화환 보내기 <웨딩 사진>",
+      "soldOut": false,
+      "image": "https://bellavita1004.blogpay.io/img/g/bellavita1004/0668131001719538129.jpg",
+      "subtext": "수요일까지 주문 및 사진 전달 시 해당 주말 배송 가능합니다.",
+      "category": "결혼 액자화환",
+      "sourceUrl": "https://bellavita1004.shop.blogpay.co.kr/good/product_view?goodNum=1454214",
+      "price": 110000,
+      "inventory": 938,
+      "images": [
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/0668131001719538129.jpg",
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/0365712001719538129.jpg"
+      ],
+      "detailImages": [
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0427397001758088567.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0557923001758088561.jpg"
+      ],
+      "detailText": "#개인정보 수집 및 이용 동의 \"상품 주문 및 배송을 위해 위에 입력된 개인정보를 수집합니다. 수집한 개인정보는 이외의 목적으로는 사용하지 않으며, 개인정보의 수집 및 이용에 대한 동의를 거부할 수 있으며, 이 경우 상품 주문이 어려울 수 있습니다.\"*개인정보 수집 및 이용에 동의하지 않으시면 주문 취소 바랍니다. 감사합니다.",
+      "options": [
+        {
+          "id": "2056922",
+          "title": "상품 선택",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "27820832",
+              "label": "2호 선물형(600x400mm)",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820833",
+              "label": "3호 선물형(700x467mm)",
+              "extra": 55000,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "2056923",
+          "title": "보내는 문구",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "27820834",
+              "label": "0. 직접 입력시 하단 <보내시는 분>입력창에 함께 입력해주세요",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820835",
+              "label": "1. 두분의 결혼을 진심으로 축하드리며 아름답고 행복한 가정을 이루시길 소망합니다",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820836",
+              "label": "2. 멋지고 아름다운 두분의 결혼을 진심으로 축하드리며 행복한 가정 이루시길 바랍니다",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820837",
+              "label": "3. 신랑 신부 두분이 만들어 나갈 따뜻하고 행복한 가정을 축복합니다",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820838",
+              "label": "4. 멋진 신랑 아름다운 신부가 함께 걷는 길이 언제나 축복이길 바랍니다",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820839",
+              "label": "5. 결혼을 진심으로 축하드리며 함께 하는 길이 언제나 행복하고 기쁨이 가득하길 기원합니다",
+              "extra": 0,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "2056924",
+          "title": "액자 사진",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "27820840",
+              "label": "신랑신부 사진 2mb 이상 전달 (카카오채널 또는 bellavita33@naver.com)",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820841",
+              "label": "2mb 이상의 사진이 아닐 시 청첩장 내 사진 중 작업 가능한 사진 중 보내드립니다.",
+              "extra": 0,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "3515909",
+          "title": "받으시는 분",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "27820842",
+              "label": "신랑측 부",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820843",
+              "label": "신랑측 모",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820844",
+              "label": "신랑",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820845",
+              "label": "신부측 부",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820846",
+              "label": "신부측 모",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820847",
+              "label": "신부",
+              "extra": 0,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "77949",
+          "title": "보내시는분 정보를 입력하신후 우측 <<입력완료>>를 눌러주세요.(예, 갤러리화환 대표 홍길동) *축하 문구 직접 입력 선택시 축하 문구도 함께 적어주세요.",
+          "required": true,
+          "type": "text",
+          "extra": 0,
+          "maxLength": 200
+        },
+        {
+          "id": "77950",
+          "title": "예식일시를 입력하신 후 우측 <<입력완료>>를 눌러주세요.(예, xx월xx일 xx요일 xx시)",
+          "required": true,
+          "type": "text",
+          "extra": 0,
+          "maxLength": 200
+        },
+        {
+          "id": "77951",
+          "title": "모바일청첩장 링크를 입력하시거나 '없음'으로 입력하신 후 우측 <<입력완료>>를 눌러주세요.",
+          "required": true,
+          "type": "text",
+          "extra": 0,
+          "maxLength": 200
+        }
+      ],
+      "delivery": {
+        "isDelivery": "0",
+        "cost": 0,
+        "free": true,
+        "text": ""
+      },
+      "sourceCategory": "결혼 액자화환",
+      "saleStatus": "on_sale",
+      "thumbnail": {
+        "url": "/assets/bellavita-thumbnails-v3.png",
+        "position": "0% 0%",
+        "design": "controlled-proportions-v3",
+        "reference": "Current public product detail composition: photo inset, message and sender panel; generated design preview",
+        "regions": [
+          [
+            174,
+            38,
+            280,
+            176
+          ],
+          [
+            200,
+            223,
+            227,
+            287
+          ]
+        ],
+        "canvas": 1254
+      },
+      "displayTitle": "웨딩 사진 액자화환",
+      "proportionEvidence": {
+        "frame": {
+          "ratio": [
+            3,
+            2
+          ],
+          "status": "published_dimensions",
+          "sizesMm": [
+            [
+              600,
+              400
+            ],
+            [
+              700,
+              467
+            ]
+          ],
+          "source": "https://bellavita1004.shop.blogpay.co.kr/good/product_view?goodNum=1454214",
+          "scope": "Published gift-frame size options; no independent physical measurement"
+        },
+        "scroll": {
+          "ratio": [
+            2,
+            3
+          ],
+          "status": "approximate_from_official_diagram",
+          "physicalSizeMm": null,
+          "source": "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0557923001758088561.jpg"
+        },
+        "relativeWidth": 0.85,
+        "relativeWidthStatus": "approximate_from_official_diagram"
+      }
+    },
+    {
+      "id": "1440817",
+      "title": "(2~4호 선물형) 결혼 축하 액자화환 <풍경 사진>",
+      "soldOut": false,
+      "image": "https://bellavita1004.blogpay.io/img/g/bellavita1004/0198954001719538148.jpg",
+      "subtext": "",
+      "category": "결혼 액자화환",
+      "sourceUrl": "https://bellavita1004.shop.blogpay.co.kr/good/product_view?goodNum=1440817",
+      "price": 110000,
+      "inventory": 958,
+      "images": [
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/0198954001719538148.jpg",
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/0863465001719538147.jpg"
+      ],
+      "detailImages": [
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0447045001758088617.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0643260001758088610.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0153029001793755778.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0576779001793755778.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0809218001793755778.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0038329001793755779.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0295326001793755779.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0533119001793755779.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0774138001793755779.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0021677001793755780.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0257127001793755780.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0497376001793755780.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0728391001793755780.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0960196001793755780.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0209552001793755781.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0442751001793755781.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0351827001793755778.jpg"
+      ],
+      "detailText": "#개인정보 수집 및 이용 동의 \"상품 주문 및 배송을 위해 위에 입력된 개인정보를 수집합니다. 수집한 개인정보는 이외의 목적으로는 사용하지 않으며, 개인정보의 수집 및 이용에 대한 동의를 거부할 수 있으며, 이 경우 상품 주문이 어려울 수 있습니다.\"*개인정보 수집 및 이용에 동의하지 않으시면 주문 취소 바랍니다. 감사합니다.",
+      "options": [
+        {
+          "id": "2040731",
+          "title": "상품 선택",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "27820717",
+              "label": "2호 선물형(600x400mm)",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820718",
+              "label": "3호 선물형(700x467mm)",
+              "extra": 55000,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "2040732",
+          "title": "보내는 문구",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "27820719",
+              "label": "0. 직접 입력시 하단<보내시는 분>입력창에 함께 입력해주세요",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820720",
+              "label": "1. 두분의 결혼을 진심으로 축하드리며 아름답고 행복한 가정을 이루시길 소망합니다",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820721",
+              "label": "2. 멋지고 아름다운 두분의 결혼을 진심으로 축하드리며 행복한 가정 이루시길 바랍니다",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820722",
+              "label": "3. 신랑 신부 두분이 만들어 나갈 따뜻하고 행복한 가정을 축복합니다",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820723",
+              "label": "4. 멋진 신랑 아름다운 신부가 함께 걷는 길이 언제나 축복이길 바랍니다",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820724",
+              "label": "5. 결혼을 진심으로 축하드리며 함께 하는 길이 언제나 행복하고 기쁨이 가득하길 기원합니다",
+              "extra": 0,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "2040733",
+          "title": "작품 선택(재고 및 예식 상황에 따라 다른 작품이 출고될 수 있습니다)",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "27820725",
+              "label": "0. 큐레이터에게 의뢰하기(작품)",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820726",
+              "label": "0. 신랑신부 웨딩 사진액자(카카오채널 또는 bellavita33@naver.com 전송)",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820727",
+              "label": "1 소백산 비로봉",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820728",
+              "label": "2 월출산 천황봉 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820729",
+              "label": "4 제주 광치기해변 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820730",
+              "label": "5 덕유산 향적봉 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820731",
+              "label": "6 명동에서 본 롯데타워 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820732",
+              "label": "7 북한산 만경대에서 본 인수봉 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820733",
+              "label": "8 부산 광안대교 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820734",
+              "label": "9 수원화성 서장대 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820735",
+              "label": "10 남한산성 제3남옹성 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820736",
+              "label": "11 남한산성 장경사 신지옹성 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820737",
+              "label": "12 수원화성 동북포루 노을",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820738",
+              "label": "13 안성팜랜드 해바라기 1",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820739",
+              "label": "14 안성팜랜드 해바라기 2",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820740",
+              "label": "15 경주 첨성대 해바라기",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820741",
+              "label": "16 경주 첨성대 해바라기",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820742",
+              "label": "17 함안 강주리 해바라기",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820743",
+              "label": "18 함안강주해바라기",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820744",
+              "label": "19 안성목장 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820745",
+              "label": "20 안성목장 노을",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820746",
+              "label": "20 제주 섭지코지 유채",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820747",
+              "label": "21 인제 원대리 자작나무숲",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820748",
+              "label": "22 인제 원대리 자작나무숲",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820749",
+              "label": "23 인제 원대리 자작나무숲 5",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820750",
+              "label": "24 인제 원대리 자작나무숲",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820751",
+              "label": "25 인제 원대리 자작나무숲",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820752",
+              "label": "26 눈 내린 백두산 서파 천지",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820753",
+              "label": "27 백두산 남파 천지2",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820754",
+              "label": "28 남한산성 서문전망대에서 본 노을",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820755",
+              "label": "29 지리산국립공원 노고단 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820756",
+              "label": "30 소백산 연화봉 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820757",
+              "label": "31 고창 보리나라 학원농장 청보리밭",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820758",
+              "label": "32 제주 가파도 청보리밭 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820759",
+              "label": "33 월출산 국립공원 천황봉 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820760",
+              "label": "34 히말라야 안나푸르나 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820761",
+              "label": "35 황매산 철쭉 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820762",
+              "label": "36 월출산 천황봉 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820763",
+              "label": "37 지리산 천왕봉 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820764",
+              "label": "38 제주 성이시돌목장 나홀로나무",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820765",
+              "label": "39 소백산 비로봉 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820766",
+              "label": "40 설악산 대청봉 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820767",
+              "label": "41 부여 성흥산성 사랑나무 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820768",
+              "label": "42 보은 원정리 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820769",
+              "label": "43 합천 황매산 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820770",
+              "label": "44 설악산 국립공원 울산바위 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820771",
+              "label": "45 정선 새비제 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820772",
+              "label": "46 강릉 안반데기 은하수 4",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820773",
+              "label": "47 제주 가파도 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820774",
+              "label": "48 춘천 건봉령승호대 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820775",
+              "label": "49 임실 옥정호 작약 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820776",
+              "label": "50 거창 창포원 은하수",
+              "extra": 0,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "2040734",
+          "title": "받으시는 분",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "27820777",
+              "label": "신랑측 부",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820778",
+              "label": "신랑측 모",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820779",
+              "label": "신랑",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820780",
+              "label": "신부측 부",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820781",
+              "label": "신부측 모",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27820782",
+              "label": "신부",
+              "extra": 0,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "77952",
+          "title": "보내시는분 정보를 입력하신후 우측 <<입력완료>>를 눌러주세요.(예, 갤러리화환 대표 홍길동) *축하 문구 직접 입력 선택시 축하 문구도 함께 적어주세요.",
+          "required": true,
+          "type": "text",
+          "extra": 0,
+          "maxLength": 200
+        },
+        {
+          "id": "77953",
+          "title": "예식일시를 입력하신 후 우측 <<입력완료>>를 눌러주세요.(예, xx월xx일 xx요일 xx시)",
+          "required": true,
+          "type": "text",
+          "extra": 0,
+          "maxLength": 200
+        },
+        {
+          "id": "77954",
+          "title": "모바일청첩장 링크를 입력하시거나 '없음'으로 입력하신 후 우측 <<입력완료>>를 눌러주세요.",
+          "required": true,
+          "type": "text",
+          "extra": 0,
+          "maxLength": 200
+        }
+      ],
+      "delivery": {
+        "isDelivery": "0",
+        "cost": 0,
+        "free": true,
+        "text": ""
+      },
+      "sourceCategory": "결혼 액자화환",
+      "saleStatus": "on_sale",
+      "thumbnail": {
+        "url": "/assets/bellavita-thumbnails-v3.png",
+        "position": "100% 0%",
+        "design": "controlled-proportions-v3",
+        "reference": "Current public product detail composition: photo inset, message and sender panel; generated design preview",
+        "regions": [
+          [
+            798,
+            38,
+            285,
+            176
+          ],
+          [
+            827,
+            223,
+            227,
+            287
+          ]
+        ],
+        "canvas": 1254
+      },
+      "displayTitle": "결혼 축하 액자화환",
+      "proportionEvidence": {
+        "frame": {
+          "ratio": [
+            3,
+            2
+          ],
+          "status": "published_dimensions",
+          "sizesMm": [
+            [
+              600,
+              400
+            ],
+            [
+              700,
+              467
+            ]
+          ],
+          "source": "https://bellavita1004.shop.blogpay.co.kr/good/product_view?goodNum=1454214",
+          "scope": "Published gift-frame size options; no independent physical measurement"
+        },
+        "scroll": {
+          "ratio": [
+            2,
+            3
+          ],
+          "status": "approximate_from_official_diagram",
+          "physicalSizeMm": null,
+          "source": "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0557923001758088561.jpg"
+        },
+        "relativeWidth": 0.85,
+        "relativeWidthStatus": "approximate_from_official_diagram"
+      }
+    },
+    {
+      "id": "1452802",
+      "title": "(2~4호 선물형) 개업ㆍ행사ㆍ취임 등 축하 액자화환 <풍경 사진>",
+      "soldOut": false,
+      "image": "https://bellavita1004.blogpay.io/img/g/bellavita1004/0382637001704263975.jpg",
+      "subtext": "",
+      "category": "행사 액자화환",
+      "sourceUrl": "https://bellavita1004.shop.blogpay.co.kr/good/product_view?goodNum=1452802",
+      "price": 110000,
+      "inventory": 973,
+      "images": [
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/0382637001704263975.jpg",
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/16939645969359.jpg",
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/16939645992315.jpg",
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/16939646051872.jpg",
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/16939646075728.jpg"
+      ],
+      "detailImages": [
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/16939070853358.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/16939653222637.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/16939648885741.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/16854228852008.jpeg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0447830001793754452.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0209243001793754600.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0676542001793754452.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0906282001793754452.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0163797001793754453.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0442118001793754453.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0684905001793754453.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0955235001793754453.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0200838001793754454.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0452988001793754454.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0708311001793754454.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0986177001793754454.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0227917001793754455.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0474445001793754455.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0723817001793754455.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/20230530145101_834514.jpeg"
+      ],
+      "detailText": "# 개인정보 수집 및 이용 동의 \"상품 주문 및 배송을 위해 위에 입력된 개인정보를 수집합니다. 수집한 개인정보는 이외의 목적으로는 사용하지 않으며, 개인정보의 수집 및 이용에 대한 동의를 거부할 수 있으며, 이 경우 상품 주문이 어려울 수 있습니다.\"*개인정보 수집 및 이용에 동의하지 않으시면 주문 취소 바랍니다. 감사합니다.",
+      "options": [
+        {
+          "id": "2054870",
+          "title": "상품 선택",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "27817655",
+              "label": "2호 선물형(600x400mm)",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817656",
+              "label": "3호 선물형(700x467mm)",
+              "extra": 55000,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "2054871",
+          "title": "행사의 성격",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "27817657",
+              "label": "1. 개업/이전",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817658",
+              "label": "2. 기념/선물",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817659",
+              "label": "3. 생일/공연",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817660",
+              "label": "4. 취임/영전",
+              "extra": 0,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "2054872",
+          "title": "작품 선택(재고 및 예식 상황에 따라 다른 작품이 출고될 수 있습니다)",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "27817661",
+              "label": "0. 큐레이터에게 의뢰하기",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817662",
+              "label": "1 소백산 비로봉",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817663",
+              "label": "2 월출산 천황봉 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817664",
+              "label": "4 제주 광치기해변 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817665",
+              "label": "5 덕유산 향적봉 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817666",
+              "label": "6 명동에서 본 롯데타워 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817667",
+              "label": "7 북한산 만경대에서 본 인수봉 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817668",
+              "label": "8 부산 광안대교 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817669",
+              "label": "9 수원화성 서장대 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817670",
+              "label": "10 남한산성 제3남옹성 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817671",
+              "label": "11 남한산성 장경사 신지옹성 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817672",
+              "label": "12 수원화성 동북포루 노을",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817673",
+              "label": "13 안성팜랜드 해바라기 1",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817674",
+              "label": "14 안성팜랜드 해바라기 2",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817675",
+              "label": "15 경주 첨성대 해바라기",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817676",
+              "label": "16 경주 첨성대 해바라기",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817677",
+              "label": "17 함안 강주리 해바라기",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817678",
+              "label": "18 함안강주해바라기",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817679",
+              "label": "19 안성목장 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817680",
+              "label": "20 안성목장 노을",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817681",
+              "label": "20 제주 섭지코지 유채",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817682",
+              "label": "21 인제 원대리 자작나무숲",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817683",
+              "label": "22 인제 원대리 자작나무숲",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817684",
+              "label": "23 인제 원대리 자작나무숲 5",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817685",
+              "label": "24 인제 원대리 자작나무숲",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817686",
+              "label": "25 인제 원대리 자작나무숲",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817687",
+              "label": "26 눈 내린 백두산 서파 천지",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817688",
+              "label": "27 백두산 남파 천지2",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817689",
+              "label": "28 남한산성 서문전망대에서 본 노을",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817690",
+              "label": "29 지리산국립공원 노고단 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817691",
+              "label": "30 소백산 연화봉 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817692",
+              "label": "31 고창 보리나라 학원농장 청보리밭",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817693",
+              "label": "32 제주 가파도 청보리밭 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817694",
+              "label": "33 월출산 국립공원 천황봉 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817695",
+              "label": "34 히말라야 안나푸르나 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817696",
+              "label": "35 황매산 철쭉 일출",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817697",
+              "label": "36 월출산 천황봉 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817698",
+              "label": "37 지리산 천왕봉 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817699",
+              "label": "38 제주 성이시돌목장 나홀로나무",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817700",
+              "label": "39 소백산 비로봉 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817701",
+              "label": "40 설악산 대청봉 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817702",
+              "label": "41 부여 성흥산성 사랑나무 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817703",
+              "label": "42 보은 원정리 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817704",
+              "label": "43 합천 황매산 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817705",
+              "label": "44 설악산 국립공원 울산바위 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817706",
+              "label": "45 정선 새비제 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817707",
+              "label": "46 강릉 안반데기 은하수 4",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817708",
+              "label": "47 제주 가파도 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817709",
+              "label": "48 춘천 건봉령승호대 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817710",
+              "label": "49 임실 옥정호 작약 은하수",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817711",
+              "label": "50 거창 창포원 은하수",
+              "extra": 0,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "2369616",
+          "title": "보내시는 분/ 행사 일시",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "27817712",
+              "label": "보내시는 분과 행사일시는 <배송 시 요청사항>에 기입해주세요",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "27817713",
+              "label": "예) 벨라비타(주) 대표 홍길동 O월O일O시(혹은 모바일 초대장 링크)",
+              "extra": 0,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "62054",
+          "title": "**우측 입력완료를 꼭 눌러주세요!** 축하의 문구",
+          "required": true,
+          "type": "text",
+          "extra": 0,
+          "maxLength": 200
+        }
+      ],
+      "delivery": {
+        "isDelivery": "0",
+        "cost": 0,
+        "free": true,
+        "text": ""
+      },
+      "sourceCategory": "행사 액자화환",
+      "saleStatus": "on_sale",
+      "thumbnail": {
+        "url": "/assets/bellavita-thumbnails-v3.png",
+        "position": "0% 100%",
+        "design": "controlled-proportions-v3",
+        "reference": "Current public product detail composition: photo inset, message and sender panel; generated design preview",
+        "regions": [
+          [
+            171,
+            665,
+            285,
+            176
+          ],
+          [
+            200,
+            852,
+            227,
+            286
+          ]
+        ],
+        "canvas": 1254
+      },
+      "displayTitle": "행사 축하 액자화환",
+      "proportionEvidence": {
+        "frame": {
+          "ratio": [
+            3,
+            2
+          ],
+          "status": "published_dimensions",
+          "sizesMm": [
+            [
+              600,
+              400
+            ],
+            [
+              700,
+              467
+            ]
+          ],
+          "source": "https://bellavita1004.shop.blogpay.co.kr/good/product_view?goodNum=1454214",
+          "scope": "Published gift-frame size options; no independent physical measurement"
+        },
+        "scroll": {
+          "ratio": [
+            2,
+            3
+          ],
+          "status": "approximate_from_official_diagram",
+          "physicalSizeMm": null,
+          "source": "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0557923001758088561.jpg"
+        },
+        "relativeWidth": 0.85,
+        "relativeWidthStatus": "approximate_from_official_diagram"
+      }
+    },
+    {
+      "id": "1969605",
+      "title": "근조 액자화환 <풍경 사진>",
+      "soldOut": false,
+      "image": "https://bellavita1004.blogpay.io/img/g/bellavita1004/0830537001704267014.jpg",
+      "subtext": "",
+      "category": "근조 액자화환",
+      "sourceUrl": "https://bellavita1004.shop.blogpay.co.kr/good/product_view?goodNum=1969605",
+      "price": 110000,
+      "inventory": 881,
+      "images": [
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/0830537001704267014.jpg",
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/0834529001704267014.jpg",
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/0837542001704267014.jpg",
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/0840531001704267014.jpg",
+        "https://bellavita1004.blogpay.io/img/g/bellavita1004/0843890001704267014.jpg"
+      ],
+      "detailImages": [
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0221958001758088759.jpg",
+        "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0355505001758088762.jpg"
+      ],
+      "detailText": "# 개인정보 수집 및 이용 동의 \"상품 주문 및 배송을 위해 위에 입력된 개인정보를 수집합니다. 수집한 개인정보는 이외의 목적으로는 사용하지 않으며, 개인정보의 수집 및 이용에 대한 동의를 거부할 수 있으며, 이 경우 상품 주문이 어려울 수 있습니다.\"*개인정보 수집 및 이용에 동의하지 않으시면 주문 취소 바랍니다. 감사합니다.",
+      "options": [
+        {
+          "id": "2751337",
+          "title": "보내는 문구",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "24146182",
+              "label": "0. 장례식장에 어울리는 문구로 의뢰하기",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "24146183",
+              "label": "1. 하늘의 별이 되신 고인을 추모하며 삼가 고인의 영전앞에 깊은 애도의 마음을 전합니다.",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "24146184",
+              "label": "2. 하늘의 별이 되신 고인을 추모하며 유가족분들께 깊은 위로의 마음를 전합니다.",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "24146185",
+              "label": "3. 주님의 위로가 유가족 분들께 함께하시길 기도 드립니다",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "24146186",
+              "label": "4. 주님 품 안에 영원한 안식과 평안 누리시길 기도 드립니다",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "24146187",
+              "label": "5. 깊은 조의를 가족 분들께 전하며 고인의 극락왕생을 발원 드립니다",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "24146188",
+              "label": "6. 부처님의 가피가 함께하시고 고인께서 부처님의 품 안에서 왕생하시길 빕니다",
+              "extra": 0,
+              "disabled": false
+            },
+            {
+              "id": "24146189",
+              "label": "7. 이 외에 개인 문구는 배송 요청사항에 기입해주세요.",
+              "extra": 0,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "2751339",
+          "title": "작품",
+          "required": true,
+          "type": "select",
+          "choices": [
+            {
+              "id": "24146190",
+              "label": "작품은 상세페이지 내 도록 중 임의로 출고합니다. (상주님께서 작품 변경 가능)",
+              "extra": 0,
+              "disabled": false
+            }
+          ]
+        },
+        {
+          "id": "79261",
+          "title": "보내시는분 정보를 입력하신후 우측 <<입력완료>>를 눌러주세요.(예, 쌀빛그림화환 대표 홍길동)",
+          "required": true,
+          "type": "text",
+          "extra": 0,
+          "maxLength": 200
+        }
+      ],
+      "delivery": {
+        "isDelivery": "0",
+        "cost": 0,
+        "free": true,
+        "text": ""
+      },
+      "sourceCategory": "근조 액자화환",
+      "saleStatus": "on_sale",
+      "thumbnail": {
+        "url": "/assets/bellavita-thumbnails-v3.png",
+        "position": "100% 100%",
+        "design": "controlled-proportions-v3",
+        "reference": "Current public product detail composition: photo inset, message and sender panel; generated design preview",
+        "regions": [
+          [
+            798,
+            665,
+            285,
+            176
+          ],
+          [
+            829,
+            852,
+            224,
+            284
+          ]
+        ],
+        "canvas": 1254
+      },
+      "displayTitle": "근조 액자화환",
+      "proportionEvidence": {
+        "frame": {
+          "ratio": [
+            3,
+            2
+          ],
+          "status": "published_dimensions",
+          "sizesMm": [
+            [
+              600,
+              400
+            ],
+            [
+              700,
+              467
+            ]
+          ],
+          "source": "https://bellavita1004.shop.blogpay.co.kr/good/product_view?goodNum=1454214",
+          "scope": "Published gift-frame size options; no independent physical measurement"
+        },
+        "scroll": {
+          "ratio": [
+            2,
+            3
+          ],
+          "status": "approximate_from_official_diagram",
+          "physicalSizeMm": null,
+          "source": "https://bellavita1004.blogpay.io/img/editor/bellavita1004/0355505001758088762.jpg"
+        },
+        "relativeWidth": 0.85,
+        "relativeWidthStatus": "approximate_from_official_diagram"
+      }
+    }
+  ],
+  "verification": {
+    "listingPages": 3,
+    "categoryPages": 15,
+    "categoryMissingIds": [],
+    "sourceChanges": false,
+    "visibleProductIds": [
+      "1454214",
+      "1440817",
+      "1452802",
+      "1969605"
+    ]
+  },
+  "selection": "User screenshot: four storefront products only; event invitation links excluded"
+}

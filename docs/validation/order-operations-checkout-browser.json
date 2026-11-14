@@ -1,0 +1,48 @@
+{
+  "viewports": [
+    {
+      "width": 320,
+      "long_message_characters": 200,
+      "greeting_fits": true,
+      "sender_fits": true,
+      "no_horizontal_overflow": true
+    },
+    {
+      "width": 375,
+      "long_message_characters": 200,
+      "greeting_fits": true,
+      "sender_fits": true,
+      "no_horizontal_overflow": true
+    },
+    {
+      "width": 430,
+      "long_message_characters": 200,
+      "greeting_fits": true,
+      "sender_fits": true,
+      "no_horizontal_overflow": true
+    },
+    {
+      "width": 1024,
+      "long_message_characters": 200,
+      "greeting_fits": true,
+      "sender_fits": true,
+      "no_horizontal_overflow": true
+    }
+  ],
+  "orders": [
+    {
+      "price": 93500,
+      "order_id": "1c7a1ccb6b4c0e01ba42950876a66165",
+      "receipt": "https://localhost/invitation-orders/1c7a1ccb6b4c0e01ba42950876a66165/receipt",
+      "state": "partial_cancel"
+    },
+    {
+      "price": 99000,
+      "order_id": "64f39dc95beb986da4945ca6b1ee22e7",
+      "receipt": "https://localhost/invitation-orders/64f39dc95beb986da4945ca6b1ee22e7/receipt",
+      "state": "cancelled"
+    }
+  ],
+  "errors": [],
+  "broken_photo_fallback": true
+}

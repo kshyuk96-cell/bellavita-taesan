@@ -1,0 +1,312 @@
+{
+  "checked_on": "2026-11-14",
+  "release_ready": false,
+  "development_scope_frozen": true,
+  "new_product_features_added": 0,
+  "status": "implementation_and_mock_rehearsals_passed_real_integration_pending",
+  "frozen_runtime_commit": "21ddc31d07f385056a5c623c19088c1103eb4ba1",
+  "source_head_before_release_docs": "0965a1bfb0832e2955fc2bcfcb483765ee4cc40f",
+  "main_base": "9474f6d1d5cd0589ae09c360d90745cbe224d41a",
+  "milestones": {
+    "scope_freeze": "complete",
+    "screen_validation": "product_conditions_owner_accepted_design_change_deferred",
+    "real_provider_integration": "unverified",
+    "operator_rehearsal": "automated_mock_pass_human_review_pending",
+    "production_transition": "planned_not_executed"
+  },
+  "existing_regression_evidence": {
+    "tests_passed": 166,
+    "commit": "21ddc31d07f385056a5c623c19088c1103eb4ba1",
+    "report": "docs/validation/shop-admin-launch.json",
+    "rerun_this_documentation_only_turn": false
+  },
+  "rerun_native_catalog_rehearsal": {
+    "products": 4,
+    "server_amount": 165000,
+    "mock_payment": true,
+    "duplicate_paid_once": true,
+    "duplicate_partial_once": true,
+    "late_paid_does_not_undo_cancel": true,
+    "process_restart_preserved": true,
+    "backup_restore": "passed",
+    "live_payment": false,
+    "live_messages": false,
+    "live_receipts": false,
+    "render_disk_verification": "not_run"
+  },
+  "rerun_business_rehearsal": {
+    "result": "passed",
+    "offer_prices": [
+      93500,
+      99000
+    ],
+    "mock_cash_receipt": "issued",
+    "mock_notifications_provider_accepted": 4,
+    "amendment_original_preserved": true,
+    "new_artifact_version": 2,
+    "assignment_rows_applied": 2,
+    "customer_photo_confirmed": true,
+    "restore_integrity": "ok",
+    "restored_factory_orders": 2,
+    "restored_factory_duplicate_orders": 0,
+    "pending_hold_recovered": true,
+    "outbound_network_requests": 0,
+    "actual_payment": false,
+    "actual_messages": false,
+    "actual_printing": false,
+    "live_sheet_writes": false
+  },
+  "live_readonly_audit": {
+    "public_statuses": {
+      "/healthz": 200,
+      "/shop": 200,
+      "/verification": 200
+    },
+    "public_products": 4,
+    "mock_order_count": 3,
+    "integrity": "ok",
+    "mount_verified": true,
+    "data_under_var_data": true,
+    "mock_mode_forced": true,
+    "manual_matches_frozen_source": true,
+    "new_orders_created": 0,
+    "new_deploys_triggered": 0
+  },
+  "verification_configuration_only": {
+    "real_account_settings_inferred": false,
+    "actual_merchant_account_examined": false,
+    "alimtalk_missing_field_names": [
+      "SOLAPI_API_KEY",
+      "SOLAPI_API_SECRET",
+      "SOLAPI_KAKAO_PFID",
+      "SHOP_ALIMTALK_TEMPLATE_ID"
+    ],
+    "staff_recipients_configured": false,
+    "public_products_without_tax_type": 4,
+    "external_automatic_credentials_configured": false
+  },
+  "verification_deployment": {
+    "auto_deploy": "no",
+    "branch": "codex/shop-backend",
+    "disk_mount": "/var/data",
+    "disk_gb": 1,
+    "instances": 1,
+    "deployment_status": "live"
+  },
+  "existing_main_service_readonly": {
+    "auto_deploy": "yes",
+    "branch": "main",
+    "disk_attached": true,
+    "actual_data_path_verified": false,
+    "changed": false,
+    "configured_data_path": "/var/data",
+    "data_path_confirmation_source": "owner reported Environment value",
+    "configured_path_matches_known_disk_mount": true,
+    "runtime_database_and_files_verified": false,
+    "migration_required": "not_indicated_by_confirmed_configuration"
+  },
+  "monitoring": {
+    "cpu_latest_percent": 0.24,
+    "memory_latest_percent": 13.47,
+    "p95_latency_available": false,
+    "nonzero_5xx_buckets": [
+      {
+        "timestamp": "2026-11-14T12:49:02.512Z",
+        "value": 1
+      },
+      {
+        "timestamp": "2026-11-14T12:51:02.512Z",
+        "value": 1
+      }
+    ],
+    "application_error_log_count": 0,
+    "scope": "low_traffic_observation_not_load_test"
+  },
+  "stabilized_http": {
+    "since_utc": "2026-11-14T12:52:00Z",
+    "requests_5xx": 0,
+    "requests_2xx": 16,
+    "p95_samples_available": false,
+    "load_test": false
+  },
+  "launch_blockers": [
+    {
+      "id": "owner_acceptance",
+      "status": "accepted",
+      "required": "four-product conditions accepted by owner; design may change later; not a pending launch blocker"
+    },
+    {
+      "id": "real_payapp",
+      "status": "unverified",
+      "required": "merchant test method or specifically authorized transaction and callback/cancellation evidence"
+    },
+    {
+      "id": "real_notifications",
+      "status": "unverified",
+      "required": "approved Alimtalk channel/templates and staff/customer handset receipt using confirmed sample-image links"
+    },
+    {
+      "id": "real_receipts",
+      "status": "unverified",
+      "required": "actual product tax types, single issuer and eligible-payment issue/cancel evidence"
+    },
+    {
+      "id": "operational_storage_and_seed",
+      "status": "pending",
+      "required": "configured /var/data path owner-confirmed; runtime DB/invitations, read-only integrity, backup/restore and approved catalog seeding remain to verify"
+    },
+    {
+      "id": "automatic_external_backup",
+      "status": "not_verified",
+      "required": "server authentication and upload/download/restore result; manual backup evidence is separate"
+    },
+    {
+      "id": "human_rehearsal_and_release_approval",
+      "status": "pending",
+      "required": "operator rehearsal and explicit production rollout request"
+    }
+  ],
+  "production_changes": {
+    "merged": false,
+    "deploys_triggered": 0,
+    "actual_transactions": 0,
+    "actual_message_deliveries": 0,
+    "actual_receipts": 0,
+    "operational_database_writes": false
+  },
+  "live_verification_followup": {
+    "product_features_added": 0,
+    "notification_channel_decision": {
+      "status": "confirmed_by_user",
+      "channel": "alimtalk",
+      "sample_delivery": "image_confirmation_link",
+      "audiences": [
+        "staff",
+        "customer"
+      ],
+      "sms_fallback": false,
+      "live_messages_enabled_changed": false,
+      "mock_tests_passed": 3,
+      "actual_messages_sent": 0
+    },
+    "available_access": {
+      "render_service_metadata": true,
+      "render_environment_read": false,
+      "render_shell_execution": false,
+      "local_render_cli_authenticated": false,
+      "payapp_account_connection": false,
+      "solapi_account_connection": false,
+      "local_payapp_credentials_available": false,
+      "local_solapi_credentials_available": false,
+      "local_registered_sender_available": false
+    },
+    "storage_probe": {
+      "path": "tools/check_shop_storage.py",
+      "isolated_tests_passed": 2,
+      "inspected_environment": "isolated_restored_rehearsal_only",
+      "integrity": "ok",
+      "database_writes": false,
+      "external_requests": 0,
+      "production_run": false
+    },
+    "real_provider_verification_performed": false,
+    "production_settings_changed": false,
+    "previous_mock_success_reclassified_as_real_success": false
+  },
+  "owner_confirmation_20261114": {
+    "product_conditions": "accepted; design may change later",
+    "test_recipient": "provided privately; not committed; actual delivery pending; test roles sequentially",
+    "payapp_business_merchant": "owner confirmed; API access unverified",
+    "blogpay_cash_receipt": "owner reported prior automatic issuance; inheritance to independent shop unverified",
+    "render_screenshot": "main 9474f6d live; TAESAN_DATA not shown",
+    "main_integration_commit": "dde62cf8a34b1cec89f011fa512b87dd5121896b",
+    "production_changed": false,
+    "render_data_path": "/var/data; owner supplied Environment value; existing DB/files not yet inspected"
+  },
+  "latest_main_integration_regression": {
+    "commit": "dde62cf8a34b1cec89f011fa512b87dd5121896b",
+    "command": ".venv/bin/python -m unittest discover -s tests",
+    "passed": 177,
+    "seconds": 82.8,
+    "production_deployed": false,
+    "actual_provider_calls": false
+  },
+  "next_review_20261114_kst": {
+    "receipt_20021": "uncertain; explicit existing-receipt notice; no automatic retry; manual number/amount comparison required",
+    "targeted_regression": {
+      "passed": 22,
+      "seconds": 11.009,
+      "command": "PYTHONPATH=tests .venv/bin/python -m unittest test_order_operations test_storage_probe test_shop_followup.FollowupTest.test_alimtalk_template_links_poll_and_no_duplicate_on_payment test_shop_followup.FollowupTest.test_alimtalk_timeout_no_fallback_and_channel_snapshot test_shop_delivery_suite.DeliverySuiteTest.test_revoked_staff_assignment_link_and_customer_ata_never_get_staff_capability"
+    },
+    "existing_service_readonly": "disk /var/data 1GB and main autodeploy reconfirmed; actual TAESAN_DATA inaccessible",
+    "real_payment_message_receipt_calls": false,
+    "production_deployed": false,
+    "verification_server_redeployed": false
+  },
+  "hosted_redeployment_20261114_kst": {
+    "runtime_commit": "4099e1464704b0dde2071643482b0c4c7d78cac7",
+    "live_at_kst": "2026-11-14T23:11:51+09:00",
+    "public_url": "https://bellavita-shop-verification-v3b4.onrender.com/shop",
+    "status": "live",
+    "public_products": 4,
+    "existing_receipt_pages_preserved": 2,
+    "product_and_receipt_content_hashes_equal": true,
+    "persistent_mount_verified": true,
+    "data_under_var_data": true,
+    "forced_live_flags_disabled": true,
+    "browser_viewport_widths": [
+      390,
+      1440
+    ],
+    "browser_product_pages_per_viewport": 4,
+    "horizontal_overflow": false,
+    "new_orders_created": 0,
+    "database_integrity_checked_this_turn": false,
+    "administrator_authenticated_audit_this_turn": false,
+    "app_error_logs": {
+      "count": 0,
+      "start_utc": "2026-11-14T14:11:51Z",
+      "end_utc": "2026-11-14T14:12:29Z"
+    },
+    "actual_payment": false,
+    "actual_messages": false,
+    "actual_receipts": false,
+    "production_changed": false
+  },
+  "live_integration_protocol_review": {
+    "checked_on_kst": "2026-11-14",
+    "reference": "https://www.payapp.kr/dev_center/dev_center01.html",
+    "callback_fields_compared": [
+      "hash",
+      "responsedate",
+      "pay_state",
+      "orig_mul_no",
+      "orig_price",
+      "mul_no",
+      "price"
+    ],
+    "callback_states_compared": [
+      "1",
+      "4",
+      "8",
+      "32",
+      "9",
+      "64",
+      "10",
+      "70",
+      "71"
+    ],
+    "response_compared": "SUCCESS",
+    "evidence_scope": "official documentation versus implementation and existing regression cases; no new provider executions",
+    "runbook": "docs/shop-live-verification-runbook.md",
+    "runtime_changes": false,
+    "new_tests_run": false,
+    "remaining_access": [
+      "merchant API settings and test method",
+      "SOLAPI account and approved template",
+      "actual product tax classification",
+      "existing production DB/files inspection and backup/restore"
+    ],
+    "real_provider_executions": 0
+  }
+}

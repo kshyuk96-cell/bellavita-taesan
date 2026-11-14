@@ -1,4 +1,6 @@
 __pycache__/
+.venv/
+test-artifacts/
 taesan-data/
 .env
 .env.*

@@ -1,0 +1,95 @@
+"""Bounded, parameterized all-record admin search and paging."""
+import datetime as dt
+import math
+import re
+from zoneinfo import ZoneInfo
+from urllib.parse import urlencode
+
+STATES={'':'전체 결제 상태','requesting':'결제 요청 확인 필요','waiting':'결제 대기','failed':'결제 요청 실패','paid':'결제 완료','partial_cancel':'일부 취소','cancelled':'취소'}
+STAGES={'':'전체 배송 상태','confirmed':'주문 확인','shipping':'배송 중','delivered':'배송 완료'}
+ATTENTION={'':'전체 확인 항목','payment':'결제 확인 필요','alerts':'알림 실패·결과 대조','receipts':'영수증 확인 필요'}
+ATTENTION_SQL={
+    'payment':"o.state IN ('requesting','waiting','failed')",
+    'alerts':"EXISTS(SELECT 1 FROM shop_messages m WHERE m.order_id=o.id AND m.state IN ('failed','uncertain'))",
+    'receipts':"EXISTS(SELECT 1 FROM shop_cash_receipts r WHERE r.order_id=o.id AND r.state IN ('failed','uncertain','held'))"}
+KEYS=('q','order','state','stage','from_date','to_date','page','task','task_owner','task_priority','attention')
+PAGE_SIZE=30
+
+
+def filters(fields):
+    result={key:str(fields.get(key,'')).strip() for key in KEYS}
+    if result['attention'] not in ATTENTION:raise ValueError('확인 필요 항목을 선택해 주세요.')
+    if len(result['q'])>100:raise ValueError('검색어는 100자 이내로 입력하세요.')
+    if result['task_priority'] not in ('','high','normal','low'):raise ValueError('업무 우선순위 검색을 확인하세요.')
+    if result['task'] not in ('','open','overdue','soon','done') or len(result['task_owner'])>60:raise ValueError('업무 상태·담당자 검색을 확인하세요.')
+    if result['order'] and not re.fullmatch('[a-f0-9]{32}',result['order']):raise ValueError('정확한 주문번호를 입력해 주세요.')
+    if result['state'] not in STATES or result['stage'] not in STAGES:raise ValueError('결제·배송 필터를 확인하세요.')
+    for key in ('from_date','to_date'):
+        if result[key]:
+            try:valid=dt.date.fromisoformat(result[key]).isoformat()==result[key]
+            except ValueError:valid=False
+            if not valid:raise ValueError('행사일은 올바른 날짜로 입력하세요.')
+    if result['from_date'] and result['to_date'] and result['from_date']>result['to_date']:raise ValueError('행사 시작일이 종료일보다 늦습니다.')
+    if result['page'] and not re.fullmatch(r'[0-9]{1,7}',result['page']):raise ValueError('페이지 번호를 확인하세요.')
+    result['page']=str(max(1,int(result['page'] or '1')))
+    return result
+
+
+def select(c,fields):
+    f=filters(fields);clauses=[];args=[]
+    if f['order']:clauses.append('o.id=?');args.append(f['order'])
+    if f['q']:
+        # Search human fields only; JSON keys and internal flags are not matches.
+        terms="o.id||' '||COALESCE(json_extract(o.details,'$.buyer'),'')||' '||COALESCE(json_extract(o.details,'$.buyer_phone'),'')||' '||COALESCE(json_extract(o.details,'$.sender'),'')||' '||COALESCE(json_extract(o.details,'$.message'),'')||' '||COALESCE(json_extract(o.details,'$.title'),'')||' '||COALESCE(json_extract(o.details,'$.venue'),'')"
+        for char in ('-',' ', '(',')'):terms="replace("+terms+",'"+char+"','')"
+        clauses.append('instr(lower('+terms+'),lower(?))>0');args.append(re.sub(r'[-\s()]','',f['q']))
+    if f['state']:clauses.append('o.state=?');args.append(f['state'])
+    if f['stage']:clauses.append('f.stage=?');args.append(f['stage'])
+    if f['attention']:clauses.append(ATTENTION_SQL[f['attention']])
+    for key,sign in (('from_date','>='),('to_date','<=')):
+        if f[key]:clauses.append("substr(json_extract(o.details,'$.event_time'),1,10)"+sign+'?');args.append(f[key])
+    if f['task'] or f['task_owner'] or f['task_priority']:
+        work=['t.order_id=o.id',"t.state='done'" if f['task']=='done' else "t.state='open'"]
+        current=dt.datetime.now(ZoneInfo('Asia/Seoul'))
+        if f['task']=='overdue':work.append('t.due<?');args.append(current.strftime('%Y-%m-%dT%H:%M'))
+        if f['task']=='soon':work.append('t.due BETWEEN ? AND ?');args.extend([current.strftime('%Y-%m-%dT%H:%M'),(current+dt.timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M')])
+        if f['task_owner']:work.append('instr(lower(t.owner),lower(?))>0');args.append(f['task_owner'])
+        if f['task_priority']:work.append('t.priority=?');args.append(f['task_priority'])
+        clauses.append('EXISTS(SELECT 1 FROM shop_operator_tasks t WHERE '+' AND '.join(work)+')')
+    sql=' FROM invitation_orders o JOIN shop_offers s ON s.id=o.job LEFT JOIN shop_fulfillment f ON f.order_id=o.id'
+    if clauses:sql+=' WHERE '+' AND '.join(clauses)
+    total=c.execute('SELECT count(*)'+sql,args).fetchone()[0];pages=max(1,math.ceil(total/PAGE_SIZE));page=min(int(f['page']),pages);f['page']=str(page)
+    rows=c.execute("SELECT o.*"+sql+" ORDER BY (o.state='requesting') DESC,o.created DESC,o.id LIMIT ? OFFSET ?",[*args,PAGE_SIZE,(page-1)*PAGE_SIZE]).fetchall()
+    return rows,{'filters':f,'total':total,'page':page,'pages':pages,'displayed':len(rows)}
+
+
+def query(f,**changes):return urlencode({k:v for k,v in dict(f,**changes).items() if k in KEYS and v})
+
+
+def redirect(path,fields):
+    from urllib.parse import parse_qsl
+    encoded=fields.get('_return_query','')
+    if len(encoded)>2400:raise ValueError('화면 복귀 정보를 확인하세요.')
+    pairs=parse_qsl(encoded,keep_blank_values=True,max_num_fields=len(KEYS))
+    if any(k not in KEYS for k,_ in pairs) or len({k for k,_ in pairs})!=len(pairs):raise ValueError('화면 복귀 정보를 확인하세요.')
+    f=filters(dict(pairs))
+    order=fields.get('order_id','');product=fields.get('product_id','')
+    anchor='order-'+order if re.fullmatch('[a-f0-9]{32}',order) else 'product-'+product if re.fullmatch('[a-f0-9]{32}',product) else fields.get('_return_anchor','admin-orders')
+    if anchor not in ('admin-orders','admin-products','admin-delivery','admin-reports','admin-settings') and not re.fullmatch(r'(order|product)-[a-f0-9]{32}',anchor):anchor='admin-orders'
+    return path+'?'+query(f)+'&saved=1#'+anchor
+
+
+def controls(path,meta):
+    from html import escape
+    f=meta['filters']
+    def select(name,labels):return '<label>'+{'state':'결제 상태','stage':'배송 상태','attention':'확인 필요 항목'}[name]+'<select name="'+name+'">'+''.join('<option value="'+code+'"'+(' selected' if f[name]==code else '')+'>'+label+'</option>' for code,label in labels.items())+'</select></label>'
+    form='<form method="get" action="'+escape(path)+'" class="admin-search"><h3>전체 주문 검색·필터</h3><label>검색어<input name="q" maxlength="100" value="'+escape(f['q'])+'" placeholder="주문번호·주문자·휴대폰·문구·상품·행사장"></label><div class="search-grid">'+select('state',STATES)+select('stage',STAGES)+select('attention',ATTENTION)
+    for key,label in [('from_date','행사 시작일'),('to_date','행사 종료일')]:form+='<label>'+label+'<input type="date" name="'+key+'" value="'+escape(f[key])+'"></label>'
+    form+='<label>업무 상태<select name="task">'+''.join('<option value="'+k+'"'+(' selected' if f['task']==k else '')+'>'+v+'</option>' for k,v in [('', '업무 조건 없음'),('open','미처리 업무 있음'),('overdue','기한 초과 업무 있음'),('soon','24시간 이내 기한 업무 있음'),('done','완료 업무 있음')])+'</select></label><label>업무 담당자<input name="task_owner" maxlength="60" value="'+escape(f['task_owner'])+'"></label>'
+    form+='<label>업무 우선순위<select name="task_priority">'+''.join('<option value="'+k+'"'+(' selected' if f['task_priority']==k else '')+'>'+v+'</option>' for k,v in [('', '전체 우선순위'),('high','높음'),('normal','보통'),('low','낮음')])+'</select></label>'
+    form+='</div><button>검색</button> <a href="'+escape(path)+'#admin-orders">조건 초기화</a></form>'
+    info='<p id="shop-result-count" role="status">전체 일치 '+str(meta['total'])+'건 · '+str(meta['page'])+'/'+str(meta['pages'])+'쪽 · 이번 쪽 '+str(meta['displayed'])+'건 (최대 30건)</p>'
+    paging='<nav class="order-pagination" aria-label="주문 페이지">'
+    for page,label in [(meta['page']-1,'이전'),(meta['page']+1,'다음')]:
+        if 1<=page<=meta['pages']:paging+='<a href="'+escape(path+'?'+query(f,page=str(page)))+'#admin-orders">'+label+'</a> '
+    return form+info+paging+'</nav>'

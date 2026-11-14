@@ -1,0 +1,135 @@
+{
+  "validated_commit": "d0da05a91beb7b85f58363499e548c37514d60f4",
+  "render_deploy": "dep-dbs3p5brjlhs73d329ag",
+  "render_status": "live",
+  "unit_tests": 135,
+  "admin_navigation_groups": 5,
+  "browser_widths": [
+    375,
+    1280
+  ],
+  "existing_amendment_as_csv_sales_browser": "passed",
+  "encryption": "AES-256-GCM",
+  "archive_bytes": 64513,
+  "drive_shared": false,
+  "external_backup": {
+    "provider": "google_drive",
+    "encrypted": true,
+    "download_verified": true,
+    "remote_restore": {
+      "restore_check": "passed",
+      "integrity": "ok",
+      "counts": {
+        "shop_products": 4,
+        "shop_offers": 3,
+        "invitation_orders": 3,
+        "payment_events": 3,
+        "payment_checks": 0,
+        "shop_fulfillment": 1,
+        "shop_stage_history": 1,
+        "shop_messages": 3,
+        "shop_cash_receipts": 0,
+        "shop_handoff": 3,
+        "shop_partial_reviews": 0,
+        "shop_artifacts": 0,
+        "shop_artifact_reviews": 0,
+        "shop_backup_runs": 1,
+        "shop_assignments": 0,
+        "shop_assignment_history": 0,
+        "shop_assignment_accepts": 0,
+        "shop_delivery_photos": 0,
+        "shop_delivery_photo_changes": 0,
+        "shop_delivery_confirms": 0,
+        "shop_diagnostic_runs": 0,
+        "shop_amendments": 0,
+        "shop_amendment_events": 0,
+        "shop_service_cases": 0,
+        "shop_service_events": 0,
+        "shop_service_photos": 0,
+        "shop_assignment_batches": 0,
+        "shop_external_backups": 0
+      }
+    },
+    "manual_record": {
+      "external_backup_record": "saved",
+      "mode": "manual_verified"
+    },
+    "unattended_upload_configured": false,
+    "live_payment": false,
+    "live_messages": false,
+    "live_receipts": false
+  },
+  "readiness": {
+    "external_backup_last_verified": null,
+    "scope": "configuration_only",
+    "live_validation": "not_run",
+    "payapp": {
+      "merchant_keys_present": false,
+      "mock_adapter": true,
+      "enabled": true,
+      "callback_path": "/invitation-orders/payapp",
+      "steps": [
+        "가맹점 제공 테스트 수단 확인",
+        "주문번호·원금액·결제번호 대조",
+        "승인·중복·부분취소·전체취소·타임아웃 대조"
+      ]
+    },
+    "alimtalk": {
+      "enabled": false,
+      "missing_fields": [
+        "SOLAPI_API_KEY",
+        "SOLAPI_API_SECRET",
+        "SOLAPI_KAKAO_PFID",
+        "SHOP_ALIMTALK_TEMPLATE_ID"
+      ],
+      "channel": "mms",
+      "template_approval_validation": "not_run",
+      "route_selected": false,
+      "templates": [
+        "confirmed",
+        "shipping",
+        "delivered",
+        "refund",
+        "cancel"
+      ],
+      "variables": [
+        "#{주문번호}",
+        "#{상태}",
+        "#{상품명}",
+        "#{샘플링크}",
+        "#{주문링크}"
+      ],
+      "sample_delivery": "주문별 이미지 확인 링크",
+      "sms_fallback": false,
+      "staff_recipients_configured": false
+    },
+    "cash_receipt": {
+      "enabled": false,
+      "owner_configured": false,
+      "products_missing_tax_type": [
+        "웨딩 사진 액자화환",
+        "결혼 축하 액자화환",
+        "행사 축하 액자화환",
+        "근조 액자화환"
+      ],
+      "eligible_payment_types": [
+        "6",
+        "7"
+      ],
+      "duplicate_owner_warning": "페이앱·쇼핑몰 중 발급 주체 하나만 설정",
+      "old_order_policy": "주문 당시 과세 구분 보존, 기존 주문은 별도 대조"
+    },
+    "external_backup": {
+      "enabled": false,
+      "configured": false,
+      "fields": {
+        "encryption_key": true,
+        "drive_folder": true,
+        "server_credentials": false
+      }
+    },
+    "secrets_exposed": false,
+    "external_requests": 0
+  },
+  "original_main_service_changed": false
+}

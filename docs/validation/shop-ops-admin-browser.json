@@ -1,0 +1,27 @@
+{
+  "target": "Python backend storefront",
+  "results": [
+    {
+      "width": 375,
+      "four_products": true,
+      "frame_ratio": 1.5,
+      "scroll_ratio": 0.667,
+      "same_buyer": true,
+      "server_price_preview": 165000,
+      "long_message_visible": true,
+      "overflow": false
+    },
+    {
+      "width": 1280,
+      "four_products": true,
+      "frame_ratio": 1.5,
+      "scroll_ratio": 0.667,
+      "same_buyer": true,
+      "server_price_preview": 165000,
+      "long_message_visible": true,
+      "overflow": false
+    }
+  ],
+  "javascript_errors": [],
+  "live_requests": false
+}

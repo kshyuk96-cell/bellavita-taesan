@@ -1,0 +1,7 @@
+[
+  {"key":"wedding-sunflower","title":"웨딩 해바라기 쌀빛화환","category":"웨딩","prices":[93500,99000],"weights":[{"kg":10,"extra":0},{"kg":20,"extra":10000},{"kg":30,"extra":20000}],"greetings":["결혼을 진심으로 축하합니다","두 분의 행복한 출발을 응원합니다"],"event":"샘플 · 민준·서연 결혼식","kind":"wedding","venue":"샘플 웨딩홀 · 그랜드홀","address":"검증용 서울 예식장 주소"},
+  {"key":"wedding-premium","title":"웨딩 프리미엄 나눔화환","category":"웨딩","prices":[129000,135000],"weights":[{"kg":20,"extra":0},{"kg":30,"extra":20000}],"greetings":["서로의 빛이 되어 행복하세요","두 분의 앞날에 사랑과 축복을"],"event":"샘플 · 지호·수아 결혼식","kind":"wedding","venue":"샘플 컨벤션 · 다이아몬드홀","address":"검증용 수원 예식장 주소"},
+  {"key":"opening-celebration","title":"개업 축하 쌀빛화환","category":"개업","prices":[109000,115000],"weights":[{"kg":10,"extra":0},{"kg":20,"extra":15000},{"kg":30,"extra":30000}],"greetings":["개업을 축하하며 번창을 기원합니다","힘찬 시작과 무궁한 발전을 응원합니다"],"event":"샘플 · 벨라카페 오픈","kind":"event","venue":"샘플 벨라카페 본점","address":"검증용 용인 행사장 주소"},
+  {"key":"promotion-honor","title":"취임·승진 축하 나눔화환","category":"취임·승진","prices":[119000,125000],"weights":[{"kg":20,"extra":0},{"kg":30,"extra":20000}],"greetings":["취임을 진심으로 축하합니다","더 큰 도약과 빛나는 앞날을 응원합니다"],"event":"샘플 · 나눔협회 취임식","kind":"event","venue":"샘플 나눔회관 · 대강당","address":"검증용 성남 행사장 주소"},
+  {"key":"anniversary-sharing","title":"기념일 감사 쌀 30kg 화환","category":"기념일","prices":[149000,155000],"weights":[{"kg":30,"extra":0}],"greetings":["함께한 시간에 감사하며 새로운 도약을 응원합니다","창립 기념일을 진심으로 축하합니다"],"event":"샘플 · 벨라비타 창립 기념식","kind":"event","venue":"샘플 기념행사장 · 로비","address":"검증용 인천 행사장 주소"}
+]

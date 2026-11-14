@@ -1,0 +1,8 @@
+{
+  "commit": "6f6dec1e329cad417d7bfbffb190917d933ffcde",
+  "integrated_main": "b3a514387d1a086d6cdf9b38b1821010be924f3d",
+  "original_handoffs_preserved": 2,
+  "shop_orders_in_legacy_queue": 0,
+  "integrity_check": "ok",
+  "environment": "local process from git archive, not Render"
+}
