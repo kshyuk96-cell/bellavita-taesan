@@ -243,8 +243,12 @@ def calculate(settings, today, now, read, db):
             continue
         elif (value(source, 0), minute(value(source, 1)), clean(value(source, 4)), clean(value(source, 7))) != (row[1], event, address, channel):
             issue = '주문 원장과 배송관리 대조 필요'
-        elif not address or event is None or event >= 1440:
-            issue = '배송지 또는 행사시간 확인 필요'
+        elif not address and (event is None or event >= 1440):
+            issue = '배송지와 행사시간 확인 필요'
+        elif not address:
+            issue = '배송지 확인 필요'
+        elif event is None or event >= 1440:
+            issue = '행사시간 확인 필요'
         elif clean(value(fee, 20)) == address and (coords := point(value(fee, 18), value(fee, 19))):
             points[address] = coords
         if order in settings['skipOrders']:
