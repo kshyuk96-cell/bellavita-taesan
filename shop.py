@@ -16,6 +16,8 @@ import shop_dashboard
 import shop_dispatch
 import shop_settlement
 import shop_diagnostics
+import shop_sales
+import assignment_batches
 import order_messages
 import cash_receipts
 
@@ -147,7 +149,7 @@ def issue_offers(connection, fields):
         'images': product['images'], 'groups': product['groups'],
         'venue': required(fields, 'venue', 120), 'address': required(fields, 'address', 200),
         'date': when.date().isoformat(), 'clock': when.strftime('%H:%M'),
-        'event_time': when.isoformat(),
+        'event_time': when.isoformat(), 'event_name':event,'product_title':product['title'],
         'cash_tax_type': product.get('cash_tax_type', ''),
     }
     photo = fields.get('wedding_photo', '').strip()
@@ -159,6 +161,11 @@ def issue_offers(connection, fields):
             'SELECT id FROM shop_offers WHERE product_id=? AND product_revision=? AND price=? AND details=?',
             (product_id, row['revision'], price, data),
         ).fetchone()
+        if not existing:
+            target=json.loads(data);target.pop('event_name',None);target.pop('product_title',None)
+            for candidate in connection.execute('SELECT details FROM shop_offers WHERE product_id=? AND product_revision=? AND price=?',(product_id,row['revision'],price)):
+                old=json.loads(candidate['details']);old.pop('event_name',None);old.pop('product_title',None)
+                if old==target:existing=True;break
         if existing:
             continue
         connection.execute('INSERT INTO shop_offers VALUES (?, ?, ?, ?, ?, 1)',
@@ -338,7 +345,7 @@ def admin_page(connection, path, origin, fields=None, root=None):
       input[type=checkbox]{display:inline;width:auto}
       a{color:#204c36}summary{cursor:pointer;padding:6px 0}small{overflow-wrap:anywhere}li{margin-bottom:12px}
       dd{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 8px}dt{font-weight:bold}</style>
-      <main><h1>벨라비타 쇼핑몰 관리</h1>''' + shop_dashboard.panel(connection) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + '''<section><h2>새 상품 등록</h2>'''
+      <main><h1>벨라비타 쇼핑몰 관리</h1>''' + shop_dashboard.panel(connection) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + assignment_batches.panel(connection,path) + shop_sales.panel(connection,path,fields) + '''<section><h2>새 상품 등록</h2>'''
       + form('save_product', product_fields({}), '상품 등록') + '</section>' + notification_settings
       + ''.join(products) + '<section><h2>행사별 주문 링크</h2>'
       + ('<ul>' + ''.join(offers) + '</ul>' if offers else '<p>발급된 링크가 없어요.</p>')

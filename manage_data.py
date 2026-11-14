@@ -38,7 +38,7 @@ def inspect(source):
         tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         counts = {name: connection.execute('SELECT COUNT(*) FROM ' + name).fetchone()[0]
                   for name in ('shop_products', 'shop_offers', 'invitation_orders', 'payment_events', 'payment_checks',
-                               'shop_fulfillment', 'shop_stage_history', 'shop_messages', 'shop_cash_receipts', 'shop_handoff', 'shop_partial_reviews', 'shop_artifacts', 'shop_artifact_reviews', 'shop_backup_runs', 'shop_assignments', 'shop_assignment_history', 'shop_assignment_accepts', 'shop_delivery_photos', 'shop_delivery_photo_changes', 'shop_delivery_confirms', 'shop_diagnostic_runs')
+                               'shop_fulfillment', 'shop_stage_history', 'shop_messages', 'shop_cash_receipts', 'shop_handoff', 'shop_partial_reviews', 'shop_artifacts', 'shop_artifact_reviews', 'shop_backup_runs', 'shop_assignments', 'shop_assignment_history', 'shop_assignment_accepts', 'shop_delivery_photos', 'shop_delivery_photo_changes', 'shop_delivery_confirms', 'shop_diagnostic_runs', 'shop_amendments', 'shop_amendment_events', 'shop_service_cases', 'shop_service_events', 'shop_service_photos', 'shop_assignment_batches')
                   if name in tables}
     return {'data_path': str(root), 'under_var_data': root.is_relative_to(Path('/var/data').resolve()),
             'var_data_is_mount': os.path.ismount('/var/data'), 'integrity_check': 'ok', 'counts': counts}

@@ -44,12 +44,16 @@ def multipart(content_type,body):
         content=part.get_payload(decode=True)
         if not isinstance(content,bytes):raise ValueError('사진 업로드 내용을 확인해 주세요.')
         if part.get_filename() is not None:
-            if name!='photo' or not content or len(content)>MAX_UPLOAD:raise ValueError('사진은 JPEG·PNG·WebP, 5MB 이내로 업로드해 주세요.')
-            fields['_photo_bytes']=content
+            if name=='csv' and (not content or len(content)>131072):raise ValueError('CSV는 비어 있지 않은 128KB 이내 파일로 업로드해 주세요.')
+            if name not in ('photo','csv') or not content or len(content)>(131072 if name=='csv' else MAX_UPLOAD):raise ValueError('사진은 JPEG·PNG·WebP, 5MB 이내로 업로드해 주세요.')
+            fields['_csv_bytes' if name=='csv' else '_photo_bytes']=content
         else:
             if len(content)>4096:raise ValueError('사진 설명이 너무 깁니다.')
             fields[name]=content.decode('utf-8')
-    if fields.get('action')!='upload_delivery_photo' or '_photo_bytes' not in fields:raise ValueError('배송 사진 업로드만 지원합니다.')
+    action=fields.get('action')
+    if action=='preview_assignment_csv':
+        if '_csv_bytes' not in fields:raise ValueError('CSV 파일을 선택해 주세요.')
+    elif action not in ('upload_delivery_photo','upload_service_photo') or '_photo_bytes' not in fields:raise ValueError('지원하는 사진·CSV 업로드를 선택해 주세요.')
     return fields
 
 

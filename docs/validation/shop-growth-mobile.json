@@ -1,0 +1,10 @@
+{
+  "mobile_width": 375,
+  "amendment_approval_and_artifact_review": true,
+  "service_case_assignment": true,
+  "csv_preview_and_apply": true,
+  "sales_reconciliation": true,
+  "overflow": false,
+  "javascript_errors": [],
+  "external_side_effects": false
+}

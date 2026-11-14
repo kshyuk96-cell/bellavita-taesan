@@ -132,3 +132,7 @@ python agent.py
 배송 담당 배정·인수인계, 행사일 일정표, 배송 사진 공개·고객 확인, 기간별 정산 Excel과
 연동 모의 진단은 [배송 운영 안내](docs/shop-delivery-suite.md),
 [검증 결과](docs/shop-delivery-suite-validation.md)를 참고하세요.
+
+원문 보존 정정 승인·AS/재배송·CSV 배정 사전 검토·판매 집계는
+[운영 안내](docs/shop-growth-operations.md)와 [검증 결과](docs/shop-growth-validation.md)를 참고하세요.
+전체 독립 리허설은 `python tests/rehearse_shop.py --output <새 경로>`로 실행합니다.

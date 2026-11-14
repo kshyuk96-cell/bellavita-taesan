@@ -53,6 +53,11 @@ def snapshot(root,destination):
                 for order_id,photo_id,expected in c.execute('SELECT order_id,id,sha256 FROM shop_delivery_photos'):
                     if hashlib.sha256(delivery_photos.photo_path(restored,order_id,photo_id).read_bytes()).hexdigest()!=expected:
                         raise ValueError('restored_delivery_photo_changed')
+        with sqlite3.connect(restored/'state.sqlite3') as c:
+            if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='shop_service_photos'").fetchone():
+                import shop_service
+                for case_id,photo_id,expected in c.execute('SELECT case_id,id,sha256 FROM shop_service_photos'):
+                    if hashlib.sha256(shop_service.photo_path(restored,case_id,photo_id).read_bytes()).hexdigest()!=expected:raise ValueError('restored_service_photo_changed')
         def logical(path):
             with sqlite3.connect(path/'state.sqlite3') as c:
                 digest=hashlib.sha256()

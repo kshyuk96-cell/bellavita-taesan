@@ -15,6 +15,7 @@ from urllib.request import Request, build_opener
 import order_ops
 import order_sample
 import alimtalk
+import order_amendments
 from blogpay import NoRedirect
 
 
@@ -40,7 +41,7 @@ def api(path, body=None):
 
 def text_for(job, order,delivery_link=None):
     data = json.loads(order['details'])
-    status = order_ops.STAGES.get(job['event'], '부분취소 잔액 대조 후 재개' if job['event'].startswith('resumed:') else '결제 일부 취소' if job['event'].startswith('refund:') else '결제 취소')
+    status = order_ops.STAGES.get(job['event'], '주문 정정 승인 · 새 제작 파일 검수 대기' if job['event'].startswith('amended:') else '부분취소 잔액 대조 후 재개' if job['event'].startswith('resumed:') else '결제 일부 취소' if job['event'].startswith('refund:') else '결제 취소')
     text = f'[벨라비타] {status}\n주문번호 {order["id"]}\n{data["title"]}\n{data["venue"]}\n{data["event_time"][:16].replace("T", " ")}\n문구 확인용 샘플 이미지를 첨부합니다.'
     if job['audience'] == 'staff':
         origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
@@ -82,7 +83,10 @@ def process_one(db, root):
                 c.execute("UPDATE shop_messages SET state='held',error='staff_recipient_removed' WHERE id=?", (job['id'],))
                 return
             order = c.execute('SELECT * FROM invitation_orders WHERE id=?', (job['order_id'],)).fetchone()
-            if not order_ops.partial_reviews.allowed(c, order) and (job['event'] in order_ops.STAGES or job['event'].startswith('resumed:')):
+            if order_amendments.pending(c,order['id']) and (job['event'] in order_ops.STAGES or job['event'].startswith(('resumed:','amended:'))):
+                c.execute("UPDATE shop_messages SET state='held',error='content_review' WHERE id=?",(job['id'],));return
+            order=order_amendments.effective(c,order)
+            if not order_ops.partial_reviews.allowed(c, order) and (job['event'] in order_ops.STAGES or job['event'].startswith(('resumed:','amended:'))):
                 c.execute("UPDATE shop_messages SET state='held',error='payment_changed' WHERE id=?", (job['id'],))
                 return
             c.execute("UPDATE shop_messages SET state='preparing' WHERE id=?", (job['id'],))
@@ -100,9 +104,13 @@ def process_one(db, root):
         with db() as c:
             c.execute('BEGIN IMMEDIATE')
             current = c.execute('SELECT * FROM invitation_orders WHERE id=?', (job['order_id'],)).fetchone()
-            if not order_ops.partial_reviews.allowed(c, current) and (job['event'] in order_ops.STAGES or job['event'].startswith('resumed:')):
+            if not order_ops.partial_reviews.allowed(c, current) and (job['event'] in order_ops.STAGES or job['event'].startswith(('resumed:','amended:'))):
                 c.execute("UPDATE shop_messages SET state='held',error='payment_changed' WHERE id=?", (job['id'],))
                 return
+            state=c.execute('SELECT state FROM shop_messages WHERE id=?',(job['id'],)).fetchone()[0]
+            current=order_amendments.effective(c,current)
+            if state!='preparing' or (order_amendments.pending(c,current['id']) and (job['event'] in order_ops.STAGES or job['event'].startswith(('resumed:','amended:')))) or current['details']!=order['details']:
+                c.execute("UPDATE shop_messages SET state='held',error='content_changed' WHERE id=? AND state='preparing'",(job['id'],));return
             import shop_dispatch
             tracking=shop_dispatch.link(c,current['id'],os.environ['TAESAN_WEBHOOK_SECRET'])
             payload=json.loads(job['request_json']) if job['request_json'] else (alimtalk.message(job,current,tracking=(os.getenv('TAESAN_PUBLIC_URL','').rstrip('/')+tracking) if job['audience']=='staff' else None) if job['channel']=='alimtalk' else {

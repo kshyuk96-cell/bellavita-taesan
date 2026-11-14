@@ -51,7 +51,7 @@ def database(root):
 
 def normalized_guard(value):
     result=json.loads(value) if isinstance(value,str) else value
-    return result+[0]*(4-len(result))
+    return result+[0]*(5-len(result))
 
 
 def call_file(server,secret,path,ca_file=None):
@@ -68,7 +68,7 @@ def call_file(server,secret,path,ca_file=None):
 
 def ingest(root, job, file_transport=None):
     payload = job['payload']
-    if (payload.get('schema_version') != (3 if payload.get('artifact') else 2 if job.get('kind') == 'resume' else 1) or payload.get('kind') != job.get('kind')
+    if (payload.get('schema_version') != (4 if payload.get('content_decision_revision',0) and job.get('kind')!='hold' else 3 if payload.get('artifact') else 2 if job.get('kind') == 'resume' else 1) or payload.get('kind') != job.get('kind')
             or job.get('kind') not in ('ready', 'hold', 'resume') or payload['order'].get('id') != job.get('order_id')
             or hashlib.sha256(canonical(payload).encode()).hexdigest() != job.get('sha256')):
         raise ValueError('handoff_payload_mismatch')
@@ -116,7 +116,9 @@ def ingest(root, job, file_transport=None):
                 raise ValueError('artifact_file_hash_mismatch')
             from production_files import write
             write(path,content)
-    guard = [refunded, revision]+artifact_revision
+    content_revision=payload.get('content_decision_revision',0)
+    if type(content_revision) is not int or content_revision<0:raise ValueError('invalid_content_revision')
+    guard = [refunded, revision]+artifact_revision+[content_revision]
     order_id, kind = job['order_id'], job['kind']
     ack = {'event_id': job['event_id'], 'lease_token': job['lease_token'], 'consumer': job['consumer'],
            'references': {'ledger': order_id, 'production': order_id}}
@@ -142,7 +144,7 @@ def ingest(root, job, file_transport=None):
             if kind == 'hold' and guard >= current_guard:
                 c.execute("UPDATE order_ledger SET state='held' WHERE order_id=?", (order_id,))
                 c.execute("UPDATE production_queue SET state='held' WHERE order_id=?", (order_id,))
-            if (kind == 'resume' or artifact) and guard > current_guard:
+            if kind in ('ready','resume') and (kind == 'resume' or artifact or content_revision) and guard > current_guard:
                 c.execute("UPDATE order_ledger SET state='awaiting_ack' WHERE order_id=?", (order_id,))
                 c.execute("UPDATE production_queue SET state='awaiting_ack' WHERE order_id=?", (order_id,))
             if artifact and guard >= current_guard:
@@ -228,7 +230,7 @@ def acknowledge_pending(root, transport):
 
 def run_once(root, consumer, transport, file_transport=None):
     acknowledge_pending(root, transport)
-    result = transport('claim', {'consumer': consumer, 'capabilities':['partial-resume-v1','production-artifact-v1']})
+    result = transport('claim', {'consumer': consumer, 'capabilities':['partial-resume-v1','production-artifact-v1','order-amendment-v1']})
     job = result.get('job')
     if not job:
         return False

@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from PIL import Image, ImageDraw
 import order_sample
 import partial_reviews
+import order_amendments
 
 RENDERER = 'bellavita-text-layout-v1'
 
@@ -41,11 +42,13 @@ def latest_review(c, order_id):
 
 def approved(c, row):
     artifact = latest(c, row['id'])
-    return artifact if artifact and artifact['state'] == 'approved' and artifact['source_hash'] == source_hash(row, json.loads(artifact['layout'])) else None
+    return artifact if artifact and artifact['state'] == 'approved' and artifact['source_hash'] == source_hash(row, json.loads(artifact['layout']),c) else None
 
 
 def allowed(c, row):
-    return approved(c, row) is not None if required(row) or latest(c, row['id']) else True
+    if order_amendments.pending(c,row['id']):return False
+    changed=json.loads(order_amendments.effective(c,row)['details']).get('_amendment_revision',0)
+    return approved(c, row) is not None if required(row) or changed or latest(c, row['id']) else True
 
 
 @lru_cache(maxsize=8)
@@ -53,7 +56,8 @@ def font_digest(path,mtime,size):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def source_hash(row, layout):
+def source_hash(row, layout,c=None):
+    if c is not None:row=order_amendments.effective(c,row)
     font=order_sample.font_path();stat=font.stat()
     data = json.dumps({'renderer':RENDERER,'order_id':row['id'],'details':json.loads(row['details']),
                        'layout':layout,'font':font_digest(str(font),stat.st_mtime_ns,stat.st_size)},
@@ -104,14 +108,15 @@ def write(path, content):
 def generate(c, fields, root):
     row=c.execute('SELECT o.* FROM invitation_orders o JOIN shop_offers s ON s.id=o.job WHERE o.id=?',(fields.get('order_id',''),)).fetchone()
     if not row or not partial_reviews.allowed(c,row):raise ValueError('결제 또는 부분취소 잔액 대조를 먼저 확인해 주세요.')
-    layout=layout_for(fields);digest=source_hash(row,layout)
+    if order_amendments.pending(c,row['id']):raise ValueError('정정 검토를 먼저 완료해 주세요.')
+    layout=layout_for(fields);digest=source_hash(row,layout,c)
     existing=c.execute('SELECT * FROM shop_artifacts WHERE order_id=? AND source_hash=?',(row['id'],digest)).fetchone()
     if existing:
         if latest(c,row['id'])['version'] != existing['version']:
             raise ValueError('예전 규격의 파일이 있습니다. 최신 파일을 검수하거나 새 규격으로 생성해 주세요.')
         return
     previous=latest(c,row['id']);version=previous['version']+1 if previous else 1
-    contents=render(row,layout)
+    contents=render(order_amendments.effective(c,row),layout)
     for extension,content in contents.items():write(artifact_path(root,row['id'],version,extension),content)
     c.execute("INSERT INTO shop_artifacts VALUES (?,?,?,?,?,?,'pending',?)",(row['id'],version,digest,json.dumps(layout),hashlib.sha256(contents['png']).hexdigest(),hashlib.sha256(contents['pdf']).hexdigest(),datetime.now(timezone.utc).isoformat()))
     # A new revision invalidates any outstanding previous production lease.
@@ -126,8 +131,8 @@ def review(c, fields, root, actor='admin-link'):
     artifact=latest(c,row['id']) if row else None
     last=latest_review(c,row['id']) if row else None
     decision,reviewer,note=(fields.get(k,'').strip() for k in ('artifact_decision','artifact_reviewer','artifact_note'))
-    if (not artifact or not partial_reviews.allowed(c,row) or str(artifact['version'])!=fields.get('artifact_version')
-            or artifact['source_hash']!=fields.get('artifact_hash') or artifact['source_hash']!=source_hash(row,json.loads(artifact['layout']))
+    if (not artifact or order_amendments.pending(c,row['id']) or not partial_reviews.allowed(c,row) or str(artifact['version'])!=fields.get('artifact_version')
+            or artifact['source_hash']!=fields.get('artifact_hash') or artifact['source_hash']!=source_hash(row,json.loads(artifact['layout']),c)
             or fields.get('artifact_compared')!='yes' or decision not in ('approved','rejected')
             or not 1<=len(reviewer)<=80 or not 1<=len(note)<=600):
         raise ValueError('최신 파일의 문구·보내는 분·중량·규격을 검수하고 확인자와 근거를 입력해 주세요.')
@@ -176,6 +181,9 @@ def panel(c,row,path):
     for ext in ('png','pdf'):
         signed=order_ops.signed_path('production-'+str(artifact['version'])+'-'+ext,row['id'],os.environ['TAESAN_WEBHOOK_SECRET'])
         result+=f'<p><a href="{signed}">버전 {artifact["version"]} {ext.upper()} 확인</a></p>'
+    if artifact['source_hash']!=source_hash(row,json.loads(artifact['layout']),c):
+        return result+'<p>이 파일은 이전 문구의 검수본입니다. 현재 승인된 정정 내용으로 새 제작 파일을 생성해 주세요.</p>'
+    if order_amendments.pending(c,row['id']):return result+'<p>정정 검토 완료 후 제작 파일을 검수할 수 있습니다.</p>'
     last=latest_review(c,row['id'])
     result+=(f'<form method="post" action="{escape(path)}">{hidden}<input type="hidden" name="action" value="review_artifact">'
         +f'<input type="hidden" name="artifact_version" value="{artifact["version"]}"><input type="hidden" name="artifact_hash" value="{artifact["source_hash"]}">'

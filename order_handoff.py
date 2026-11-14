@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 
 import partial_reviews
 import production_files
+import order_amendments
 
 SEOUL = ZoneInfo('Asia/Seoul')
 STATES = {'review': '사진 검토 후 제작 접수', 'pending': '공장 전달 대기', 'leased': '공장 수신 처리 중',
@@ -38,6 +39,7 @@ def payload_for(c, row, kind):
                                        'venue','address','event_time','amount')}
     order['id'] = row['id']
     order['offer_id'] = row['job']
+    data=json.loads(order_amendments.effective(c,row)['details'])
     options = dict(order['options'])
     weight = re.search(r'(?<!\d)(10|20|30)\s*(?:kg|㎏|키로|킬로)', options.get('상품 선택', ''), re.I)
     production = {'order_number': row['id'], 'quantity': 1, 'rice_kg': int(weight[1]) if weight else None,
@@ -64,6 +66,9 @@ def payload_for(c, row, kind):
     latest=production_files.latest(c,row['id'])
     review=production_files.latest_review(c,row['id'])
     result['artifact_revision']=[latest['version'] if latest else 0,review['id'] if review else 0]
+    result['content_decision_revision']=order_amendments.revision(c,row['id'])
+    if kind in ('ready','resume') and result['content_decision_revision']:
+        result['schema_version']=4
     return result
 
 
@@ -141,8 +146,9 @@ def claim(c, fields):
     if not isinstance(capabilities,list) or len(capabilities)>10:raise ValueError('invalid_capabilities')
     supports_resume = 'partial-resume-v1' in capabilities
     supports_files = 'production-artifact-v1' in capabilities
+    supports_amendments='order-amendment-v1' in capabilities
     row = c.execute("""SELECT * FROM shop_handoff WHERE (state='pending' OR (state='leased' AND lease_until<=?))
-        AND (kind!='resume' OR ?) AND (json_extract(payload,'$.schema_version')!=3 OR ?) ORDER BY (kind='hold') DESC,created,event_id LIMIT 1""", (now, supports_resume,supports_files)).fetchone()
+        AND (kind!='resume' OR ?) AND (json_extract(payload,'$.schema_version') NOT IN (3,4) OR ?) AND (json_extract(payload,'$.schema_version')!=4 OR ?) ORDER BY (kind='hold') DESC,created,event_id LIMIT 1""", (now, supports_resume,supports_files,supports_amendments)).fetchone()
     if not row:
         return {'job': None}
     token = secrets.token_hex(32)
@@ -158,6 +164,7 @@ def fulfill_event(c, event):
     order = c.execute('SELECT * FROM invitation_orders WHERE id=?', (event['order_id'],)).fetchone()
     if not production_files.allowed(c,order):return False
     payload=json.loads(event['payload'])
+    if payload.get('content_decision_revision',0)!=order_amendments.revision(c,order['id']):return False
     if production_files.required(order) or production_files.latest(c,order['id']):
         current=production_files.manifest(c,order)
         if payload.get('artifact')!=current:return False

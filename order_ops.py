@@ -18,6 +18,9 @@ import scheduled_backups
 import shop_dispatch
 import delivery_photos
 import shop_diagnostics
+import order_amendments
+import shop_service
+import assignment_batches
 
 SEOUL = ZoneInfo('Asia/Seoul')
 STAGES = {'confirmed': '주문 확인', 'shipping': '배송 중', 'delivered': '배송 완료'}
@@ -50,6 +53,9 @@ def setup(c):
     columns={row[1] for row in c.execute('PRAGMA table_info(shop_messages)')}
     for name,definition in (('channel',"TEXT NOT NULL DEFAULT 'mms'"),('request_json','TEXT')):
         if name not in columns:c.execute('ALTER TABLE shop_messages ADD COLUMN '+name+' '+definition)
+    order_amendments.setup(c)
+    shop_service.setup(c)
+    assignment_batches.setup(c)
     shop_dispatch.setup(c)
     delivery_photos.setup(c)
     shop_diagnostics.setup(c)
@@ -98,7 +104,7 @@ def on_payment(c, order_id, state, fields):
             queue(c, order_id, 'confirmed')
     if state in ('cancelled', 'partial_cancel') and not partial_reviews.allowed(c, row):
         c.execute("""UPDATE shop_messages SET state='held',error='payment_changed' WHERE order_id=? AND state='queued'
-                     AND (event IN ('confirmed','shipping','delivered') OR event LIKE 'resumed:%')""",
+                     AND (event IN ('confirmed','shipping','delivered') OR event LIKE 'resumed:%' OR event LIKE 'amended:%')""",
                   (order_id,))
         if fields.get('pay_state') in ('9', '64', '70', '71', '8', '32'):
             event = ('refund:' if fields.get('orig_mul_no') else 'cancel:') + fields.get('mul_no', '')
@@ -193,6 +199,8 @@ def controls(c, row, path, *, staff=False):
         return content
     delivery = shop_dispatch.link(c,row['id'],os.environ['TAESAN_WEBHOOK_SECRET'])
     content += f'<p><a href="{escape(delivery)}">직원용 주문·배송 링크 (24시간)</a></p>'
+    content += shop_service.panel(c,row,path)
+    content += order_amendments.panel(c,row,path)
     content += production_files.panel(c, row, path)
     content += partial_reviews.panel(c, row, path)
     content += '<h3>알림 이력</h3>'

@@ -19,7 +19,7 @@ def message(job,order,tracking=None,settings=None):
     receipt=origin+'/invitation-orders/'+order['id']+'/receipt'
     event=job['event'];group=event.split(':')[0]
     template=settings.get('SHOP_ALIMTALK_TEMPLATE_'+group.upper(),settings['SHOP_ALIMTALK_TEMPLATE_ID'])
-    status=order_ops.STAGES.get(event,'잔액 대조 후 재개' if event.startswith('resumed:') else '결제 일부 취소' if event.startswith('refund:') else '결제 취소')
+    status=order_ops.STAGES.get(event,'주문 정정 승인 · 새 제작 파일 검수 대기' if event.startswith('amended:') else'잔액 대조 후 재개' if event.startswith('resumed:') else '결제 일부 취소' if event.startswith('refund:') else '결제 취소')
     tracking=tracking or (origin+order_ops.signed_path('delivery',order['id'],settings['TAESAN_WEBHOOK_SECRET'],86400)
               if job['audience']=='staff' else receipt)
     return {'to':job['recipient'],'type':'ATA','kakaoOptions':{

@@ -37,6 +37,10 @@ import shop_dispatch
 import delivery_photos
 import shop_settlement
 import shop_diagnostics
+import order_amendments
+import shop_service
+import assignment_batches
+import shop_sales
 import cash_receipts
 import order_handoff
 import order_intake
@@ -1336,6 +1340,7 @@ class Handler(BaseHTTPRequestHandler):
         with db() as c:
             row = c.execute('''SELECT o.* FROM invitation_orders o JOIN shop_fulfillment f
                                ON f.order_id=o.id WHERE o.id=?''', (order_id,)).fetchone()
+            if row:row=order_amendments.effective(c,row)
             if not row:
                 return self.order_message('주문을 찾지 못했어요.', 404)
             page = order_ops.delivery_page(c, row, match[0])
@@ -1355,6 +1360,10 @@ class Handler(BaseHTTPRequestHandler):
                           'record_payment_check': shop.record_payment_check,
                           'save_notifications': order_ops.save_settings,
                           'assign_delivery':shop_dispatch.assign,
+                          'request_amendment':order_amendments.request,'review_amendment':order_amendments.review,
+                          'create_service_case':shop_service.create,'update_service_case':shop_service.update,
+                          'upload_service_photo':lambda c,f:shop_service.upload(c,f,ROOT),
+                          'preview_assignment_csv':assignment_batches.preview,'apply_assignment_csv':assignment_batches.apply,
                           'upload_delivery_photo':lambda c,f:delivery_photos.upload(c,f,ROOT),
                           'publish_delivery_photo':lambda c,f:delivery_photos.publish(c,f,ROOT),
                           'run_shop_diagnostics':lambda c,f:shop_diagnostics.run(c,f,ROOT),
@@ -1460,6 +1469,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        service_photo=re.fullmatch(r'/shop/service-photo/([a-f0-9]{32})/([a-f0-9]{32})/([a-f0-9]{32})/([0-9]{10})/([a-f0-9]{64})\.jpg',path)
+        if service_photo:
+            order_id,case_id,photo_id,expiry,signed=service_photo.groups()
+            if not order_ops.authorized('service-photo-'+case_id+'-'+photo_id,order_id,expiry,signed,os.environ['TAESAN_WEBHOOK_SECRET']):return self.order_message('AS 사진 링크가 만료됐어요.',403)
+            with db() as c:photo=c.execute('SELECT * FROM shop_service_photos WHERE id=? AND case_id=? AND order_id=?',(photo_id,case_id,order_id)).fetchone()
+            if not photo:return self.order_message('AS 사진이 없습니다.',404)
+            try:
+                content=shop_service.photo_path(ROOT,case_id,photo_id).read_bytes()
+                if hashlib.sha256(content).hexdigest()!=photo['sha256']:raise ValueError('photo_changed')
+            except (ValueError,OSError):return self.order_message('AS 사진 무결성을 확인해 주세요.',503)
+            self.send_response(200);self.send_header('Content-Type','image/jpeg');self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
         photo_match=re.fullmatch(r'/shop/delivery-photo/(admin|customer)/([a-f0-9]{32})/([a-f0-9]{32})/([0-9]{10})/([a-f0-9]{64})\.jpg',path)
         if photo_match:
             audience,order_id,photo_id,expiry,signed=photo_match.groups()
@@ -1473,7 +1493,7 @@ class Handler(BaseHTTPRequestHandler):
                     if hashlib.sha256(content).hexdigest()!=photo['sha256']:raise ValueError('photo_changed')
                 except (OSError,ValueError):return self.order_message('배송 사진 무결성·백업을 확인해 주세요.',503)
             self.send_response(200);self.send_header('Content-Type','image/jpeg');self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
-        for suffix in ('/settlement.xlsx','/diagnostics.json'):
+        for suffix in ('/settlement.xlsx','/sales.xlsx','/assignment-batch.csv','/diagnostics.json'):
             admin_export=shop.ADMIN_PATH.fullmatch(path.removesuffix(suffix)) if path.endswith(suffix) else None
             if admin_export:
                 if not shop.admin_authorized(*admin_export.groups(),os.environ['TAESAN_WEBHOOK_SECRET']):return self.order_message('관리자 링크가 만료됐어요.',403)
@@ -1481,13 +1501,17 @@ class Handler(BaseHTTPRequestHandler):
                     fields=dict(parse_qsl(urlsplit(self.path).query))
                     with db() as c:
                         if suffix=='/settlement.xlsx':content,filename=shop_settlement.workbook(c,fields)
+                        elif suffix=='/sales.xlsx':content,filename=shop_sales.workbook(c,fields)
+                        elif suffix=='/assignment-batch.csv':
+                            if not re.fullmatch(r'[a-f0-9]{32}',fields.get('batch','')):raise ValueError('검토 기록을 선택해 주세요.')
+                            content=assignment_batches.report(c,fields['batch']);filename='assignment-batch.csv'
                         else:
                             if not fields.get('run','').isdigit():raise ValueError('진단 기록을 선택해 주세요.')
                             row=c.execute('SELECT report FROM shop_diagnostic_runs WHERE id=?',(int(fields['run']),)).fetchone()
                             if not row:return self.order_message('진단 기록이 없습니다.',404)
                             content=row['report'].encode();filename='shop-diagnostics.json'
                 except ValueError as error:return self.order_message(str(error),422,back=True)
-                self.send_response(200);self.send_header('Content-Type','application/json; charset=utf-8' if suffix.endswith('json') else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');self.send_header('Content-Disposition','attachment; filename="'+filename+'"');self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
+                self.send_response(200);self.send_header('Content-Type','application/json; charset=utf-8' if suffix.endswith('json') else 'text/csv; charset=utf-8' if suffix.endswith('csv') else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');self.send_header('Content-Disposition','attachment; filename="'+filename+'"');self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
         production=re.fullmatch(r'/shop/(production-([0-9]+)-(png|pdf))/([a-f0-9]{32})/([0-9]{10})/([a-f0-9]{64})',path)
         factory_file=re.fullmatch(r'/shop/handoff/file/([a-f0-9]{32})/([0-9]+)\.(png|pdf)',path)
         if production or factory_file:
@@ -1520,6 +1544,7 @@ class Handler(BaseHTTPRequestHandler):
             with db() as c:
                 row = c.execute('''SELECT o.* FROM invitation_orders o JOIN shop_fulfillment f
                                    ON f.order_id=o.id WHERE o.id=?''', (order_id,)).fetchone()
+                if row:row=order_amendments.effective(c,row)
             if not row:
                 return self.order_message('주문을 찾지 못했어요.', 404)
             try:
