@@ -21,6 +21,7 @@ import stat
 import subprocess
 import tempfile
 import threading
+import tomllib
 import time
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
@@ -261,8 +262,30 @@ class CodexRunner:
                 or stat.S_IMODE(details.st_mode) != 0o600):
             raise WorkerError('전용 Codex 로그인 파일을 확인해 주세요.')
         for entry in home.iterdir():
-            if entry.is_symlink() or entry.name in ('mcp.json', 'hooks.json', 'hooks', 'plugins', 'managed_config.toml'):
+            if entry.is_symlink() or entry.name in ('mcp.json', 'hooks.json', 'hooks', 'managed_config.toml'):
                 raise WorkerError('전용 Codex 환경에 외부 도구나 훅 설정이 있어 실행하지 않았어요.')
+        configuration = home / 'config.toml'
+        if configuration.exists():
+            if not configuration.is_file() or configuration.stat().st_size > 65536:
+                raise WorkerError('전용 Codex 설정 형식을 확인해 주세요.')
+            try:
+                settings = tomllib.loads(configuration.read_text())
+            except (OSError, ValueError):
+                raise WorkerError('전용 Codex 설정 형식을 확인하지 못했어요.') from None
+            if any(settings.get(section) for section in ('plugins', 'mcp_servers', 'hooks')):
+                raise WorkerError('전용 프로필의 외부 도구 설정을 확인해 주세요.')
+        plugins = home / 'plugins'
+        if plugins.exists():
+            if not plugins.is_dir():
+                raise WorkerError('Codex 캐시 폴더 형식을 확인해 주세요.')
+            for entry in plugins.iterdir():
+                if entry.name not in ('cache', '.remote-plugin-install-staging') or entry.is_symlink() or not entry.is_dir():
+                    raise WorkerError('공식 CLI 캐시 이외의 플러그인 설정은 사용할 수 없어요.')
+                if entry.name == '.remote-plugin-install-staging' and any(entry.iterdir()):
+                    raise WorkerError('플러그인 설치 중에는 워커를 시작하지 않아요.')
+            for index, entry in enumerate(plugins.rglob('*')):
+                if index >= 10000 or entry.is_symlink() or not (entry.is_dir() or entry.is_file()):
+                    raise WorkerError('Codex 캐시 범위 또는 파일 형식을 확인해 주세요.')
         # User config is explicitly ignored. Project configs are checked separately.
         return home, work
 

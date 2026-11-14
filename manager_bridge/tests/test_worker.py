@@ -327,6 +327,29 @@ class CodexRunnerTests(unittest.TestCase):
             entry.unlink()
         self.assertEqual(self.children, [])
 
+    def test_official_cache_allows_next_task_after_cli_created_profile_files(self):
+        cache = self.home / 'plugins' / 'cache' / 'openai-curated-remote' / 'fixture' / 'v1'
+        cache.mkdir(parents=True)
+        (cache / 'SKILL.md').write_text('Fixture cache only; not an enabled tool.')
+        (self.home / 'plugins' / '.remote-plugin-install-staging').mkdir()
+        (self.home / 'config.toml').write_text('[projects."/fixture/repository"]\ntrust_level="trusted"\n')
+        runner = self.runner()
+        runner.preflight()
+        result = runner.run(self.assignment, pulse=lambda: True)
+        self.assertTrue(next(check['passed'] for check in result['checks'] if check['name']=='codex_exit_zero'))
+        runner.preflight()
+
+    def test_enabled_plugin_configuration_and_cache_symlinks_still_block_execution(self):
+        (self.home / 'config.toml').write_text('[plugins.fixture]\nenabled=true\n')
+        with self.assertRaises(WorkerError):
+            self.runner().preflight()
+        (self.home / 'config.toml').unlink()
+        cache = self.home / 'plugins' / 'cache'
+        cache.mkdir(parents=True)
+        (cache / 'outside').symlink_to(self.repo, target_is_directory=True)
+        with self.assertRaises(WorkerError):
+            self.runner().preflight()
+
     def test_cancellation_or_uncertain_heartbeat_terminates_running_child_group(self):
         def running(arguments, **options):
             process = FakeProcess(arguments, complete=False, **options)
