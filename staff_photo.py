@@ -8,6 +8,20 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 MAX_BYTES = 5_000_000
 
+ALL = re.compile(r'(?:사진으로 배송 확인|(?:배송\s*)?(?:전체(?:\s*상태)?|전부|상태|현황)\s*(?:를?\s*(?:보여|알려|확인)(?:\s*(?:해|줘|주세요|줘요))*)?)[?.!]*')
+FILTER = re.compile(r'(?:이\s*사진에서\s*)?(?:배송\s*)?(미\s*완료|완료|아직\s*안\s*끝난|아직\s*안\s*된|끝난)(?:\s*된)?(?:\s*(?:건|것|거))?\s*만\s*(?:(?:보여|알려)\s*(?:줘|줘요|주세요)?|확인\s*(?:해\s*)?(?:줘|줘요|주세요)?)?[?.!]*')
+STATUS = re.compile(r'(?:이거\s*|이\s*주문\s*)?(?:배송\s*)?(?:완료됐어|완료됐나요|아직\s*안\s*(?:끝났어|됐어)|상태\s*확인해\s*줘)[?.!]*')
+
+
+def question_mode(question):
+    from delivery_counts import PHOTO_MESSAGE
+
+    if not question or PHOTO_MESSAGE.fullmatch(question) or ALL.fullmatch(question) or STATUS.fullmatch(question):
+        return 'all'
+    if match := FILTER.fullmatch(question):
+        return 'pending' if re.search(r'미|아직', match[1]) else 'complete'
+    return None
+
 
 def urls(body):
     action = body.get('action')
