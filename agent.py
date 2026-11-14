@@ -28,6 +28,7 @@ import delivery_routes
 import development_queue
 import invitation
 import owner_alerts
+import order_duplicates
 import order_intake
 import order_ledger
 import order_operations
@@ -735,6 +736,8 @@ def run_job(job, message, owner, kind=''):
             result = run_invitation(message, owner)
         elif kind == 'order':
             result = run_order(message, owner)
+        elif kind == 'order_duplicate':
+            result = {'summary': order_duplicates.check(int(message), read_delivery_ranges)}
         else:
             result = handle(message, recent(owner), owner)
     except ValueError as error:
@@ -745,6 +748,8 @@ def run_job(job, message, owner, kind=''):
             result = {'summary': '배송루트 자료를 확인하지 못했어요. 잠시 뒤 “다시 계산”이라고 말씀해 주세요.'}
         elif kind == 'order':
             result = {'summary': '원장 등록을 확인하지 못했어요. 주문 내용을 보관하고 다시 확인할게요.'}
+        elif kind == 'order_duplicate':
+            result = {'summary': '원장을 읽지 못해 중복을 확인하지 못했어요. 잠시 뒤 다시 말씀해 주세요.'}
         elif getattr(error, 'code', None) == 'credit_balance_exhausted':
             result = {'summary': 'AI 이용 잔액이 부족해 이 요청을 해석하지 못했어요. 메뉴의 오늘 할 일과 재고 조회는 이용할 수 있어요.'}
         else:
@@ -917,7 +922,8 @@ def dispatch(body, defer_callback=None):
             '주문 접수라고 쓰고 같은 메시지에 주문 내용을 적어 주세요.\n'
             '청첩장이나 부고장이 있으면 링크와 보내는 분을 함께 보내 주세요.\n'
             '링크가 없으면 아래처럼 보내 주세요.\n\n'
-            '주문 접수\n설치장소: 예식장 이름과 주소\n보내는 분: 이름 또는 업체명',
+            '주문 접수\n설치장소: 예식장 이름과 주소\n보내는 분: 이름 또는 업체명\n\n'
+            '이미 입력한 주문은 “주문 1001번 중복 확인”처럼 물어보세요.',
             buttons=[('주문 접수 상태', '주문 접수 상태'), ('메뉴', '메뉴')],
         )
     if re.fullmatch(r'(?:내\s*)?(?:최근\s*)?주문\s*(?:접수\s*상태|등록\s*상태)(?:\s*(?:확인|알려|보여)\s*(?:해\s*)?(?:줘|주세요)?)?[.!?]?', message):
@@ -997,11 +1003,15 @@ def dispatch(body, defer_callback=None):
             or development_queue.APPROVE.fullmatch(message)) or re.fullmatch(
             r'(?:승인 검토|구조 변경 승인|구조 변경 반려) [a-f0-9]{12}', message):
         return approval_command(owner, message)
+    duplicate_check = order_duplicates.REQUEST.fullmatch(message)
     with LOCK, db() as c:
         pending = c.execute('SELECT details FROM invitation_input WHERE owner=? AND expires>?',
                             (owner, time.time())).fetchone()
         route_context = delivery_routes.session(db, owner)
-        if order_intake.wants_order(message, explicit_only=True):
+        if duplicate_check:
+            message = duplicate_check['first'] or duplicate_check['last']
+            kind = 'order_duplicate'
+        elif order_intake.wants_order(message, explicit_only=True):
             kind = 'order'
         elif (development_queue.REQUEST.fullmatch(message)
               or development_queue.DUPLICATE_ALERT_REQUEST.fullmatch(message)):
@@ -1018,7 +1028,7 @@ def dispatch(body, defer_callback=None):
         fingerprint = hashlib.sha256(fingerprint_input.encode()).hexdigest()
         for old in [key for key, future in ACTIVE.items() if future.done()]:
             ACTIVE.pop(old, None)
-        row = None if kind == 'route' else c.execute(
+        row = None if kind in ('route', 'order_duplicate') else c.execute(
             'SELECT * FROM jobs WHERE owner=? AND fingerprint=? AND created>? ORDER BY created DESC LIMIT 1',
             (owner, fingerprint, time.time()-180)).fetchone()
         if row:
@@ -1047,6 +1057,8 @@ def dispatch(body, defer_callback=None):
             return {'version': '2.0', 'useCallback': True}
         if kind == 'order':
             return kakao('주문을 확인하고 있어요.', buttons=[('주문 확인', f'결과 {job}')])
+        if kind == 'order_duplicate':
+            return kakao('원장을 확인하고 있어요.', buttons=[('중복 확인 결과', f'결과 {job}')])
         if kind == 'route':
             return kakao('배송루트를 계산하고 있어요.', buttons=[('배정안 확인', f'결과 {job}')])
         if kind == 'invitation':
