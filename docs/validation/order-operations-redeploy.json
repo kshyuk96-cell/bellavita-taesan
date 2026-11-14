@@ -1,0 +1,17 @@
+{
+  "commit": "a6158976cec4f4fc75e3d5724a998cd470598892",
+  "kind": "local new process from git archive, not Render deploy",
+  "preserved": {
+    "shop_products": 1,
+    "shop_offers": 2,
+    "invitation_orders": 4,
+    "payment_events": 7,
+    "shop_fulfillment": 4,
+    "shop_stage_history": 6,
+    "shop_messages": 12,
+    "shop_receipt_payments": 4,
+    "shop_cash_receipts": 0,
+    "shop_notification_settings": 1
+  },
+  "integrity_check": "ok"
+}

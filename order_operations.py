@@ -145,12 +145,14 @@ def web_owner(c, token):
 
 
 def list_orders(c, selected=''):
-    return c.execute('''SELECT i.id,i.created,i.state AS payment,i.details AS payment_details,
+    separate_shop = ("AND NOT EXISTS (SELECT 1 FROM shop_offers s WHERE s.id=i.job)"
+                     if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='shop_offers'").fetchone() else '')
+    return c.execute(f'''SELECT i.id,i.created,i.state AS payment,i.details AS payment_details,
                          o.state,o.order_number,o.details,r.checked
                          FROM invitation_orders i LEFT JOIN order_operations o ON o.id=
                          substr(i.id,1,8)||'-'||substr(i.id,9,4)||'-'||substr(i.id,13,4)||'-'||substr(i.id,17,4)||'-'||substr(i.id,21)
                          LEFT JOIN order_review r ON r.order_id=o.id
-                         WHERE i.state IN ('paid','cancelled','partial_cancel') AND (?='' OR i.id=?)
+                         WHERE i.state IN ('paid','cancelled','partial_cancel') AND (?='' OR i.id=?) {separate_shop}
                          ORDER BY i.created DESC LIMIT 100''', (selected, selected)).fetchall()
 
 

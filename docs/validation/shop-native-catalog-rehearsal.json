@@ -1,0 +1,14 @@
+{
+  "products": 4,
+  "server_amount": 165000,
+  "mock_payment": true,
+  "duplicate_paid_once": true,
+  "duplicate_partial_once": true,
+  "late_paid_does_not_undo_cancel": true,
+  "process_restart_preserved": true,
+  "backup_restore": "passed",
+  "live_payment": false,
+  "live_messages": false,
+  "live_receipts": false,
+  "render_disk_verification": "not_run"
+}

@@ -1,0 +1,11 @@
+{
+  "hosted_delivery_suite": "passed",
+  "order_id": "BV-8e0cbbee-7b67-4f2c-bb68-4530e09d64a6",
+  "old_records_preserved": true,
+  "assignment_handover": true,
+  "public_photo_confirmation": true,
+  "hidden_photo_denied": true,
+  "settlement_xlsx_readable": true,
+  "diagnostics_live_not_run": true,
+  "final_order_state": "cancelled"
+}

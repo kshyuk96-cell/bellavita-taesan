@@ -29,6 +29,26 @@ import delivery_routes
 import development_queue
 import invitation
 import owner_alerts
+import shop
+import shop_catalog
+import shop_admin_queries
+import shop_admin_workflow
+import shop_admin_daily
+import shop_admin_training
+import shop_admin_manual
+import order_ops
+import order_sample
+import production_files
+import shop_dispatch
+import delivery_photos
+import shop_settlement
+import shop_diagnostics
+import order_amendments
+import shop_service
+import assignment_batches
+import shop_sales
+import cash_receipts
+import order_handoff
 import order_intake
 import order_ledger
 import order_operations
@@ -96,6 +116,7 @@ def db():
     connection.execute('''CREATE TABLE IF NOT EXISTS invitation_input (
         owner TEXT PRIMARY KEY, expires REAL NOT NULL, details TEXT NOT NULL)''')
     checkout.setup(connection)
+    shop.setup(connection)
     delivery_routes.setup(connection)
     owner_alerts.setup(connection)
     staff_features.setup(connection)
@@ -970,18 +991,21 @@ def dispatch(body, defer_callback=None):
             c.execute('INSERT OR REPLACE INTO invitation_input VALUES (?,?,?)', (owner, time.time()+1800, ''))
         return kakao('청첩장 링크나 행사 정보를 올려주세요',
                      buttons=[('초대장 취소', '초대장 취소')])
-    if message == '초대장 주문 내역':
+    if message in ('초대장 주문 내역', '쇼핑몰 관리'):
         if role_of(owner) != 'admin':
-            return kakao('대표 계정에서만 초대장 주문 내역을 볼 수 있어요.')
+            return kakao('대표 계정에서만 열 수 있어요.')
         origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
         if not invitation.https_url(origin):
-            return kakao('초대장 주문 내역 주소를 설정해 주세요.')
+            return kakao('관리 화면 주소를 설정해 주세요.')
         expiry = str(int(time.time()) + 600)
-        signature = checkout.admin_signature(expiry, os.environ['TAESAN_WEBHOOK_SECRET'])
-        url = f'{origin}/invitation-orders/admin/{expiry}/{signature}'
+        is_shop = message == '쇼핑몰 관리'
+        route = 'shop/admin' if is_shop else 'invitation-orders/admin'
+        signature = (shop.admin_signature if is_shop else checkout.admin_signature)(
+            expiry, os.environ['TAESAN_WEBHOOK_SECRET'])
+        url = f'{origin}/{route}/{expiry}/{signature}'
         return {'version': '2.0', 'template': {'outputs': [{'basicCard': {
-            'title': '초대장 주문 내역', 'description': '이 주소는 10분 동안 열 수 있어요.',
-            'buttons': [{'action': 'webLink', 'label': '주문 내역 보기', 'webLinkUrl': url}],
+            'title': message, 'description': '이 주소는 10분 동안 열 수 있어요.',
+            'buttons': [{'action': 'webLink', 'label': '관리 화면 열기', 'webLinkUrl': url}],
         }}]}}
     if message == '초대장 취소':
         with db() as c:
@@ -1119,6 +1143,46 @@ class Handler(BaseHTTPRequestHandler):
                 connection.close()
             return self.send_json(result, status)
         path = urlsplit(self.path).path
+        catalog_product=shop_catalog.PRODUCT_PATH.fullmatch(path)
+        if catalog_product:return self.catalog_order(catalog_product[1],submit=True)
+        customer_confirm=re.fullmatch(r'/invitation-orders/([a-f0-9]{32})/delivery-confirm',path)
+        if customer_confirm:
+            if self.headers.get('Origin')!=os.getenv('TAESAN_PUBLIC_URL','').rstrip('/'):return self.order_message('고객 주문 화면을 다시 열어 주세요.',403)
+            try:
+                fields=self.read_order_form()
+                with db() as c:
+                    c.execute('BEGIN IMMEDIATE');delivery_photos.confirm(c,customer_confirm[1],fields)
+            except (ValueError,UnicodeError) as error:return self.order_message(str(error),422,back=True)
+            self.send_response(303);self.send_header('Location','/invitation-orders/'+customer_confirm[1]+'/receipt');self.send_header('Cache-Control','no-store');self.end_headers();return
+        if path in ('/shop/handoff/claim', '/shop/handoff/ack'):
+            if not order_handoff.authorize(self.headers.get('Authorization', '')):
+                return self.send_json({'error': 'handoff_not_authorized'}, 401)
+            try:
+                size = int(self.headers.get('Content-Length', '0'))
+                if not 0 < size <= 65536 or self.headers.get_content_type() != 'application/json':
+                    raise ValueError('invalid_request')
+                fields = json.loads(self.rfile.read(size).decode())
+                if not isinstance(fields, dict):
+                    raise ValueError('invalid_request')
+                with db() as c:
+                    if path.endswith('/claim'):
+                        result, status = order_handoff.claim(c, fields), 200
+                    else:
+                        result, status = order_handoff.acknowledge(c, fields)
+            except (ValueError, UnicodeError):
+                return self.send_json({'error': 'invalid_request'}, 400)
+            return self.send_json(result, status)
+        assigned_delivery=re.fullmatch(r'/shop/assigned-delivery/([a-f0-9]{32})/([0-9]+)/([0-9]{10})/([a-f0-9]{64})',path)
+        if assigned_delivery:return self.delivery(assigned_delivery,write=self.command=='POST',assigned=True)
+        delivery = order_ops.DELIVERY_PATH.fullmatch(path)
+        if delivery:
+            return self.delivery(delivery, write=True)
+        shop_admin = shop.ADMIN_PATH.fullmatch(path)
+        if shop_admin:
+            return self.shop_admin(shop_admin, write=True)
+        shop_order = shop.ORDER_PATH.fullmatch(path)
+        if shop_order:
+            return self.shop_order(shop_order[1], submit=True)
         if path == '/development-queue':
             try:
                 length = int(self.headers.get('Content-Length', ''))
@@ -1249,6 +1313,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def read_order_form(self):
         size = int(self.headers.get('Content-Length', '0'))
+        if self.headers.get_content_type()=='multipart/form-data':
+            if not 0<size<=delivery_photos.MAX_UPLOAD+32768:raise ValueError('사진은 5MB 이내로 업로드해 주세요.')
+            return delivery_photos.multipart(self.headers['Content-Type'],self.rfile.read(size))
         if not 0 < size <= 16384 or self.headers.get_content_type() != 'application/x-www-form-urlencoded':
             raise ValueError('주문 정보가 올바르지 않아요.')
         fields = parse_qs(self.rfile.read(size).decode(), keep_blank_values=True, max_num_fields=100)
@@ -1265,6 +1332,136 @@ class Handler(BaseHTTPRequestHandler):
                              '<title>벨라비타 주문</title><main><h1>벨라비타 주문</h1><p>'
                              + escape(message) + '</p>' + link + '</main></html>', status)
 
+    def delivery(self, match, *, write=False, assigned=False):
+        if assigned:order_id,version,expiry,signed=match.groups()
+        else:order_id,expiry,signed=match.groups();version=None
+        kind='assigned-delivery-'+version if assigned else 'delivery'
+        if not order_ops.authorized(kind, order_id, expiry, signed, os.environ['TAESAN_WEBHOOK_SECRET']):
+            return self.order_message('주문·배송 관리 링크가 만료됐어요. 대표에게 최신 링크를 요청해 주세요.', 403)
+        with db() as c:
+            assignment=shop_dispatch.current(c,order_id)
+            if (assigned and not shop_dispatch.valid(c,order_id,version)) or (not assigned and assignment and assignment['owner']):
+                return self.order_message('담당자가 변경됐거나 전용 링크가 필요합니다. 현재 담당자 링크를 열어 주세요.',403)
+        if write:
+            if self.headers.get('Origin') != os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'):
+                return self.order_message('주문·배송 화면을 다시 열어 주세요.', 403)
+            try:
+                fields = self.read_order_form()
+                if fields.get('action') not in ('change_stage','upload_delivery_photo','accept_assignment') or fields.get('order_id') != order_id:
+                    raise ValueError('이 주문의 배송 상태만 변경할 수 있어요.')
+                with db() as c:
+                    c.execute('BEGIN IMMEDIATE')
+                    current_assignment=shop_dispatch.current(c,order_id)
+                    if (assigned and not shop_dispatch.valid(c,order_id,version)) or (not assigned and current_assignment and current_assignment['owner']):raise ValueError('담당자가 변경됐습니다. 최신 링크를 열어 주세요.')
+                    actor='assignment-link-v'+version if assigned else 'staff-order-link'
+                    if fields['action']=='change_stage':order_ops.change_stage(c,fields,actor=actor)
+                    elif fields['action']=='upload_delivery_photo':delivery_photos.upload(c,fields,ROOT,actor=actor)
+                    elif assigned and fields.get('assignment_version')==version:shop_dispatch.accept(c,fields,actor=actor)
+                    else:raise ValueError('현재 담당자 전용 링크에서 인수 확인해 주세요.')
+            except (ValueError, UnicodeError) as error:
+                return self.order_message(str(error), 422)
+            self.send_response(303)
+            self.send_header('Location', match[0])
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            return
+        with db() as c:
+            row = c.execute('''SELECT o.* FROM invitation_orders o JOIN shop_fulfillment f
+                               ON f.order_id=o.id WHERE o.id=?''', (order_id,)).fetchone()
+            if row:row=order_amendments.effective(c,row)
+            if not row:
+                return self.order_message('주문을 찾지 못했어요.', 404)
+            page = order_ops.delivery_page(c, row, match[0])
+        return self.send_order_html(page, referrer_policy='same-origin')
+
+    def shop_admin(self, match, *, write=False):
+        if not shop.admin_authorized(*match.groups(), os.environ['TAESAN_WEBHOOK_SECRET']):
+            return self.order_message('태산이에서 쇼핑몰 관리를 다시 열어 주세요.', 403)
+        origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
+        if write:
+            if not invitation.https_url(origin) or self.headers.get('Origin') != origin:
+                return self.order_message('태산이에서 쇼핑몰 관리를 다시 열어 주세요.', 403)
+            try:
+                fields = self.read_order_form()
+                return_location=shop_admin_queries.redirect(match[0],fields) if '_return_query' in fields else match[0]
+                action = {'save_operator_task':shop_admin_daily.save_task,'save_search':shop_admin_workflow.save_search,'delete_search':shop_admin_workflow.delete_search,'save_operator_handover':shop_admin_workflow.save_handover,
+                          'save_product': shop.save_product, 'issue_offers': shop.issue_offers,
+                          'change_offer': shop.change_offer,
+                          'record_payment_check': shop.record_payment_check,
+                          'save_notifications': order_ops.save_settings,
+                          'assign_delivery':shop_dispatch.assign,
+                          'request_amendment':order_amendments.request,'review_amendment':order_amendments.review,
+                          'create_service_case':shop_service.create,'update_service_case':shop_service.update,
+                          'upload_service_photo':lambda c,f:shop_service.upload(c,f,ROOT),
+                          'preview_assignment_csv':assignment_batches.preview,'apply_assignment_csv':assignment_batches.apply,
+                          'upload_delivery_photo':lambda c,f:delivery_photos.upload(c,f,ROOT),
+                          'publish_delivery_photo':lambda c,f:delivery_photos.publish(c,f,ROOT),
+                          'run_shop_diagnostics':lambda c,f:shop_diagnostics.run(c,f,ROOT),
+                          'change_stage': order_ops.change_stage, 'retry_message': order_ops.retry_message,
+                          'reconcile_message': order_ops.reconcile_message,
+                          'review_partial': order_ops.partial_reviews.review,
+                          'generate_artifact': lambda c,f:production_files.generate(c,f,ROOT),
+                          'review_artifact': lambda c,f:production_files.review(c,f,ROOT),
+                          'prepare_handoff': order_handoff.prepare, 'review_shop_photo': order_handoff.review_photo,
+                          'reconcile_receipt': cash_receipts.reconcile}.get(fields.get('action'))
+                if action is None:
+                    raise ValueError('요청 내용을 확인해 주세요.')
+                with db() as connection:
+                    connection.execute('BEGIN IMMEDIATE')
+                    action(connection, fields)
+            except (ValueError, UnicodeError) as error:
+                from html import escape
+                return self.send_order_html('<!doctype html><html lang="ko"><meta name="viewport" content="width=device-width,initial-scale=1"><main><h1>저장하지 못했습니다</h1><p>'+escape(str(error))+'</p><p>기존 기록을 먼저 확인하세요. 결과가 불명확하면 반복 저장하지 마세요.</p><button type="button" onclick="history.back()">입력 화면으로 돌아가기</button><p><a href="'+escape(match[0])+'">최신 관리자 화면 열기</a></p></main></html>',422)
+
+            self.send_response(303)
+            self.send_header('Location', return_location)
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            return
+        with db() as connection:
+            try:page = shop.admin_page(connection, match[0], origin,dict(parse_qsl(urlsplit(self.path).query)),ROOT)
+            except ValueError as error:return self.order_message(str(error),422,back=True)
+        return self.send_order_html(page, referrer_policy='same-origin')
+
+    def catalog_order(self, identity, *, submit=False):
+        origin=os.getenv('TAESAN_PUBLIC_URL','').rstrip('/')
+        config=checkout.payment_config()
+        can_pay=os.getenv('SHOP_CHECKOUT_ENABLED')=='1' and all(config.values()) and invitation.https_url(origin)
+        if not submit:
+            with db() as c:
+                row,product=shop_catalog.read(c,identity)
+                if product:product=dict(shop_catalog.snapshot(identity,product),revision=row['revision'])
+            if not product:return self.order_message('상품을 찾을 수 없습니다.',404)
+            return self.send_order_html(checkout.render(product,'/shop/products/'+identity,can_pay and product.get('available',True)),referrer_policy='same-origin')
+        if not can_pay:return self.order_message('현재 결제를 이용할 수 없습니다.',503)
+        if self.headers.get('Origin')!=origin:return self.order_message('주문서를 다시 열어 주세요.',403)
+        try:
+            fields=self.read_order_form()
+            with db() as c:
+                c.execute('BEGIN IMMEDIATE');offer,product=shop_catalog.prepare(c,identity,fields)
+            location=checkout.start_order(db,offer,product['price'],product,fields,origin,config)
+        except ValueError as error:return self.order_message(str(error),422,back=True)
+        except Exception as error:
+            print('상품 결제 연결 실패:',type(error).__name__,file=sys.stderr,flush=True)
+            return self.order_message('결제 요청 상태를 확인해 주세요. 결과가 불명확하면 새 결제를 요청하지 마세요.',502)
+        self.send_response(303);self.send_header('Location',location);self.send_header('Cache-Control','no-store');self.send_header('Referrer-Policy','no-referrer');self.end_headers()
+
+    def shop_order(self, offer_id, *, submit=False):
+        with db() as connection:
+            product, active = shop.read_offer(connection, offer_id)
+        if not product:
+            return self.order_message('주문서를 찾지 못했어요.', 404)
+        if not active or not checkout.available(product):
+            return self.order_message('이 행사의 주문이 마감됐어요.', 410)
+        config = checkout.payment_config()
+        origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
+        can_pay = (os.getenv('SHOP_CHECKOUT_ENABLED') == '1' and all(config.values())
+                   and invitation.https_url(origin))
+        if submit:
+            return self.submit_checkout(offer_id, product['price'], product, can_pay, origin, config)
+        return self.send_order_html(checkout.render(product, f'/shop/order/{offer_id}', can_pay),
+                                    referrer_policy='same-origin')
+
     def place_invitation_order(self, job, price):
         product = checkout.read(ROOT, job, price)
         if not product:
@@ -1273,7 +1470,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.order_message('이 행사의 주문이 마감됐어요.', 410)
         config = checkout.payment_config()
         origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
-        if not checkout.payment_enabled(job) or not all(config.values()) or not invitation.https_url(origin):
+        can_pay = checkout.payment_enabled(job) and all(config.values()) and invitation.https_url(origin)
+        return self.submit_checkout(job, price, product, can_pay, origin, config)
+
+    def submit_checkout(self, job, price, product, can_pay, origin, config):
+        if not can_pay:
             return self.order_message('현재 결제를 이용할 수 없어요. 문의 031-8067-8580', 503, back=True)
         if self.headers.get('Origin') not in (None, origin):
             return self.order_message('주문서를 다시 열고 결제하기를 눌러 주세요.', 403, back=True)
@@ -1323,6 +1524,122 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        for suffix in ('/manual','/manual.md','/training'):
+            manual=shop.ADMIN_PATH.fullmatch(path.removesuffix(suffix)) if path.endswith(suffix) else None
+            if manual:
+                if not shop.admin_authorized(*manual.groups(),os.environ['TAESAN_WEBHOOK_SECRET']):return self.order_message('관리자 링크가 만료됐습니다.',403)
+                if suffix=='/training':return self.send_order_html(shop_admin_training.page(manual[0]),referrer_policy='same-origin')
+                if suffix=='/manual':return self.send_order_html(shop_admin_manual.page(manual[0]),referrer_policy='same-origin')
+                content=shop_admin_manual.SOURCE.read_bytes();self.send_response(200);self.send_header('Content-Type','text/markdown; charset=utf-8');self.send_header('Content-Disposition','attachment; filename=bellavita-admin-manual.md');self.send_header('Cache-Control','private, no-store');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
+        if path in ('/shop','/shop/'):
+            with db() as c:page=shop_catalog.page(c)
+            return self.send_order_html(page,referrer_policy='same-origin')
+        if path.startswith('/shop-art/'):
+            name=path.removeprefix('/shop-art/')
+            if name not in ('store.css','thumbnails-v3.png'):return self.order_message('파일이 없습니다.',404)
+            content=(shop_catalog.ASSETS/name).read_bytes()
+            self.send_response(200);self.send_header('Content-Type','text/css; charset=utf-8' if name.endswith('.css') else 'image/png');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
+        catalog_product=shop_catalog.PRODUCT_PATH.fullmatch(path)
+        if catalog_product:return self.catalog_order(catalog_product[1])
+        service_photo=re.fullmatch(r'/shop/service-photo/([a-f0-9]{32})/([a-f0-9]{32})/([a-f0-9]{32})/([0-9]{10})/([a-f0-9]{64})\.jpg',path)
+        if service_photo:
+            order_id,case_id,photo_id,expiry,signed=service_photo.groups()
+            if not order_ops.authorized('service-photo-'+case_id+'-'+photo_id,order_id,expiry,signed,os.environ['TAESAN_WEBHOOK_SECRET']):return self.order_message('AS 사진 링크가 만료됐어요.',403)
+            with db() as c:photo=c.execute('SELECT * FROM shop_service_photos WHERE id=? AND case_id=? AND order_id=?',(photo_id,case_id,order_id)).fetchone()
+            if not photo:return self.order_message('AS 사진이 없습니다.',404)
+            try:
+                content=shop_service.photo_path(ROOT,case_id,photo_id).read_bytes()
+                if hashlib.sha256(content).hexdigest()!=photo['sha256']:raise ValueError('photo_changed')
+            except (ValueError,OSError):return self.order_message('AS 사진 무결성을 확인해 주세요.',503)
+            self.send_response(200);self.send_header('Content-Type','image/jpeg');self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
+        photo_match=re.fullmatch(r'/shop/delivery-photo/(admin|customer)/([a-f0-9]{32})/([a-f0-9]{32})/([0-9]{10})/([a-f0-9]{64})\.jpg',path)
+        if photo_match:
+            audience,order_id,photo_id,expiry,signed=photo_match.groups()
+            if not order_ops.authorized('delivery-photo-'+audience+'-'+photo_id,order_id,expiry,signed,os.environ['TAESAN_WEBHOOK_SECRET']):return self.order_message('사진 링크가 만료됐어요.',403)
+            with db() as c:
+                photo=c.execute('SELECT * FROM shop_delivery_photos WHERE id=? AND order_id=?',(photo_id,order_id)).fetchone()
+                if not photo:return self.order_message('사진을 찾지 못했어요.',404)
+                if audience=='customer' and (photo['state']!='public' or not delivery_photos.deliverable(c,order_id)):return self.order_message('고객에게 공개되지 않은 사진입니다.',403)
+                try:
+                    content=delivery_photos.photo_path(ROOT,order_id,photo_id).read_bytes()
+                    if hashlib.sha256(content).hexdigest()!=photo['sha256']:raise ValueError('photo_changed')
+                except (OSError,ValueError):return self.order_message('배송 사진 무결성·백업을 확인해 주세요.',503)
+            self.send_response(200);self.send_header('Content-Type','image/jpeg');self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
+        for suffix in ('/settlement.xlsx','/sales.xlsx','/assignment-batch.csv','/diagnostics.json'):
+            admin_export=shop.ADMIN_PATH.fullmatch(path.removesuffix(suffix)) if path.endswith(suffix) else None
+            if admin_export:
+                if not shop.admin_authorized(*admin_export.groups(),os.environ['TAESAN_WEBHOOK_SECRET']):return self.order_message('관리자 링크가 만료됐어요.',403)
+                try:
+                    fields=dict(parse_qsl(urlsplit(self.path).query))
+                    with db() as c:
+                        if suffix=='/settlement.xlsx':content,filename=shop_settlement.workbook(c,fields)
+                        elif suffix=='/sales.xlsx':content,filename=shop_sales.workbook(c,fields)
+                        elif suffix=='/assignment-batch.csv':
+                            if not re.fullmatch(r'[a-f0-9]{32}',fields.get('batch','')):raise ValueError('검토 기록을 선택해 주세요.')
+                            content=assignment_batches.report(c,fields['batch']);filename='assignment-batch.csv'
+                        else:
+                            if not fields.get('run','').isdigit():raise ValueError('진단 기록을 선택해 주세요.')
+                            row=c.execute('SELECT report FROM shop_diagnostic_runs WHERE id=?',(int(fields['run']),)).fetchone()
+                            if not row:return self.order_message('진단 기록이 없습니다.',404)
+                            content=row['report'].encode();filename='shop-diagnostics.json'
+                except ValueError as error:return self.order_message(str(error),422,back=True)
+                self.send_response(200);self.send_header('Content-Type','application/json; charset=utf-8' if suffix.endswith('json') else 'text/csv; charset=utf-8' if suffix.endswith('csv') else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');self.send_header('Content-Disposition','attachment; filename="'+filename+'"');self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
+        production=re.fullmatch(r'/shop/(production-([0-9]+)-(png|pdf))/([a-f0-9]{32})/([0-9]{10})/([a-f0-9]{64})',path)
+        factory_file=re.fullmatch(r'/shop/handoff/file/([a-f0-9]{32})/([0-9]+)\.(png|pdf)',path)
+        if production or factory_file:
+            if production:
+                kind,version,extension,order_id,expiry,signed=production.groups()
+                if not order_ops.authorized(kind,order_id,expiry,signed,os.environ['TAESAN_WEBHOOK_SECRET']):
+                    return self.order_message('제작 파일 확인 링크가 만료됐어요.',403)
+            else:
+                if not order_handoff.authorize(self.headers.get('Authorization','')):return self.send_json({'error':'handoff_not_authorized'},401)
+                order_id,version,extension=factory_file.groups()
+            with db() as c:
+                row=c.execute('SELECT o.* FROM invitation_orders o JOIN shop_offers s ON s.id=o.job WHERE o.id=?',(order_id,)).fetchone()
+                artifact=c.execute('SELECT * FROM shop_artifacts WHERE order_id=? AND version=?',(order_id,int(version))).fetchone()
+                if not row or not artifact:return self.order_message('제작 파일을 찾지 못했어요.',404)
+                if factory_file and (not order_ops.partial_reviews.allowed(c,row) or not production_files.allowed(c,row) or production_files.latest(c,order_id)['version']!=int(version)):
+                    return self.send_json({'error':'artifact_not_approved'},409)
+                try:
+                    content=production_files.artifact_path(ROOT,order_id,version,extension).read_bytes()
+                    if hashlib.sha256(content).hexdigest()!=artifact[extension+'_hash']:raise ValueError('artifact_changed')
+                except (OSError,ValueError):return self.order_message('제작 파일 무결성을 확인해 주세요.',503)
+            self.send_response(200);self.send_header('Content-Type','image/png' if extension=='png' else 'application/pdf')
+            self.send_header('Content-Disposition',f'inline; filename="{order_id}-v{version}.{extension}"')
+            self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff')
+            self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
+        sample = order_ops.SAMPLE_PATH.fullmatch(path)
+        if sample:
+            order_id, expiry, signed = sample.groups()
+            if not order_ops.authorized('sample', order_id, expiry, signed, os.environ['TAESAN_WEBHOOK_SECRET']):
+                return self.order_message('이미지 확인 링크가 만료됐어요.', 403)
+            with db() as c:
+                row = c.execute('''SELECT o.* FROM invitation_orders o JOIN shop_fulfillment f
+                                   ON f.order_id=o.id WHERE o.id=?''', (order_id,)).fetchone()
+                if row:row=order_amendments.effective(c,row)
+            if not row:
+                return self.order_message('주문을 찾지 못했어요.', 404)
+            try:
+                data = order_sample.sample(ROOT, row).read_bytes()
+            except Exception:
+                return self.order_message('샘플 이미지 생성 설정을 확인해 주세요.', 503)
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/jpeg')
+            self.send_header('Cache-Control', 'private, no-store')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            return self.wfile.write(data)
+        assigned_delivery=re.fullmatch(r'/shop/assigned-delivery/([a-f0-9]{32})/([0-9]+)/([0-9]{10})/([a-f0-9]{64})',path)
+        if assigned_delivery:return self.delivery(assigned_delivery,write=self.command=='POST',assigned=True)
+        delivery = order_ops.DELIVERY_PATH.fullmatch(path)
+        if delivery:
+            return self.delivery(delivery)
+        shop_admin = shop.ADMIN_PATH.fullmatch(path)
+        if shop_admin:
+            return self.shop_admin(shop_admin)
+        shop_order = shop.ORDER_PATH.fullmatch(path)
+        if shop_order:
+            return self.shop_order(shop_order[1])
         if path == '/development-queue':
             with db() as c:
                 if not development_queue.authorized(c, self.headers.get('Authorization', ''), 'GET'):
@@ -1368,6 +1685,7 @@ class Handler(BaseHTTPRequestHandler):
                 orders = connection.execute('''SELECT o.*, r.reviewed_at AS photo_reviewed
                     FROM invitation_orders o LEFT JOIN invitation_photo_reviews r ON r.order_id=o.id
                     WHERE o.state IN ('paid', 'cancelled', 'partial_cancel')
+                    AND NOT EXISTS (SELECT 1 FROM shop_offers s WHERE s.id=o.job)
                     ORDER BY o.created DESC LIMIT 200''').fetchall()
             return self.send_order_html(checkout.admin_page(orders, path), referrer_policy='same-origin')
         order = checkout.ORDER_PATH.fullmatch(path)
@@ -1384,9 +1702,12 @@ class Handler(BaseHTTPRequestHandler):
         receipt = checkout.RECEIPT_PATH.fullmatch(path)
         if receipt:
             with db() as connection:
-                row = connection.execute('SELECT state FROM invitation_orders WHERE id=?', (receipt[1],)).fetchone()
+                row = connection.execute('SELECT * FROM invitation_orders WHERE id=?', (receipt[1],)).fetchone()
+                page = order_ops.customer_receipt(connection, row) if row else None
             if not row:
                 return self.order_message('주문을 찾지 못했어요.', 404)
+            if page:
+                return self.send_order_html(page, referrer_policy='same-origin')
             message = {'paid': '결제가 완료됐어요.', 'cancelled': '결제가 취소됐어요.',
                        'partial_cancel': '결제 금액의 일부가 취소됐어요.'}.get(row['state'], '결제 상태를 확인하고 있어요.')
             return self.order_message(message)
@@ -1480,6 +1801,8 @@ if __name__ == '__main__':
     if len(os.getenv('TAESAN_WEBHOOK_SECRET', '')) < 32:
         raise SystemExit('TAESAN_WEBHOOK_SECRET에 32자 이상의 임의 문자열이 필요합니다.')
     owner_alerts.start(db)
+    order_ops.start(db, ROOT)
     start_order_queue()
     ThreadingHTTPServer((os.getenv('TAESAN_BIND', '127.0.0.1'), int(os.getenv('PORT', '8080'))),
                         Handler).serve_forever()
+

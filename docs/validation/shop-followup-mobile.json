@@ -1,0 +1,9 @@
+{
+  "mobile_width": 375,
+  "production_generate_review": "passed",
+  "approved_version_png": true,
+  "dashboard_filter_search": true,
+  "overflow": false,
+  "javascript_errors": [],
+  "actual_sends": false
+}

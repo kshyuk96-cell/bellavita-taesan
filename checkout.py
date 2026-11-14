@@ -18,6 +18,7 @@ from lxml import html
 
 from blogpay import NoRedirect
 from scroll_sender import split_sender
+import order_ops
 from order_operations import stage_paid
 
 SEOUL = ZoneInfo('Asia/Seoul')
@@ -233,6 +234,9 @@ def render(product, action, can_pay):
     pictures = ''.join(f'<img src="{escape(src)}" alt="쌀빛그림화환 상품 사진"'
                        + (' loading="lazy"' if index else '') + '>'
                        for index, src in enumerate(product['images']))
+    if product.get('thumbnail'):
+        import shop_catalog
+        pictures='<div>'+shop_catalog.thumbnail(product)+'<details><summary>원본 상품 사진 보기</summary><div class="gallery">'+pictures+'</div></details></div>'
     preview = wedding_preview(product)
     if preview:
         pictures = f'''<figure class="wreath-preview" id="wreath-preview">
@@ -249,14 +253,24 @@ def render(product, action, can_pay):
           </div>
           <figcaption>예식 당일 신랑신부 사진 및<br>풍경사진으로 설치해드립니다.</figcaption>
         </figure><div class="gallery" id="wreath-fallback" role="group" aria-label="상품 사진" tabindex="0" hidden>{pictures}</div>'''
-    else:
+    elif not product.get('thumbnail'):
         pictures = f'<div class="gallery" role="group" aria-label="상품 사진" tabindex="0">{pictures}</div>'
+    detail_content='\n<p><strong>쌀(쌀빛그림)화환 관련</strong></p>\n<p>신청해주신 쌀빛그림화환은 친환경 웨딩갤러리를 만들기 위해 액자를 설치하고<br>예식 후 쌀로 교환하여 혼주님께 드리거나 필요한 시설에 기부합니다.</p>\n<p>필요한 웨딩액자나 작품액자는 준비된 액자를 사용하니<br>전화나 문자를 이용하시거나 주문시스템에서 시청하시면 됩니다.</p>\n<p>문의 전화 031-8067-8580</p>\n<img src="https://bellavita1004.blogpay.io/img/editor/bellavita1004/temp/0524251001759278768.jpg" alt="쌀빛그림화환 상세 안내" loading="lazy">'
+    if product.get('detail_text'):
+        detail_content='<p style="white-space:pre-wrap">'+escape(product['detail_text'])+'</p>'+''.join('<img src="'+escape(url)+'" alt="상품 상세 안내" loading="lazy">' for url in product.get('detail_images',[]))
+    extra_fields=''.join('<label>'+escape(spec['label'])+'<input name="extra'+str(i)+'" maxlength="'+str(spec.get('max',200))+'" required></label>' for i,spec in enumerate(product.get('extra_fields',[])))
+    if product.get('customer_event_input'):
+        installation='<label>행事장·홀<input name="venue" maxlength="120" required></label><label>설치 주소<input name="address" maxlength="200" required></label><label>행사 일시(한국 시간)<input name="event_time" type="datetime-local" required></label>'
+        installation=installation.replace('행事','행사')
+    else:installation='<p class="venue">'+escaped['venue']+' <span>'+escaped['address']+'</span><span>'+escaped['date']+' '+escaped['clock']+'</span></p>'
     return Template(TEMPLATE.read_text(encoding='utf-8')).substitute(
-        escaped, action=escape(action), groups=''.join(groups), pictures=pictures,
+        escaped, checkout_heading='액자화환 주문서' if product.get('thumbnail') else '쌀빛그림화환 주문서', detail_content=detail_content, action=escape(action), groups=''.join(groups), pictures=pictures, extra_fields=extra_fields, installation=installation, product_revision=escape(str(product.get('revision',''))), force_message='1' if product.get('force_message') else '0', catalog_style='<link rel="stylesheet" href="/shop-art/store.css">' if product.get('customer_event_input') else '',
         base=str(product['price']), base_display=f'{product["price"]:,}',
+        receipt_section_state='' if 'cash_tax_type' in product else 'hidden',
+        receipt_controls_state='' if 'cash_tax_type' in product else 'disabled',
         attempt=secrets.token_hex(16),
         button_state='' if can_pay else 'disabled', can_submit='true' if can_pay else 'false',
-        notice='' if can_pay else '<p class="hint">현재 결제를 이용할 수 없습니다. 문의 031-8067-8580</p>')
+        notice=('<p class="hint">독립 검증 환경 · 모의 결제만 실행하며 실제 결제·발송·현금영수증 발급은 없습니다.</p>' if os.getenv('SHOP_VERIFICATION_MODE')=='1' else '') + ('' if can_pay else '<p class="hint">현재 결제를 이용할 수 없습니다. 문의 031-8067-8580</p>'))
 
 
 def normalize_order(product, fields):
@@ -269,7 +283,7 @@ def normalize_order(product, fields):
     if fields.get('consent') != 'yes':
         raise ValueError('주문 정보 수집에 동의해 주세요.')
     selected, amount = [], product['price']
-    custom = False
+    custom = bool(product.get('force_message'))
     for index, group in enumerate(product['groups']):
         choice = group['choices'].get(fields.get(f'choice{index}'))
         if not choice:
@@ -277,16 +291,30 @@ def normalize_order(product, fields):
         amount += choice['amount']
         selected.append([group['label'], choice['label']])
         custom |= choice['custom']
+    for i,spec in enumerate(product.get('extra_fields',[])):
+        selected.append([spec['label'],value('extra'+str(i),spec.get('max',200))])
     buyer_phone = re.sub(r'[\s-]', '', value('buyer_phone', 20))
     if not re.fullmatch(r'01[016789]\d{7,8}', buyer_phone):
         raise ValueError('주문자 휴대폰 번호를 확인해 주세요.')
     sender = value('sender', 140)
     buyer = sender if fields.get('same_buyer') == 'yes' else value('buyer', 60)
-    return {'product': product['number'], 'title': product['title'], 'options': selected,
+    order = {'product': product['number'], 'title': product['title'], 'options': selected,
             'sender': sender, 'message': value('message', 200) if custom else '',
             'buyer': buyer, 'buyer_phone': buyer_phone,
             'venue': product['venue'], 'address': product['address'],
             'event_time': product['event_time'], 'amount': amount, 'source': product.get('source', '')}
+    kind = fields.get('cash_receipt_type', '')
+    if kind:
+        if kind not in ('personal', 'business', 'self'):
+            raise ValueError('현금영수증 발급 구분을 확인해 주세요.')
+        identifier = ('0100001234' if kind == 'self' else buyer_phone if kind == 'personal' and
+                      not fields.get('cash_receipt_identifier', '').strip() else
+                      re.sub(r'[\s-]', '', fields.get('cash_receipt_identifier', '')))
+        pattern = r'01[016789]\d{8}' if kind == 'personal' else r'\d{10}'
+        if not re.fullmatch(pattern, identifier):
+            raise ValueError('현금영수증 휴대폰 번호(11자리) 또는 사업자번호(10자리)를 확인해 주세요.')
+        order['cash_receipt'] = {'kind': kind, 'identifier': identifier}
+    return order
 
 
 def setup(connection):
@@ -295,6 +323,17 @@ def setup(connection):
         details TEXT NOT NULL, state TEXT NOT NULL, payment_number TEXT UNIQUE, payment_url TEXT)''')
     connection.execute('''CREATE TABLE IF NOT EXISTS invitation_photo_reviews (
         order_id TEXT PRIMARY KEY, reviewed_at TEXT NOT NULL)''')
+    connection.execute('''CREATE TABLE IF NOT EXISTS payment_events (
+        order_id TEXT NOT NULL, event_key TEXT NOT NULL, kind TEXT NOT NULL,
+        payment_number TEXT NOT NULL, amount INTEGER NOT NULL,
+        provider_time TEXT NOT NULL, received TEXT NOT NULL, previous_state TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY(order_id, event_key))''')
+    if 'previous_state' not in {row[1] for row in connection.execute('PRAGMA table_info(payment_events)')}:
+        connection.execute("ALTER TABLE payment_events ADD COLUMN previous_state TEXT NOT NULL DEFAULT ''")
+    connection.execute('''CREATE TABLE IF NOT EXISTS payment_checks (
+        id INTEGER PRIMARY KEY, order_id TEXT NOT NULL, payment_number TEXT NOT NULL,
+        amount INTEGER NOT NULL, note TEXT NOT NULL, checked TEXT NOT NULL)''')
+    order_ops.setup(connection)
 
 
 def review_photo(connection, fields):
@@ -319,11 +358,21 @@ def payapp_request(config, order_id, order, origin):
               'returnurl': f'{origin}/invitation-orders/{order_id}/receipt'}
     request = Request('https://api.payapp.kr/oapi/v2', urlencode(fields).encode('ascii'))
     with build_opener(NoRedirect).open(request, timeout=12) as reply:
-        result = parse_qs(reply.read(32768).decode('utf-8'))
-    if result.get('state') != ['1']:
+        try:
+            result = parse_qs(reply.read(32768).decode('utf-8'))
+        except ValueError as error:
+            raise OSError('Uncertain payment response') from error
+    if result.get('errno') == ['9040'] or result.get('errorCode') == ['9040']:
+        raise OSError('Payment request timed out')
+    if result.get('state') == ['0']:
         raise ValueError('결제창을 열지 못했어요. 문의 031-8067-8580')
+    if result.get('state') != ['1'] or not result.get('mul_no') or not result.get('payurl'):
+        raise OSError('Uncertain payment response')
     number, url = result['mul_no'][0], result['payurl'][0]
-    parsed = urlsplit(url)
+    try:
+        parsed = urlsplit(url)
+    except ValueError as error:
+        raise OSError('Unexpected payment URL') from error
     if not re.fullmatch(r'[0-9]{1,20}', number) or parsed.scheme not in ('http', 'https') or (
         parsed.netloc not in ('payapp.kr', 'www.payapp.kr', 'api.payapp.kr')
     ):
@@ -336,7 +385,8 @@ def start_order(db, job, price, product, fields, origin, config):
     if not re.fullmatch(r'[a-f0-9]{32}', attempt):
         raise ValueError('주문서를 다시 열어 주세요.')
     order = normalize_order(product, fields)
-    details = json.dumps({**order, 'wedding_preview': wedding_preview(product)}, ensure_ascii=False)
+    details = json.dumps({**order, 'wedding_preview': wedding_preview(product),
+                          'product_snapshot': product}, ensure_ascii=False)
     with db() as connection:
         connection.execute('BEGIN IMMEDIATE')
         row = connection.execute('SELECT * FROM invitation_orders WHERE id=?', (attempt,)).fetchone()
@@ -345,6 +395,7 @@ def start_order(db, job, price, product, fields, origin, config):
             saved.pop('recipient', None)
             saved.pop('recipient_phone', None)
             saved.pop('wedding_preview', None)
+            saved.pop('product_snapshot', None)
             saved.setdefault('source', '')
             if row['job'] != job or row['price'] != int(price) or saved != order:
                 raise ValueError('주문서를 다시 열어 주세요.')
@@ -380,31 +431,83 @@ def receive_payment(db, fields, config):
     when = fields.get('responsedate', '')
     if not re.fullmatch(r'[0-9]{14}', when):
         return False
+    try:
+        dt.datetime.strptime(when, '%Y%m%d%H%M%S')
+    except ValueError:
+        return False
     expected = {'userid': config['USER_ID'], 'linkkey': config['LINK_KEY'],
-                'linkval': config['LINK_VALUE'], 'hash': signature(config, when)}
+                'linkval': config['LINK_VALUE']}
     if any(not hmac.compare_digest(value.encode(), fields.get(key, '').encode()) for key, value in expected.items()):
         return False
+    if not hmac.compare_digest(signature(config, when), fields.get('hash', '').lower()):
+        return False
     incoming = fields.get('pay_state')
+    if incoming not in ('1', '4', '8', '9', '10', '32', '64', '70', '71'):
+        return False
     partial = incoming in ('70', '71')
     attempt = fields.get('var1', '')
     number = fields.get('orig_mul_no' if partial else 'mul_no', '')
     amount = fields.get('orig_price' if partial else 'price')
     if not re.fullmatch(r'[a-f0-9]{32}', attempt) or not re.fullmatch(r'[0-9]{1,20}', number):
         return False
+    event_number = fields.get('mul_no', '')
+    if not re.fullmatch(r'[0-9]{1,20}', event_number):
+        return False
+    kind = ('partial' if partial else 'cancel' if incoming in ('9', '64') else
+            'request_cancel' if incoming in ('8', '32') else 'paid' if incoming == '4' else 'waiting')
+    event_amount = fields.get('price', '')
+    if not re.fullmatch(r'[0-9]{1,9}', event_amount):
+        return False
+    event_amount = int(event_amount)
+    # A partial cancellation has its own mul_no; 70/71 and repeated delivery
+    # describe the same cancellation, never a second refund.
+    key = kind + ':' + event_number
     with db() as connection:
         connection.execute('BEGIN IMMEDIATE')
         row = connection.execute('SELECT * FROM invitation_orders WHERE id=?', (attempt,)).fetchone()
         if (not row or row['payment_number'] not in (None, number) or
                 amount != str(json.loads(row['details'])['amount'])):
             return False
+        total = json.loads(row['details'])['amount']
+        if partial and (number == event_number or not 0 < event_amount <= total):
+            return False
+        existing = connection.execute('SELECT amount FROM payment_events WHERE order_id=? AND event_key=?',
+                                      (attempt, key)).fetchone()
+        if existing and existing['amount'] != event_amount:
+            return False
+        refunded = connection.execute("SELECT COALESCE(SUM(amount),0) FROM payment_events WHERE order_id=? AND kind='partial'",
+                                      (attempt,)).fetchone()[0]
+        if partial and not existing and refunded + event_amount > total:
+            return False
+        # The UNIQUE payment number also protects orders whose first notification
+        # arrives before payrequest returns. Reject a cross-order reference cleanly.
+        duplicate = connection.execute('SELECT id FROM invitation_orders WHERE payment_number=? AND id!=?',
+                                       (number, attempt)).fetchone()
+        if duplicate:
+            return False
+        had_request_cancel = connection.execute("""SELECT 1 FROM payment_events WHERE order_id=? AND kind='request_cancel'
+                                                AND previous_state IN ('requesting','waiting','failed')""",
+                                                (attempt,)).fetchone()
+        had_full_cancel = connection.execute("SELECT 1 FROM payment_events WHERE order_id=? AND kind='cancel'",
+                                             (attempt,)).fetchone()
+        connection.execute('INSERT OR IGNORE INTO payment_events VALUES (?,?,?,?,?,?,?,?)',
+                           (attempt, key, kind, event_number, event_amount, when,
+                            dt.datetime.now(SEOUL).isoformat(), row['state']))
         state = row['state']
-        if incoming in ('8', '9', '32', '64'):
+        if kind == 'cancel':
             state = 'cancelled'
-        elif partial and state != 'cancelled':
+        elif partial and (state != 'cancelled' or (had_request_cancel and not had_full_cancel)):
             state = 'partial_cancel'
-        elif incoming == '4' and state not in ('cancelled', 'partial_cancel'):
+        elif kind == 'paid' and (state not in ('cancelled', 'partial_cancel') or
+                                (state == 'cancelled' and had_request_cancel and not had_full_cancel)):
             state = 'paid'
+        elif kind == 'request_cancel' and state in ('requesting', 'waiting', 'failed'):
+            state = 'cancelled'
+        elif kind == 'waiting' and state == 'requesting':
+            state = 'waiting'
         connection.execute('UPDATE invitation_orders SET state=?, payment_number=? WHERE id=?', (state, number, attempt))
-        if state == 'paid':
+        is_shop = connection.execute('SELECT 1 FROM shop_offers WHERE id=?', (row['job'],)).fetchone()
+        if state == 'paid' and not is_shop:
             stage_paid(connection, row)
+        order_ops.on_payment(connection, attempt, state, fields)
     return True

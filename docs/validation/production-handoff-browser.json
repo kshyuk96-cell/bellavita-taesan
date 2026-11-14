@@ -1,0 +1,12 @@
+{
+  "order_id": "0ebf9f05adf92626edf72abb9447977e",
+  "photo_reviewed": true,
+  "ledger_rows": 1,
+  "production_rows": 1,
+  "received_state": "pending",
+  "after_cancel": "held",
+  "remaining_amount": 0,
+  "actual_printing": false,
+  "live_sheet_writes": false,
+  "javascript_errors": []
+}
