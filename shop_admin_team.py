@@ -116,9 +116,10 @@ def shift_report(c,fields,clock=None):
 
 
 def shift_summary(c,path,fields,clock=None):
+    from shop_admin_launch import snapshot_form
     report=shift_report(c,fields,clock);owner,until=report['owner'],report['until']
     query='<form method="get" action="'+escape(path)+'"><label>교대 업무 담당자<input name="handover_owner" maxlength="60" value="'+escape(owner)+'"></label><label>이 날짜까지의 기한<input type="date" name="handover_until" value="'+escape(until)+'"></label><button>교대 요약 갱신</button></form>'
-    return '<section class="shift-summary copy-panel"><h2>교대 미처리 업무 요약</h2><p>전체 주문의 미처리 업무만 포함합니다. 화면 생성 시점의 기록이며 고객 정보 대신 주문번호로 인계합니다. 담당자·기한 조건은 이 요약에만 적용합니다.</p>'+query+'<p><a class="shift-download" href="'+escape(path+'/shift-summary.txt?'+urlencode({'handover_owner':owner,'handover_until':until}))+'">교대 요약 파일 다운로드</a> · 직원 내부용 · 다운로드 시점의 최신 기록</p><label>직원 내부 전달용<textarea class="copy-field shift-text" readonly>'+escape(report['text'])+'</textarea></label><button type="button" data-copy-field>교대 요약 복사</button></section>'
+    return '<section class="shift-summary copy-panel"><h2>교대 미처리 업무 요약</h2><p>전체 주문의 미처리 업무만 포함합니다. 화면 생성 시점의 기록이며 고객 정보 대신 주문번호로 인계합니다. 담당자·기한 조건은 이 요약에만 적용합니다.</p>'+query+'<p><a class="shift-download" href="'+escape(path+'/shift-summary.txt?'+urlencode({'handover_owner':owner,'handover_until':until}))+'">교대 요약 파일 다운로드</a> · 직원 내부용 · 다운로드 시점의 최신 기록</p><label>직원 내부 전달용<textarea class="copy-field shift-text" readonly>'+escape(report['text'])+'</textarea></label><button type="button" data-copy-field>교대 요약 복사</button>'+snapshot_form(path,owner,until)+'</section>'
 
 
 SCRIPT=r'''

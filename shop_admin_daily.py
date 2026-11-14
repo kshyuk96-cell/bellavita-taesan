@@ -57,12 +57,13 @@ def quick_dates(c,path,clock=now):
 
 
 def task_board(c,path,clock=now):
-    current=clock().astimezone(SEOUL).strftime('%Y-%m-%dT%H:%M')
+    current_time=clock().astimezone(SEOUL);current=current_time.strftime('%Y-%m-%dT%H:%M');soon=(current_time+dt.timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M')
     total=c.execute("SELECT count(*) FROM shop_operator_tasks WHERE state='open'").fetchone()[0]
     overdue=c.execute("SELECT count(*) FROM shop_operator_tasks WHERE state='open' AND due<?",(current,)).fetchone()[0]
-    body='<section class="task-board"><h2>미처리 업무</h2><p>업무 담당자는 배송 담당 배정과 별도입니다. 한국 시간 기준 · 미처리 '+str(total)+'건 / 기한 초과 '+str(overdue)+'건 · 우선순위·기한순 최대 50건 표시</p><p><a href="'+escape(path+'?task=open#admin-orders')+'">미처리 업무 주문 전체 보기</a> · <a href="'+escape(path+'?task=overdue#admin-orders')+'">기한 초과 주문 보기</a></p>'
+    imminent=c.execute("SELECT count(*) FROM shop_operator_tasks WHERE state='open' AND due BETWEEN ? AND ?",(current,soon)).fetchone()[0]
+    body='<section class="task-board"><h2>미처리 업무</h2><p>업무 담당자는 배송 담당 배정과 별도입니다. 한국 시간 기준 · 미처리 '+str(total)+'건 / 기한 초과 '+str(overdue)+'건 / 24시간 이내 '+str(imminent)+'건 · 우선순위·기한순 최대 50건 표시</p><p><a href="'+escape(path+'?task=open#admin-orders')+'">미처리 업무 주문 전체 보기</a> · <a href="'+escape(path+'?task=overdue#admin-orders')+'">기한 초과 주문 보기</a> · <a href="'+escape(path+'?task=soon#admin-orders')+'">24시간 이내 업무 주문</a> · <a href="'+escape(path+'?task=done#admin-orders')+'">완료 업무 주문 보기</a></p>'
     for task in c.execute("SELECT * FROM shop_operator_tasks WHERE state='open' ORDER BY "+team.PRIORITY_SQL+",due,id LIMIT 50"):
-        body+='<p><a href="'+escape(path+'?order='+task['order_id']+'#order-'+task['order_id'])+'">'+escape(task['title'])+'</a> · '+team.PRIORITIES[task['priority']]+' · '+escape(task['owner'])+' · '+escape(task['due'].replace('T',' '))+(' · 기한 초과' if task['due']<current else '')+'</p>'+shortcuts.quick_form(path,task)
+        body+='<p><a href="'+escape(path+'?order='+task['order_id']+'#order-'+task['order_id'])+'">'+escape(task['title'])+'</a> · '+team.PRIORITIES[task['priority']]+' · '+escape(task['owner'])+' · '+escape(task['due'].replace('T',' '))+(' · 기한 초과' if task['due']<current else ' · 24시간 이내' if task['due']<=soon else '')+'</p>'+shortcuts.quick_form(path,task)
     return body+'</section>'
 
 

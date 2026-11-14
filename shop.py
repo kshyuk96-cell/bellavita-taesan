@@ -29,6 +29,7 @@ import shop_admin_daily
 import shop_admin_training
 import shop_admin_team
 import shop_admin_shortcuts
+import shop_admin_launch
 
 ADMIN_PATH = re.compile(r'/shop/admin/([0-9]{10})/([a-f0-9]{64})')
 ORDER_PATH = re.compile(r'/shop/order/([a-f0-9]{32})')
@@ -52,6 +53,7 @@ def setup(connection):
     shop_admin_daily.setup(connection)
     shop_admin_team.setup(connection)
     shop_admin_shortcuts.setup(connection)
+    shop_admin_launch.setup(connection)
     connection.execute("""CREATE TABLE IF NOT EXISTS shop_products (
         id TEXT PRIMARY KEY, details TEXT NOT NULL, revision INTEGER NOT NULL)""")
     connection.execute("""CREATE TABLE IF NOT EXISTS shop_offers (
@@ -402,7 +404,7 @@ def admin_page(connection, path, origin, fields=None, root=None):
       input[type=checkbox]{display:inline;width:auto}
       a{color:#204c36}summary{cursor:pointer;padding:6px 0}small{overflow-wrap:anywhere}li{margin-bottom:12px}
       dd{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 8px}dt{font-weight:bold}</style>
-      <main><h1>벨라비타 쇼핑몰 관리</h1><p><a href="/shop">고객 쇼핑몰 보기</a></p>''' + shop_dashboard.panel(connection,selected_rows) + shop_admin_daily.quick_dates(connection,path) + shop_admin_daily.task_board(connection,path) + shop_admin_team.shift_summary(connection,path,fields) + shop_admin_team.templates(connection,path) + shop_admin_shortcuts.favorites_panel(connection,path) + shop_admin_training.entry(path) + shop_admin_workflow.searches(connection,path,result_meta['filters']) + shop_admin_workflow.backups(connection) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + assignment_batches.panel(connection,path) + shop_sales.panel(connection,path,fields) + '''<section><h2>새 상품 등록</h2>'''
+      <main><h1>벨라비타 쇼핑몰 관리</h1><p><a href="/shop">고객 쇼핑몰 보기</a></p>''' + shop_dashboard.panel(connection,selected_rows) + shop_admin_daily.quick_dates(connection,path) + shop_admin_daily.task_board(connection,path) + shop_admin_team.shift_summary(connection,path,fields) + shop_admin_team.templates(connection,path) + shop_admin_shortcuts.favorites_panel(connection,path) + shop_admin_launch.favorite_panel(connection,path) + shop_admin_launch.snapshot_panel(connection,path) + shop_admin_launch.launch_panel(connection,path,root or '.') + shop_admin_training.entry(path) + shop_admin_workflow.searches(connection,path,result_meta['filters']) + shop_admin_workflow.backups(connection) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + assignment_batches.panel(connection,path) + shop_sales.panel(connection,path,fields) + '''<section><h2>새 상품 등록</h2>'''
       + form('save_product', product_fields({}), '상품 등록') + '</section>' + notification_settings
       + ''.join(products) + '<section><h2>행사별 주문 링크</h2>'
       + ('<ul>' + ''.join(offers) + '</ul>' if offers else '<p>발급된 링크가 없어요.</p>')
@@ -420,4 +422,4 @@ def admin_page(connection, path, origin, fields=None, root=None):
         loaded();
       }
       </script>''' + shop_dashboard.SCRIPT + '</html>')
-    return shop_admin_layout.render(page,shop_readiness.panel(connection),path=path,filters=result_meta['filters'],saved=fields.get('saved')=='1')
+    return shop_admin_layout.render(page,shop_readiness.panel(connection),path=path,filters=result_meta['filters'],saved=fields.get('saved')=='1',feature_favorites=shop_admin_launch.favorite_nav(connection))
