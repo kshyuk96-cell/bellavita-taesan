@@ -19,6 +19,7 @@ EXCLUDED = re.compile(r'개발|기능|수정|바꿔|버그|개선|늘려|줄여|
                       r'\d+\s*(?:월|일)|[월화수목금토일]요일|택배|재고|제작|미배정|이미지|엑셀|보고서|루트')
 SHORT_STATUS = re.compile(r'(?:배송\s*)?(?:미\s*완료|완료|남은\s*건)(?:만|도)?[.!?]?')
 COUNT_CHALLENGE = re.compile(r'(?:뭔|무슨|왜|어떻게)\s*\d+\s*(?:건|개)|이렇게\s*밖에.*남')
+EXPLAIN = re.compile(r'(?:건수|숫자|갯수|개수).*?(?:달라|다르|안\s*맞|틀려)|왜.*?(?:달라|다르|안\s*맞|틀려)|(?:건수|집계)\s*(?:차이|기준|이유)')
 PHOTO_MESSAGE = re.compile(r'(?:\[\s*(?:사진|이미지)\s*\]|사진|이미지|사진을 보냈습니다\.?|이미지를 보냈습니다\.?)')
 COUNT_BUTTONS = (
     ('오늘 배송 미완료', '오늘 배송 미완료 몇 건?'),
@@ -69,7 +70,12 @@ def follow_up(message):
     return None
 
 
-def count(day, center, kind, read):
+def wants_explanation(message):
+    return bool(EXPLAIN.search(message) and not EXCLUDED.search(message) and '\n' not in message
+                and not re.search(r'정산|초대장|입고|주문\s*접수|결제', message))
+
+
+def count(day, center, kind, read, *, explain=False, checked_at=None):
     if center is not None and not isinstance(center, str):
         raise ValueError('어느 센터 배송을 확인할까요?')
     center_key = re.sub(r'\s+', '', center or '')
@@ -77,7 +83,7 @@ def count(day, center, kind, read):
     ranges = ["'액자화환'!B4:B"]
     if selected_center:
         ranges.append("'액자화환'!I4:I")
-    if kind != 'total':
+    if kind != 'total' or explain:
         ranges.extend(("'배송관리'!A3:B", "'배송관리'!K3:K"))
     dates, *data = read(ranges)
     channels = data.pop(0) if selected_center else []
@@ -91,13 +97,15 @@ def count(day, center, kind, read):
     orders = {index + 4 for index, row in enumerate(dates[1:], 1) if value(row, 0) == serial
               and (not selected_center or center_key in re.sub(r'\s+', '', str(value(value(channels, index), 0))))}
     label = f'{day.month}월 {day.day}일 {center.strip() if selected_center else "전체"}'
-    if kind == 'total':
+    if kind == 'total' and not explain:
         return f'{label} 배송은 {len(orders)}건이에요.'
     visible, flags = data
     if visible[:1] != [['주문번호', '배송일']] or flags[:1] != [['배송 완료']]:
         raise ValueError('배송관리의 배송완료 열 제목을 확인해 주세요.')
     states = {}
-    uncertain = set()
+    duplicate = set()
+    invalid = set()
+    seen = set()
     for index, row in enumerate(visible[1:], 1):
         order = value(row, 0)
         if isinstance(order, str) and re.fullmatch(r'[0-9]{1,7}', order):
@@ -105,10 +113,23 @@ def count(day, center, kind, read):
         if type(order) not in (int, float) or order not in orders or value(row, 1) != serial:
             continue
         state = value(value(flags, index), 0)
-        if type(state) is not bool or order in states:
-            uncertain.add(order)
+        if order in seen:
+            duplicate.add(order)
+        seen.add(order)
+        if type(state) is not bool:
+            invalid.add(order)
         else:
             states[order] = state
+    uncertain = duplicate | invalid
+    if explain:
+        complete = sum(order not in uncertain and state is True for order, state in states.items())
+        pending = sum(order not in uncertain and state is False for order, state in states.items())
+        missing = len(orders - seen)
+        checked = f' · {checked_at():%H:%M} 조회' if checked_at else ''
+        return (f'{label} 배송{checked}\n'
+                f'원장 {len(orders)}건 · 완료 {complete}건 · 미완료 {pending}건\n'
+                f'확인 필요 {len(uncertain) + missing}건 '
+                f'(배송관리 미표시 {missing} · 체크값 불명확 {len(invalid - duplicate)} · 주문번호 중복 {len(duplicate)})')
     target = kind == 'complete'
     confirmed = sum(state is target for order, state in states.items() if order not in uncertain)
     status = '배송완료' if target else '배송 미완료'

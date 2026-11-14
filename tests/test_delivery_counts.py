@@ -108,6 +108,34 @@ class DeliveryCountTests(unittest.TestCase):
         text = delivery_counts.count(DAY.date(), None, 'pending', lambda ranges: [data[key] for key in ranges])
         self.assertIn('1건은 배송관리에서 상태 확인', text)
 
+    def test_explanation_separates_unmatched_flags_and_duplicate_orders(self):
+        data = fixture()
+        data[DATES].extend([[SERIAL], [SERIAL], [SERIAL]])
+        data[VIEW].extend([[10, SERIAL], [11, SERIAL]])
+        data[FLAGS].extend([[], ['TRUE']])
+        text = delivery_counts.count(DAY.date(), None, 'total', lambda ranges: [data[key] for key in ranges],
+                                     explain=True, checked_at=lambda: DAY)
+        self.assertIn('12:00 조회', text)
+        self.assertIn('원장 5건 · 완료 1건 · 미완료 1건', text)
+        self.assertIn('확인 필요 3건 (배송관리 미표시 1 · 체크값 불명확 1 · 주문번호 중복 1)', text)
+
+    def test_why_counts_differ_keeps_previous_date_and_center(self):
+        data = fixture()
+        with tempfile.TemporaryDirectory() as tmp, patch.object(agent, 'ROOT', Path(tmp)), \
+             patch.object(agent, 'datetime', wraps=datetime) as clock, patch.object(agent, 'choose') as choose, \
+             patch.object(agent, 'read_delivery_ranges', side_effect=lambda ranges, **kw: [data[key] for key in ranges]):
+            clock.now.return_value = DAY
+            with agent.db() as c:
+                c.execute("INSERT INTO staff VALUES ('fixture-staff','staff',0)")
+
+            def dispatch(question):
+                return agent.dispatch({'userRequest': {'user': {'id': 'fixture-staff'}, 'utterance': question}})['template']['outputs'][0]['simpleText']['text']
+
+            self.assertIn('11월 15일 구로', dispatch('내일 구로센터 배송 미완료 몇 건?'))
+            self.assertIn('11월 15일 구로 배송 · 12:00 조회', dispatch('왜 시트랑 건수가 달라?'))
+            self.assertIn('11월 14일 전체 배송', dispatch('오늘 전체 배송 건수 차이 알려줘'))
+            choose.assert_not_called()
+
     def test_today_overview_keeps_unknown_separate_from_unchecked(self):
         with patch.object(agent, 'datetime', wraps=datetime) as clock, \
              patch.object(agent, 'read_delivery_ranges', return_value=(
@@ -122,3 +150,5 @@ class DeliveryCountTests(unittest.TestCase):
         for question in ('배송완료 몇 건인지 알려주는 기능 개발해', '오늘 제작 배송 몇 건', '다음 주 배송 몇 건?',
                          '오늘 구로 배송 몇 건?', '배송완료 처리해줘 몇 건'):
             self.assertIsNone(delivery_counts.request(question), question)
+        for question in ('왜 정산 숫자가 달라?', '택배 건수가 달라', '주문 접수 건수 차이 알려줘'):
+            self.assertFalse(delivery_counts.wants_explanation(question), question)

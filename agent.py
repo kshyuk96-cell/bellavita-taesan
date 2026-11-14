@@ -432,7 +432,7 @@ def delivery_read_sheet():
     return os.getenv('TAESAN_DELIVERY_READ_SHEET_ID') or delivery_counts.OPERATIONS_SHEET_ID
 
 
-def delivery_count(offset, center, metric):
+def delivery_count(offset, center, metric, *, explain=False):
     day = datetime.now(SEOUL).date() + timedelta(days=offset)
     spreadsheet = delivery_read_sheet()
 
@@ -440,7 +440,8 @@ def delivery_count(offset, center, metric):
         return read_delivery_ranges(ranges, spreadsheet=spreadsheet)
 
     try:
-        summary = delivery_counts.count(day, center, metric, read)
+        summary = delivery_counts.count(day, center, metric, read, explain=explain,
+                                        checked_at=lambda: datetime.now(SEOUL))
     except ValueError as error:
         summary = str(error)
     except Exception as error:
@@ -629,6 +630,19 @@ def photo_order_status(image_urls):
 def handle(message, history, owner):
     if message in ('오늘 할 일', '오늘 현황'):
         return {'summary': today(), 'delivery_count': True}
+    if delivery_counts.wants_explanation(message):
+        previous = current_read_query(history)
+        if '배송' in message or (previous and previous[0] in ('delivery_count', 'staff_report')):
+            offset, center = previous[1:3] if previous and previous[0] in ('delivery_count', 'staff_report') else (0, None)
+            days = [index for index, label in enumerate(delivery_counts.DAYS) if label in message]
+            centers = [m[1] for m in delivery_counts.CENTER.finditer(re.sub(r'오늘|내일|모레', ' ', message))]
+            if len(days) > 1 or len(centers) > 1:
+                return {'summary': '비교할 날짜와 센터를 한 곳씩 말씀해 주세요.'}
+            if days:
+                offset = days[0]
+            if centers or '전체' in message:
+                center = centers[0] if centers and centers[0] not in ('전체', '모든') else None
+            return delivery_count(offset, center, 'total', explain=True)
     if query := staff_delivery.request(message):
         return delivery_report(*query)
     if query := delivery_venues.request(message):
@@ -1137,6 +1151,11 @@ def dispatch(body, defer_callback=None):
         elif delivery_venues.request(message):
             kind = 'venue_rank'
         elif delivery_counts.request(message) or delivery_counts.follow_up(message):
+            kind = 'delivery_count'
+        elif delivery_counts.wants_explanation(message) and (
+            '배송' in message or (read_query := current_read_query(recent(owner)))
+            and read_query[0] in ('delivery_count', 'staff_report')
+        ):
             kind = 'delivery_count'
         elif (staff_delivery.FOLLOW.fullmatch(message) or message in ('ㅇㅇ', '응', '네', '맞아', '그래')) and current_read_query(recent(owner)):
             kind = 'staff_report'
