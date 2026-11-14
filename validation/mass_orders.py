@@ -21,17 +21,24 @@ def cases(record):
     kind=ALIASES.get(record['event_type'],record['event_type'])
     expected={'event_type':kind,'venue':record['location'],'recipient':record['recipient'],'sender':record['sender'],'artwork':record['artwork'],'size':record['size'],'message':record['message']}
     if not expected['venue'] or not expected['sender']:return
-    for style in ['canonical','compact','wide-colon','heading-block','spoken-labels']:
+    for style in ['canonical','compact','wide-colon','heading-block','spoken-labels','reversed','crlf','nbsp','bullets','inline-colon','inline-spoken','greeting','spoken-joined']:
         lines=['주문 접수']
-        for field,label in FIELDS.items():
+        for field,label in (reversed(list(FIELDS.items())) if style=='reversed' else FIELDS.items()):
             if not expected[field]:continue
             value=expected[field]
             if style=='compact':label=label.replace(' ','')
             if style=='heading-block':lines.extend([label,value]);continue
-            if style=='spoken-labels':lines.append(label+'은 '+value);continue
+            if style=='spoken-joined':lines.append(label+'은'+value);continue
+            if style in {'spoken-labels','inline-spoken'}:lines.append(label+'은 '+value);continue
             sep='：' if style=='wide-colon' else ': '
             lines.append(label+sep+value)
-        yield style,'\n'.join(lines),expected
+        message='\n'.join(lines)
+        if style=='crlf':message=message.replace('\n','\r\n')
+        elif style=='nbsp':message=message.replace(' ', '\u00a0')
+        elif style=='bullets':message='\n'.join('• '+line if i else line for i,line in enumerate(lines))
+        elif style in {'inline-colon','inline-spoken'}:message=' / '.join(lines)
+        elif style=='greeting':message='안녕하세요 ~\n'+message
+        yield style,message,expected
 
 def run(path,report_path,limit=None):
     started=time.monotonic();data=json.loads(Path(path).read_text());counts=collections.Counter();groups=collections.defaultdict(collections.Counter);failures=[]

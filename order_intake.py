@@ -22,7 +22,7 @@ def source(message):
     supported = []
     for link in dict.fromkeys(links):
         parsed = invitation.https_url(link)
-        if parsed and parsed.hostname.removeprefix('www.') in invitation.HOSTS | {'e-baro.co.kr'}:
+        if parsed and parsed.hostname.removeprefix('www.') in invitation.HOSTS | {'e-baro.co.kr', 'e-iris.co.kr'}:
             supported.append(link)
     return supported
 
@@ -65,6 +65,19 @@ def bugo(link, raw):
             'note': ' · '.join([deceased, *dates]), 'source': link}
 
 
+def iris_bugo(link, raw):
+    tree = html.fromstring(raw)
+    descriptions = tree.xpath('//meta[@property="og:description"]/@content')
+    deceased = re.search(r'故\s*([가-힣]{2,12}?)님(?:께서|이)', descriptions[0] if descriptions else '')
+    venue = plain(invitation.text_at(tree, '//*[contains(@class,"obituary-funeral-info")]'))
+    address = plain(invitation.text_at(tree, '//*[contains(@class,"company-address")]'))
+    if not deceased or not venue or not address:
+        raise ValueError('부고장의 빈소와 주소, 고인명을 확인해 주세요.')
+    schedule = plain(invitation.text_at(tree, '//*[contains(@class,"obituary-funeral-date")]'))
+    return {'event_type': '근조', 'venue': venue, 'address': address,
+            'recipient': '故 ' + deceased[1] + '님 유가족', 'source': link, 'note': schedule[:300]}
+
+
 def wedding(link):
     event = invitation.parse_page(link, invitation.get_page(link))
     when = event['when']
@@ -84,9 +97,11 @@ LABEL_ALIASES = {
     '설치장소':'venue','설치주소':'address','설치장소주소':'address','배송지':'address','주소':'address',
     '사진보낼곳':'photo_phone','사진보내실곳':'photo_phone','청첩장':'source','부고장':'source','초대장':'source'}
 LABEL_NAMES=sorted(LABEL_ALIASES,key=len,reverse=True)
-LABEL_TOKEN='|'.join('[ \t]*'.join(re.escape(c) for c in label) for label in LABEL_NAMES)
-INLINE_SEPARATOR=re.compile(r'[ \t]*[,;|/][ \t]*(?=(?:'+LABEL_TOKEN+r')[ \t]*(?:[:：]|[은는][ \t]+))')
-LABEL_PATTERN=re.compile(r'^[ \t]*(?P<label>'+ '|'.join('[ \t]*'.join(re.escape(c) for c in label) for label in LABEL_NAMES)+r')[ \t]*(?:(?:[:：])[ \t]*(?P<colon>.*)|(?:은|는)[ \t]+(?P<spoken>.*)|$)')
+HSPACE=r'[^\S\r\n]'
+LABEL_TOKEN='|'.join((HSPACE+'*').join(re.escape(c) for c in label) for label in LABEL_NAMES)
+BULLET=r'(?:[-•·▪▶▷📍📝📦👤]'+HSPACE+r'*)?'
+INLINE_SEPARATOR=re.compile(HSPACE+r'*[,;|/]'+HSPACE+r'*(?=(?:'+LABEL_TOKEN+r')'+HSPACE+r'*(?:[:：]|[은는]'+HSPACE+r'*))')
+LABEL_PATTERN=re.compile(r'^'+HSPACE+r'*'+BULLET+r'(?P<label>'+LABEL_TOKEN+r')'+HSPACE+r'*(?:(?:[:：])'+HSPACE+r'*(?P<colon>.*)|(?:은|는)'+HSPACE+r'*(?P<spoken>.*)|$)')
 
 
 def parse_fields(details):
@@ -101,10 +116,10 @@ def parse_fields(details):
     for line in details.splitlines():
         match=LABEL_PATTERN.fullmatch(line)
         if match:
-            candidate=LABEL_ALIASES[re.sub(r'[ \t]+','',match['label'])]
+            candidate=LABEL_ALIASES[re.sub(r'\s+','',match['label'])]
             if candidate==active and not any(line.strip() for line in lines) and match['colon'] is None and match['spoken'] is None:
                 lines.append(line);continue
-            finish();active=LABEL_ALIASES[re.sub(r'[ \t]+','',match['label'])]
+            finish();active=LABEL_ALIASES[re.sub(r'\s+','',match['label'])]
             lines=[match['colon'] if match['colon'] is not None else match['spoken'] or '']
         elif active is not None:lines.append(line)
         else:unlabelled.append(line)
@@ -122,7 +137,9 @@ def extract(message):
     link=urls[0] if urls else ''
     if link:
         parsed=urlsplit(link)
-        if parsed.hostname.removeprefix('www.')=='e-baro.co.kr':
+        if parsed.hostname.removeprefix('www.')=='e-iris.co.kr':
+            result=iris_bugo(link,invitation.get_page(link,hosts={'e-iris.co.kr'}))
+        elif parsed.hostname.removeprefix('www.')=='e-baro.co.kr':
             if parsed.path!='/bugo.php' or not re.fullmatch(r'[A-Za-z0-9]{4,32}',parse_qs(parsed.query).get('code',[''])[0]):
                 raise ValueError('부고장 주소를 다시 확인해 주세요.')
             result=bugo(link,invitation.get_page(link,hosts={'e-baro.co.kr'}))
@@ -136,12 +153,23 @@ def extract(message):
     elif not result.get('address'):result['address']=fields.get('address','')
     sender=fields.get('sender','')
     if not sender:
+        # A separated final signature block is distinct from an invitation's host
+        # greeting. Preserve a company line followed by a named role as one inscription.
+        blocks=[block.strip() for block in re.split(r'\n[ \t]*\n', '\n'.join(unlabelled)) if block.strip()]
+        tail=blocks[-1] if blocks else ''
+        role=r'(?:대표(?:이사)?|총회장|회장|군수|CFO|CEO|CMO|COO|CTO|지회장|사무총장)'
+        named_role=re.search(role+r'[ \t]*[가-힣]{2,8}[ \t]*$',tail)
+        if (named_role and len(tail)<=300 and len(tail.splitlines())<=5
+                and not re.search(r'올림|혼주|께서|초대합니다|초대드립니다|바랍니다|내딛|이루는',tail)):
+            sender=tail
+    if not sender:
         lines=[line.strip() for line in unlabelled if line.strip() and ':' not in line
                and not re.search(r'화환.*(?:부탁|보내|주세요)|^(?:신랑|신부)\s*측',line)
                and not re.fullmatch(r'(?:안녕하세요|안녕하십니까|감사합니다|감사해요|고맙습니다|네\s*감사합니다)[\s~!.,😊🙏]*',line)]
         if len(lines)==1 and re.search('[가-힣A-Za-z]',lines[0]):sender=lines[0]
         elif lines and all(re.search(r'대표|회장|군수|CFO|CEO|지회장|사무총장',line,re.I) for line in lines):sender='\n'.join(lines)
-    if not sender or len(sender)>1000:raise ValueError('보내시는 분의 이름과 직함을 확인해 주세요.')
+    if (not sender or len(sender)>1000 or not any(c.isalpha() for c in sender)
+            or re.fullmatch(r'미정|미확인|확인\s*필요|나중에|추후|모름|없음',sender.strip())):raise ValueError('보내시는 분의 이름과 직함을 확인해 주세요.')
     side=re.search(r'(신랑|신부)\s*측',details) if result['event_type']=='결혼' else None
     result.update(sender=sender,recipient=fields.get('recipient') or (result['recipient']+(' '+side[1]+'측' if side else '')),
                   delivery_date=fields.get('delivery_date',''),delivery_time=fields.get('delivery_time',''),
@@ -175,5 +203,5 @@ def report(number, details):
     if delivery != '확인 필요':
         lines.extend(('', f'[{delivery[:5]} {clock[:2]}시{clock[3:]}분], [배송지= {address}, {display("recipient")}], [보내는분= {display("sender")}]'))
     alert=delivery_alert(' / '.join(filter(None,(details.get('venue'),details.get('address')))))
-    if alert['message']:lines.extend(('',alert['message']))
+    if alert['message']:lines.insert(2,alert['message'])
     return '\n'.join(lines)

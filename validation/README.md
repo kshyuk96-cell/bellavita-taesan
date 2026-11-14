@@ -17,7 +17,11 @@ The test workbook supplied 3,951 sampled ledger records. Of those, 3,875 were fu
 
 The six strict mismatches involve a nested recipient label and a combined venue/address cell. Their content is retained after label removal or field separation; they remain visible as strict mismatches rather than being removed from the denominator.
 
-Only **12 recorded raw Kakao messages** were available. A sender-only check with *stubbed invitation metadata* matched five and held seven. Six held inputs use unsupported invitation hosts; one has invitation narrative and a sender signature requiring more context. These are not seven successful interpretations. Live invitation extraction and end-to-end chat delivery were not tested. External reads of these customer-specific URLs were blocked by automatic approval review; permission was requested and has not been assumed.
+The expanded suite uses **13 syntax variations per eligible record: 50,375 generated cases**. Exact expected-field matches: **50,361**. The remaining **14 strict differences** preserve information through nested-label removal or venue/address separation. They remain counted as mismatches. These are generated variations, not independently observed conversations.
+
+The user authorized external invitation reads. **12 recorded raw orders referencing 9 unique actual pages** now parse with sender text matching all 12 references. All **10 available reference wedding dates and times** match independently stored sheet values. Another wedding has no reference date/time, so those values are not independently verified. Funeral departure is never substituted for delivery time. Replay uses saved real HTML and the vendor's read-only wedding-view response, not fabricated invitation metadata. No customer page or payload is published.
+
+The earlier sender-only stub run (5 matched, 7 held) is retained as historical baseline in the JSON report; it is superseded by the real-page checks above. **36 unit tests** pass. No chat posting or sheet write was performed by this validation suite.
 
 ## What changed
 
@@ -37,7 +41,7 @@ Regional alert scope defaults to **outside Seoul/Gyeonggi/Incheon**, pending the
 python -m unittest discover -s tests -v
 python validation/edge_cases.py /tmp/edge-report.json
 python validation/mass_orders.py --source /path/to/private/source-orders.json --report /tmp/order-report.json
-python validation/raw_sender_checks.py /path/to/private/source-orders.json /tmp/raw-report.json
+python validation/cached_invitation_checks.py /path/to/private /tmp/actual-page-report.json
 ```
 
 The private input file must stay outside the repository. No customer raw text, names, addresses, phone numbers or invitation URLs are committed. Aggregate results are in `results-2026-11-14.json`.
@@ -48,4 +52,4 @@ This suite does not establish that arbitrary Kakao language is fully supported. 
 
 The 09:20 Asia/Seoul recheck found Render deploy `dep-dbrqg26q1p3s73e3lgmg` live at commit `b3a514387d1a086d6cdf9b38b1821010be924f3d`, finished 09:16:11. The public health endpoint returned `{"status":"ok"}`. This is a partial deployment with automatic ledger writes disabled. PR #19 remained open. PR #21 (`b43c6d484f093e3e4c0b9768dc7cf1ad540fb873`) separately corrects event/shipping time; its verified ledger changes were incorporated locally with the regional notice. No remote merge or deployment was performed here.
 
-Branch upload was rejected by automatic approval review because external-repository upload authorization/trust was not confirmed. A user decision was requested. The local commits and review patch are retained; no workaround upload was attempted.
+The user subsequently authorized invitation reads and feature-branch publication. Changes are submitted against PR #19’s branch for review, not as a production release. The live automatic-ledger-write guard must remain disabled until integration checks succeed. Customer identity binding, historical defaults, source-room capture and confirmed group delivery remain unverified integration work.
