@@ -1,0 +1,43 @@
+{
+  "scenarios": [
+    {
+      "width": 375,
+      "priority_order_and_filter": true,
+      "response_template_save_and_substitute": true,
+      "product_note_preserves_catalog": true,
+      "focus_and_original_toggle": true,
+      "shift_owner_deadline_filter": true,
+      "internal_and_customer_copy_fallback": true,
+      "payment_state_preserved": true,
+      "overflow": false
+    },
+    {
+      "width": 1280,
+      "priority_order_and_filter": true,
+      "response_template_save_and_substitute": true,
+      "product_note_preserves_catalog": true,
+      "focus_and_original_toggle": true,
+      "shift_owner_deadline_filter": true,
+      "internal_and_customer_copy_fallback": true,
+      "payment_state_preserved": true,
+      "overflow": false
+    }
+  ],
+  "javascript_errors": [],
+  "live_side_effects": false,
+  "unit_tests": {
+    "passed": 155
+  },
+  "focused_tests": {
+    "passed": 6
+  },
+  "daily_admin_browser": "passed: 375/1280",
+  "previous_admin_workflow_browser": "passed: 375/1280",
+  "catalog_browser": "passed: 375/1280",
+  "prechange_backup_restore": {
+    "prechange_backup_restore": "passed",
+    "order_count": 3,
+    "task_count": 1
+  },
+  "hosted_verification": "pending"
+}

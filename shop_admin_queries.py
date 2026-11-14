@@ -7,13 +7,14 @@ from urllib.parse import urlencode
 
 STATES={'':'전체 결제 상태','requesting':'결제 요청 확인 필요','waiting':'결제 대기','failed':'결제 요청 실패','paid':'결제 완료','partial_cancel':'일부 취소','cancelled':'취소'}
 STAGES={'':'전체 배송 상태','confirmed':'주문 확인','shipping':'배송 중','delivered':'배송 완료'}
-KEYS=('q','order','state','stage','from_date','to_date','page','task','task_owner')
+KEYS=('q','order','state','stage','from_date','to_date','page','task','task_owner','task_priority')
 PAGE_SIZE=30
 
 
 def filters(fields):
     result={key:str(fields.get(key,'')).strip() for key in KEYS}
     if len(result['q'])>100:raise ValueError('검색어는 100자 이내로 입력하세요.')
+    if result['task_priority'] not in ('','high','normal','low'):raise ValueError('업무 우선순위 검색을 확인하세요.')
     if result['task'] not in ('','open','overdue') or len(result['task_owner'])>60:raise ValueError('업무 상태·담당자 검색을 확인하세요.')
     if result['order'] and not re.fullmatch('[a-f0-9]{32}',result['order']):raise ValueError('정확한 주문번호를 입력해 주세요.')
     if result['state'] not in STATES or result['stage'] not in STAGES:raise ValueError('결제·배송 필터를 확인하세요.')
@@ -40,10 +41,11 @@ def select(c,fields):
     if f['stage']:clauses.append('f.stage=?');args.append(f['stage'])
     for key,sign in (('from_date','>='),('to_date','<=')):
         if f[key]:clauses.append("substr(json_extract(o.details,'$.event_time'),1,10)"+sign+'?');args.append(f[key])
-    if f['task'] or f['task_owner']:
+    if f['task'] or f['task_owner'] or f['task_priority']:
         work=['t.order_id=o.id',"t.state='open'"]
         if f['task']=='overdue':work.append('t.due<?');args.append(dt.datetime.now(ZoneInfo('Asia/Seoul')).strftime('%Y-%m-%dT%H:%M'))
         if f['task_owner']:work.append('instr(lower(t.owner),lower(?))>0');args.append(f['task_owner'])
+        if f['task_priority']:work.append('t.priority=?');args.append(f['task_priority'])
         clauses.append('EXISTS(SELECT 1 FROM shop_operator_tasks t WHERE '+' AND '.join(work)+')')
     sql=' FROM invitation_orders o JOIN shop_offers s ON s.id=o.job LEFT JOIN shop_fulfillment f ON f.order_id=o.id'
     if clauses:sql+=' WHERE '+' AND '.join(clauses)
@@ -75,6 +77,7 @@ def controls(path,meta):
     form='<form method="get" action="'+escape(path)+'" class="admin-search"><h3>전체 주문 검색·필터</h3><label>검색어<input name="q" maxlength="100" value="'+escape(f['q'])+'" placeholder="주문번호·주문자·휴대폰·문구·상품·행사장"></label><div class="search-grid">'+select('state',STATES)+select('stage',STAGES)
     for key,label in [('from_date','행사 시작일'),('to_date','행사 종료일')]:form+='<label>'+label+'<input type="date" name="'+key+'" value="'+escape(f[key])+'"></label>'
     form+='<label>미처리 업무<select name="task">'+''.join('<option value="'+k+'"'+(' selected' if f['task']==k else '')+'>'+v+'</option>' for k,v in [('', '업무 조건 없음'),('open','미처리 업무 있음'),('overdue','기한 초과 업무 있음')])+'</select></label><label>미처리 업무 담당자<input name="task_owner" maxlength="60" value="'+escape(f['task_owner'])+'"></label>'
+    form+='<label>미처리 업무 우선순위<select name="task_priority">'+''.join('<option value="'+k+'"'+(' selected' if f['task_priority']==k else '')+'>'+v+'</option>' for k,v in [('', '전체 우선순위'),('high','높음'),('normal','보통'),('low','낮음')])+'</select></label>'
     form+='</div><button>검색</button> <a href="'+escape(path)+'#admin-orders">조건 초기화</a></form>'
     info='<p id="shop-result-count" role="status">전체 일치 '+str(meta['total'])+'건 · '+str(meta['page'])+'/'+str(meta['pages'])+'쪽 · 이번 쪽 '+str(meta['displayed'])+'건 (최대 30건)</p>'
     paging='<nav class="order-pagination" aria-label="주문 페이지">'
