@@ -28,6 +28,7 @@ import delivery_routes
 import invitation
 import owner_alerts
 import order_intake
+import customer_orders
 import order_ledger
 import order_operations
 import order_sms
@@ -911,6 +912,10 @@ def dispatch(body, defer_callback=None):
     if message == '승인 대기' or re.fullmatch(
             r'(?:승인 검토|구조 변경 승인|구조 변경 반려) [a-f0-9]{12}', message):
         return approval_command(owner, message)
+    try:
+        message, customer_decision = customer_orders.prepare(message, ROOT / 'customer-memory.sqlite3')
+    except ValueError as error:
+        return kakao(str(error))
     with LOCK, db() as c:
         pending = c.execute('SELECT details FROM invitation_input WHERE owner=? AND expires>?',
                             (owner, time.time())).fetchone()
