@@ -1,5 +1,7 @@
 """Durable order intake, paid-order work queue, and approved staff web access."""
 import hashlib
+import contextlib
+import customer_sources
 import json
 import os
 import re
@@ -39,6 +41,9 @@ def setup(c):
     order_assistance.setup(c)
     import order_sharing
     order_sharing.setup(c)
+    customer_sources.setup(c)
+    import order_cancellation
+    order_cancellation.setup(c)
 
 
 def now():
@@ -59,13 +64,15 @@ def stage(c, key, owner, kind, raw, details, created):
     return c.execute('SELECT * FROM order_operations WHERE id=?', (key,)).fetchone()
 
 
-def intake(db, owner, message):
+def intake(db, owner, message, source_context=None):
     from order_intake import REQUEST
 
     canonical = '\n'.join(line.strip() for line in REQUEST.sub('', message).splitlines() if line.strip())
-    key = str(uuid.uuid5(uuid.NAMESPACE_URL, 'bellavita:kakao:' + canonical))
+    suffix='\0'+json.dumps(source_context,sort_keys=True,ensure_ascii=False) if source_context is not None else ''
+    key = str(uuid.uuid5(uuid.NAMESPACE_URL, 'bellavita:kakao:' + canonical+suffix))
     with db() as c:
         row = stage(c, key, owner, 'kakao', message, {}, now())
+        if source_context is not None:c.execute('INSERT OR IGNORE INTO order_sources VALUES (?,?)',(key,dump(source_context)))
     if row['owner'] != owner:
         return None, '같은 내용의 주문을 이미 접수했어요.'
     return key, None
@@ -106,9 +113,16 @@ def ledger_key(payment_id):
     return str(uuid.UUID(payment_id))
 
 
-def save(db, key, extract, write, after_save=None):
+def save(db, key, extract, write, after_save=None, *, source_guard=None):
     with writer_lock(db):
-        return _save_locked(db,key,extract,write,after_save)
+        with db() as c:row=c.execute('SELECT context FROM order_sources WHERE order_id=?',(key,)).fetchone()
+        try:
+            if row and source_guard is None:raise customer_sources.SourceRevoked('원본 고객방 연결을 검증하지 못해 자동 처리를 중지했어요.')
+            guard=source_guard(json.loads(row['context'])) if row else contextlib.nullcontext()
+            with guard:return _save_locked(db,key,extract,write,after_save)
+        except customer_sources.SourceRevoked:
+            with db() as c:customer_sources.hold(c,key)
+            raise
 
 def _save_locked(db, key, extract, write, after_save=None):
     with db() as c:

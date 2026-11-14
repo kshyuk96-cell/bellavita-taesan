@@ -1,12 +1,12 @@
 {
   "main_commit_reviewed": "9348afabf049322b2bf3f061d511f5848d7aa1bf",
-  "merge_simulation_conflicts": [
-    "agent.py",
-    "invitation.py"
-  ],
-  "direct_main_merge_ready": false,
+  "merge_simulation_conflicts": [],
+  "direct_main_merge_ready": true,
   "deployment_performed": false,
-  "scope": "Static compatibility review and independent merge-tree simulation only; no branch merge or deployment.",
+  "scope": "Isolated integration branch resolves reviewed main conflicts; no main ref change or deployment.",
   "order_ledger_enabled": false,
-  "automatic_write_guard_preserved": true
+  "automatic_write_guard_preserved": true,
+  "integration_branch": "customer-order-integration-20261114",
+  "integration_base_is_ancestor": true,
+  "deployment_ready": false
 }

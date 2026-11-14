@@ -13,6 +13,9 @@ def command(db,owner,message):
     with writer_lock(db):return _command_locked(db,owner,message)
 
 def _command_locked(db,owner,message):
+    import order_cancellation
+    confirmation=order_cancellation.command(db,owner,message)
+    if confirmation is not None:return confirmation
     match=COMMAND.fullmatch(message)
     if not match:
         if re.search(r'아까.*(?:수정|취소)|같은\s*(?:걸|거).*하나\s*더|주문\s*(?:수정|취소)|추가\s*주문',message):
@@ -26,8 +29,9 @@ def _command_locked(db,owner,message):
         row=rows[0];before=json.loads(row['details'])
         if action=='주문 취소':
             if body.strip():return '취소 요청에는 주문번호만 적어주세요.'
+            if row['state']=='cancel_confirmed':return '배송 취소 확인이 직원 수동 기록으로 남아 있어요. 다른 대상의 취소 상태는 별도 확인해 주세요.'
             if row['state']=='cancel_requested':return '이미 취소 요청을 기록했어요. 현장·배송 취소 완료는 아직 미확인입니다.'
-            if row['state'] not in ('saved','update','review_hold'):return '처리 상태를 확인한 뒤 취소를 요청해 주세요.'
+            if row['state'] not in ('saved','update','review_hold','source_hold'):return '처리 상태를 확인한 뒤 취소를 요청해 주세요.'
             order_sharing.invalidate(c,row['id'])
             after={**before,'cancellation_requested':True}
             c.execute('INSERT INTO order_changes VALUES (?,?,?,?,?)',(row['id'],owner,ops.now(),ops.dump(before),ops.dump(after)))
@@ -42,6 +46,7 @@ def _command_locked(db,owner,message):
             after={k:v for k,v in before.items() if k not in ('order_number','cancellation_requested','regional_alert','delivery_region')}
             after['note']=' · '.join(filter(None,(before.get('note'),f'같은 행사 추가 요청 / 원주문 {number}')))
             ops.stage(c,key,owner,'kakao','',after,ops.now())
+            c.execute('INSERT OR IGNORE INTO order_sources SELECT ?,context FROM order_sources WHERE order_id=?',(key,row['id']))
             c.execute('INSERT INTO order_changes VALUES (?,?,?,?,?)',(key,owner,ops.now(),ops.dump({'parent_order':row['id']}),ops.dump(after)))
             return '같은 행사·장소·문구의 별도 추가 주문을 보관했어요. 원장 등록 완료 여부는 주문 접수 상태로 확인해 주세요.'
         try:fields,unlabelled=order_intake.parse_fields(body)

@@ -2,6 +2,7 @@ import json,unittest
 from unittest.mock import Mock
 import test_order_lifecycle
 from sheet_fake import MemoryLedger
+from native_form_fake import native_payload
 import order_operations as ops
 import order_intake,order_lifecycle as life,order_assistance as assist,order_sharing as sharing
 
@@ -39,6 +40,8 @@ class FullFlowTests(unittest.TestCase):
         ops.save(self.db,key,Mock(),book.save)
         self.assertIn('모의협회 회장',book.rows[5][15]['stringValue'])
         with self.db() as c:
+            details=json.loads(c.execute('SELECT details FROM order_operations WHERE id=?',(key,)).fetchone()[0])
+            self.assertTrue(sharing.attach_native_form(c,key,native_payload(number,details),'synthetic',5)['ready_for_final_share'])
             jobs=c.execute("SELECT * FROM order_share_jobs WHERE order_id=? AND state='waiting'",(key,)).fetchall()
             self.assertEqual(len(jobs),2)
             for i,job in enumerate(jobs):sharing.record_verified_receipt(c,job['id'],'기획방',job['body_digest'],f'synthetic-{i}','2026-11-14T12:00:00+09:00')

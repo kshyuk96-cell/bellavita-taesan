@@ -1,0 +1,17 @@
+{
+  "synthetic_checks": 4690,
+  "passed": {
+    "valid_shipping_minutes": 1440,
+    "invalid_clock_held": 1000,
+    "multiple_clocks_held": 1000,
+    "revoked_source_held": 250,
+    "reenabled_old_source_held": 250,
+    "billing_not_delivery": 250,
+    "manual_delivery_record_only": 250,
+    "confirmation_replay": 250
+  },
+  "external_calls": 0,
+  "live_side_effects": false,
+  "formula_validation": "Python reference behavior; not Google Sheets engine execution",
+  "cancellation_records": "Synthetic staff confirmations, not real-world cancellations"
+}

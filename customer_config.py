@@ -33,11 +33,14 @@ class ConfigChanges:
         before=self.db.execute('SELECT * FROM customer_order_rooms WHERE room=?',(room,)).fetchone()
         self.audit('allow_room',room,confirmed_by,before,(room,confirmed_by))
         self.db.execute('INSERT OR REPLACE INTO customer_order_rooms VALUES (?,?)',(room,confirmed_by))
+        self.db.execute('INSERT OR IGNORE INTO customer_room_grants VALUES (?,lower(hex(randomblob(16))))',(room,))
     @atomic_change
     def disable_room(self,room,confirmed_by):
         before=self.db.execute('SELECT * FROM customer_order_rooms WHERE room=?',(room,)).fetchone()
         bindings=self.db.execute('SELECT * FROM customer_bindings WHERE scope=?',(room,)).fetchall()
         self.audit('disable_room',room,confirmed_by,{'room':before,'bindings':bindings},None)
+        self.db.execute('DELETE FROM customer_binding_grants WHERE scope=?',(room,))
+        self.db.execute('DELETE FROM customer_room_grants WHERE room=?',(room,))
         self.db.execute('DELETE FROM customer_bindings WHERE scope=?',(room,))
         self.db.execute('DELETE FROM customer_order_rooms WHERE room=?',(room,))
     @atomic_change
@@ -45,6 +48,7 @@ class ConfigChanges:
         before=self.db.execute('SELECT * FROM customer_bindings WHERE scope=? AND external_id=?',(scope,external_id)).fetchone()
         if before and before[2]!=customer_id:raise ValueError('Binding customer mismatch')
         self.audit('unbind',scope+':'+external_id,confirmed_by,before,None)
+        self.db.execute('DELETE FROM customer_binding_grants WHERE scope=? AND external_id=?',(scope,external_id))
         self.db.execute('DELETE FROM customer_bindings WHERE scope=? AND external_id=?',(scope,external_id))
     @atomic_change
     def remove_variant(self,variant_id,customer_id,confirmed_by):
@@ -56,5 +60,6 @@ class ConfigChanges:
     def remove_profile(self,customer_id,confirmed_by):
         before=self.db.execute('SELECT * FROM customer_profiles WHERE id=?',(customer_id,)).fetchone()
         self.audit('remove_profile',customer_id,confirmed_by,before,None)
+        self.db.execute('DELETE FROM customer_binding_grants WHERE (scope,external_id) IN (SELECT scope,external_id FROM customer_bindings WHERE customer_id=?)',(customer_id,))
         for table,column in (('customer_bindings','customer_id'),('sender_variants','customer_id'),('sender_evidence','customer_id'),('customer_profiles','id')):
             self.db.execute('DELETE FROM '+table+' WHERE '+column+'=?',(customer_id,))

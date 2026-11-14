@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path[:0]=[str(ROOT),str(ROOT/'tests')]
 from sheet_fake import MemoryLedger
+from native_form_fake import native_payload
 import order_operations as ops
 import order_intake,order_lifecycle as life,order_assistance as assist,order_sharing as sharing
 
@@ -26,6 +27,8 @@ def run():
         assist.command(db,owner,command);assist.command(db,owner,command);ops.save(db,key,order_intake.extract,book.save)
         assert book.rows[number][15]['stringValue'].count(f'모의협회{i} 회장')==1;counts['fragment_replay']+=1
         with db() as con:
+            details=json.loads(con.execute('SELECT details FROM order_operations WHERE id=?',(key,)).fetchone()[0])
+            assert sharing.attach_native_form(con,key,native_payload(number,details),'synthetic',5)['ready_for_final_share']
             jobs=con.execute("SELECT * FROM order_share_jobs WHERE order_id=? AND state='waiting'",(key,)).fetchall();assert len(jobs)==2
             for j,job in enumerate(jobs):sharing.record_verified_receipt(con,job['id'],'기획방',job['body_digest'],f'synthetic-{i}-{j}','2026-11-14T12:00:00+09:00')
         assert '카톡 공유: 기획방' in assist.command(db,owner,f'주문 상태 {number}');counts['both_sharing_receipts']+=1

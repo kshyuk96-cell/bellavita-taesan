@@ -13,6 +13,7 @@ class SenderDecision:
     source: str
     reason: str
     evidence: tuple = ()
+    source_context: dict | None = None
 
 class CustomerMemory(ConfigChanges):
     def __init__(self,path):
@@ -23,6 +24,10 @@ class CustomerMemory(ConfigChanges):
         self.db.execute('CREATE TABLE IF NOT EXISTS sender_evidence (customer_id TEXT, row_id TEXT, sender TEXT, evidence_type TEXT, PRIMARY KEY(customer_id,row_id,evidence_type))')
         self.db.execute('CREATE TABLE IF NOT EXISTS customer_order_rooms (room TEXT PRIMARY KEY, confirmed_by TEXT NOT NULL)')
         self.db.execute('CREATE TABLE IF NOT EXISTS customer_config_audit (id INTEGER PRIMARY KEY, action TEXT, entity TEXT, actor TEXT, before TEXT, after TEXT, changed TEXT)')
+        self.db.execute('CREATE TABLE IF NOT EXISTS customer_room_grants (room TEXT PRIMARY KEY, token TEXT NOT NULL)')
+        self.db.execute('CREATE TABLE IF NOT EXISTS customer_binding_grants (scope TEXT, external_id TEXT, token TEXT NOT NULL, PRIMARY KEY(scope,external_id))')
+        self.db.execute('INSERT OR IGNORE INTO customer_room_grants SELECT room,lower(hex(randomblob(16))) FROM customer_order_rooms')
+        self.db.execute('INSERT OR IGNORE INTO customer_binding_grants SELECT scope,external_id,lower(hex(randomblob(16))) FROM customer_bindings')
         self.db.commit()
     @atomic_change
     def confirm_profile(self,customer_id,name,sender,confirmed_by):
@@ -39,6 +44,7 @@ class CustomerMemory(ConfigChanges):
         before=self.db.execute('SELECT * FROM customer_bindings WHERE scope=? AND external_id=?',(scope,external_id)).fetchone()
         self.audit('binding',scope+':'+external_id,confirmed_by,before,(scope,external_id,customer_id,confirmed_by))
         self.db.execute('INSERT OR REPLACE INTO customer_bindings VALUES (?,?,?,?)',(scope,external_id,customer_id,confirmed_by))
+        self.db.execute('INSERT OR IGNORE INTO customer_binding_grants VALUES (?,?,lower(hex(randomblob(16))))',(scope,external_id))
     @atomic_change
     def confirm_variant(self,variant_id,customer_id,sender,cue,confirmed_by):
         if not all(isinstance(v,str) and v.strip() for v in [variant_id,customer_id,sender,cue,confirmed_by]):raise ValueError('Confirmed variant required')

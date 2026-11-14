@@ -24,13 +24,25 @@ def apply_changes(memory,changes):
             getattr(memory,method)(**{key:change[key] for key in keys})
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--db',required=True)
+    parser=argparse.ArgumentParser();parser.add_argument('--db',required=True);parser.add_argument('--orders-db')
     group=parser.add_mutually_exclusive_group(required=True);group.add_argument('--config');group.add_argument('--changes')
     args=parser.parse_args();memory=CustomerMemory(args.db)
     try:
         payload=json.loads(Path(args.config or args.changes).read_text())
         if args.config:apply_config(memory,payload)
         else:apply_changes(memory,payload)
+        target=Path(args.orders_db) if args.orders_db else Path(args.db).with_name('state.sqlite3')
+        if target.is_file():
+            import contextlib,sqlite3,customer_sources
+            @contextlib.contextmanager
+            def orders():
+                connection=sqlite3.connect(target);connection.row_factory=sqlite3.Row
+                import order_operations
+                order_operations.setup(connection)
+                try:
+                    with connection:yield connection
+                finally:connection.close()
+            customer_sources.suspend_revoked(orders,args.db)
         print('Reviewed customer configuration applied atomically. No orders sent or written.')
     finally:memory.db.close()
 if __name__=='__main__':main()

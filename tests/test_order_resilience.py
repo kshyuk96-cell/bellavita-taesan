@@ -5,6 +5,7 @@ import order_operations as ops
 import order_assistance as assist
 import order_lifecycle as life
 import order_sharing as sharing
+from native_form_fake import native_payload
 from order_lock import writer_lock
 
 # Module-level subprocess targets for actual process-boundary lock verification.
@@ -30,8 +31,15 @@ class ResilienceTests(unittest.TestCase):
     setUp=test_order_lifecycle.LifecycleTests.setUp
     row=test_order_lifecycle.LifecycleTests.row
     def save(self):
-        with self.db() as c:c.execute("UPDATE order_operations SET state='pending' WHERE id='parent'")
+        with self.db() as c:
+            details={**self.original,'event_type':'결혼','artwork':'모의작품','size':'2호','delivery_date':'2099-12-01','delivery_time':'10:00','notes':'배송시각 10:00'}
+            c.execute("UPDATE order_operations SET state='pending',details=? WHERE id='parent'",(json.dumps(details),))
         return ops.save(self.db,'parent',Mock(),lambda key,data,created,update:(21380,data))
+    def validate_native(self):
+        with self.db() as c:
+            details=json.loads(c.execute("SELECT details FROM order_operations WHERE id='parent'").fetchone()[0])
+            result=sharing.attach_native_form(c,'parent',native_payload(21380,details),'synthetic',5)
+            self.assertTrue(result['ready_for_final_share'])
     def jobs(self):
         with self.db() as c:return [dict(r) for r in c.execute("SELECT * FROM order_share_jobs WHERE state!='stale'").fetchall()]
     def test_retry_budget_backoff_and_explicit_resume(self):
@@ -60,6 +68,7 @@ class ResilienceTests(unittest.TestCase):
             self.assertEqual(self.row()['attempts'],0)
     def test_only_two_jobs_and_both_receipts_required(self):
         self.save();ops.save(self.db,'parent',Mock(),Mock())
+        self.validate_native()
         jobs=self.jobs();self.assertEqual(len(jobs),2)
         for i,job in enumerate(jobs):
             with self.db() as c:
@@ -67,7 +76,7 @@ class ResilienceTests(unittest.TestCase):
                 self.assertEqual(c.execute('SELECT COUNT(*) FROM order_transmissions').fetchone()[0],i)
         self.assertIn('카톡 공유: 기획방',assist.command(self.db,'staff','주문 상태 21380'))
     def test_wrong_room_digest_and_reused_receipt_held(self):
-        self.save();first,second=self.jobs()
+        self.save();self.validate_native();first,second=self.jobs()
         for dest,digest in (('확인방',first['body_digest']),('기획방','wrong')):
             with self.db() as c,self.assertRaises(ValueError):sharing.record_verified_receipt(c,first['id'],dest,digest,'synthetic','2026-11-14T12:00:00+09:00')
         with self.db() as c:sharing.record_verified_receipt(c,first['id'],'기획방',first['body_digest'],'synthetic','2026-11-14T12:00:00+09:00')
