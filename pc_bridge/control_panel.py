@@ -26,7 +26,7 @@ class Panel:
         self.db=sqlite3.connect(STATE/'panel.sqlite3');setup(self.db)
         self.db.execute('CREATE TABLE IF NOT EXISTS room_baselines (id TEXT PRIMARY KEY,seen TEXT NOT NULL)');self.db.commit()
         self.watch_process=None;self.review_signature=None
-        self.root=tk.Tk();self.root.title('태산이 주문 테스트 · OCR 확대 4');self.root.geometry('920x760')
+        self.root=tk.Tk();self.root.title('태산이 주문 테스트 · OCR 항목 보정 5');self.root.geometry('920x760')
         self.status=tk.StringVar(value='업무 PC 모드 · 등록한 열린 방의 백그라운드 OCR 감시 · 시트 쓰기 없음')
         ttk.Label(self.root,textvariable=self.status,wraplength=880).pack(pady=8)
         self.manual_mode=tk.BooleanVar(value=False)

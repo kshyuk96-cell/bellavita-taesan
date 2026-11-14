@@ -25,7 +25,7 @@ class Store:
             result TEXT NOT NULL,sightings INTEGER NOT NULL DEFAULT 1)''');self.db.commit()
         self.db.execute('CREATE TABLE IF NOT EXISTS ocr_analysis_version (id INTEGER PRIMARY KEY CHECK(id=1),version TEXT)')
         version=self.db.execute('SELECT version FROM ocr_analysis_version WHERE id=1').fetchone()
-        if not version or version[0]!='readability-v4':
+        if not version or version[0]!='readability-v5':
             with self.db:
                 for key,body,old in self.db.execute('SELECT id,changed_text,result FROM ocr_reviews').fetchall():
                     try:result=preview(body,ocr=True)
@@ -34,7 +34,7 @@ class Store:
                     result['warning']=json.loads(old).get('warning','OCR 원문을 확인해야 합니다.')
                     result['reanalysis']=True
                     self.db.execute('UPDATE ocr_reviews SET result=? WHERE id=?',(json.dumps(result,ensure_ascii=False),key))
-                self.db.execute('INSERT OR REPLACE INTO ocr_analysis_version VALUES (1,?)',('readability-v4',))
+                self.db.execute('INSERT OR REPLACE INTO ocr_analysis_version VALUES (1,?)',('readability-v5',))
     def observe(self,scope,lines):
         old=self.db.execute('SELECT lines FROM ocr_frames WHERE scope=?',(scope,)).fetchone()
         before=json.loads(old[0]) if old else []

@@ -3,16 +3,39 @@ import datetime as dt
 import re
 from preview_fields import parse_fields,LABEL_TOKEN,LABEL_ALIASES
 from order_review_rules import split_orders,sender_text
-from delivery_regions import delivery_alert
+from delivery_regions import delivery_alert,province
+import unicodedata
 
 LABELS={'event_type':'행사 구분','sender':'보내는 분','recipient':'받는 분',
         'delivery_date':'배송일','delivery_time':'배송시각','venue':'장소','address':'주소',
         'artwork':'작품','size':'규격','message':'문구'}
 
 
+def label_distance(left,right):
+    row=list(range(len(right)+1))
+    for i,char in enumerate(left,1):
+        following=[i]
+        for j,other in enumerate(right,1):following.append(min(following[-1]+1,row[j]+1,row[j-1]+(char!=other)))
+        row=following
+    return row[-1]
+
+
 def normalize_ocr_labels(text):
     lines=[];changed=False
     for line in text.splitlines():
+        labelled=re.match(r'^\s*([^:：\n]{2,16})[:：]\s*(.*)$',line)
+        if labelled:
+            head=''.join(c for c in labelled[1] if not c.isspace() and unicodedata.category(c)!='Cf').lstrip('-•·')
+            value=labelled[2]
+            if head in LABEL_ALIASES:
+                normalized=head+': '+value
+                changed=changed or normalized!=line;line=normalized
+            elif 3<=len(head)<=8 and province(value):
+                distances=[(label_distance(head,name),key) for name,key in LABEL_ALIASES.items()]
+                best=min(distance for distance,_ in distances)
+                keys={key for distance,key in distances if distance==best}
+                if best==1 and keys=={'address'}:
+                    line='설치주소: '+value;changed=True
         match=re.match(r'^\s*(?P<label>'+LABEL_TOKEN+r')(?P<suffix>.*)$',line)
         if match:
             suffix=match['suffix']
@@ -33,7 +56,7 @@ def preview(text,*,ocr=False):
     if ocr:text,labels_normalized=normalize_ocr_labels(text)
     fields,_=parse_fields(re.sub(r'^주문\s*(?:접수|등록|입력)\s*[:：]?\s*','',text))
     warnings=[]
-    if ocr and labels_normalized:warnings.append('OCR에서 빠진 항목 구분 기호를 보정했습니다. 원문 대조가 필요합니다.')
+    if ocr and labels_normalized:warnings.append('OCR 항목 이름·구분 기호를 보정했습니다. 값은 원문 대조가 필요합니다.')
     fields['sender']=sender_text(fields.get('sender',''))
     if ocr and re.search(r'\n[^\n]*(?:20\d{2}[-./]\d{1,2}[-./]\d{1,2}|(?:배송일|배송시각|설치주소|사이즈)\s*[:：])',fields['sender']):
         fields['sender_unverified_ocr']=fields['sender'];fields['sender']=''
@@ -51,11 +74,17 @@ def preview(text,*,ocr=False):
     if fields.get('delivery_date'):
         try:dt.date.fromisoformat(fields['delivery_date'])
         except ValueError:warnings.append('배송일은 실제 날짜의 YYYY-MM-DD 형식으로 확인해 주세요.')
+    if ocr and re.fullmatch(r'(?:[01][0-9]|2[0-3])[.．][0-5][0-9]',fields.get('delivery_time','')):
+        fields['delivery_time_original_ocr']=fields['delivery_time']
+        fields['delivery_time']=fields['delivery_time'].replace('.',':').replace('．',':')
+        warnings.append('OCR 배송시각의 점을 콜론으로 보정했습니다. 원문 대조가 필요합니다.')
     if fields.get('delivery_time') and not re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]',fields['delivery_time']):
         warnings.append('배송시각을 HH:MM 형식으로 확인해 주세요.')
     missing=[label for key,label in LABELS.items() if key not in {'address','venue','message'} and
              (not fields.get(key) or re.fullmatch(r'미확인|미정|확인\s*필요|없음',fields[key]))]
     if not (fields.get('venue') or fields.get('address')):missing.append('설치 장소·주소')
+    elif re.search(r'(?:주소\s*(?:미정|미확인)|(?:^|\s)(?:미정|미확인)(?:\s|$))',fields.get('address','')):
+        missing.append('상세 설치주소')
     urls=re.findall(r'https?://[^\s<>]+',text)
     if urls:warnings.append('링크 본문은 조회하지 않았습니다. 링크만으로 행사 일시·장소·보내는 분을 추정하지 않습니다.')
     region=delivery_alert(fields.get('address') or fields.get('venue',''))
