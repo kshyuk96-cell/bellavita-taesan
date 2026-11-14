@@ -20,7 +20,7 @@ import checkout
 from blogpay import BlogPay, PRICES
 
 SEOUL = ZoneInfo('Asia/Seoul')
-HOSTS = {'bojagicard.com', 'feelcard.co.kr', 'salondeletter.com', 'toourguest.com', 'itscard.co.kr', 'itscard.com', 'mcard.itscard.co.kr', 'happyceo.kr'}
+HOSTS = {'bojagicard.com', 'feelcard.co.kr', 'salondeletter.com', 'toourguest.com', 'itscard.co.kr', 'itscard.com', 'mcard.itscard.co.kr', 'happyceo.kr', 'letterb.barunsoncard.com', 'makedear.com'}
 WHEN = re.compile(r'(20\d\d)[년./-]\s*(\d{1,2})[월./-]\s*(\d{1,2})일?[T\s]*[ (]*(?:[월화수목금토일](?:요일)?\)?)?\s*(오전|오후)?\s*(\d{1,2})(?:\s*시\s*(?:(\d{1,2})\s*분)?|:(\d{1,2}))')
 PRODUCT_LOCK = threading.Lock()
 
@@ -63,6 +63,19 @@ def get_page(url, *, hosts=HOSTS, request=None):
 def text_at(tree, path, **variables):
     matches = tree.xpath(path, **variables)
     return matches[0].text_content().strip() if matches else ''
+
+
+def read_itscard_view(uid):
+    """Read the vendor's public view endpoint only, never RSVP/guestbook writes."""
+    if not isinstance(uid, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', uid):
+        raise ValueError('청첩장 식별자를 확인해 주세요.')
+    url = 'https://apis.itscard.co.kr:447/mcard/view/' + uid
+    request = Request(url, data=b'', headers={'User-Agent': 'Mozilla/5.0'})
+    with build_opener(NoRedirect()).open(request, timeout=9) as response:
+        raw = response.read(2_000_001)
+    if len(raw) > 2_000_000:
+        raise ValueError('청첩장 정보가 너무 커서 읽지 못했어요.')
+    return json.loads(raw)
 
 
 def parse_time(value, required=True):
@@ -164,6 +177,13 @@ def parse_page(source, raw, extract=None):
     tree = dom.fromstring(raw)
     host = urlsplit(source).hostname.removeprefix('www.')
     meta = {m.get('property'): m.get('content', '') for m in tree.xpath('//meta[@property]')}
+    if host in {'letterb.barunsoncard.com','makedear.com'}:
+        from order_invitation import parse_order_page
+        result=parse_order_page(source,raw)
+        if extract is not None:
+            return event_fields({},source,result['when'],result['venue'],result['address'],result['families'],[],True)
+        result.update(photos=[],greeting='',signature='',note='',host_side='',wreath_restriction=False)
+        return result
     description = meta.get('og:description', '')
     title = meta.get('og:title', '')
     cover = meta.get('og:image', '')

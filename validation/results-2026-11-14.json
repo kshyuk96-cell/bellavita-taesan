@@ -1,0 +1,242 @@
+{
+  "tested_base_commit": "a5349a95dd17d2d9a0eefdd060805fc7b02e70bd",
+  "baseline": {
+    "revision_scope": "local offline parser",
+    "source_ledger_records": 3951,
+    "ledger_derived_syntax_cases": {
+      "cases": 19375,
+      "passed": 6107,
+      "failed": 13268,
+      "failed_compact": 3875,
+      "failed_heading-block": 3875,
+      "failed_spoken-labels": 3875,
+      "failed_canonical": 821,
+      "failed_wide-colon": 822
+    },
+    "by_event_type": {
+      "결혼": {
+        "cases": 9730,
+        "passed": 3100,
+        "failed": 6630
+      },
+      "생일/공연": {
+        "cases": 605,
+        "passed": 202,
+        "failed": 403
+      },
+      "개업/이전": {
+        "cases": 490,
+        "passed": 127,
+        "failed": 363
+      },
+      "취임/영전": {
+        "cases": 215,
+        "passed": 66,
+        "failed": 149
+      },
+      "근조": {
+        "cases": 7765,
+        "passed": 2446,
+        "failed": 5319
+      },
+      "기념/선물": {
+        "cases": 570,
+        "failed": 404,
+        "passed": 166
+      }
+    },
+    "raw_kakao": {
+      "total": 12,
+      "eligible": 0,
+      "passed": 0,
+      "needs_link_or_context": 12,
+      "failed": 0
+    },
+    "seconds": 0.262,
+    "live_side_effects": false,
+    "limitations": [
+      "Ledger-derived inputs are generated syntax variations, not independent human conversations.",
+      "Invitation URL extraction and true customer identity/context require separate integration tests."
+    ]
+  },
+  "after_fixes": {
+    "revision_scope": "local offline parser",
+    "source_ledger_records": 3951,
+    "ledger_derived_syntax_cases": {
+      "cases": 19375,
+      "passed": 19369,
+      "strict_mismatch_but_information_preserved": 6,
+      "failed": 6,
+      "failed_heading-block": 2,
+      "failed_canonical": 1,
+      "failed_compact": 1,
+      "failed_wide-colon": 1,
+      "failed_spoken-labels": 1
+    },
+    "by_event_type": {
+      "결혼": {
+        "cases": 9730,
+        "passed": 9730
+      },
+      "생일/공연": {
+        "cases": 605,
+        "passed": 605
+      },
+      "개업/이전": {
+        "cases": 490,
+        "passed": 489,
+        "failed": 1
+      },
+      "취임/영전": {
+        "cases": 215,
+        "passed": 215
+      },
+      "근조": {
+        "cases": 7765,
+        "passed": 7760,
+        "failed": 5
+      },
+      "기념/선물": {
+        "cases": 570,
+        "passed": 570
+      }
+    },
+    "raw_kakao": {
+      "total": 12,
+      "eligible": 0,
+      "passed": 0,
+      "needs_link_or_context": 12,
+      "failed": 0
+    },
+    "seconds": 0.935,
+    "live_side_effects": false,
+    "limitations": [
+      "Ledger-derived inputs are generated syntax variations, not independent human conversations.",
+      "Invitation URL extraction and true customer identity/context require separate integration tests."
+    ]
+  },
+  "edge_cases": {
+    "synthetic_edge_cases": {
+      "regional_cases": 5100,
+      "regional_passed": 5100,
+      "ambiguous_cases": 2000,
+      "ambiguous_held": 2000,
+      "invalid_shipping_cases": 1000,
+      "invalid_shipping_held": 1000
+    },
+    "errors": [],
+    "error_count": 0,
+    "live_side_effects": false
+  },
+  "recorded_sender_checks": {
+    "recorded_raw_sender_text": {
+      "total": 12,
+      "held": 7,
+      "sender_matched": 5
+    },
+    "invitation_metadata_stubbed": true,
+    "live_invitation_extraction_tested": false,
+    "scope": "sender text only; unsupported vendor detection retained"
+  },
+  "privacy": "No customer text, names, addresses, contacts, or invitation URLs are included in this report.",
+  "external_pages": "User-authorized retrieval completed: 12 order references, 9 unique pages; replay uses saved real responses without network.",
+  "event_time_alignment": {
+    "reference_pr": 21,
+    "reference_commit": "b43c6d484f093e3e4c0b9768dc7cf1ad540fb873",
+    "event_column": "C",
+    "shipping_time_location": "notes",
+    "staff_updates_preserve_event_time": true
+  },
+  "deployment_recheck": {
+    "live_commit": "b3a514387d1a086d6cdf9b38b1821010be924f3d",
+    "health": "ok",
+    "automatic_ledger_writes_enabled": false
+  },
+  "publish_status": "User-authorized code/test/aggregate-only review publication; repository public; no main merge or deployment.",
+  "expanded_after_fixes": {
+    "revision_scope": "local offline parser",
+    "source_ledger_records": 3951,
+    "ledger_derived_syntax_cases": {
+      "cases": 50375,
+      "passed": 50361,
+      "strict_mismatch_but_information_preserved": 14,
+      "failed": 14,
+      "failed_heading-block": 2,
+      "failed_canonical": 1,
+      "failed_compact": 1,
+      "failed_wide-colon": 1,
+      "failed_spoken-labels": 1,
+      "failed_reversed": 1,
+      "failed_crlf": 1,
+      "failed_nbsp": 1,
+      "failed_bullets": 1,
+      "failed_inline-colon": 1,
+      "failed_inline-spoken": 1,
+      "failed_greeting": 1,
+      "failed_spoken-joined": 1
+    },
+    "by_event_type": {
+      "결혼": {
+        "cases": 25298,
+        "passed": 25298
+      },
+      "생일/공연": {
+        "cases": 1573,
+        "passed": 1573
+      },
+      "개업/이전": {
+        "cases": 1274,
+        "passed": 1273,
+        "failed": 1
+      },
+      "취임/영전": {
+        "cases": 559,
+        "passed": 559
+      },
+      "근조": {
+        "cases": 20189,
+        "passed": 20176,
+        "failed": 13
+      },
+      "기념/선물": {
+        "cases": 1482,
+        "passed": 1482
+      }
+    },
+    "raw_kakao": {
+      "total": 12,
+      "eligible": 0,
+      "passed": 0,
+      "needs_link_or_context": 12,
+      "failed": 0
+    },
+    "seconds": 2.753,
+    "live_side_effects": false,
+    "limitations": [
+      "Ledger-derived inputs are generated syntax variations, not independent human conversations.",
+      "Invitation URL extraction and true customer identity/context require separate integration tests."
+    ]
+  },
+  "actual_invitation_checks": {
+    "actual_page_checks": {
+      "total": 12,
+      "parsed": 12,
+      "sender_matched": 12,
+      "reference_date_checked": 10,
+      "reference_date_matched": 10,
+      "reference_time_checked": 10,
+      "reference_time_matched": 10
+    },
+    "invitation_metadata_stubbed": false,
+    "network_disabled_during_replay": true
+  },
+  "unit_tests": 187,
+  "synthetic_complete_flows": 1000,
+  "full_flow_phase_assertions": 8000,
+  "local_synthetic_ci_scripts_completed": 8,
+  "main_direct_merge_ready": true,
+  "deployment_ready": false,
+  "order_ledger_enabled": false,
+  "automatic_write_guard_preserved": true,
+  "authorized_live_test_formula_cells_updated": 2
+}

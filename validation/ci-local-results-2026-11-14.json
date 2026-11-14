@@ -1,0 +1,15 @@
+{
+  "unit_tests": {
+    "tests": 187,
+    "failures": 0,
+    "errors": 0,
+    "external_python_sockets_disabled": true,
+    "loopback_tests_allowed": true
+  },
+  "completion": {
+    "synthetic_scripts_completed": 8,
+    "unit_tests_passed": true,
+    "no_private_source_files": true
+  },
+  "status": "local recovery bundle success; actual remote result checked separately"
+}

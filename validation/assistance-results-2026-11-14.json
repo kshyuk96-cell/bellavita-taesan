@@ -1,0 +1,14 @@
+{
+  "synthetic_checks": 7000,
+  "passed": {
+    "missing_only": 1000,
+    "schedule_hold": 1000,
+    "no_shipping_inference": 1000,
+    "fragment_replay": 1000,
+    "status_no_fabricated_receipt": 1000,
+    "owner_isolation": 1000,
+    "review_list": 1000
+  },
+  "external_calls": 0,
+  "live_side_effects": false
+}

@@ -1,0 +1,14 @@
+{
+  "synthetic_legacy_orders": 500,
+  "phase_checks": 3000,
+  "passed": {
+    "legacy_quarantined": 500,
+    "wrong_owner_held": 500,
+    "explicit_manual_restored": 500,
+    "replay_no_extra_audit": 500,
+    "same_intake_id_preserved": 500,
+    "one_writer_call": 500
+  },
+  "external_calls": 0,
+  "live_state_database_changed": false
+}
