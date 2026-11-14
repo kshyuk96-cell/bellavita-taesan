@@ -6,7 +6,7 @@
   "status": "implementation_and_mock_rehearsals_passed_real_integration_pending",
   "frozen_runtime_commit": "21ddc31d07f385056a5c623c19088c1103eb4ba1",
   "source_head_before_release_docs": "0965a1bfb0832e2955fc2bcfcb483765ee4cc40f",
-  "main_base": "9348afabf049322b2bf3f061d511f5848d7aa1bf",
+  "main_base": "9474f6d1d5cd0589ae09c360d90745cbe224d41a",
   "milestones": {
     "scope_freeze": "complete",
     "screen_validation": "technical_pass_owner_review_pending",
@@ -207,5 +207,22 @@
     "real_provider_verification_performed": false,
     "production_settings_changed": false,
     "previous_mock_success_reclassified_as_real_success": false
+  },
+  "owner_confirmation_20261114": {
+    "product_conditions": "accepted; design may change later",
+    "test_recipient": "provided privately; not committed; actual delivery pending; test roles sequentially",
+    "payapp_business_merchant": "owner confirmed; API access unverified",
+    "blogpay_cash_receipt": "owner reported prior automatic issuance; inheritance to independent shop unverified",
+    "render_screenshot": "main 9474f6d live; TAESAN_DATA not shown",
+    "main_integration_commit": "dde62cf8a34b1cec89f011fa512b87dd5121896b",
+    "production_changed": false
+  },
+  "latest_main_integration_regression": {
+    "commit": "dde62cf8a34b1cec89f011fa512b87dd5121896b",
+    "command": ".venv/bin/python -m unittest discover -s tests",
+    "passed": 177,
+    "seconds": 82.8,
+    "production_deployed": false,
+    "actual_provider_calls": false
   }
 }
