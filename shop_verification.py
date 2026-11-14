@@ -40,9 +40,41 @@ def token(order_id):return hmac.new(os.environ['TAESAN_WEBHOOK_SECRET'].encode()
 def handler(agent,checkout):
     import datetime as dt
     import re
+    started=time.time_ns()
     class VerificationHandler(agent.Handler):
+        def review_authorized(self):
+            key=os.getenv('SHOP_VERIFICATION_REVIEW_KEY','')
+            return len(key)>=32 and hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+key)
+        def review(self,write=False,admin=False):
+            if not self.review_authorized():return self.send_json({'error':'unauthorized'},401)
+            import manage_data
+            import scheduled_backups
+            if admin:
+                import shop
+                expiry=str(int(time.time())+600)
+                link=os.environ['TAESAN_PUBLIC_URL'].rstrip('/')+'/shop/admin/'+expiry+'/'+shop.admin_signature(expiry,os.environ['TAESAN_WEBHOOK_SECRET'])
+                return self.send_json({'admin_url':link,'expires_in':600})
+            if write:
+                try:
+                    fields=self.read_order_form()
+                    if fields.get('action')!='backup_restore':return self.send_json({'error':'invalid_action'},422)
+                    base=Path(os.environ['SHOP_BACKUP_DIRECTORY']).resolve()
+                    base.mkdir(parents=True,exist_ok=True)
+                    report=scheduled_backups.snapshot(agent.ROOT,base/('review-'+str(time.time_ns())))
+                except (OSError,ValueError):return self.send_json({'backup_restore':'failed'},503)
+                return self.send_json({'backup_restore':'passed','integrity':report['integrity_check'],'restored_counts':report['counts']})
+            report=manage_data.inspect(agent.ROOT)
+            with agent.db() as c:
+                backup=c.execute('SELECT state,note FROM shop_backup_runs ORDER BY id DESC LIMIT 1').fetchone()
+                financial=[dict(row) for row in c.execute('SELECT id,state,payment_number FROM invitation_orders ORDER BY created')]
+            return self.send_json({'mode':'isolated_mock','counts':report['counts'],'integrity':report['integrity_check'],
+                'data_under_var_data':report['under_var_data'],'mount_verified':report['var_data_is_mount'],
+                'last_automatic_backup':dict(backup) if backup else None,'orders':financial,'process_started':str(started),
+                'live_payment':False,'live_messages':False,'live_receipts':False})
         def do_GET(self):
             path=urlsplit(self.path).path
+            if path=='/verification/review':return self.review()
+            if path=='/verification/review/admin':return self.review(admin=True)
             if path=='/verification':return self.send_json({'mode':'isolated_mock','live_payment':False,'live_messages':False,'live_receipts':False,'storefront':'/shop','data_under_var_data':agent.ROOT.is_relative_to(Path('/var/data')),'mount_verified':os.path.ismount('/var/data')})
             match=re.fullmatch(r'/verification/pay/([a-f0-9]{32})/([a-f0-9]{64})',path)
             if match:
@@ -50,6 +82,7 @@ def handler(agent,checkout):
                 return self.send_order_html('<!doctype html><html lang="ko"><meta name="viewport" content="width=device-width,initial-scale=1"><h1>페이앱 모의 결제</h1><p>실제 결제·영수증·메시지 전송이 없습니다.</p><form method="post"><button name="state" value="4">모의 결제 완료</button><button name="state" value="70">모의 부분취소 10,000원</button><button name="state" value="64">모의 전체취소</button></form><p><a href="/invitation-orders/'+match[1]+'/receipt">주문 상태 확인</a></p></html>')
             return super().do_GET()
         def do_POST(self):
+            if urlsplit(self.path).path=='/verification/review':return self.review(write=True)
             match=re.fullmatch(r'/verification/pay/([a-f0-9]{32})/([a-f0-9]{64})',urlsplit(self.path).path)
             if not match:return super().do_POST()
             origin=os.getenv('TAESAN_PUBLIC_URL','').rstrip('/')

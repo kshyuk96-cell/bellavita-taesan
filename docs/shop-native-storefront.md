@@ -51,3 +51,7 @@ python tests/rehearse_shop.py --output /새/기존업무/검증/경로
 ## 이미지 규격
 
 공개 판매 옵션은 600×400mm와 700×467mm(약 3:2). 족자 약 2:3은 공식 구성사진에서 추정한 화면 비율로, 실제 제작 mm 치수는 미확정이다. 썸네일은 생성 이미지의 비율에 맡기지 않고 별도 CSS 상자의 3:2 / 2:3을 적용한다. 제작용 PNG/PDF 치수를 이번 썸네일 비율로 변경하지 않는다.
+
+## 검증 서버 원격 점검
+
+SHOP_VERIFICATION_REVIEW_KEY는 검증 서버에만 개별 환경변수로 설정하며 저장소/Blueprint에는 값이 없다. Blueprint에 생략된 기존 서비스 변수는 이후 동기화에서 보존한다. /verification/review는 Bearer 인증 후 디스크 마운트·SQLite 무결성·건수·모의 결제 상태·자동 백업·프로세스 시작 식별자를 조회한다. 같은 경로의 backup_restore POST는 새 백업과 임시 복구 검증을 수행하며 실제 DB는 덮어쓰지 않는다. /verification/review/admin은 인증 후 10분 관리자 링크를 반환한다. 이 점검 경로는 shop_verification.py에서만 등록되며 운영 agent.py에는 없다.
