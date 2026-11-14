@@ -36,6 +36,7 @@ import shop_admin_workflow
 import shop_admin_daily
 import shop_admin_training
 import shop_admin_team
+import shop_admin_shortcuts
 import shop_admin_manual
 import order_ops
 import order_sample
@@ -1365,7 +1366,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 fields = self.read_order_form()
                 return_location=shop_admin_queries.redirect(match[0],fields) if '_return_query' in fields else match[0]
-                action = {'save_response_template':shop_admin_team.save_template,'save_product_note':shop_admin_team.save_product_note,'save_operator_task':shop_admin_daily.save_task,'save_search':shop_admin_workflow.save_search,'delete_search':shop_admin_workflow.delete_search,'save_operator_handover':shop_admin_workflow.save_handover,
+                action = {'quick_operator_task':shop_admin_shortcuts.quick_task,'toggle_response_favorite':shop_admin_shortcuts.toggle_favorite,'save_response_template':shop_admin_team.save_template,'save_product_note':shop_admin_team.save_product_note,'save_operator_task':shop_admin_daily.save_task,'save_search':shop_admin_workflow.save_search,'delete_search':shop_admin_workflow.delete_search,'save_operator_handover':shop_admin_workflow.save_handover,
                           'save_product': shop.save_product, 'issue_offers': shop.issue_offers,
                           'change_offer': shop.change_offer,
                           'record_payment_check': shop.record_payment_check,
@@ -1505,10 +1506,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        for suffix in ('/manual','/manual.md','/training'):
+        for suffix in ('/manual','/manual.md','/training','/shift-summary.txt'):
             manual=shop.ADMIN_PATH.fullmatch(path.removesuffix(suffix)) if path.endswith(suffix) else None
             if manual:
                 if not shop.admin_authorized(*manual.groups(),os.environ['TAESAN_WEBHOOK_SECRET']):return self.order_message('관리자 링크가 만료됐습니다.',403)
+                if suffix=='/shift-summary.txt':
+                    try:
+                        with db() as c:content=shop_admin_team.shift_report(c,dict(parse_qsl(urlsplit(self.path).query)))['text'].encode('utf-8')
+                    except ValueError as error:return self.order_message(str(error),422)
+                    self.send_response(200);self.send_header('Content-Type','text/plain; charset=utf-8');self.send_header('Content-Disposition','attachment; filename=bellavita-shift-summary.txt');self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
                 if suffix=='/training':return self.send_order_html(shop_admin_training.page(manual[0]),referrer_policy='same-origin')
                 if suffix=='/manual':return self.send_order_html(shop_admin_manual.page(manual[0]),referrer_policy='same-origin')
                 content=shop_admin_manual.SOURCE.read_bytes();self.send_response(200);self.send_header('Content-Type','text/markdown; charset=utf-8');self.send_header('Content-Disposition','attachment; filename=bellavita-admin-manual.md');self.send_header('Cache-Control','private, no-store');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)

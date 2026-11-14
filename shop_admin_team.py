@@ -8,6 +8,8 @@ from html import escape
 import shop_admin_workflow as workflow
 import order_amendments
 import shop_admin_queries
+import shop_admin_shortcuts as shortcuts
+from urllib.parse import urlencode
 
 PRIORITIES={'high':'높음','normal':'보통','low':'낮음'}
 PRIORITY_SQL="CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END"
@@ -60,11 +62,15 @@ def response_tools(c,row):
     from shop_admin_daily import customer_summary
     order=json.loads(order_amendments.effective(c,row)['details']);stage=c.execute('SELECT stage FROM shop_fulfillment WHERE order_id=?',(row['id'],)).fetchone()
     values={'요약':customer_summary(c,row),'주문번호':row['id'],'상품':order['title'],'결제상태':shop_admin_queries.STATES.get(row['state'],'확인 필요'),'배송상태':shop_admin_queries.STAGES.get(stage['stage'],'확인 필요') if stage else '결제 확인 후 시작','행사시간':order['event_time'][:16].replace('T',' '),'행사장':order['venue'],'보내는분':order['sender'],'문구':order['message'] or ' / '.join(v for k,v in order['options'] if '문구' in k) or '선택 사항 확인','원결제금액':f'{order["amount"]:,}원'}
-    templates=DEFAULTS+[(r['name'],r['body']) for r in c.execute('SELECT name,body FROM shop_response_templates WHERE active=1 ORDER BY name,id')]
+    templates=[('builtin:'+str(i),name,body) for i,(name,body) in enumerate(DEFAULTS)]+[(r['id'],r['name'],r['body']) for r in c.execute('SELECT id,name,body FROM shop_response_templates WHERE active=1 ORDER BY name,id')]
+    favorite=shortcuts.favorite_keys(c);templates.sort(key=lambda item:item[0] not in favorite)
     options=''
-    for name,body in templates:
-        validate_template(body);options+='<option value="'+escape(body.format_map(values))+'">'+escape(name)+'</option>'
-    return '<details class="response-tools copy-panel"><summary>고객 응대 문구 선택</summary><label>응대 템플릿<select class="response-choice">'+options+'</select></label><label>고객 전달 전 검토<textarea class="copy-field response-text" readonly>'+escape(values['요약'])+'</textarea></label><button type="button" data-copy-field>응대 문구 복사</button><p>복사 후 실제 상태를 확인해 전달하세요. 내부 메모는 치환하지 않습니다.</p></details>'
+    initial=''
+    for key,name,body in templates:
+        validate_template(body);rendered=body.format_map(values)
+        if not initial:initial=rendered
+        options+='<option value="'+escape(rendered)+'">'+escape(('★ ' if key in favorite else '')+name)+'</option>'
+    return '<details class="response-tools copy-panel"><summary>고객 응대 문구 선택</summary><label>응대 템플릿<select class="response-choice">'+options+'</select></label><label>고객 전달 전 검토<textarea class="copy-field response-text" readonly>'+escape(initial)+'</textarea></label><button type="button" data-copy-field>응대 문구 복사</button><p>복사 후 실제 상태를 확인해 전달하세요. 내부 메모는 치환하지 않습니다.</p></details>'
 
 
 def save_product_note(c,f):
@@ -80,7 +86,7 @@ def product_note(c,identity,path):
     fields=workflow.hidden('product_id',identity)+workflow.hidden('note_version',latest['version'] if latest else 0)+'<label>작성자<input name="note_author" maxlength="60" required value="'+escape(latest['author'] if latest else '')+'"></label><label>상품 운영 메모 · 직원 내부용<textarea name="product_note" maxlength="2000">'+escape(latest['note'] if latest else '')+'</textarea></label>'
     body='<details class="product-note"><summary>상품 운영 메모 · 내부용</summary><p>고객 쇼핑몰·주문 요약·제작 파일에는 표시하지 않습니다. 상품 가격·옵션·리비전은 바꾸지 않습니다. 빈 메모 저장은 현재 메모를 비웁니다.</p>'+workflow.form(path,'save_product_note',fields,'운영 메모 저장')+'<h4>최근 메모 10회</h4>'
     for record in records:body+='<p>'+escape(record['created'][:16]+' UTC · '+record['author'])+'</p><p class="preserve-lines">'+escape(record['note'] or '(빈 메모)')+'</p>'
-    return body+'</details>'
+    return shortcuts.note_preview(latest)+body+'</details>'
 
 
 def focus(c,row):
@@ -89,7 +95,7 @@ def focus(c,row):
     return '<div class="order-focus"><h3>작업 핵심 정보</h3><p>승인된 정정 반영 · 원접수 정보는 아래 기록에서 확인합니다.</p><dl>'+''.join('<dt>'+label+'</dt><dd>'+escape(value)+'</dd>' for label,value in pairs)+'</dl></div>'
 
 
-def shift_summary(c,path,fields,clock=None):
+def shift_report(c,fields,clock=None):
     from shop_admin_daily import now,SEOUL
     current=(clock or now)().astimezone(SEOUL);owner=fields.get('handover_owner','').strip();until=fields.get('handover_until','').strip()
     if len(owner)>60:raise ValueError('교대 담당자 검색은 60자 이내로 입력하세요.')
@@ -106,8 +112,13 @@ def shift_summary(c,path,fields,clock=None):
     for row in rows:lines.append('주문 '+row['order_id']+' | '+PRIORITIES[row['priority']]+' | '+row['title']+' | '+row['owner']+' | '+row['due'].replace('T',' ')+' | '+row['note'])
     if total>len(rows):lines.append('100건을 초과했습니다. 담당자·기한 조건을 좁혀 다시 생성하세요.')
     if not rows:lines.append('조건에 맞는 미처리 업무 없음')
+    return {'owner':owner,'until':until,'text':'\n'.join(lines)}
+
+
+def shift_summary(c,path,fields,clock=None):
+    report=shift_report(c,fields,clock);owner,until=report['owner'],report['until']
     query='<form method="get" action="'+escape(path)+'"><label>교대 업무 담당자<input name="handover_owner" maxlength="60" value="'+escape(owner)+'"></label><label>이 날짜까지의 기한<input type="date" name="handover_until" value="'+escape(until)+'"></label><button>교대 요약 갱신</button></form>'
-    return '<section class="shift-summary copy-panel"><h2>교대 미처리 업무 요약</h2><p>전체 주문의 미처리 업무만 포함합니다. 화면 생성 시점의 기록이며 고객 정보 대신 주문번호로 인계합니다. 담당자·기한 조건은 이 요약에만 적용합니다.</p>'+query+'<label>직원 내부 전달용<textarea class="copy-field shift-text" readonly>'+escape('\n'.join(lines))+'</textarea></label><button type="button" data-copy-field>교대 요약 복사</button></section>'
+    return '<section class="shift-summary copy-panel"><h2>교대 미처리 업무 요약</h2><p>전체 주문의 미처리 업무만 포함합니다. 화면 생성 시점의 기록이며 고객 정보 대신 주문번호로 인계합니다. 담당자·기한 조건은 이 요약에만 적용합니다.</p>'+query+'<p><a class="shift-download" href="'+escape(path+'/shift-summary.txt?'+urlencode({'handover_owner':owner,'handover_until':until}))+'">교대 요약 파일 다운로드</a> · 직원 내부용 · 다운로드 시점의 최신 기록</p><label>직원 내부 전달용<textarea class="copy-field shift-text" readonly>'+escape(report['text'])+'</textarea></label><button type="button" data-copy-field>교대 요약 복사</button></section>'
 
 
 SCRIPT=r'''

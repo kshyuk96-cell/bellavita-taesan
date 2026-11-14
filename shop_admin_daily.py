@@ -9,6 +9,7 @@ import shop_admin_queries
 import shop_admin_workflow as workflow
 import order_amendments
 import shop_admin_team as team
+import shop_admin_shortcuts as shortcuts
 
 SEOUL=ZoneInfo('Asia/Seoul')
 STATES={'open':'미처리','done':'처리 완료'}
@@ -61,7 +62,7 @@ def task_board(c,path,clock=now):
     overdue=c.execute("SELECT count(*) FROM shop_operator_tasks WHERE state='open' AND due<?",(current,)).fetchone()[0]
     body='<section class="task-board"><h2>미처리 업무</h2><p>업무 담당자는 배송 담당 배정과 별도입니다. 한국 시간 기준 · 미처리 '+str(total)+'건 / 기한 초과 '+str(overdue)+'건 · 우선순위·기한순 최대 50건 표시</p><p><a href="'+escape(path+'?task=open#admin-orders')+'">미처리 업무 주문 전체 보기</a> · <a href="'+escape(path+'?task=overdue#admin-orders')+'">기한 초과 주문 보기</a></p>'
     for task in c.execute("SELECT * FROM shop_operator_tasks WHERE state='open' ORDER BY "+team.PRIORITY_SQL+",due,id LIMIT 50"):
-        body+='<p><a href="'+escape(path+'?order='+task['order_id']+'#order-'+task['order_id'])+'">'+escape(task['title'])+'</a> · '+team.PRIORITIES[task['priority']]+' · '+escape(task['owner'])+' · '+escape(task['due'].replace('T',' '))+(' · 기한 초과' if task['due']<current else '')+'</p>'
+        body+='<p><a href="'+escape(path+'?order='+task['order_id']+'#order-'+task['order_id'])+'">'+escape(task['title'])+'</a> · '+team.PRIORITIES[task['priority']]+' · '+escape(task['owner'])+' · '+escape(task['due'].replace('T',' '))+(' · 기한 초과' if task['due']<current else '')+'</p>'+shortcuts.quick_form(path,task)
     return body+'</section>'
 
 
@@ -78,7 +79,7 @@ def tasks(c,row,path):
     records=c.execute("SELECT * FROM shop_operator_tasks WHERE order_id=? ORDER BY (state='open') DESC,"+team.PRIORITY_SQL+",due,id LIMIT 50",(oid,)).fetchall()
     for record in records:
         task=dict(record);fields=workflow.hidden('order_id',oid)+workflow.hidden('task_id',task['id'])+workflow.hidden('task_version',task['version'])+task_fields(task)
-        body+='<details><summary>'+escape(team.PRIORITIES[task['priority']]+' · '+task['title']+' · '+task['owner']+' · '+STATES[task['state']]+' · '+task['due'].replace('T',' '))+'</summary>'+workflow.form(path,'save_operator_task',fields,'업무 변경 저장')+'<h4>변경 이력 · 최근 10회</h4>'
+        body+='<details><summary>'+escape(team.PRIORITIES[task['priority']]+' · '+task['title']+' · '+task['owner']+' · '+STATES[task['state']]+' · '+task['due'].replace('T',' '))+'</summary>'+shortcuts.quick_form(path,task)+workflow.form(path,'save_operator_task',fields,'업무 변경 저장')+'<h4>변경 이력 · 최근 10회</h4>'
         for event in c.execute('SELECT * FROM shop_operator_task_events WHERE task_id=? ORDER BY version DESC LIMIT 10',(task['id'],)):
             data=json.loads(event['details']);body+='<p>'+escape(event['created'][:16]+' · '+team.PRIORITIES[data.get('priority','normal')]+' · '+data['title']+' · '+data['owner']+' · '+data['due']+' · '+STATES[data['state']]+' · '+data['note'])+'</p>'
         body+='</details>'

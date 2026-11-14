@@ -3,6 +3,7 @@ from lxml import html
 import shop_admin_queries
 import shop_product_guidance
 import shop_admin_team
+import shop_admin_feature_search
 
 
 def render(page,readiness,*,path='',filters=None,saved=False):
@@ -13,11 +14,12 @@ def render(page,readiness,*,path='',filters=None,saved=False):
         heading=html.Element('h2',attrib={'class':'admin-group-title'});heading.text=labels[key];group.append(heading)
     for section in list(main.xpath('./section')):
         heading=''.join(section.xpath('./h2[1]//text()')).strip()
+        section.set('data-admin-feature-title',heading)
         product_form=bool(section.xpath('.//input[@name="action" and (@value="save_product" or @value="issue_offers")]'))
         key=('products' if product_form else 'orders' if heading in ('운영 현황판','쇼핑몰 주문·결제 내역','저장 검색','행사 빠른 보기','미처리 업무','교대 미처리 업무 요약') else
             'delivery' if heading in ('배송 일정표','담당자 일괄 배정 · CSV 사전 검토','담당 배정 CSV · 사전 검토') or '배정' in heading or '일정' in heading else
             'reports' if '정산' in heading or '집계' in heading else
-            'settings' if heading in ('직원 주문 알림','외부 연동 진단','백업 누락·실패 안내','직원 교육','고객 응대 템플릿') else 'products')
+            'settings' if heading in ('직원 주문 알림','외부 연동 진단','백업 누락·실패 안내','직원 교육','고객 응대 템플릿','응대 문구 즐겨찾기') else 'products')
         groups[key].append(section)
     groups['settings'].insert(1,html.fragment_fromstring(readiness))
     nav=html.Element('nav',attrib={'class':'admin-nav','aria-label':'관리 업무 바로가기'})
@@ -30,6 +32,7 @@ def render(page,readiness,*,path='',filters=None,saved=False):
             ancestor=next((x for x in form.iterancestors() if x.get('id','').startswith('admin-')),None)
             form.append(html.Element('input',type='hidden',name='_return_anchor',value=ancestor.get('id') if ancestor is not None else 'admin-orders'))
     main.insert(2,nav)
+    main.insert(3,html.fragment_fromstring(shop_admin_feature_search.markup()))
     if saved:
         message=html.Element('p',attrib={'role':'status','class':'admin-saved'});message.text='저장 완료 · 현재 주문 상태와 다음 할 일을 확인해 주세요.';main.insert(3,message)
     status=html.Element('p',id='shop-action-status',attrib={'role':'status'});main.append(status)
@@ -46,8 +49,9 @@ def render(page,readiness,*,path='',filters=None,saved=False):
     style.text+='\n.admin-search{border:1px solid #dce3d8;padding:16px;border-radius:8px;background:#fafbf8}.search-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.order-tools{display:flex;gap:8px;flex-wrap:wrap;padding:10px 0}.copy-source{font-size:12px!important}.order-identity{display:block;font-size:13px;font-weight:400;color:#526351}.order-next{display:block;font-size:14px}.order-next,.admin-saved{border-left:3px solid #315840;padding:10px 12px;background:#edf3e9}.order-pagination{display:flex;gap:18px;padding:12px 0}@media(max-width:600px){.search-grid{grid-template-columns:1fr}}'
     style.text+='\n.saved-search{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.comparison-wrap{overflow-x:auto;max-width:100%}.comparison-wrap table{border-collapse:collapse;width:100%;table-layout:fixed}.comparison-wrap th,.comparison-wrap td{border:1px solid #dce3d8;padding:8px;vertical-align:top;overflow-wrap:anywhere;white-space:pre-wrap}.order-timeline,.operator-handover{border-top:1px solid #dce3d8;margin-top:18px;padding:12px 0}.product-diff{padding:12px;background:#f3f7ef;margin:12px 0}'
     style.text+='\n.order-focus{padding:16px;background:#f4f8ef;border:1px solid #dce3d8;border-radius:10px}.order-focus dl{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px}.order-focus dd{margin:0}.preserve-lines{white-space:pre-wrap}.shift-text{min-height:220px}.response-text{min-height:180px}.order-reference{margin:16px 0}@media(max-width:600px){.order-focus dl{grid-template-columns:1fr}.order-focus dd{margin-bottom:10px}}'
+    style.text+='\n.product-note-preview{padding:12px;background:#f4f8ef;border-left:3px solid #315840;margin:14px 0}.quick-task{margin:8px 0}.favorite-item{padding:10px 0;border-bottom:1px solid #dce3d8}#admin-feature-results{display:flex;gap:8px;flex-wrap:wrap}.admin-feature-search{scroll-margin-top:110px}details,aside{scroll-margin-top:110px}'
     tree.append(style)
-    script=html.Element('script');script.text=SCRIPT+shop_product_guidance.SCRIPT+shop_admin_team.SCRIPT;tree.append(script)
+    script=html.Element('script');script.text=SCRIPT+shop_product_guidance.SCRIPT+shop_admin_team.SCRIPT+shop_admin_feature_search.SCRIPT;tree.append(script)
     return '<!doctype html>'+html.tostring(tree,encoding='unicode',method='html')
 
 

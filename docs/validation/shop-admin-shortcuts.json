@@ -1,0 +1,39 @@
+{
+  "scenarios": [
+    {
+      "width": 375,
+      "quick_done_and_reopen": true,
+      "shared_favorite_sorted_and_prefilled": true,
+      "note_preview_bounded_and_detail_closed": true,
+      "feature_search_opens_detail_without_post": true,
+      "unknown_feature_empty_result": true,
+      "filtered_shift_file_download": true,
+      "financial_state_preserved": true,
+      "overflow": false
+    },
+    {
+      "width": 1280,
+      "quick_done_and_reopen": true,
+      "shared_favorite_sorted_and_prefilled": true,
+      "note_preview_bounded_and_detail_closed": true,
+      "feature_search_opens_detail_without_post": true,
+      "unknown_feature_empty_result": true,
+      "filtered_shift_file_download": true,
+      "financial_state_preserved": true,
+      "overflow": false
+    }
+  ],
+  "javascript_errors": [],
+  "live_side_effects": false,
+  "unit_tests": {
+    "passed": 160
+  },
+  "focused_tests": {
+    "passed": 5
+  },
+  "previous_team_browser": "passed: 375/1280",
+  "daily_admin_browser": "passed: 375/1280",
+  "catalog_browser": "passed: 375/1280",
+  "prechange_backup_restore": "passed",
+  "hosted_verification": "pending"
+}
