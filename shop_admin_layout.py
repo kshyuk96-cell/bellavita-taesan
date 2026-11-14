@@ -1,6 +1,7 @@
 """Arrange existing controls by operator task without changing their actions."""
 from lxml import html
 import shop_admin_queries
+import shop_product_guidance
 
 
 def render(page,readiness,*,path='',filters=None,saved=False):
@@ -12,10 +13,10 @@ def render(page,readiness,*,path='',filters=None,saved=False):
     for section in list(main.xpath('./section')):
         heading=''.join(section.xpath('./h2[1]//text()')).strip()
         product_form=bool(section.xpath('.//input[@name="action" and (@value="save_product" or @value="issue_offers")]'))
-        key=('products' if product_form else 'orders' if heading in ('운영 현황판','쇼핑몰 주문·결제 내역','저장 검색') else
+        key=('products' if product_form else 'orders' if heading in ('운영 현황판','쇼핑몰 주문·결제 내역','저장 검색','행사 빠른 보기','미처리 업무') else
             'delivery' if heading in ('배송 일정표','담당자 일괄 배정 · CSV 사전 검토','담당 배정 CSV · 사전 검토') or '배정' in heading or '일정' in heading else
             'reports' if '정산' in heading or '집계' in heading else
-            'settings' if heading in ('직원 주문 알림','외부 연동 진단','백업 누락·실패 안내') else 'products')
+            'settings' if heading in ('직원 주문 알림','외부 연동 진단','백업 누락·실패 안내','직원 교육') else 'products')
         groups[key].append(section)
     groups['settings'].insert(1,html.fragment_fromstring(readiness))
     nav=html.Element('nav',attrib={'class':'admin-nav','aria-label':'관리 업무 바로가기'})
@@ -44,7 +45,7 @@ def render(page,readiness,*,path='',filters=None,saved=False):
     style.text+='\n.admin-search{border:1px solid #dce3d8;padding:16px;border-radius:8px;background:#fafbf8}.search-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.order-tools{display:flex;gap:8px;flex-wrap:wrap;padding:10px 0}.copy-source{font-size:12px!important}.order-identity{display:block;font-size:13px;font-weight:400;color:#526351}.order-next{display:block;font-size:14px}.order-next,.admin-saved{border-left:3px solid #315840;padding:10px 12px;background:#edf3e9}.order-pagination{display:flex;gap:18px;padding:12px 0}@media(max-width:600px){.search-grid{grid-template-columns:1fr}}'
     style.text+='\n.saved-search{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.comparison-wrap{overflow-x:auto;max-width:100%}.comparison-wrap table{border-collapse:collapse;width:100%;table-layout:fixed}.comparison-wrap th,.comparison-wrap td{border:1px solid #dce3d8;padding:8px;vertical-align:top;overflow-wrap:anywhere;white-space:pre-wrap}.order-timeline,.operator-handover{border-top:1px solid #dce3d8;margin-top:18px;padding:12px 0}.product-diff{padding:12px;background:#f3f7ef;margin:12px 0}'
     tree.append(style)
-    script=html.Element('script');script.text=SCRIPT;tree.append(script)
+    script=html.Element('script');script.text=SCRIPT+shop_product_guidance.SCRIPT;tree.append(script)
     return '<!doctype html>'+html.tostring(tree,encoding='unicode',method='html')
 
 
@@ -53,10 +54,10 @@ SCRIPT="""
 const status=document.getElementById('shop-action-status');
 if(/^#product-[a-f0-9]{32}$/.test(location.hash)){const section=document.getElementById(location.hash.slice(1));const detail=section?.querySelector('details');if(detail)detail.open=true;}
 if(document.querySelector('.admin-saved')&&/^#order-[a-f0-9]{32}$/.test(location.hash)&&!document.getElementById(location.hash.slice(1))){const link=document.createElement('a');link.href=location.pathname+'?order='+location.hash.slice(7)+location.hash;link.textContent=' 변경한 주문 바로 열기';document.querySelector('.admin-saved').append(link);}
-for(const button of document.querySelectorAll('[data-copy-order],[data-copy-link]'))button.addEventListener('click',async()=>{
- const value=button.dataset.copyOrder||button.dataset.copyLink;
+for(const button of document.querySelectorAll('[data-copy-order],[data-copy-link],[data-copy-summary]'))button.addEventListener('click',async()=>{
+ const value=button.dataset.copyOrder||button.dataset.copyLink||button.dataset.copySummary;
  try{if(!navigator.clipboard)throw Error('clipboard');await navigator.clipboard.writeText(value);status.textContent='복사했습니다. 해당 주문 담당자·주문자에게만 전달하세요.';button.textContent='복사 완료';}
- catch(error){const source=button.closest('.order-tools').querySelector('.copy-source');if(source){source.value=value;source.focus();source.select();}status.textContent='복사할 내용을 선택했습니다. 직접 복사해 주세요.';}
+ catch(error){const source=button.dataset.copySummary?button.closest('.customer-summary').querySelector('.summary-source'):button.closest('.order-tools').querySelector('.copy-source');if(source){source.value=value;source.focus();source.select();}status.textContent='복사할 내용을 선택했습니다. 직접 복사해 주세요.';}
 });
 for(const input of document.querySelectorAll('input[name=action][value=save_product]')){
  const form=input.form;if(!form.querySelector('[name=product_id]'))continue;

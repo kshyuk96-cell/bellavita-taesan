@@ -25,6 +25,8 @@ import shop_readiness
 import external_backups
 import shop_admin_queries
 import shop_admin_workflow
+import shop_admin_daily
+import shop_admin_training
 
 ADMIN_PATH = re.compile(r'/shop/admin/([0-9]{10})/([a-f0-9]{64})')
 ORDER_PATH = re.compile(r'/shop/order/([a-f0-9]{32})')
@@ -45,6 +47,7 @@ def admin_authorized(expiry, signature, secret):
 def setup(connection):
     external_backups.setup(connection)
     shop_admin_workflow.setup(connection)
+    shop_admin_daily.setup(connection)
     connection.execute("""CREATE TABLE IF NOT EXISTS shop_products (
         id TEXT PRIMARY KEY, details TEXT NOT NULL, revision INTEGER NOT NULL)""")
     connection.execute("""CREATE TABLE IF NOT EXISTS shop_offers (
@@ -76,6 +79,7 @@ def image_url(value):
 
 def choices(text, *, priced=False):
     result = {}
+    seen=set()
     for line in text.splitlines():
         line = line.strip()
         if not line:
@@ -90,6 +94,9 @@ def choices(text, *, priced=False):
             label, amount = line, 0
         if not label or len(label) > 300 or len(result) >= 60:
             raise ValueError('옵션은 최대 60개, 이름은 300자까지 입력할 수 있어요.')
+        normalized=' '.join(label.casefold().split())
+        if normalized in seen:raise ValueError('같은 이름의 선택지가 있습니다: '+label+' · 이름을 구분해 주세요.')
+        seen.add(normalized)
         result[str(len(result) + 1)] = {'label': label, 'amount': amount, 'custom': False}
     if not result:
         raise ValueError('옵션을 한 개 이상 입력해 주세요.')
@@ -138,6 +145,9 @@ def save_product(connection, fields):
             {'label': '축하 문구', 'choices': greetings},
             {'label': '받으시는 분', 'choices': choices('신랑측\n신부측\n행사 주최측')},
         ]
+    group_names=[' '.join(group['label'].casefold().split()) for group in details['groups']]
+    if len(set(group_names))!=len(group_names):raise ValueError('옵션 묶음 이름이 중복됩니다. 서로 다른 이름으로 입력하세요.')
+    if details['price']+sum(max(v['amount'] for v in g['choices'].values()) for g in details['groups'])>PRICE_LIMIT:raise ValueError('옵션 포함 최대 판매금액은 1억원까지입니다.')
     if fields.get('catalog_edit')=='1':
         details.update(public=fields.get('public')=='yes',available=fields.get('available')=='yes',category=fields.get('category','').strip()[:80],description=fields.get('description','').strip()[:1200])
     data = json.dumps(details, ensure_ascii=False)
@@ -367,7 +377,7 @@ def admin_page(connection, path, origin, fields=None, root=None):
         search_text=' '.join(str(value) for value in (row['id'],order['buyer'],order['buyer_phone'],order['sender'],order['message'],order['title'],order['venue']))
         orders.append(f'<li id="order-{row["id"]}" data-shop-order="{row["id"]}" data-search="{escape(search_text)}" data-queues="{",".join(shop_dashboard.categories(connection,row))}"><details><summary>{escape(order["title"])} · {order["amount"]:,}원 · '
                       f'{STATES.get(row["state"], "확인 필요")} · 주문 {row["id"]}<small class="order-identity">주문자 {escape(order["buyer"])} · 행사 {escape(order["event_time"][:16].replace("T"," "))}</small><span class="order-next">{escape(shop_dashboard.next_action(connection,row))}</span></summary>'
-                      f'<div class="order-tools"><button type="button" data-copy-order="{row["id"]}">주문번호 복사</button><button type="button" data-copy-link="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}">고객 상태 링크 복사</button><input class="copy-source" readonly aria-label="복사할 값" value="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}"></div><dl>{content}</dl>{check_form}' + shop_admin_workflow.timeline(connection,row) + order_ops.controls(connection, row, path) + shop_admin_workflow.handover(connection,row,path) + '</details></li>')
+                      f'<div class="order-tools"><button type="button" data-copy-order="{row["id"]}">주문번호 복사</button><button type="button" data-copy-link="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}">고객 상태 링크 복사</button><input class="copy-source" readonly aria-label="복사할 값" value="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}"></div><dl>{content}</dl>{check_form}' + shop_admin_daily.summary_tools(connection,row) + shop_admin_workflow.timeline(connection,row) + order_ops.controls(connection, row, path) + shop_admin_workflow.handover(connection,row,path) + shop_admin_daily.tasks(connection,row,path) + '</details></li>')
 
     notification_settings = ('<section><h2>직원 주문 알림</h2>'
         + form('save_notifications', field('알림 받을 직원 휴대폰 · 쉼표 또는 줄바꿈으로 구분', 'staff_phones',
@@ -388,7 +398,7 @@ def admin_page(connection, path, origin, fields=None, root=None):
       input[type=checkbox]{display:inline;width:auto}
       a{color:#204c36}summary{cursor:pointer;padding:6px 0}small{overflow-wrap:anywhere}li{margin-bottom:12px}
       dd{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 8px}dt{font-weight:bold}</style>
-      <main><h1>벨라비타 쇼핑몰 관리</h1><p><a href="/shop">고객 쇼핑몰 보기</a></p>''' + shop_dashboard.panel(connection,selected_rows) + shop_admin_workflow.searches(connection,path,result_meta['filters']) + shop_admin_workflow.backups(connection) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + assignment_batches.panel(connection,path) + shop_sales.panel(connection,path,fields) + '''<section><h2>새 상품 등록</h2>'''
+      <main><h1>벨라비타 쇼핑몰 관리</h1><p><a href="/shop">고객 쇼핑몰 보기</a></p>''' + shop_dashboard.panel(connection,selected_rows) + shop_admin_daily.quick_dates(connection,path) + shop_admin_daily.task_board(connection,path) + shop_admin_training.entry(path) + shop_admin_workflow.searches(connection,path,result_meta['filters']) + shop_admin_workflow.backups(connection) + shop_dispatch.schedule_panel(connection,path,fields) + shop_settlement.panel(path,fields) + shop_diagnostics.panel(connection,path,root or '.') + assignment_batches.panel(connection,path) + shop_sales.panel(connection,path,fields) + '''<section><h2>새 상품 등록</h2>'''
       + form('save_product', product_fields({}), '상품 등록') + '</section>' + notification_settings
       + ''.join(products) + '<section><h2>행사별 주문 링크</h2>'
       + ('<ul>' + ''.join(offers) + '</ul>' if offers else '<p>발급된 링크가 없어요.</p>')

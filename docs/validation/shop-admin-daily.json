@@ -1,0 +1,41 @@
+{
+  "scenarios": [
+    {
+      "width": 375,
+      "seoul_today_link": true,
+      "task_create_and_complete": true,
+      "overdue_owner_filter": true,
+      "payment_state_preserved": true,
+      "customer_summary_excludes_internal_note": true,
+      "clipboard_fallback": true,
+      "duplicate_and_negative_option_validation": true,
+      "training_five_cases_and_reset": true,
+      "training_posts": 0,
+      "overflow": false
+    },
+    {
+      "width": 1280,
+      "seoul_today_link": true,
+      "task_create_and_complete": true,
+      "overdue_owner_filter": true,
+      "payment_state_preserved": true,
+      "customer_summary_excludes_internal_note": true,
+      "clipboard_fallback": true,
+      "duplicate_and_negative_option_validation": true,
+      "training_five_cases_and_reset": true,
+      "training_posts": 0,
+      "overflow": false
+    }
+  ],
+  "javascript_errors": [],
+  "live_side_effects": false,
+  "unit_tests": {
+    "passed": 149
+  },
+  "focused_tests": {
+    "passed": 5
+  },
+  "previous_admin_workflow_browser": "passed: 375/1280",
+  "catalog_browser": "passed: 375/1280",
+  "hosted_verification": "pending"
+}
