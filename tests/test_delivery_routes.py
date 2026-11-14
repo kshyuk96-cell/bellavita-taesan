@@ -35,12 +35,13 @@ class WeekendDeliveryTests(unittest.TestCase):
 
             now = datetime(2026, 11, 15, 9, tzinfo=ZoneInfo('Asia/Seoul'))
             day = '2026-11-15'
-            calculator = Mock(return_value={day: {'routes': [], 'missed': [], 'held': 0}})
+            calculator = Mock(return_value=({day: {'routes': [], 'missed': [], 'held': 0}}, {}))
             with patch.object(delivery_routes, 'calculate', calculator):
                 result = delivery_routes.run('이번 주말', '가상직원', db, Mock(), now)
 
             self.assertEqual(calculator.call_args.args[0]['days'], [day])
             self.assertEqual(list(result['route_report']), [day])
+            self.assertEqual(result['route_board'], {})
             self.assertEqual(delivery_routes.session(db, '가상직원')['days'], [day])
             self.assertIsNone(delivery_routes.session(db, '다른직원'))
             with self.assertRaisesRegex(ValueError, '오늘 이후'):

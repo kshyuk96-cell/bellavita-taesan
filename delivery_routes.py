@@ -1,4 +1,5 @@
 """Read-only delivery planning and per-employee conversation state."""
+import hashlib
 import json
 import os
 import re
@@ -15,8 +16,10 @@ SCRIPT = Path(__file__).with_name('delivery') / 'run.js'
 EPOCH = date(1899, 12, 30)
 ROAD = re.compile(r'(?:서울(?:특별시)?|인천(?:광역시)?|경기(?:도)?|충남|충청남도)\s+[^(),\n]{0,55}?(?:대로|번길|로|길)\s*\d+(?:-\d+)?')
 FOLLOW = re.compile(r'다시.{0,8}(?:짜|계산|돌려)|재계산|(?:10\s*(?:km|키로|킬로미터)|이동\s*시간).*(?:시간|분)|(?:[가-힣]{2,3}(?:님|은|는|을|를)?|\d+번)\s*(?:빼고|제외)|(?:\d+번|이동\s*시간).*(?:시간|분)|배송원\s*전원|(?:조건|제외)\s*초기화|모두\s*투입', re.I)
+COMPARE = re.compile(r'(?:(?:아까|최근|저장한|직전)\s*)?(?:구로\s*)?배송\s*(?:루트|동선)(?:에서|랑|와|의)?\s*(?:뭐가\s*바뀌었(?:어|나요)|바뀐\s*거(?:\s*있어)?|변경(?:\s*(?:사항|비교|확인))?|차이(?:\s*(?:보여\s*줘|확인))?|비교(?:해\s*줘)?)[.!?]?')
 GURO_ADDRESS = '서울 구로구 디지털로31길 62, 816호'
 GURO_POINT = [37.4863155666722, 126.892484748869]
+BOARD_RANGES = ("'배송관리'!A3:D", "'배송관리'!G3:G", "'배송관리'!K3:K", "'배송관리'!O3:O")
 
 
 def setup(connection):
@@ -181,17 +184,70 @@ def lookup_point(address, key, deadline):
     return None
 
 
+def board_rows(view, channels, done, owners, days):
+    if (view[:1] != [['주문번호', '배송일', '행사시간', '배송주소']] or channels[:1] != [['배송채널']]
+            or owners[:1] != [['배송원']] or done[:1] != [['배송 완료']]):
+        raise ValueError('배송관리의 열 제목을 확인해 주세요.')
+    wanted = {(date.fromisoformat(day) - EPOCH).days for day in days}
+    return [(i, row) for i, row in enumerate(view[1:], 1) if value(row, 1) in wanted and value(row, 0)]
+
+
+def board_snapshot(selected, channels, done, owners):
+    by_day = {}
+    for i, row in selected:
+        channel = clean(value(value(channels, i), 0))
+        number = clean(value(row, 0))
+        if channel not in ('구로', '구로센터') or not re.fullmatch(r'[1-9][0-9]{0,5}', number):
+            continue
+        day = (EPOCH + timedelta(days=row[1])).isoformat()
+        entries = by_day.setdefault(day, {})
+        flag = value(value(done, i), 0)
+        assigned = bool(clean(value(value(owners, i), 0)))
+        address = clean(value(row, 3))
+        event = minute(value(row, 2))
+        if number in entries or type(flag) is not bool:
+            entries[number] = None
+        else:
+            address_key = hashlib.sha256(address.encode()).hexdigest() if address else None
+            entries[number] = [event, address_key, not flag and not assigned]
+    return by_day
+
+
+def compare_saved(result, read):
+    baseline = result.get('route_board')
+    days = result.get('route_report', {})
+    if baseline is None or not days:
+        return '최근 배정안에는 비교할 기록이 없어요. 배송루트를 한 번 계산한 뒤 다시 확인해 주세요.'
+    view, channels, done, owners = read(BOARD_RANGES)
+    selected = board_rows(view, channels, done, owners, days)
+    current = board_snapshot(selected, channels, done, owners)
+    lines = []
+    for day in days:
+        before, after = baseline.get(day, {}), current.get(day, {})
+        added = {number for number in after.keys() - before.keys() if after[number] and after[number][2]}
+        common = before.keys() & after.keys()
+        uncertain = {number for number, row in after.items() if row is None}
+        uncertain.update(number for number in common if before[number] is None)
+        changed = {number for number in common - uncertain if before[number][:2] != after[number][:2]}
+        missing = {number for number in before.keys() - after.keys() if before[number] and before[number][2]}
+        pending = {number for number, row in after.items() if row and row[2]}
+        lines.append(f'{day[5:]} 구로 배송관리 · 현재 미배정 {len(pending)}건')
+        for label, numbers in (('새로 보이는 미배정 번호', added), ('행사시간·장소 변경', changed),
+                               ('목록에서 빠진 번호', missing), ('상태 확인 필요', uncertain)):
+            if numbers:
+                first = ', '.join(f'{number}번' for number in sorted(numbers, key=int)[:5])
+                lines.append(f'{label} {len(numbers)}건 · {first}')
+    lines.append('주문번호는 행 이동으로 바뀔 수 있어요. 새로 보이거나 빠진 번호는 원장과 대조해 주세요.')
+    return '\n'.join(lines)
+
+
 def workbook(read, days):
-    base_ranges = ["'배송관리'!A3:D", "'배송관리'!G3:G", "'배송관리'!K3:K", "'배송관리'!O3:O",
-                   "'배송비DB'!A1:V", "'배송상태DB'!A2:C", "'배송원DB'!A1:A", "'배송원DB'!E1:M",
+    base_ranges = [*BOARD_RANGES, "'배송비DB'!A1:V", "'배송상태DB'!A2:C", "'배송원DB'!A1:A", "'배송원DB'!E1:M",
                    "'배송센터DB'!A1:C", "'배송채널DB'!A1:D"]
     view, channels, done, owners, fees, statuses, names, workers, centers, mapping = read(base_ranges)
-    if (view[:1] != [['주문번호', '배송일', '행사시간', '배송주소']] or channels[:1] != [['배송채널']]
-            or owners[:1] != [['배송원']] or done[:1] != [['배송 완료']]
-            or not fees or value(fees[0], 21) != '직접 입력 배송원' or names[:1] != [['배송원명']]):
-        raise ValueError('배송관리 또는 배송원DB의 열 제목이 바뀌었어요. 시트 설정을 확인해 주세요.')
-    wanted = {(date.fromisoformat(day) - EPOCH).days for day in days}
-    selected = [(i, row) for i, row in enumerate(view[1:], 1) if value(row, 1) in wanted and value(row, 0)]
+    if not fees or value(fees[0], 21) != '직접 입력 배송원' or names[:1] != [['배송원명']]:
+        raise ValueError('배송비DB 또는 배송원DB의 열 제목을 확인해 주세요.')
+    selected = board_rows(view, channels, done, owners, days)
     if len(selected) > 160:
         raise ValueError('한 번에 확인할 배송 건이 많아요. 배송 날짜를 하루씩 말씀해 주세요.')
     indices = sorted({int(row[0]) for _, row in selected if re.fullmatch(r'[1-9]\d{0,5}', clean(row[0])) and int(row[0]) >= 5})
@@ -207,6 +263,7 @@ def workbook(read, days):
 def calculate(settings, today, now, read, db):
     days = settings['days']
     channels, done, owners, fees, statuses, names, roster, mapping, selected, ledger, origin = workbook(read, days)
+    snapshot = board_snapshot(selected, channels, done, owners)
     fees = index_rows(fees[1:])
     statuses = index_rows(statuses)
     channel_center = {clean(row[0]): clean(value(row, 1)) for row in mapping[1:]
@@ -255,8 +312,8 @@ def calculate(settings, today, now, read, db):
     active_orders = {o['order'] for items in orders.values() for o in items}
     if (set(settings['manualTimes']) | set(settings['skipOrders'])) - active_orders:
         raise ValueError('현재 배송일의 구로 미배정 목록에서 주문번호를 찾지 못했어요.')
-    return {day: plan_day(settings, day, today, now, orders[day], busy[day], names, roster, points, origin, db)
-            for day in days}
+    return ({day: plan_day(settings, day, today, now, orders[day], busy[day], names, roster, points, origin, db)
+             for day in days}, snapshot)
 
 
 def resolve_points(addresses, points, db):
@@ -359,7 +416,8 @@ def run(message, owner, db, read, now):
     settings = settings_for(message, previous, now.date())
     if any(day < now.date().isoformat() for day in settings['days']):
         raise ValueError('오늘 이후 배송 날짜를 말씀해 주세요.')
-    result = calculate(settings, now.date(), now.hour * 60 + now.minute, read, db) if settings['days'] else None
+    result, board = (calculate(settings, now.date(), now.hour * 60 + now.minute, read, db)
+                     if settings['days'] else (None, None))
     with db() as conn:
         conn.execute('''INSERT INTO route_sessions VALUES (?, ?, ?)
             ON CONFLICT(owner) DO UPDATE SET changed=excluded.changed,settings=excluded.settings''',
@@ -376,5 +434,5 @@ def run(message, owner, db, read, now):
         page = f'{page}\n{line}' if page else line
     if page:
         pages.append(page)
-    return {'summary': pages[0], 'route_pages': pages, 'route_report': result,
-            'route_buttons': ['다시 계산', '이동시간 10분 추가']}
+    return {'summary': pages[0], 'route_pages': pages, 'route_report': result, 'route_board': board,
+            'route_buttons': ['다시 계산', '이동시간 10분 추가', '배송루트 변경 확인']}
