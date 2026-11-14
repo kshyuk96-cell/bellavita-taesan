@@ -33,5 +33,20 @@
   "daily_admin_browser": "passed: 375/1280",
   "catalog_browser": "passed: 375/1280",
   "prechange_backup_restore": "passed",
-  "hosted_verification": "pending"
+  "hosted_verification": {
+    "hosted_ui": true,
+    "completed_owner_priority_search": true,
+    "due_soon_search": true,
+    "feature_favorite_after_redeploy": true,
+    "snapshot_hash_preserved_after_redeploy": true,
+    "launch_check_records_remain_separate_from_actual_validation": true,
+    "existing_order_states_preserved": true,
+    "order_count": 3,
+    "integrity": "ok",
+    "mount_verified": true,
+    "new_tables_restore_verified": true,
+    "manual_matches_source": true,
+    "live_side_effects": false
+  },
+  "verified_commit": "21ddc31d07f385056a5c623c19088c1103eb4ba1"
 }
