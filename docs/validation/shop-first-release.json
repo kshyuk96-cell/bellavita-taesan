@@ -168,5 +168,32 @@
     "actual_message_deliveries": 0,
     "actual_receipts": 0,
     "operational_database_writes": false
+  },
+  "live_verification_followup": {
+    "product_features_added": 0,
+    "notification_channel_decision": "requested_pending",
+    "available_access": {
+      "render_service_metadata": true,
+      "render_environment_read": false,
+      "render_shell_execution": false,
+      "local_render_cli_authenticated": false,
+      "payapp_account_connection": false,
+      "solapi_account_connection": false,
+      "local_payapp_credentials_available": false,
+      "local_solapi_credentials_available": false,
+      "local_registered_sender_available": false
+    },
+    "storage_probe": {
+      "path": "tools/check_shop_storage.py",
+      "isolated_tests_passed": 2,
+      "inspected_environment": "isolated_restored_rehearsal_only",
+      "integrity": "ok",
+      "database_writes": false,
+      "external_requests": 0,
+      "production_run": false
+    },
+    "real_provider_verification_performed": false,
+    "production_settings_changed": false,
+    "previous_mock_success_reclassified_as_real_success": false
   }
 }
