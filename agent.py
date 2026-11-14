@@ -31,6 +31,7 @@ import order_intake
 import customer_orders
 import order_ledger
 import order_operations
+import order_lifecycle
 import order_sms
 import staff_features
 
@@ -845,6 +846,10 @@ def dispatch(body, defer_callback=None):
             order = order_operations.latest_intake(c, owner)
         if not order:
             return kakao('아직 직접 접수한 카톡 주문이 없어요.')
+        if order['state'] == 'cancel_requested':
+            return kakao('최근 카톡 주문은 취소 요청 상태예요. 시트·배송 취소 완료는 아직 미확인입니다.')
+        if order['state'] == 'update':
+            return kakao('최근 카톡 주문은 수정 요청을 보관했어요. 원장 반영은 아직 미확인입니다.')
         if order['state'] == 'saved':
             return kakao(f'최근 카톡 주문을 원장에 등록했어요. 주문번호는 {order["order_number"]}번이에요.')
         return kakao('최근 카톡 주문은 접수됐어요. 원장 등록은 아직 확인되지 않았어요.')
@@ -912,6 +917,10 @@ def dispatch(body, defer_callback=None):
     if message == '승인 대기' or re.fullmatch(
             r'(?:승인 검토|구조 변경 승인|구조 변경 반려) [a-f0-9]{12}', message):
         return approval_command(owner, message)
+    with ORDER_LOCK:
+        lifecycle_reply = order_lifecycle.command(db, owner, message)
+    if lifecycle_reply is not None:
+        return kakao(lifecycle_reply)
     try:
         message, customer_decision = customer_orders.prepare(message, ROOT / 'customer-memory.sqlite3')
     except ValueError as error:

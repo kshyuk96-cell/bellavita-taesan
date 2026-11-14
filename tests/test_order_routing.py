@@ -41,3 +41,22 @@ class OrderRoutingTests(unittest.TestCase):
                 link = 'https://salondeletter.com/w/qa-example'
                 self.assertIn('모의 초대장', str(dispatch(link)))
                 invitation.assert_called_once_with(link, owner)
+
+
+class LifecycleRoutingTests(unittest.TestCase):
+    def test_staff_cancellation_uses_lifecycle_without_new_job_or_sheet_write(self):
+        import order_operations
+        with tempfile.TemporaryDirectory() as temporary, patch.object(agent, 'ROOT', Path(temporary)):
+            owner='synthetic-staff'
+            with agent.db() as c:
+                c.execute('INSERT INTO staff VALUES (?,?,?)',(owner,'staff',time.time()))
+                order_operations.stage(c,'synthetic-parent',owner,'kakao','synthetic',{'sender':'모의회사'},order_operations.now())
+                c.execute("UPDATE order_operations SET state='saved',order_number=21380 WHERE id='synthetic-parent'")
+            with patch.object(agent,'write_order',side_effect=AssertionError('must not write')):
+                response=agent.dispatch({'userRequest':{'user':{'id':owner},'utterance':'주문 취소 21380'}})
+            self.assertIn('취소 요청',str(response));self.assertIn('미확인',str(response))
+            status=agent.dispatch({'userRequest':{'user':{'id':owner},'utterance':'주문 접수 상태'}})
+            self.assertIn('취소 요청 상태',str(status))
+            with agent.db() as c:
+                self.assertEqual(c.execute("SELECT state FROM order_operations WHERE id='synthetic-parent'").fetchone()[0],'cancel_requested')
+                self.assertEqual(c.execute('SELECT COUNT(*) FROM jobs').fetchone()[0],0)

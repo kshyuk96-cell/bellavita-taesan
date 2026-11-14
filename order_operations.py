@@ -101,6 +101,8 @@ def save(db, key, extract, write, after_save=None):
         row = c.execute('SELECT * FROM order_operations WHERE id=?', (key,)).fetchone()
     if row['state'] == 'saved':
         return row['order_number'], json.loads(row['details'])
+    if row['state'] not in ('pending', 'update'):
+        raise ValueError('취소 요청 또는 보류 상태의 주문은 자동 등록하지 않아요.')
     data = json.loads(row['details'])
     if not data and row['kind'] == 'kakao':
         data = extract(row['raw'])
