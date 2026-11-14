@@ -45,7 +45,7 @@
 
 ## 외부 백업
 
-Google Drive 폴더: https://drive.google.com/drive/folders/1WxBszLzEoGHphfE88AAma9f90nk_8oGi
+Google Drive 폴더: (비공개 백업 위치는 서버 설정과 관리자 검증 기록에서 확인)
 
 검증 서버의 인증된 내보내기에서 SQLite·파일 체크섬·복구 검증을 마친 스냅샷을 AES-256-GCM으로 암호화한다. 암호화 키는 검증 서비스 SHOP_BACKUP_ENCRYPTION_KEY에만 보관하고 저장소·백업 파일·로그에 넣지 않는다. 복구 키는 서버와 별개로 운영자가 관리해야 하며, 키를 잃으면 암호화 파일을 복구할 수 없다.
 
@@ -53,7 +53,7 @@ Google Drive 폴더: https://drive.google.com/drive/folders/1WxBszLzEoGHphfE88AA
 
 서버 자동 업로드 설정:
 - SHOP_EXTERNAL_BACKUP_ENABLED=1 (이번에는 0 유지)
-- SHOP_BACKUP_DRIVE_FOLDER: 위 폴더 ID
+- SHOP_BACKUP_DRIVE_FOLDER: 검증 전용 비공개 폴더 ID
 - SHOP_BACKUP_DRIVE_CREDENTIALS: 해당 폴더에만 권한을 부여한 별도 서비스 계정 파일
 - SHOP_BACKUP_ENCRYPTION_KEY: 32바이트 키의 64자리 16진수 문자열
 
@@ -72,7 +72,7 @@ python external_backups.py restore --file downloaded.bvbackup --destination /새
 코드 d0da05a, Render dep-dbs3p5brjlhs73d329ag가 live 된 뒤 검증했다.
 전체 135개 테스트, 375/1280px 관리자 메뉴·주문서, 기존 정정/AS/CSV/집계 브라우저 흐름과 암호화 내보내기 HTTP 리허설이 통과했다.
 
-Drive 백업 파일: https://drive.google.com/file/d/1su8lndnYiCyn8e4VBppIn_Jya0cJjJNe/view
+Drive 백업 파일: (비공개 백업 위치는 서버 설정과 관리자 검증 기록에서 확인)
 비공개 64,513바이트 암호화 파일을 저장하고 원본 바이트 재다운로드, SHA-256 비교, 실제 Render에서 복호화·임시 경로 복구를 확인했다. 기존 주문 3건·상품 4개와 무결성 검사가 통과했고 검증 이력을 관리자에 기록했다. 원본 DB를 덮어쓰지 않았다.
 
 실가맹점 키와 알림톡 4개 필수 설정·승인 템플릿·직원 번호, 4개 상품의 과세/면세 구분은 미확정으로 표시한다. 설정 완료로 가정해 실제 성공을 꾸미지 않는다. 실거래·실발송·국세청 발급은 실행하지 않았다.

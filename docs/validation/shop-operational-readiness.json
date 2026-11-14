@@ -14,8 +14,6 @@
   "drive_shared": false,
   "external_backup": {
     "provider": "google_drive",
-    "file_id": "1su8lndnYiCyn8e4VBppIn_Jya0cJjJNe",
-    "sha256": "f4401d439d179883b246c14c09389593b63e95603da16cb766d634fb0744011d",
     "encrypted": true,
     "download_verified": true,
     "remote_restore": {
