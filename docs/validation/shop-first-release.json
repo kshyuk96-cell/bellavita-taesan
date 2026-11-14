@@ -98,7 +98,12 @@
     "branch": "main",
     "disk_attached": true,
     "actual_data_path_verified": false,
-    "changed": false
+    "changed": false,
+    "configured_data_path": "/var/data",
+    "data_path_confirmation_source": "owner reported Environment value",
+    "configured_path_matches_known_disk_mount": true,
+    "runtime_database_and_files_verified": false,
+    "migration_required": "not_indicated_by_confirmed_configuration"
   },
   "monitoring": {
     "cpu_latest_percent": 0.24,
@@ -148,7 +153,7 @@
     {
       "id": "operational_storage_and_seed",
       "status": "pending",
-      "required": "verify actual main data path, backup before any migration, approved four-product seeding and display"
+      "required": "configured /var/data path owner-confirmed; runtime DB/invitations, read-only integrity, backup/restore and approved catalog seeding remain to verify"
     },
     {
       "id": "automatic_external_backup",
@@ -215,7 +220,8 @@
     "blogpay_cash_receipt": "owner reported prior automatic issuance; inheritance to independent shop unverified",
     "render_screenshot": "main 9474f6d live; TAESAN_DATA not shown",
     "main_integration_commit": "dde62cf8a34b1cec89f011fa512b87dd5121896b",
-    "production_changed": false
+    "production_changed": false,
+    "render_data_path": "/var/data; owner supplied Environment value; existing DB/files not yet inspected"
   },
   "latest_main_integration_regression": {
     "commit": "dde62cf8a34b1cec89f011fa512b87dd5121896b",
@@ -298,8 +304,8 @@
     "remaining_access": [
       "merchant API settings and test method",
       "SOLAPI account and approved template",
-      "actual production TAESAN_DATA",
-      "actual product tax classification"
+      "actual product tax classification",
+      "existing production DB/files inspection and backup/restore"
     ],
     "real_provider_executions": 0
   }
