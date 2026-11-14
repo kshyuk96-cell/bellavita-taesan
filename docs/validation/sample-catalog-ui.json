@@ -1,0 +1,10 @@
+{
+  "products": 5,
+  "seededOrders": 5,
+  "createdOrders": 5,
+  "priceAndWeightChecks": 5,
+  "deliveryFlows": 5,
+  "adminEditedOffer": true,
+  "javascriptErrors": [],
+  "scope": "jsdom logic checks; no browser rendering"
+}
