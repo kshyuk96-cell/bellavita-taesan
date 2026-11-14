@@ -25,24 +25,30 @@ class Panel:
         self.receiver=Receiver(STATE/'receiver.sqlite3')
         self.db=sqlite3.connect(STATE/'panel.sqlite3');setup(self.db)
         self.db.execute('CREATE TABLE IF NOT EXISTS room_baselines (id TEXT PRIMARY KEY,seen TEXT NOT NULL)');self.db.commit()
+        self.watch_process=None;self.review_signature=None
         self.root=tk.Tk();self.root.title('태산이 주문 테스트');self.root.geometry('920x760')
-        self.status=tk.StringVar(value='업무 PC 모드 · 백그라운드 수신 연결 미완료 · 주문 분석은 PC 안에서만 처리합니다.')
+        self.status=tk.StringVar(value='업무 PC 모드 · 등록한 열린 방의 백그라운드 OCR 감시 · 시트 쓰기 없음')
         ttk.Label(self.root,textvariable=self.status,wraplength=880).pack(pady=8)
         self.manual_mode=tk.BooleanVar(value=False)
         ttk.Checkbutton(self.root,text='직접 조작하는 테스트 허용 · 카톡 창과 클립보드를 사용합니다',variable=self.manual_mode).pack(anchor='w',padx=10)
         bar=ttk.Frame(self.root);bar.pack(fill='x',padx=10)
-        for label,action in [('고객방 설정',self.settings),('방 목록 새로고침',self.refresh),
-                             ('선택 방 읽기',self.capture),('연결 테스트',self.connect),
-                             ('검토용 주문서 공유',self.share_review)]:
+        for label,action in [('자동 감시 시작',self.start_watch),('감시 중지',self.stop_watch),('고객방 설정',self.settings),('방 목록 새로고침',self.refresh)]:
             ttk.Button(bar,text=label,command=lambda fn=action:self.guard(fn)).pack(side='left',padx=3)
-        self.room=tk.StringVar();self.rooms=ttk.Combobox(self.root,textvariable=self.room,state='readonly');self.rooms.pack(fill='x',padx=10,pady=8)
-        ttk.Label(self.root,text='서버 연결용 전용 키 (연결 테스트에서만 사용)').pack(anchor='w',padx=10)
-        self.key=tk.StringVar();ttk.Entry(self.root,textvariable=self.key,show='*').pack(fill='x',padx=10)
-        ttk.Label(self.root,text='주문 한 건을 붙여넣거나 새 메시지를 선택해 분석하세요.').pack(anchor='w',padx=10,pady=6)
+        ttk.Label(self.root,text='등록한 모든 열린 방을 자동 순회합니다. 방별 선택이나 주문 키 변경은 필요 없습니다.').pack(anchor='w',padx=10,pady=6)
+        self.manual_area=ttk.Frame(self.root)
+        self.manual_mode.trace_add('write',lambda *args:self.toggle_manual())
+        manual_buttons=ttk.Frame(self.manual_area);manual_buttons.pack(fill='x')
+        for label,action in [('선택 방 읽기',self.capture),('연결 테스트',self.connect),('검토용 주문서 공유',self.share_review)]:
+            ttk.Button(manual_buttons,text=label,command=lambda fn=action:self.guard(fn)).pack(side='left',padx=3)
+        self.room=tk.StringVar();self.rooms=ttk.Combobox(self.manual_area,textvariable=self.room,state='readonly');self.rooms.pack(fill='x',pady=5)
+        ttk.Label(self.manual_area,text='서버 연결용 전용 키 (수동 연결 테스트에서만 사용)').pack(anchor='w')
+        self.key=tk.StringVar();ttk.Entry(self.manual_area,textvariable=self.key,show='*').pack(fill='x')
+        ttk.Label(self.root,text='자동 감시 중 발견한 주문 후보는 아래에 표시됩니다. 직접 붙여넣기 분석도 가능합니다.').pack(anchor='w',padx=10,pady=6)
         self.input=tk.Text(self.root,height=10);self.input.pack(fill='both',expand=True,padx=10)
         ttk.Button(self.root,text='주문 분석 미리보기 · 시트 쓰기 없음',command=lambda:self.guard(self.analyze)).pack(pady=5)
         self.output=tk.Text(self.root,height=15,state='disabled');self.output.pack(fill='both',expand=True,padx=10,pady=6)
         self.root.protocol('WM_DELETE_WINDOW',self.close);self.refresh()
+        self.root.after(1000,self.watch_status)
     def guard(self,fn):
         try:fn()
         except Exception as e:
@@ -59,6 +65,53 @@ class Panel:
         if self.room.get() not in self.rooms['values']:self.room.set('')
     def settings(self):
         subprocess.Popen([sys.executable,str(ROOT/'room_settings.py'),'--config',str(self.config_path)])
+    def toggle_manual(self):
+        if self.manual_mode.get():self.manual_area.pack(fill='x',padx=10,before=self.input)
+        else:self.manual_area.pack_forget()
+    def start_watch(self):
+        if self.watch_process and self.watch_process.poll() is None:
+            self.status.set('이미 자동 감시 중입니다.');return
+        entries=validate_config(self.config())
+        if not entries:raise ValueError('처음 한 번 고객방을 등록하고 저장해 주세요.')
+        self.watch_process=subprocess.Popen([sys.executable,str(ROOT/'background_watch.py'),
+            '--config',str(self.config_path),'--state',str(STATE),'--interval','5'],
+            stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+        self.status.set('자동 감시 시작 · 등록한 방을 열어두세요. 최소화하지 않고 다른 창 뒤에 둘 수 있습니다.')
+    def stop_watch(self):
+        if self.watch_process and self.watch_process.poll() is None:
+            if os.name=='nt':
+                subprocess.run(['taskkill','/PID',str(self.watch_process.pid),'/T','/F'],
+                    capture_output=True,timeout=5,creationflags=subprocess.CREATE_NO_WINDOW)
+            else:self.watch_process.terminate()
+            self.watch_process.wait(timeout=5)
+        self.watch_process=None;self.status.set('자동 감시 중지')
+    def watch_status(self):
+        try:
+            if self.watch_process:
+                if self.watch_process.poll() is not None:
+                    self.status.set('감시 프로세스가 멈췄습니다.');self.watch_process=None
+                elif (STATE/'background-status.json').exists():
+                    data=json.loads((STATE/'background-status.json').read_text(encoding='utf-8'))
+                    labels={'baseline_saved':'기존 화면 제외','unchanged':'변화 없음','checked':'주문 변화 없음',
+                            'review_required':'주문 후보 검토 필요','error':'읽기 실패','unreadable':'본문 인식 실패'}
+                    status=' / '.join(r['room']+': '+labels.get(r['state'],r['state'])+
+                        (' '+r.get('error_type','')+' '+r.get('error_location','') if r['state']=='error' else '') for r in data.get('rooms',[]))
+                    self.status.set('자동 감시 · '+(status or '등록 방·설정 확인 필요'))
+                    database=STATE/'background-orders.sqlite3'
+                    if database.exists():
+                        with sqlite3.connect(database,timeout=.2) as c:
+                            rows=c.execute('SELECT id,scope,changed_text,result,sightings FROM ocr_reviews ORDER BY rowid DESC LIMIT 20').fetchall()
+                        allowed={json.dumps([e['id'],e['window_title']],ensure_ascii=False) for e in validate_config(self.config())}
+                        rows=[r for r in rows if r[1] in allowed]
+                        signature=tuple((r[0],r[4]) for r in rows)
+                        if signature!=self.review_signature:
+                            self.review_signature=signature
+                            self.show('\n\n'.join('방: '+json.loads(r[1])[1]+' / OCR 검토 필요\n'+
+                                json.loads(r[3])['text']+'\n'+json.loads(r[3])['warning'] for r in rows) or '새 주문 후보 대기 중')
+        except Exception:
+            self.status.set('감시 상태 갱신 대기 · 설정 또는 읽기 오류 확인 필요')
+        finally:self.root.after(1000,self.watch_status)
     def later(self,instruction,fn):
         self.status.set(instruction+' · 8초 뒤 실행합니다. 다른 조작은 잠시 멈춰주세요.')
         self.root.after(8000,lambda:self.guard(fn))
@@ -133,6 +186,7 @@ class Panel:
         self.show(review['body'])
         self.later('기획 방 아래 메시지 입력칸을 클릭하세요',lambda:self.send_once('review:'+m['order_id'],review['body']))
     def close(self):
+        self.stop_watch()
         self.key.set('');self.receiver.db.close();self.db.close();self.root.destroy()
 
 

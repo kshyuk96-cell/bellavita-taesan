@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 
-async def recognize(path):
+async def recognize(path,*,include_lines=False,save_text=True):
     import winrt.windows.foundation
     import winrt.windows.foundation.collections
     import winrt.windows.globalization
@@ -27,13 +27,22 @@ async def recognize(path):
     try:
         decoder=await BitmapDecoder.create_async(stream)
         bitmap=await decoder.get_software_bitmap_async()
-        converted=SoftwareBitmap.convert(bitmap,BitmapPixelFormat.BGRA8,BitmapAlphaMode.PREMULTIPLIED)
+        converted=SoftwareBitmap.convert_with_alpha(bitmap,BitmapPixelFormat.BGRA8,BitmapAlphaMode.PREMULTIPLIED)
         result=await engine.recognize_async(converted)
         output=path.with_name('background-ocr-test.txt')
-        output.write_text('\n'.join(line.text for line in result.lines),encoding='utf-8-sig')
-        return {'ocr_available':True,'language':korean.language_tag,
+        if save_text:output.write_text('\n'.join(line.text for line in result.lines),encoding='utf-8-sig')
+        report={'ocr_available':True,'language':korean.language_tag,
                 'recognized_lines':len(result.lines),'recognized_characters':len(result.text),
-                'text_path':str(output),'text_uploaded':False,'order_accuracy_verified':False}
+                'text_path':str(output) if save_text else None,'text_uploaded':False,'order_accuracy_verified':False}
+        if include_lines:
+            lines=[]
+            for line in result.lines:
+                boxes=[word.bounding_rect for word in line.words]
+                if not boxes:continue
+                lines.append({'text':line.text,'top':min(b.y for b in boxes),
+                              'bottom':max(b.y+b.height for b in boxes)})
+            report['lines']=lines
+        return report
     finally:
         for resource in (converted,bitmap,stream):
             close=getattr(resource,'close',None)
