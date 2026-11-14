@@ -47,7 +47,7 @@ def fixture(ranges):
         "'배송관리'!K3:K": [['배송 완료'], [True], [False], ['TRUE'], [False], [False], [False]],
         "'배송관리'!O3:O": [['배송원'], ['가상 직원'], [], ['교육용 담당'], [], [], []],
     }
-    data["'배송관리'!A3:C"] = [row[:3] for row in data["'배송관리'!A3:D"]]
+    data["'배송관리'!A3:A"] = [row[:1] for row in data["'배송관리'!A3:D"]]
     return [data[key] for key in ranges]
 
 
@@ -148,6 +148,40 @@ class StaffOperationsTests(unittest.TestCase):
         outputs = staff_photo.extract_numbers([URL], model, 'mock-model', fetch=lambda *_args, **_kwargs: BytesIO(stream.getvalue()))
         self.assertEqual(outputs, ['123', '456'])
         self.assertIs(model.responses.create.call_args.kwargs['store'], False)
+
+    def test_same_photo_respects_question_and_cannot_request_writes(self):
+        def photo(question):
+            body = payload(question)
+            body['action'] = {'params': {'secureimage': {'privacyAgreement': 'Y', 'secureUrls': [URL]}}}
+            return text(agent.dispatch(body))
+
+        with patch.dict(sys.modules, {'openai': SimpleNamespace(OpenAI=Mock())}), \
+             patch.object(staff_photo, 'extract_numbers', return_value=['101', '102', '103', '999']) as extract, \
+             patch.object(agent, 'choose') as choose:
+            complete = photo('완료된 것만 보여줘')
+            self.assertIn('배송 완료 1건 · 101번', complete)
+            self.assertIn('확인하지 못한 주문 2건', complete)
+            self.assertNotIn('102번', complete)
+            pending = photo('미완료만 보여줘')
+            self.assertIn('배송 미완료 1건 · 102번', pending)
+            self.assertNotIn('101번', pending)
+            all_statuses = photo('전부 보여줘')
+            self.assertIn('101번 · 완료', all_statuses)
+            self.assertIn('102번 · 미완료', all_statuses)
+            self.assertIn('배송 완료·미완료 상태를 조회', photo('주문 101번 완료 처리해 줘'))
+            self.assertEqual(extract.call_count, 3)
+            choose.assert_not_called()
+            with agent.db() as conn:
+                statuses = conn.execute('SELECT input FROM jobs').fetchall()
+            self.assertTrue(all(json.loads(row[0])['message'] == '사진으로 배송 확인' for row in statuses))
+
+    def test_photo_differentiates_unreadable_image_and_sheet_outage(self):
+        with patch.dict(sys.modules, {'openai': SimpleNamespace(OpenAI=Mock())}), \
+             patch.object(staff_photo, 'extract_numbers', side_effect=[[], ['101']]), \
+             patch.object(agent, 'read_staff_delivery', side_effect=TimeoutError) as read:
+            self.assertIn('주문번호가 잘 보이도록', agent.photo_order_status([URL], '전체 상태')['summary'])
+            read.assert_not_called()
+            self.assertIn('배송관리를 조회하지 못했어요', agent.photo_order_status([URL], '전체 상태')['summary'])
 
     def test_slow_read_hands_off_to_kakao_callback_without_transmitting(self):
         release = threading.Event()
