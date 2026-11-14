@@ -502,7 +502,10 @@ def find_links(product, root):
     if not shop or not token:
         raise ValueError('쇼핑몰 연결을 확인해야 해요. 관리자에게 알려주세요.')
     with PRODUCT_LOCK:
-        template = os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID', '').strip()
+        auto_copy = os.getenv('BLOGPAY_INVITATION_AUTO_CREATE') == '1'
+        template = os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID', '').strip() if auto_copy else ''
+        if auto_copy and not template:
+            raise ValueError('블로그페이 원본 상품 번호를 설정해 주세요.')
         if template and (not template.isascii() or not template.isdecimal()):
             raise ValueError('블로그페이 원본 상품 번호를 확인해 주세요.')
         links = BlogPay(shop, token).ensure_links(product, root, int(template) if template else None)
