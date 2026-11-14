@@ -11,10 +11,11 @@ from html import escape
 from zoneinfo import ZoneInfo
 
 import partial_reviews
+import production_files
 
 SEOUL = ZoneInfo('Asia/Seoul')
 STATES = {'review': '사진 검토 후 제작 접수', 'pending': '공장 전달 대기', 'leased': '공장 수신 처리 중',
-          'acked': '원장·제작 대기열 접수 확인', 'held': '결제 변경으로 제작 보류'}
+          'acked': '원장·제작 대기열 접수 확인', 'held': '결제·검수 변경으로 제작 보류'}
 
 
 def canonical(value):
@@ -56,6 +57,13 @@ def payload_for(c, row, kind):
         if not check:
             raise ValueError('partial_approval_required')
         result['approval'] = {'id': check['id'], 'fingerprint': check['fingerprint'], 'remaining': check['remaining'], 'refunded': check['refunded'], 'decision': 'resume'}
+    artifact=production_files.manifest(c,row) if kind in ('ready','resume') else None
+    if artifact:
+        result['schema_version']=3
+        result['artifact']=artifact
+    latest=production_files.latest(c,row['id'])
+    review=production_files.latest_review(c,row['id'])
+    result['artifact_revision']=[latest['version'] if latest else 0,review['id'] if review else 0]
     return result
 
 
@@ -72,7 +80,7 @@ def ensure_ready(c, row):
         return
     data = json.loads(row['details'])
     reviewed = c.execute('SELECT 1 FROM invitation_photo_reviews WHERE order_id=?', (row['id'],)).fetchone()
-    state = 'review' if data.get('wedding_preview') and not reviewed else 'pending'
+    state = 'review' if (data.get('wedding_preview') and not reviewed) or not production_files.allowed(c,row) else 'pending'
     enqueue(c, row, 'ready', row['id'] + ':ready', state)
 
 
@@ -105,7 +113,8 @@ def review_photo(c, fields):
     if not row or not checkout.review_photo(c, fields):
         raise ValueError('결제 상태와 신랑신부 사진의 두 얼굴을 먼저 확인해 주세요.')
     ensure_ready(c, row)
-    c.execute("UPDATE shop_handoff SET state='pending' WHERE order_id=? AND kind='ready' AND state='review'", (order_id,))
+    if production_files.allowed(c,row):
+        c.execute("UPDATE shop_handoff SET state='pending' WHERE order_id=? AND kind='ready' AND state='review'", (order_id,))
 
 
 def authorize(header):
@@ -128,9 +137,12 @@ def claim(c, fields):
     for candidate in c.execute("SELECT * FROM shop_handoff WHERE kind IN ('ready','resume') AND state IN ('pending','leased')").fetchall():
         if not fulfill_event(c, candidate):
             c.execute("UPDATE shop_handoff SET state='held' WHERE event_id=?", (candidate['event_id'],))
-    supports_resume = 'partial-resume-v1' in fields.get('capabilities', [])
+    capabilities=fields.get('capabilities',[])
+    if not isinstance(capabilities,list) or len(capabilities)>10:raise ValueError('invalid_capabilities')
+    supports_resume = 'partial-resume-v1' in capabilities
+    supports_files = 'production-artifact-v1' in capabilities
     row = c.execute("""SELECT * FROM shop_handoff WHERE (state='pending' OR (state='leased' AND lease_until<=?))
-        AND (kind!='resume' OR ?) ORDER BY (kind='hold') DESC,created,event_id LIMIT 1""", (now, supports_resume)).fetchone()
+        AND (kind!='resume' OR ?) AND (json_extract(payload,'$.schema_version')!=3 OR ?) ORDER BY (kind='hold') DESC,created,event_id LIMIT 1""", (now, supports_resume,supports_files)).fetchone()
     if not row:
         return {'job': None}
     token = secrets.token_hex(32)
@@ -144,6 +156,11 @@ def claim(c, fields):
 
 def fulfill_event(c, event):
     order = c.execute('SELECT * FROM invitation_orders WHERE id=?', (event['order_id'],)).fetchone()
+    if not production_files.allowed(c,order):return False
+    payload=json.loads(event['payload'])
+    if production_files.required(order) or production_files.latest(c,order['id']):
+        current=production_files.manifest(c,order)
+        if payload.get('artifact')!=current:return False
     if event['kind'] == 'ready':
         return order['state'] == 'paid'
     check = partial_reviews.approval(c, order)
@@ -186,7 +203,8 @@ def panel(c, row, path):
                    '<input type="hidden" name="action" value="prepare_handoff"><button>후속 접수 준비</button></form>')
     for record in records:
         kind = {'ready':'제작 접수','resume':'잔액 대조 후 재개','hold':'제작 보류 전달'}[record['kind']]
-        result += '<p>' + kind + ' · ' + STATES[record['state']] + '</p>'
+        state_label='제작 파일 검수 대기' if record['state']=='review' and production_files.required(row) else STATES[record['state']]
+        result += '<p>' + kind + ' · ' + state_label + '</p>'
         if record['receipt']:
             refs = json.loads(record['receipt'])
             result += '<p>원장 접수번호: ' + escape(refs['ledger']) + '<br>제작 대기열 번호: ' + escape(refs['production']) + '</p>'

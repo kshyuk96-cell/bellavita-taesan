@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import json
+import os
 import re
 import secrets
 import time
@@ -11,6 +12,7 @@ from urllib.parse import urlsplit
 
 from checkout import SEOUL
 import order_ops
+import shop_dashboard
 import order_messages
 import cash_receipts
 
@@ -173,7 +175,9 @@ def read_offer(connection, offer_id):
     row = connection.execute('SELECT * FROM shop_offers WHERE id=?', (offer_id,)).fetchone()
     if not row:
         return None, False
-    return json.loads(row['details']), bool(row['active'])
+    product=json.loads(row['details'])
+    product['production_review_required']=os.getenv('SHOP_PRODUCTION_REVIEW_REQUIRED','1')!='0'
+    return product, bool(row['active'])
 
 
 def record_payment_check(connection, fields):
@@ -305,7 +309,7 @@ def admin_page(connection, path, origin):
                                  + field('페이앱 확인 상태·대조 근거·재전송 요청 결과', 'note', multiline=True)
                                  + '<label><input type="checkbox" name="compared" value="yes" required>'
                                    '페이앱 원거래와 주문을 직접 대조했습니다</label>', '대조 기록 저장'))
-        orders.append(f'<li><details><summary>{escape(order["title"])} · {order["amount"]:,}원 · '
+        orders.append(f'<li id="order-{row["id"]}" data-shop-order="{row["id"]}" data-queues="{",".join(shop_dashboard.categories(connection,row))}"><details><summary>{escape(order["title"])} · {order["amount"]:,}원 · '
                       f'{STATES.get(row["state"], "확인 필요")} · 주문 {row["id"]}</summary>'
                       f'<dl>{content}</dl>{check_form}' + order_ops.controls(connection, row, path) + '</details></li>')
 
@@ -328,7 +332,7 @@ def admin_page(connection, path, origin):
       input[type=checkbox]{display:inline;width:auto}
       a{color:#204c36}summary{cursor:pointer;padding:6px 0}small{overflow-wrap:anywhere}li{margin-bottom:12px}
       dd{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 8px}dt{font-weight:bold}</style>
-      <main><h1>벨라비타 쇼핑몰 관리</h1><section><h2>새 상품 등록</h2>'''
+      <main><h1>벨라비타 쇼핑몰 관리</h1>''' + shop_dashboard.panel(connection) + '''<section><h2>새 상품 등록</h2>'''
       + form('save_product', product_fields({}), '상품 등록') + '</section>' + notification_settings
       + ''.join(products) + '<section><h2>행사별 주문 링크</h2>'
       + ('<ul>' + ''.join(offers) + '</ul>' if offers else '<p>발급된 링크가 없어요.</p>')
@@ -344,4 +348,4 @@ def admin_page(connection, path, origin):
         image.addEventListener('error', loaded);
         loaded();
       }
-      </script></html>''')
+      </script>''' + shop_dashboard.SCRIPT + '</html>')

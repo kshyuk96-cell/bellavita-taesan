@@ -44,7 +44,8 @@ class ShopFixture(unittest.TestCase):
         self.root.mkdir()
         self.root_patch = patch.object(agent, 'ROOT', self.root)
         self.root_patch.start()
-        env = {'TAESAN_PUBLIC_URL': ORIGIN, 'TAESAN_WEBHOOK_SECRET': SECRET,
+        # Preserve legacy handoff regression scenarios; new artifact tests opt in.
+        env = {'SHOP_PRODUCTION_REVIEW_REQUIRED':'0', 'TAESAN_PUBLIC_URL': ORIGIN, 'TAESAN_WEBHOOK_SECRET': SECRET,
                'SHOP_CHECKOUT_ENABLED': '1', 'INVITATION_CHECKOUT_ENABLED': '0',
                'TAESAN_LIVE_WRITE': '0', 'TAESAN_ADMIN_IDS': 'admin', 'TAESAN_STAFF_IDS': 'staff',
                **{'INVITATION_PAYAPP_' + key: value for key, value in CONFIG.items()}}

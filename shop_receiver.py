@@ -2,6 +2,7 @@
 import argparse
 import csv
 import hashlib
+import re
 import json
 import os
 from pathlib import Path
@@ -48,9 +49,26 @@ def database(root):
     return c
 
 
-def ingest(root, job):
+def normalized_guard(value):
+    result=json.loads(value) if isinstance(value,str) else value
+    return result+[0]*(4-len(result))
+
+
+def call_file(server,secret,path,ca_file=None):
+    parsed=urlsplit(server)
+    if parsed.scheme!='https' or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or len(secret)<32:
+        raise ValueError('invalid_file_source')
+    if not re.fullmatch(r'/shop/handoff/file/[a-f0-9]{32}/[0-9]+\.(png|pdf)',path):raise ValueError('invalid_file_path')
+    request=Request(server.rstrip('/')+path,headers={'Authorization':'Bearer '+secret})
+    with build_opener(NoRedirect,HTTPSHandler(context=ssl.create_default_context(cafile=ca_file))).open(request,timeout=30) as reply:
+        content=reply.read(12_000_001)
+        if len(content)>12_000_000:raise ValueError('artifact_too_large')
+        return content
+
+
+def ingest(root, job, file_transport=None):
     payload = job['payload']
-    if (payload.get('schema_version') != (2 if job.get('kind') == 'resume' else 1) or payload.get('kind') != job.get('kind')
+    if (payload.get('schema_version') != (3 if payload.get('artifact') else 2 if job.get('kind') == 'resume' else 1) or payload.get('kind') != job.get('kind')
             or job.get('kind') not in ('ready', 'hold', 'resume') or payload['order'].get('id') != job.get('order_id')
             or hashlib.sha256(canonical(payload).encode()).hexdigest() != job.get('sha256')):
         raise ValueError('handoff_payload_mismatch')
@@ -71,7 +89,34 @@ def ingest(root, job):
                 or approval.get('refunded') != refunded or not isinstance(approval.get('fingerprint'), str)
                 or len(approval['fingerprint']) != 64):
             raise ValueError('partial_approval_required')
-    guard = [refunded, revision]
+    artifact=payload.get('artifact')
+    artifact_revision=payload.get('artifact_revision',[0,0])
+    if (not isinstance(artifact_revision,list) or len(artifact_revision)!=2
+            or any(type(v) is not int or v<0 for v in artifact_revision)):
+        raise ValueError('invalid_artifact_revision')
+    if artifact:
+        if (not isinstance(artifact,dict) or type(artifact.get('version')) is not int or artifact['version']<1
+                or type(artifact.get('approval_id')) is not int or artifact['approval_id']<1
+                or artifact_revision!=[artifact['version'],artifact['approval_id']]
+                or not re.fullmatch(r'[a-f0-9]{64}',str(artifact.get('source_hash','')))
+                or not re.fullmatch(r'[a-f0-9]{32}',job['order_id'])):
+            raise ValueError('invalid_artifact_manifest')
+        for ext in ('png','pdf'):
+            entry=artifact.get(ext,{})
+            expected=f'/shop/handoff/file/{job["order_id"]}/{artifact["version"]}.{ext}'
+            if entry.get('path')!=expected or not re.fullmatch(r'[a-f0-9]{64}',str(entry.get('sha256',''))):
+                raise ValueError('invalid_artifact_path')
+            path=Path(root)/'production-files'/job['order_id']/(str(artifact['version'])+'.'+ext)
+            if path.exists() and hashlib.sha256(path.read_bytes()).hexdigest()==entry['sha256']:continue
+            if not file_transport:raise ValueError('artifact_file_transport_required')
+            content=file_transport(expected)
+            if (not isinstance(content,bytes) or len(content)>12_000_000
+                    or not content.startswith(b'\x89PNG\r\n\x1a\n' if ext=='png' else b'%PDF-')
+                    or hashlib.sha256(content).hexdigest()!=entry['sha256']):
+                raise ValueError('artifact_file_hash_mismatch')
+            from production_files import write
+            write(path,content)
+    guard = [refunded, revision]+artifact_revision
     order_id, kind = job['order_id'], job['kind']
     ack = {'event_id': job['event_id'], 'lease_token': job['lease_token'], 'consumer': job['consumer'],
            'references': {'ledger': order_id, 'production': order_id}}
@@ -93,13 +138,16 @@ def ingest(root, job):
             if refunded >= previous.get('refunded_amount',0):
                 c.execute('UPDATE order_ledger SET payment=? WHERE order_id=?', (canonical(payment),order_id))
             c.execute('INSERT OR IGNORE INTO production_queue(order_id,details,state,guard) VALUES (?,?,?,?)', (order_id, canonical(payload['production']), state, canonical(guard)))
-            current_guard = json.loads(c.execute('SELECT guard FROM production_queue WHERE order_id=?', (order_id,)).fetchone()[0])
+            current_guard = normalized_guard(c.execute('SELECT guard FROM production_queue WHERE order_id=?', (order_id,)).fetchone()[0])
             if kind == 'hold' and guard >= current_guard:
                 c.execute("UPDATE order_ledger SET state='held' WHERE order_id=?", (order_id,))
                 c.execute("UPDATE production_queue SET state='held' WHERE order_id=?", (order_id,))
-            if kind == 'resume' and guard > current_guard:
+            if (kind == 'resume' or artifact) and guard > current_guard:
                 c.execute("UPDATE order_ledger SET state='awaiting_ack' WHERE order_id=?", (order_id,))
                 c.execute("UPDATE production_queue SET state='awaiting_ack' WHERE order_id=?", (order_id,))
+            if artifact and guard >= current_guard:
+                details=dict(payload['production'],artifact=artifact)
+                c.execute('UPDATE production_queue SET details=? WHERE order_id=?',(canonical(details),order_id))
             if guard >= current_guard:
                 c.execute('UPDATE production_queue SET guard=? WHERE order_id=?', (canonical(guard), order_id))
             c.execute('''INSERT INTO received_events(event_id,order_id,kind,digest,ack_json,guard) VALUES (?,?,?,?,?,?)
@@ -119,7 +167,7 @@ def finish(root, event_id, *, payment_changed=False):
                 raise ValueError('unknown_local_event')
             current_guard = c.execute('SELECT guard FROM production_queue WHERE order_id=?', (row['order_id'],)).fetchone()[0]
             if payment_changed:
-                if json.loads(row['guard']) < json.loads(current_guard):
+                if normalized_guard(row['guard']) < normalized_guard(current_guard):
                     c.execute('UPDATE received_events SET ack_json=NULL WHERE event_id=?', (event_id,))
                     return
                 c.execute("UPDATE order_ledger SET state='held' WHERE order_id=?", (row['order_id'],))
@@ -127,7 +175,7 @@ def finish(root, event_id, *, payment_changed=False):
                 c.execute('UPDATE received_events SET ack_json=NULL WHERE event_id=?', (event_id,))
                 return
             c.execute('UPDATE received_events SET acked=1,ack_json=NULL WHERE event_id=?', (event_id,))
-            if row['kind'] in ('ready','resume') and row['guard'] == current_guard:
+            if row['kind'] in ('ready','resume') and normalized_guard(row['guard']) == normalized_guard(current_guard):
                 c.execute("UPDATE order_ledger SET state='received' WHERE order_id=? AND state!='held'", (row['order_id'],))
                 c.execute("UPDATE production_queue SET state='pending' WHERE order_id=? AND state!='held'", (row['order_id'],))
     finally:
@@ -178,13 +226,13 @@ def acknowledge_pending(root, transport):
                     c.close()
 
 
-def run_once(root, consumer, transport):
+def run_once(root, consumer, transport, file_transport=None):
     acknowledge_pending(root, transport)
-    result = transport('claim', {'consumer': consumer, 'capabilities':['partial-resume-v1']})
+    result = transport('claim', {'consumer': consumer, 'capabilities':['partial-resume-v1','production-artifact-v1']})
     job = result.get('job')
     if not job:
         return False
-    ingest(root, job)
+    ingest(root, job,file_transport)
     acknowledge_pending(root, transport)
     return True
 
@@ -252,7 +300,7 @@ if __name__ == '__main__':
     transport = lambda action, fields: call(args.server, os.getenv('SHOP_HANDOFF_SECRET',''), action, fields, args.ca_file)
     while True:
         try:
-            received = run_once(args.data, args.consumer, transport)
+            received = run_once(args.data, args.consumer, transport,lambda path:call_file(args.server,os.getenv('SHOP_HANDOFF_SECRET',''),path,args.ca_file))
             print('접수 확인' if received else '대기 주문 없음', flush=True)
             if args.export_csv:
                 export_csv(args.data, args.export_csv)

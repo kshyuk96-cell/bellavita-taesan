@@ -14,12 +14,16 @@ from urllib.request import Request, build_opener
 
 import order_ops
 import order_sample
+import alimtalk
 from blogpay import NoRedirect
 
 
-def configured():
-    return (os.getenv('SHOP_MESSAGES_ENABLED') == '1' and
-            all(os.getenv(key) for key in ('SOLAPI_API_KEY', 'SOLAPI_API_SECRET', 'SOLAPI_SENDER')))
+def configured(channel=None):
+    base=os.getenv('SHOP_MESSAGES_ENABLED')=='1' and all(os.getenv(k) for k in ('SOLAPI_API_KEY','SOLAPI_API_SECRET'))
+    if not base:return False
+    mms=bool(os.getenv('SOLAPI_SENDER'))
+    ata=alimtalk.configured()
+    return (mms or ata) if channel is None else ata if channel=='alimtalk' else mms
 
 
 def api(path, body=None):
@@ -71,7 +75,8 @@ def process_one(db, root):
         return
     with db() as c:
         c.execute('BEGIN IMMEDIATE')
-        job = c.execute("SELECT * FROM shop_messages WHERE state='queued' ORDER BY created,id LIMIT 1").fetchone()
+        channels=[channel for channel in ('mms','alimtalk') if configured(channel)]
+        job=c.execute("SELECT * FROM shop_messages WHERE state='queued' AND channel IN ("+','.join('?' for _ in channels)+") ORDER BY created,id LIMIT 1",channels).fetchone()
         if job:
             if job['audience'] == 'staff' and job['recipient'] not in order_ops.phones(c):
                 c.execute("UPDATE shop_messages SET state='held',error='staff_recipient_removed' WHERE id=?", (job['id'],))
@@ -85,7 +90,7 @@ def process_one(db, root):
         return poll(db)
     try:
         image_id = job['image_id']
-        if not image_id:
+        if job['channel']=='mms' and not image_id:
             image = order_sample.sample(root, order).read_bytes()
             uploaded = api('/storage/v1/files', {'file': base64.b64encode(image).decode(), 'type': 'MMS',
                                                 'name': 'bellavita-order.jpg'})
@@ -98,17 +103,17 @@ def process_one(db, root):
             if not order_ops.partial_reviews.allowed(c, current) and (job['event'] in order_ops.STAGES or job['event'].startswith('resumed:')):
                 c.execute("UPDATE shop_messages SET state='held',error='payment_changed' WHERE id=?", (job['id'],))
                 return
-            c.execute("UPDATE shop_messages SET state='sending',image_id=? WHERE id=?", (image_id, job['id']))
+            payload=json.loads(job['request_json']) if job['request_json'] else (alimtalk.message(job,current) if job['channel']=='alimtalk' else {
+                'to':job['recipient'],'from':os.environ['SOLAPI_SENDER'],'type':'MMS',
+                'text':text_for(job,current),'subject':'벨라비타 주문 안내','imageId':image_id,
+                'customFields':{'orderId':job['order_id'],'notificationId':job['id']}})
+            c.execute("UPDATE shop_messages SET state='sending',image_id=?,request_json=? WHERE id=?", (image_id,json.dumps(payload,ensure_ascii=False),job['id']))
     except Exception:
         with db() as c:
             c.execute("UPDATE shop_messages SET state='failed',error='image_preparation_failed' WHERE id=? AND state='preparing'", (job['id'],))
         return
     try:
-        result = api('/messages/v4/send-many/detail', {'messages': [{
-            'to': job['recipient'], 'from': os.environ['SOLAPI_SENDER'], 'type': 'MMS',
-            'text': text_for(job, order), 'subject': '벨라비타 주문 안내', 'imageId': image_id,
-            'customFields': {'orderId': job['order_id'], 'notificationId': job['id']}}],
-            'allowDuplicates': False, 'showMessageList': True})
+        result=api('/messages/v4/send-many/detail', {'messages':[payload], 'allowDuplicates':False,'showMessageList':True})
         if result.get('failedMessageList'):
             if result.get('messageList'):
                 raise OSError('inconsistent_acceptance')

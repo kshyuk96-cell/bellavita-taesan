@@ -61,7 +61,9 @@ def review(c, fields, actor='admin-link'):
         if created:
             c.execute("INSERT INTO shop_stage_history VALUES (?,1,'confirmed','balance-review',?)", (row['id'], order_ops.now()))
         check = approval(c, row)
-        order_handoff.enqueue(c, row, 'resume', row['id']+':resume:'+str(check['id']), 'pending')
+        import production_files
+        if production_files.allowed(c,row):
+            order_handoff.enqueue(c, row, 'resume', row['id']+':resume:'+str(check['id']), 'pending')
         order_ops.queue(c, row['id'], 'resumed:'+str(check['id']))
     else:
         check = c.execute('SELECT last_insert_rowid()').fetchone()[0]

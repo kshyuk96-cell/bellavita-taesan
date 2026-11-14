@@ -32,6 +32,7 @@ import owner_alerts
 import shop
 import order_ops
 import order_sample
+import production_files
 import cash_receipts
 import order_handoff
 import order_intake
@@ -1326,6 +1327,8 @@ class Handler(BaseHTTPRequestHandler):
                           'change_stage': order_ops.change_stage, 'retry_message': order_ops.retry_message,
                           'reconcile_message': order_ops.reconcile_message,
                           'review_partial': order_ops.partial_reviews.review,
+                          'generate_artifact': lambda c,f:production_files.generate(c,f,ROOT),
+                          'review_artifact': lambda c,f:production_files.review(c,f,ROOT),
                           'prepare_handoff': order_handoff.prepare, 'review_shop_photo': order_handoff.review_photo,
                           'reconcile_receipt': cash_receipts.reconcile}.get(fields.get('action'))
                 if action is None:
@@ -1422,6 +1425,30 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        production=re.fullmatch(r'/shop/(production-([0-9]+)-(png|pdf))/([a-f0-9]{32})/([0-9]{10})/([a-f0-9]{64})',path)
+        factory_file=re.fullmatch(r'/shop/handoff/file/([a-f0-9]{32})/([0-9]+)\.(png|pdf)',path)
+        if production or factory_file:
+            if production:
+                kind,version,extension,order_id,expiry,signed=production.groups()
+                if not order_ops.authorized(kind,order_id,expiry,signed,os.environ['TAESAN_WEBHOOK_SECRET']):
+                    return self.order_message('제작 파일 확인 링크가 만료됐어요.',403)
+            else:
+                if not order_handoff.authorize(self.headers.get('Authorization','')):return self.send_json({'error':'handoff_not_authorized'},401)
+                order_id,version,extension=factory_file.groups()
+            with db() as c:
+                row=c.execute('SELECT o.* FROM invitation_orders o JOIN shop_offers s ON s.id=o.job WHERE o.id=?',(order_id,)).fetchone()
+                artifact=c.execute('SELECT * FROM shop_artifacts WHERE order_id=? AND version=?',(order_id,int(version))).fetchone()
+                if not row or not artifact:return self.order_message('제작 파일을 찾지 못했어요.',404)
+                if factory_file and (not order_ops.partial_reviews.allowed(c,row) or not production_files.allowed(c,row) or production_files.latest(c,order_id)['version']!=int(version)):
+                    return self.send_json({'error':'artifact_not_approved'},409)
+                try:
+                    content=production_files.artifact_path(ROOT,order_id,version,extension).read_bytes()
+                    if hashlib.sha256(content).hexdigest()!=artifact[extension+'_hash']:raise ValueError('artifact_changed')
+                except (OSError,ValueError):return self.order_message('제작 파일 무결성을 확인해 주세요.',503)
+            self.send_response(200);self.send_header('Content-Type','image/png' if extension=='png' else 'application/pdf')
+            self.send_header('Content-Disposition',f'inline; filename="{order_id}-v{version}.{extension}"')
+            self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff')
+            self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
         sample = order_ops.SAMPLE_PATH.fullmatch(path)
         if sample:
             order_id, expiry, signed = sample.groups()

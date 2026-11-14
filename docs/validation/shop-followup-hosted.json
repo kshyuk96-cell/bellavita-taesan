@@ -1,0 +1,11 @@
+{
+  "hosted_followup": "passed",
+  "order_id": "BV-e3231926-d310-4ecc-87d8-f2b8582b3065",
+  "old_records_preserved": true,
+  "proof_approval_and_shipping": true,
+  "uncertain_retry_blocked": true,
+  "examples_png_pdf_verified": 10,
+  "final_order_state": "cancelled",
+  "site_source": "28ad17790b6fbba4092e1c2243051ca6fcb7f6d3",
+  "site_deployment": "appgdep_6af7fa7c3bc4819186a4232c6cf16c15"
+}
