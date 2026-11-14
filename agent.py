@@ -730,9 +730,22 @@ def start_order_queue():
     threading.Thread(target=loop, daemon=True).start()
 
 
+def ledger_access_status(owner):
+    if role_of(owner) != 'admin':
+        return {'summary': '원장 권한 확인은 대표 계정에서만 할 수 있어요.', 'ledger_access': True}
+    import ledger_access
+    report = ledger_access.diagnose()
+    if role_of(owner) != 'admin':
+        return {'summary': '권한이 변경되어 연결 정보를 표시하지 않았어요.', 'ledger_access': True}
+    return {'summary': report['summary'], 'ledger_access': True,
+            'ledger_access_status': report['status']}
+
+
 def run_job(job, message, owner, kind=''):
     try:
-        if kind == 'route':
+        if kind == 'ledger_access':
+            result = ledger_access_status(owner)
+        elif kind == 'route':
             result = delivery_routes.run(message, owner, db, read_delivery_ranges, datetime.now(SEOUL))
         elif kind == 'invitation':
             result = run_invitation(message, owner)
@@ -784,6 +797,8 @@ def signed_url(job, number, label):
 
 
 def present(job, result, owner=None):
+    if result.get('ledger_access') and role_of(owner) != 'admin':
+        return kakao('원장 연결 정보는 대표 계정에서만 확인할 수 있어요.')
     if 'route_buttons' in result:
         pages = result.get('route_pages', [result['summary']])
         index = result.get('selected', 1) - 1
@@ -883,6 +898,8 @@ def dispatch(body, defer_callback=None):
                      else '등록 코드가 틀렸거나 만료됐어요.')
     if not role_of(owner):
         return request_access(owner, message)
+    if message == '원장 권한 확인' and role_of(owner) != 'admin':
+        return kakao('원장 권한 확인은 대표 계정에서만 할 수 있어요.')
     if delivery_counts.PHOTO_MESSAGE.fullmatch(message):
         return kakao('사진 내용은 받지 못했어요. 오늘 배송 현황은 아래 버튼을 눌러 바로 확인하세요.',
                      buttons=delivery_counts.COUNT_BUTTONS)
@@ -1012,7 +1029,9 @@ def dispatch(body, defer_callback=None):
         pending = c.execute('SELECT details FROM invitation_input WHERE owner=? AND expires>?',
                             (owner, time.time())).fetchone()
         route_context = delivery_routes.session(db, owner)
-        if order_intake.wants_order(message, explicit_only=True):
+        if message == '원장 권한 확인':
+            kind = 'ledger_access'
+        elif order_intake.wants_order(message, explicit_only=True):
             kind = 'order'
         elif development_queue.request_detail(message):
             kind = 'development'
@@ -1030,7 +1049,7 @@ def dispatch(body, defer_callback=None):
         fingerprint = hashlib.sha256(fingerprint_input.encode()).hexdigest()
         for old in [key for key, future in ACTIVE.items() if future.done()]:
             ACTIVE.pop(old, None)
-        row = None if kind in ('route', 'delivery_count') else c.execute(
+        row = None if kind in ('route', 'delivery_count', 'ledger_access') else c.execute(
             'SELECT * FROM jobs WHERE owner=? AND fingerprint=? AND created>? ORDER BY created DESC LIMIT 1',
             (owner, fingerprint, time.time()-180)).fetchone()
         if row:
@@ -1098,6 +1117,40 @@ class Handler(BaseHTTPRequestHandler):
         return self.order_message('카톡에서 “초대장 주문관리”를 열어 직원 로그인을 해 주세요.', 401)
 
     def do_POST(self):
+        if urlsplit(self.path).path == '/staff-orders/ledger-patch':
+            owner = self.staff_web_owner()
+            origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
+            if (not owner or role_of(owner) != 'admin' or not invitation.https_url(origin)
+                    or self.headers.get('Origin') != origin):
+                return self.send_json({'status': 'denied', 'summary': '대표 계정의 로그인과 요청 출처를 확인해 주세요.'}, 403)
+            try:
+                size = int(self.headers.get('Content-Length', '0'))
+                if not 0 < size <= 32768:
+                    raise ValueError('invalid size')
+                payload = json.loads(self.rfile.read(size))
+                if not isinstance(payload, dict) or payload.get('action') not in ('prepare', 'apply'):
+                    raise ValueError('invalid action')
+                import ledger_patch
+                service = ledger_patch.LedgerPatchService(role_for=role_of,
+                    audit_path=ROOT / 'ledger-edits.sqlite3')
+                try:
+                    if payload['action'] == 'prepare':
+                        result = service.prepare(owner, payload.get('range'), payload.get('values'))
+                    else:
+                        result = service.apply(owner, payload.get('request_id'), payload.get('range'),
+                            payload.get('values'), expected_digest=payload.get('before_digest'),
+                            expected_fingerprint=payload.get('row_fingerprint'))
+                finally:
+                    close = getattr(service, 'close', None)
+                    if callable(close):
+                        close()
+                if role_of(owner) != 'admin':
+                    return self.send_json({'status': 'denied', 'summary': '권한이 변경되어 결과를 표시하지 않았어요.'}, 403)
+                return self.send_json(result, 200 if result.get('status') in ('prepared', 'verified') else 409)
+            except (ValueError, TypeError, UnicodeError):
+                return self.send_json({'status': 'blocked', 'summary': '수정 대상과 값을 확인해 주세요.'}, 400)
+            except Exception:
+                return self.send_json({'status': 'uncertain', 'summary': '원장 처리 결과를 확인하지 못했어요. 재실행 전에 반영 여부를 확인해야 해요.'}, 503)
         if self.path == '/pc/planning-probe':
             import planning_probe
             token = os.getenv('TAESAN_PC_PROBE_TOKEN', '')
