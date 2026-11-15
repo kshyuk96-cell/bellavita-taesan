@@ -148,8 +148,12 @@ class Coordination:
                       (worker_hash, int(ready), reason, now, now + ttl))
             return {'ready': ready, 'reason': reason, 'expires_at': now + ttl}
 
-    def route(self, token, task_id):
+    def route(self, token, task_id, *, worker_hash=None):
         import json
+        if worker_hash is not None:
+            import re
+            if not isinstance(worker_hash,str) or not re.fullmatch('[a-f0-9]{64}',worker_hash):
+                raise ValueError('exact registered worker identity required')
         with self.store._transaction() as c:
             actor = self.store._authenticate(c, token)
             self.store._role(actor, ('owner', 'manager'))
@@ -174,6 +178,8 @@ class Coordination:
                 AND (t.expires IS NULL OR t.expires>?) AND h.ready=1 AND h.expires>?
                 ORDER BY h.checked DESC,t.subject,t.token_hash''', (now, now)).fetchall()
             for worker in workers:
+                if worker_hash is not None and worker['token_hash']!=worker_hash:
+                    continue
                 if (row['project'] not in json.loads(worker['projects'])
                         or manifest['kind'] not in json.loads(worker['capabilities'])):
                     continue

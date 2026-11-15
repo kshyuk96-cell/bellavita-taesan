@@ -250,3 +250,11 @@ python -m manager_bridge.sessions --data /private/manager-data --token-file /pri
 인증 범위·읽기 점검·승인형 시험·사본 복원/구조 변경·의존성 검토·작업 큐·통합 보고를
 추가했습니다. 기본 실행은 비활성화이며 상주 서비스나 운영 예약을 시작하지 않습니다.
 실행 계약과 남은 연결은 [유지보수 검토안](../docs/taesan-maintenance-suite.md)에 있습니다.
+
+## 태산이 대리 관리
+
+대표가 승인한 범위의 개발/시험을 지정 관리자가 처리하는 위임 정책, 등록 에이전트 수신함,
+중간 지시 변경, 독립 검토, 묶음 결정, 미팅 후속과 인증된 관리 API를 추가했습니다.
+기존 다른 Codex 창에 대한 자동 접근이나 운영 권한 확대는 아닙니다.
+[대리 관리 검토안](../docs/taesan-representative-management.md)에 실제 네이티브 에이전트
+검증과 남은 연결을 기록했습니다.

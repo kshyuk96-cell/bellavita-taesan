@@ -206,6 +206,7 @@ class Checks:
             if actor['role']!='worker':raise PermissionDenied('only assigned worker may nest checks')
             parent=self.store._get(c,actor,parent_task_id)
             manifest=json.loads(parent['manifest'])
+            self.store._validate_execution(c,parent,check_source_age=False)
             approval=json.loads(parent['approval']) if parent['approval'] else {}
             if (parent['state']!='running' or parent['worker_token_hash']!=actor['token_hash']
                     or parent['worker_subject']!=actor['subject']

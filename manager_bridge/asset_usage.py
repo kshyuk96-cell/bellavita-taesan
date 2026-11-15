@@ -84,7 +84,7 @@ class AssetUsage:
                 raise Conflict('사용 기록의 작업 범위가 바뀌었어요.')
             if provenance == 'worker_claim':
                 self.store._role(actor, ('worker',))
-                self.store._lease(row, actor, lease_token)
+                self.store._lease(row, actor, lease_token, c=c)
                 if row['state'] != 'running' or row['lease_expires'] <= self.store._now():
                     raise Conflict('실행 중인 본인 작업의 유효 임대권이 필요해요.')
             else:

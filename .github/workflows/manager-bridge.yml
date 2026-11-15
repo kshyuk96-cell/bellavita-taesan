@@ -11,6 +11,7 @@ on:
     branches:
       - 'codex/taesan-manager-*'
       - 'codex/taesan-maintenance-*'
+      - 'codex/taesan-delegated-*'
     paths:
       - 'manager_bridge/**'
       - 'tests/test_manager_bridge.py'
