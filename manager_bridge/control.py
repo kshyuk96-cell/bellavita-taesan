@@ -102,6 +102,8 @@ def main(argv=None):
         if action in ('approve', 'review'):
             sub.add_argument('--version', type=int, required=True)
             sub.add_argument('--digest', required=True)
+        if action == 'approve':
+            sub.add_argument('--policy-digest')
         if action == 'review':
             sub.add_argument('--evidence-reference', required=True)
     args = parser.parse_args(argv)
@@ -163,6 +165,8 @@ def main(argv=None):
                     path += '/' + action
                 if action in ('approve', 'review'):
                     payload.update(version=args.version, digest=args.digest)
+                if action == 'approve' and args.policy_digest:
+                    payload['policy_digest'] = args.policy_digest
                 if action == 'review':
                     payload['evidence_reference'] = args.evidence_reference
                 if method == 'GET':
