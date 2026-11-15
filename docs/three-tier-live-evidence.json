@@ -1,0 +1,70 @@
+{
+  "scope": "private synthetic registered Codex CLI worker, NOT the previously created UI chat",
+  "observed_at_kst": "2026-11-16T00:30:36.236160+09:00",
+  "worker_session_digest": "83910afcd7bcca28ece713091c471097380361c5b99532b968d1d0cc36534190",
+  "same_actual_cli_session": true,
+  "api_key_used": false,
+  "codex_subscription_usage_applies": true,
+  "records": [
+    {
+      "task_id": "80557d43c48ce32be05d42d33597a469",
+      "source_head": "0e22ba8092f684af2280943510c64cf4589d5ead",
+      "candidate_digest": "52a9528c3873d988e7df7bf3fd1b3476686467a347715a3597fcc8ea35d247aa",
+      "worker_turn_completed": true,
+      "worker_command_exit_codes": [
+        0,
+        0,
+        0
+      ],
+      "independent_check_exit_codes": [
+        0,
+        0
+      ],
+      "independent_semantic_review": {
+        "recommendation": "pass",
+        "findings_digest": "6817f27bb646d4e19745b29f321be433ed4eee11bab76d4abe3d80798152bb86",
+        "reference": "native-review/hierarchy_architecture/stage-a"
+      },
+      "artifact_digest": "36dc09f41f58fbeacd1d62975a2752debb625efa3090bf75c48877109fb709fd",
+      "runtime_digest": "95fd35e3a2fdac75846f61ca05317f77914372d2dfb735486890847ccd70e0b2",
+      "private_cli_record_digest": "440ac151e88ddba4e9b4e9a2a34eb37125b8ba1565860627d46ed31155de3100",
+      "technical_accepted": true,
+      "operational_approved": false
+    },
+    {
+      "task_id": "ff06137f46ba9d0c9d664d3fceb905bf",
+      "source_head": "6dc1dcd86bf0985df2e222f54be63ff96526d23b",
+      "candidate_digest": "2210b0e3ad1d08aeb3a35045540a311e736208ac4c5e362b796c7c16a1bfe665",
+      "worker_turn_completed": true,
+      "worker_command_exit_codes": [
+        0,
+        0,
+        0
+      ],
+      "independent_check_exit_codes": [
+        0,
+        0
+      ],
+      "independent_semantic_review": {
+        "recommendation": "pass",
+        "findings_digest": "2c13bbbc0509f583fb1bfdfb8f2a1a07199820d64aad712fa612641fa9efec25",
+        "reference": "native-review/hierarchy_architecture/stage-b"
+      },
+      "artifact_digest": "c2009661aee4989399adac817a2002bec56b6399245a8e608650ba9cdadd0885",
+      "runtime_digest": "95fd35e3a2fdac75846f61ca05317f77914372d2dfb735486890847ccd70e0b2",
+      "private_cli_record_digest": "e88c4f7a09b64425a094dd4e2bfa04cf7eb8a3e443eeb144eb967a2fa5605e2c",
+      "technical_accepted": true,
+      "operational_approved": false
+    }
+  ],
+  "next_task_authorized_by_taesan": true,
+  "next_authorization_parent_digest": "52a9528c3873d988e7df7bf3fd1b3476686467a347715a3597fcc8ea35d247aa",
+  "actual_followup_received_and_executed": true,
+  "independent_isolation_verified": true,
+  "trusted_system_base": "/usr (not a full container image attestation)",
+  "production_deployed": false,
+  "existing_ui_chat_control_verified": false,
+  "all_existing_codex_windows_connected": false,
+  "method": "Root tool-orchestrated live rehearsal; not unattended daemon or customer project acceptance",
+  "test_case_counts_from_model_output": null
+}

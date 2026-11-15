@@ -24,6 +24,7 @@ on:
       - 'codex/taesan-connection-*'
       - 'codex/taesan-project-*'
       - 'codex/taesan-conversation-*'
+      - 'codex/taesan-three-tier-*'
     paths:
       - 'manager_bridge/**'
       - 'taesan_core/**'

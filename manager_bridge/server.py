@@ -95,7 +95,10 @@ class Handler(BaseHTTPRequestHandler):
         return result
 
     def do_GET(self):
-        static = {'/dashboard': ('index.html', 'text/html; charset=utf-8'),
+        static = {'/three-tier': ('three-tier.html', 'text/html; charset=utf-8'),
+                  '/three-tier.js': ('three-tier.js', 'application/javascript; charset=utf-8'),
+                  '/three-tier.css': ('three-tier.css', 'text/css; charset=utf-8'),
+                  '/dashboard': ('index.html', 'text/html; charset=utf-8'),
                   '/dashboard.js': ('dashboard.js', 'application/javascript; charset=utf-8'),
                   '/dashboard.css': ('dashboard.css', 'text/css; charset=utf-8')}
         if self.path in static:
