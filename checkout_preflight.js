@@ -80,6 +80,7 @@
   }
   phone.setAttribute('inputmode', 'tel');
   phone.placeholder = '010-1234-5678';
+  const guidance=window.BellavitaCheckoutGuidance({form,field,node,label,focusField,summary,mobile,refresh:()=>render()});
   function validate() {
     const number = cleanNumber(phone.value.trim());
     phone.setCustomValidity(number && !/^01[016789]\d{7,8}$/.test(number) ? '휴대폰 번호를 확인해 주세요. 예: 010-1234-5678' : '');
@@ -94,6 +95,7 @@
           receiptId.setCustomValidity(receiptType.value === 'business' ? '사업자번호 10자리를 입력해 주세요.' : '현금영수증용 휴대폰 번호 11자리를 확인해 주세요.');
       }
     }
+    guidance.validate();
   }
   function invalidFields() { return [...form.elements].filter(el => el.willValidate && !el.validity.valid); }
   function showErrors() {
@@ -158,6 +160,7 @@
     progress.textContent = '필수 입력 '+completed+' / '+required.length+' 완료';
     for (const control of form.elements) if (control.getAttribute('aria-invalid') === 'true' && control.validity.valid) control.removeAttribute('aria-invalid');
     if (errorsShown) showErrors();
+    guidance.render(errorsShown);
   }
   function snapshot() {
     return JSON.stringify([...form.elements].filter(el => el.name && !['hidden','submit','button'].includes(el.type)).map(el => [el.name,el.type === 'checkbox' ? el.checked : el.value]));
@@ -194,7 +197,7 @@
     receiptType.dispatchEvent(new Event('change',{bubbles:true}));
     errorsShown=false; errors.hidden=true; submitted=false;
     for (const control of form.elements) control.removeAttribute('aria-invalid');
-    render(); initial=snapshot(); dialog.close(); focusField(selects[0] || field('sender'));
+    guidance.reset();render(); initial=snapshot(); dialog.close(); focusField(selects[0] || field('sender'));
   });
   render(); initial=snapshot();
 })();

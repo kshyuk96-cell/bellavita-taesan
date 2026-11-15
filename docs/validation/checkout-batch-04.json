@@ -1,0 +1,174 @@
+{
+  "checked_on_kst": "2026-11-15",
+  "batch": 4,
+  "features": 10,
+  "source_parent": "9efa828a05e0d6a9ccfd138c339c0d808312f91d",
+  "runtime_sha256": {
+    "checkout.html": "904734e0c7eff7bdeca9922c282b32e5a7d2141ebd6b93f8d98bd6b301fba2b2",
+    "checkout.py": "271950443cf6737c5974308616cf068ebee0b22a519c12e3e3700c83c44cd229",
+    "checkout_preflight.js": "f8cdc8c688282efa2f8907d915d56c3605ae0cc4cc4827912013062cb1196123",
+    "checkout_guidance.js": "f06f7b3e6d1dddd1b2c36bfb2d89071d23457b11ddc2289007b9f4b8a3089b1c"
+  },
+  "full_regression": {
+    "passed": 189,
+    "seconds": 89.151
+  },
+  "server_authority_tests": {
+    "passed": 2,
+    "seconds": 1.147
+  },
+  "new_browser": {
+    "results": [
+      {
+        "width": 390,
+        "device_timezone": "America/Los_Angeles",
+        "option_breakdown": true,
+        "price_change_delta": true,
+        "address_counter": true,
+        "past_event_rejected": true,
+        "kst_midnight_boundary": true,
+        "event_expiring_while_open": true,
+        "frame_size_hint": true,
+        "required_optional_markers": true,
+        "inline_error_recovery": true,
+        "trim_preserves_internal_spaces": true,
+        "next_field_and_summary_focus": true,
+        "reset_clears_guidance": true,
+        "horizontal_overflow": false
+      },
+      {
+        "width": 1280,
+        "device_timezone": "Asia/Tokyo",
+        "option_breakdown": true,
+        "price_change_delta": true,
+        "address_counter": true,
+        "past_event_rejected": true,
+        "kst_midnight_boundary": true,
+        "event_expiring_while_open": true,
+        "frame_size_hint": true,
+        "required_optional_markers": true,
+        "inline_error_recovery": true,
+        "trim_preserves_internal_spaces": true,
+        "next_field_and_summary_focus": true,
+        "reset_clears_guidance": true,
+        "horizontal_overflow": false
+      }
+    ],
+    "invitation_results": [
+      {
+        "width": 390,
+        "static_event_kst_day": true,
+        "mobile_step_focus": true,
+        "rice_weight_explanation": true,
+        "legacy_receipt_disabled": true
+      },
+      {
+        "width": 1280,
+        "static_event_kst_day": true,
+        "mobile_step_focus": true,
+        "rice_weight_explanation": true,
+        "legacy_receipt_disabled": true
+      }
+    ],
+    "javascript_errors": [],
+    "orders_created": 0,
+    "actual_provider_calls": 0,
+    "browser_personal_storage_used": false,
+    "clock_scope": "synthetic server-render time and virtual elapsed time; actual server clock unchanged"
+  },
+  "prior_preflight_browser": {
+    "results": [
+      {
+        "width": 390,
+        "live_summary": true,
+        "edit_focus": true,
+        "character_counts": true,
+        "phone_validation_and_cleanup": true,
+        "receipt_validation_and_modes": true,
+        "error_summary_and_recovery": true,
+        "required_progress": true,
+        "dirty_navigation_warning": true,
+        "mobile_amount_and_review": true,
+        "confirmed_reset": true,
+        "no_personal_browser_storage": true,
+        "no_horizontal_overflow": true
+      },
+      {
+        "width": 1280,
+        "live_summary": true,
+        "edit_focus": true,
+        "character_counts": true,
+        "phone_validation_and_cleanup": true,
+        "receipt_validation_and_modes": true,
+        "error_summary_and_recovery": true,
+        "required_progress": true,
+        "dirty_navigation_warning": true,
+        "mobile_amount_and_review": true,
+        "confirmed_reset": true,
+        "no_personal_browser_storage": true,
+        "no_horizontal_overflow": true
+      }
+    ],
+    "invitation_results": [
+      {
+        "width": 390,
+        "static_installation_summary": true,
+        "legacy_receipt_disabled": true,
+        "live_scroll_preserved": true,
+        "edit_mobile_step": true,
+        "reset_clears_scroll_and_steps": true
+      },
+      {
+        "width": 1280,
+        "static_installation_summary": true,
+        "legacy_receipt_disabled": true,
+        "live_scroll_preserved": true,
+        "edit_mobile_step": true,
+        "reset_clears_scroll_and_steps": true
+      }
+    ],
+    "javascript_errors": [],
+    "orders_created": 0,
+    "unexpected_order_requests": 0,
+    "captured_mock_handoffs": 1,
+    "double_submit_blocked": true,
+    "submit_has_no_leave_warning": true,
+    "sender_preview_mocked": true,
+    "external_requests": 0,
+    "real_payment": false
+  },
+  "catalog_browser": {
+    "target": "Python backend storefront",
+    "results": [
+      {
+        "width": 375,
+        "four_products": true,
+        "frame_ratio": 1.5,
+        "scroll_ratio": 0.667,
+        "same_buyer": true,
+        "server_price_preview": 165000,
+        "long_message_visible": true,
+        "overflow": false
+      },
+      {
+        "width": 1280,
+        "four_products": true,
+        "frame_ratio": 1.5,
+        "scroll_ratio": 0.667,
+        "same_buyer": true,
+        "server_price_preview": 165000,
+        "long_message_visible": true,
+        "overflow": false
+      }
+    ],
+    "javascript_errors": [],
+    "live_requests": false
+  },
+  "production_deployed": false,
+  "verification_server_redeployed": false,
+  "actual_payments": false,
+  "actual_messages": false,
+  "database_schema_changed": false,
+  "browser_personal_storage_used": false,
+  "integration_document": "docs/checkout-improvements-batch-04.md"
+}

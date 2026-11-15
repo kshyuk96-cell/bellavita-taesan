@@ -268,7 +268,7 @@ def render(product, action, can_pay):
         base=str(product['price']), base_display=f'{product["price"]:,}',
         receipt_section_state='' if 'cash_tax_type' in product else 'hidden',
         receipt_controls_state='' if 'cash_tax_type' in product else 'disabled',
-        attempt=secrets.token_hex(16), preflight_script=(TEMPLATE.parent / 'checkout_preflight.js').read_text(encoding='utf-8'),
+        attempt=secrets.token_hex(16), event_time=escape(str(product.get('event_time',''))),server_now=str(dt.datetime.now(SEOUL).timestamp()),preflight_script=(TEMPLATE.parent / 'checkout_guidance.js').read_text(encoding='utf-8')+'\n'+(TEMPLATE.parent / 'checkout_preflight.js').read_text(encoding='utf-8'),
         button_state='' if can_pay else 'disabled', can_submit='true' if can_pay else 'false',
         notice=('<p class="hint">독립 검증 환경 · 모의 결제만 실행하며 실제 결제·발송·현금영수증 발급은 없습니다.</p>' if os.getenv('SHOP_VERIFICATION_MODE')=='1' else '') + ('' if can_pay else '<p class="hint">현재 결제를 이용할 수 없습니다. 문의 031-8067-8580</p>'))
 
