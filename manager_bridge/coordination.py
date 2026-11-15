@@ -71,6 +71,9 @@ class Coordination:
                 task TEXT PRIMARY KEY,worker_hash TEXT NOT NULL,routed REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS bridge_failure_records (
                 task TEXT PRIMARY KEY,plan TEXT NOT NULL,recorded REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS bridge_verified_candidates (
+                task TEXT PRIMARY KEY,report_digest TEXT NOT NULL,head_sha TEXT NOT NULL,
+                artifact_digest TEXT NOT NULL,dirty INTEGER NOT NULL,verified REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS bridge_stop_confirmations (
                 task TEXT PRIMARY KEY,evidence TEXT NOT NULL,actor TEXT NOT NULL,recorded REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS bridge_evaluations (
