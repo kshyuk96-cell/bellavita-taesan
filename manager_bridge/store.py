@@ -218,6 +218,11 @@ class Store:
         now = self._now()
         if not row or row['revoked'] is not None or (row['expires'] is not None and row['expires'] <= now):
             raise PermissionDenied('관리 연결 인증이 없거나 만료·해제됐어요.')
+        web=c.execute('SELECT parent_hash FROM bridge_web_sessions WHERE token_hash=?',(hashed,)).fetchone()
+        if web:
+            parent=c.execute('SELECT revoked,expires FROM bridge_tokens WHERE token_hash=?',(web['parent_hash'],)).fetchone()
+            if not parent or parent['revoked'] is not None or (parent['expires'] is not None and parent['expires']<=now):
+                raise PermissionDenied('원래 관리 연결이 만료·해제됐어요.')
         return {'subject': row['subject'], 'role': row['role'], 'projects': json.loads(row['projects']),
                 'capabilities': json.loads(row['capabilities']), 'token_hash': hashed}
 
@@ -416,7 +421,9 @@ class Store:
                 "(SELECT 1 FROM bridge_stop_confirmations s WHERE s.task=t.id)))", (actor['token_hash'],)).fetchone()
             if busy:
                 return None
-            rows = c.execute("SELECT * FROM bridge_tasks WHERE project=? AND state='queued' ORDER BY created,id", (project,)).fetchall()
+            rows = c.execute("SELECT t.* FROM bridge_tasks t LEFT JOIN bridge_task_planning p ON p.task=t.id "
+                "WHERE t.project=? AND t.state='queued' ORDER BY COALESCE(p.priority,0) DESC,"
+                "COALESCE(p.due,1e30),t.created,t.id", (project,)).fetchall()
             reserved_repositories = self._reserved_repositories(c)
             for row in rows:
                 manifest = json.loads(row['manifest'])

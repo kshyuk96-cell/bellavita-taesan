@@ -9,6 +9,8 @@ from .store import Store
 from .coordination import Coordination
 from .workbench import Workbench
 from .trials import TrialRunner
+from .sessions import Sessions
+from .workflow import Workflow
 
 
 def _pairs(pairs):
@@ -30,24 +32,52 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass  # Never print task text, tokens, private evidence or request URLs.
 
-    def respond(self, status, value):
+    def respond(self, status, value, *, cookie=None):
         payload = json.dumps(value, ensure_ascii=False, allow_nan=False).encode()
         self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(payload)))
+        if cookie is not None:
+            self.send_header('Set-Cookie', cookie)
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
         self.end_headers()
         self.wfile.write(payload)
 
+    def _browser_request(self):
+        if self.headers.get('X-Taesan-Client')!='dashboard':
+            raise PermissionError('browser client required')
+        if self.headers.get('Sec-Fetch-Site')=='cross-site':
+            raise PermissionError('cross-site request rejected')
+        origin=self.headers.get('Origin')
+        allowed=getattr(self.server,'public_origin',None) or 'http://'+self.headers.get('Host','')
+        if origin and origin!=allowed:
+            raise PermissionError('origin mismatch')
+
+    def _cookie_value(self):
+        from http.cookies import SimpleCookie
+        parsed=SimpleCookie();parsed.load(self.headers.get('Cookie',''))
+        return parsed['taesan_session'].value if 'taesan_session' in parsed else None
+
+    def _session_cookie(self,value,age):
+        secure='; Secure' if str(getattr(self.server,'public_origin','')).startswith('https://') else ''
+        return 'taesan_session='+value+'; HttpOnly; SameSite=Strict; Path=/; Max-Age='+str(age)+secure
+
     def token(self):
-        value = self.headers.get('Authorization', '')
-        if not value.startswith('Bearer ') or len(value) > 1024:
-            raise PermissionError('authentication required')
-        token = value[7:]
-        self.server.store.authenticate(token)
-        return token
+        value=self.headers.get('Authorization','')
+        if value:
+            if not value.startswith('Bearer ') or len(value)>1024:
+                raise PermissionError('authentication required')
+            token=value[7:]
+            self.server.store.authenticate(token)
+            return token
+        raw=self._cookie_value()
+        if raw:
+            if self.command=='POST':
+                self._browser_request()
+            return Sessions(self.server.store).cookie_token(raw)
+        raise PermissionError('authentication required')
 
     def body(self):
         if self.headers.get_content_type() != 'application/json':
@@ -87,13 +117,29 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_api(self, method):
         try:
-            token = self.token()
             store = self.server.store
             parsed = urlsplit(self.path)
-            if method == 'GET' and parsed.path in ('/v1/tasks', '/v1/overview', '/v1/scorecard', '/v1/dashboard', '/v1/trials'):
+            if method=='POST' and self.path in ('/v1/auth/redeem','/v1/auth/logout'):
+                self._browser_request()
+                data=self.body()
+                if self.path.endswith('/redeem'):
+                    session=Sessions(store).redeem(data.get('code'),self.client_address[0])
+                    return self.respond(200,{'ok':True,'expires_at':session['expires_at']},
+                        cookie=self._session_cookie(session['token'],900))
+                raw=self._cookie_value()
+                if raw:
+                    try:
+                        Sessions(store).logout(raw)
+                    except PermissionError:
+                        pass
+                return self.respond(200,{'ok':True,'logged_out':True},cookie=self._session_cookie('',0))
+            token = self.token()
+            if method == 'GET' and parsed.path in ('/v1/tasks', '/v1/overview', '/v1/scorecard', '/v1/dashboard', '/v1/trials', '/v1/digest'):
                 query = parse_qs(parsed.query, strict_parsing=True)
                 if set(query) != {'project'} or len(query['project']) != 1:
                     raise ValueError('project required')
+                if parsed.path == '/v1/digest':
+                    return self.respond(200, {'ok': True, 'digest': Workflow(store).preview_digest(token,query['project'][0])})
                 if parsed.path == '/v1/trials':
                     return self.respond(200, {'ok': True, 'trials': TrialRunner(store).status(token, query['project'][0])})
                 if parsed.path == '/v1/dashboard':
@@ -114,6 +160,17 @@ class Handler(BaseHTTPRequestHandler):
             if method != 'POST' or parsed.query:
                 return self.respond(404, {'ok': False, 'error': 'not_found'})
             data = self.body()
+            if parsed.path=='/v1/digest/acknowledge':
+                return self.respond(200,{'ok':True,'receipt':Workflow(store).acknowledge_digest(token,data['project'],data['fingerprint'])})
+            workflow_match=re.fullmatch(r'/v1/tasks/([a-f0-9]{32})/(planning|change)',parsed.path)
+            if workflow_match:
+                workflow=Workflow(store)
+                if workflow_match[2]=='planning':
+                    result=workflow.plan(token,workflow_match[1],priority=data['priority'],due_at=data['due_at'])
+                else:
+                    result=workflow.propose_change(token,workflow_match[1],request_key=data['request_key'],
+                        manifest=data['manifest'],reason=data['reason'])
+                return self.respond(200,{'ok':True,'workflow':result})
             card_match = re.fullmatch(r'/v1/tasks/([a-f0-9]{32})/review-card(/acknowledge)?', parsed.path)
             if card_match:
                 workbench=Workbench(store)
@@ -178,9 +235,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(503, {'ok': False, 'error': 'unavailable'})
 
 
-def make_server(store, host='127.0.0.1', port=8791):
+def make_server(store, host='127.0.0.1', port=8791, *, public_origin=None):
     server = ThreadingHTTPServer((host, port), Handler)
     server.store = store
+    server.public_origin = public_origin
     return server
 
 
@@ -199,7 +257,7 @@ def main(argv=None):
     path = Path(args.data) / 'manager.sqlite3'
     if not path.is_file():
         parser.error('먼저 manager_bridge.control init으로 비공개 저장소를 준비해 주세요.')
-    server = make_server(Store(path), args.host, args.port)
+    server = make_server(Store(path), args.host, args.port, public_origin=args.public_origin)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
