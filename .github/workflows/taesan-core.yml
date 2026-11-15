@@ -6,7 +6,7 @@ on:
       - 'tests/test_taesan_core.py'
       - '.github/workflows/taesan-core.yml'
   push:
-    branches: ['codex/taesan-platform-core-*']
+    branches: ['codex/taesan-platform-core-*', 'codex/taesan-company-commerce-*']
     paths:
       - 'taesan_core/**'
       - 'tests/test_taesan_core.py'

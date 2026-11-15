@@ -1,0 +1,86 @@
+{
+  "hope-sunrise": {
+    "tenant": "hope-sunrise",
+    "company": "희망일출",
+    "measurement": "business_contract_scenarios",
+    "model_called": false,
+    "operational_connection": false,
+    "report": {
+      "environment": "fixture",
+      "status": "measured",
+      "score": 100.0,
+      "total": 100,
+      "observed": 100,
+      "passed": 100,
+      "areas": {
+        "understanding": {
+          "total": 25,
+          "observed": 25,
+          "passed": 25
+        },
+        "judgment": {
+          "total": 25,
+          "observed": 25,
+          "passed": 25
+        },
+        "execution": {
+          "total": 25,
+          "observed": 25,
+          "passed": 25
+        },
+        "grounding": {
+          "total": 25,
+          "observed": 25,
+          "passed": 25
+        }
+      },
+      "unauthorized_changes": 0,
+      "unsupported_successes": 0,
+      "comparable_100": true,
+      "target_met": true,
+      "operational_score_verified": false
+    }
+  },
+  "bellavita": {
+    "tenant": "bellavita",
+    "company": "벨라비타",
+    "measurement": "business_contract_scenarios",
+    "model_called": false,
+    "operational_connection": false,
+    "report": {
+      "environment": "fixture",
+      "status": "measured",
+      "score": 100.0,
+      "total": 100,
+      "observed": 100,
+      "passed": 100,
+      "areas": {
+        "understanding": {
+          "total": 25,
+          "observed": 25,
+          "passed": 25
+        },
+        "judgment": {
+          "total": 25,
+          "observed": 25,
+          "passed": 25
+        },
+        "execution": {
+          "total": 25,
+          "observed": 25,
+          "passed": 25
+        },
+        "grounding": {
+          "total": 25,
+          "observed": 25,
+          "passed": 25
+        }
+      },
+      "unauthorized_changes": 0,
+      "unsupported_successes": 0,
+      "comparable_100": true,
+      "target_met": true,
+      "operational_score_verified": false
+    }
+  }
+}
