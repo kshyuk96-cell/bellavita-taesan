@@ -1,0 +1,35 @@
+[
+  {
+    "project": "taesan-pr-62",
+    "state": "review_completed",
+    "review_verified": true,
+    "development_execution_verified": false,
+    "sandbox_verified": false,
+    "existing_cloud_windows_connected": false,
+    "operational_change": false,
+    "raw_comment_retained": false,
+    "checked_at": 1794736799.1574113,
+    "repository": "kshyuk96-cell/bellavita-taesan",
+    "pull_request": 62,
+    "head_sha": "5b02dcd5510b5f2447959c513dd1e91a193d70ff",
+    "observed_at": 1794736799.156564,
+    "has_any_findings": false,
+    "has_unresolved_findings": false,
+    "receipt_comment_id": 6892114321
+  },
+  {
+    "project": "taesan-pr-64",
+    "state": "environment_required",
+    "review_verified": false,
+    "development_execution_verified": false,
+    "sandbox_verified": false,
+    "existing_cloud_windows_connected": false,
+    "operational_change": false,
+    "raw_comment_retained": false,
+    "checked_at": 1794736800.486949,
+    "repository": "kshyuk96-cell/bellavita-taesan",
+    "pull_request": 64,
+    "head_sha": "27495b670ae295373722495b571496a421760a62",
+    "observed_at": 1794736800.4863465
+  }
+]

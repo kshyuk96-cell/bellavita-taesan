@@ -20,6 +20,7 @@ def dispatch(handler,method,path,token,body=None):
         'conversation/read':(('project','channel','conversation','request_id','text'),('attachment_ids',)),
         'business/read':(('project','action'),('query',)),
         'business/event':(('project','order_id','event_key'),()),
+        'receipts/inspect':(('project',),('max_age',)),
         'source/inspect':(('project',),()),
         'source/pending':(('projects',),('limit',)),
         'source/ack':(('event_id',),()),
@@ -95,6 +96,9 @@ def dispatch(handler,method,path,token,body=None):
         from .project_adapters import ProjectAdapters
         service=ProjectAdapters(store,registry,getattr(server,'project_business_providers',None))
         result=service.read(token,**args) if route.endswith('/read') else service.sync_event(token,**args)
+    elif route=='receipts/inspect':
+        from .cloud_review_receipts import CloudReviewReceipts
+        result=CloudReviewReceipts(store,registry,getattr(server,'cloud_review_probes',None)).inspect(token,**args)
     elif route.startswith('source/'):
         from .source_watch import SourceWatch
         service=SourceWatch(store,registry,getattr(server,'project_source_probes',None))
