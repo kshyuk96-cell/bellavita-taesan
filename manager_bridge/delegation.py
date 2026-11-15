@@ -183,20 +183,60 @@ class Delegation:
                       (key,project,owner['token_hash'],manager_hash,canonical_json(policy),digest(policy),'pending_approval',None,0,now))
             return self._public(c.execute('SELECT * FROM management_delegations WHERE id=?',(key,)).fetchone())
 
-    def activate(self,token,key,fingerprint):
+    def _activate(self,c,token,key,fingerprint):
         _hash(fingerprint)
+        row,policy=_grant(c,self.store,key)
+        config=self.registry._get(c,token,row['project'],('owner',))
+        actor=self.store._authenticate(c,token)
+        if actor['token_hash']!=row['owner_hash']:raise PermissionDenied('original granting owner required')
+        if row['fingerprint']!=fingerprint:raise Conflict('exact delegation approval required')
+        if row['state'] not in ('pending_approval','active'):raise Conflict('revoked delegation cannot reactivate')
+        if config['fingerprint']!=policy['config_fingerprint']:raise Conflict('project configuration changed')
+        if policy['expires_at']<=self.store._now():raise Conflict('delegation expired before activation')
+        _live_identity(c,self.store,row['manager_hash'],'manager',row['project'])
+        c.execute("UPDATE management_delegations SET state='active',approval=? WHERE id=?",(fingerprint,key))
+        return self._public(c.execute('SELECT * FROM management_delegations WHERE id=?',(key,)).fetchone())
+
+    def activate(self,token,key,fingerprint):
         with self.store._transaction() as c:
-            row,policy=_grant(c,self.store,key)
-            config=self.registry._get(c,token,row['project'],('owner',))
-            actor=self.store._authenticate(c,token)
-            if actor['token_hash']!=row['owner_hash']:raise PermissionDenied('original granting owner required')
-            if row['fingerprint']!=fingerprint:raise Conflict('exact delegation approval required')
-            if row['state'] not in ('pending_approval','active'):raise Conflict('revoked delegation cannot reactivate')
-            if config['fingerprint']!=policy['config_fingerprint']:raise Conflict('project configuration changed')
-            if policy['expires_at']<=self.store._now():raise Conflict('delegation expired before activation')
-            _live_identity(c,self.store,row['manager_hash'],'manager',row['project'])
-            c.execute("UPDATE management_delegations SET state='active',approval=? WHERE id=?",(fingerprint,key))
-            return self._public(c.execute('SELECT * FROM management_delegations WHERE id=?',(key,)).fetchone())
+            return self._activate(c,token,key,fingerprint)
+
+    def activate_batch(self,token,items):
+        """One exact owner decision, all-or-nothing; never enables project execution.
+
+        Each existing proposal retains its exact manager, paths, task budget and
+        expiry. An unrelated approval string or a partially valid list grants none.
+        """
+        if type(items) is not list or not 1<=len(items)<=20:
+            raise ValueError('bounded explicit delegation batch required')
+        ids=[]
+        for item in items:
+            if type(item) is not dict or set(item)!={'id','fingerprint'}:
+                raise ValueError('exact delegation identities and fingerprints required')
+            _task_id(item['id']);_hash(item['fingerprint']);ids.append(item['id'])
+        if len(set(ids))!=len(ids):raise ValueError('duplicate delegation approval')
+        with self.store._transaction() as c:
+            values=[self._activate(c,token,item['id'],item['fingerprint']) for item in items]
+            return {'delegations':values,'atomic':True,'project_execution_activated':False,
+                    'operational_approval':False}
+
+    def inventory(self,token,projects):
+        if type(projects) is not list or not 1<=len(projects)<=20 or len(set(projects))!=len(projects):
+            raise ValueError('bounded exact delegation scope required')
+        with self.store._transaction() as c:
+            for project in projects:self.registry._get(c,token,project)
+            values=[]
+            for project in sorted(projects):
+                rows=c.execute('SELECT * FROM management_delegations WHERE project=? ORDER BY created,id',(project,)).fetchall()
+                for row in rows:
+                    policy=json.loads(row['policy'])
+                    state=row['state']
+                    if state=='active':
+                        try:_current_grant(c,self.store,row,policy)
+                        except (Conflict,PermissionDenied):state='blocked'
+                    values.append({**self._public(row),'effective_state':state,
+                                   'remaining_tasks':max(0,policy['max_tasks']-row['used'])})
+            return {'delegations':values,'operational_approval':False}
 
     def authorize(self,token,grant_id,task_id,version,manifest_digest,*,requested_paths,dependencies=()):
         _task_id(task_id);_hash(manifest_digest)
