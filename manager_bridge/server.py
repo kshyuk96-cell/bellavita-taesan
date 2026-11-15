@@ -137,6 +137,12 @@ class Handler(BaseHTTPRequestHandler):
                         pass
                 return self.respond(200,{'ok':True,'logged_out':True},cookie=self._session_cookie('',0))
             token = self.token()
+            if parsed.path.startswith('/v1/representative/'):
+                from .representative_api import dispatch
+                data=self.body() if method=='POST' else None
+                if dispatch(self,method,self.path,token,data):
+                    return
+                return self.respond(404,{'ok':False,'error':'not_found'})
             if method == 'GET' and parsed.path in ('/v1/tasks', '/v1/overview', '/v1/scorecard', '/v1/dashboard', '/v1/trials', '/v1/digest', '/v1/connections'):
                 query = parse_qs(parsed.query, strict_parsing=True)
                 if set(query) != {'project'} or len(query['project']) != 1:
@@ -204,7 +210,7 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == '/v1/tasks':
                 result = store.submit(token, data['request_key'], data['manifest'])
             elif parsed.path == '/v1/worker/claim':
-                result = store.claim(token, data['project'], lease_seconds=data.get('lease_seconds', 300))
+                result = store.claim(token, data['project'], lease_seconds=data.get('lease_seconds', 300), task_id=data.get('task_id'))
             elif parsed.path == '/v1/worker/heartbeat':
                 result = store.heartbeat(token, data['id'], data['lease_token'],
                                          lease_seconds=data.get('lease_seconds', 300))

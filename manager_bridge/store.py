@@ -443,6 +443,10 @@ class Store:
                     c.execute("UPDATE bridge_tasks SET state='needs_verification',updated=? WHERE id=?", (self._now(), row['id']))
                     self._event(c, row['id'], 'server', 'approval_binding_invalid', 'needs_verification')
                     continue
+                try:
+                    self._validate_execution(c,row,check_source_age=True)
+                except (Conflict, PermissionDenied):
+                    continue
                 policy_row = c.execute('SELECT * FROM bridge_task_policy WHERE task=?', (row['id'],)).fetchone()
                 if policy_row:
                     from .coordination import Coordination
@@ -474,11 +478,19 @@ class Store:
                 return assignment
             return None
 
-    def _lease(self, row, actor, lease):
+    def _validate_execution(self,c,row,*,check_source_age=False):
+        approval=json.loads(row['approval']) if row['approval'] else {}
+        if approval.get('delegation_id') is not None:
+            if c is None:raise Conflict('delegated execution requires a transactional fence')
+            from .delegation import validate_execution
+            validate_execution(c,self,row,check_source_age=check_source_age)
+
+    def _lease(self, row, actor, lease, *, c=None):
         if (not isinstance(lease, str) or not _DIGEST.fullmatch(lease)
                 or row['worker_token_hash'] != actor['token_hash'] or row['worker_subject'] != actor['subject']
                 or not row['lease_hash'] or not hmac.compare_digest(row['lease_hash'], hashlib.sha256(lease.encode()).hexdigest())):
             raise Conflict('현재 작업자의 임대 식별값과 일치하지 않아요.')
+        self._validate_execution(c,row,check_source_age=False)
 
     def heartbeat(self, token, task_id, lease_token, *, lease_seconds=300, progress=None):
         _lease_seconds(lease_seconds)
@@ -489,7 +501,7 @@ class Store:
             actor = self._authenticate(c, token)
             self._role(actor, ('worker',))
             row = self._get(c, actor, task_id)
-            self._lease(row, actor, lease_token)
+            self._lease(row, actor, lease_token, c=c)
             self._expire(c, row['project'])
             row = self._get(c, actor, task_id)
             if row['state'] != 'running':
@@ -506,7 +518,7 @@ class Store:
             actor = self._authenticate(c, token)
             self._role(actor, ('worker',))
             row = self._get(c, actor, task_id)
-            self._lease(row, actor, lease_token)
+            self._lease(row, actor, lease_token, c=c)
             if row['state'] != 'running' or row['lease_expires'] <= self._now():
                 raise Conflict('작업이 취소·만료되었거나 이미 보고돼 결과를 확정하지 않았어요.')
             c.execute("UPDATE bridge_tasks SET state='reported',report=?,updated=? WHERE id=? AND state='running'",

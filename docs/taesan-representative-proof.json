@@ -1,0 +1,22 @@
+{
+  "scope": "synthetic_project_actual_native_agent",
+  "owner_policy_activations": 1,
+  "owner_per_task_approvals": 0,
+  "manager_authorized_tasks": 2,
+  "actual_native_executions": 1,
+  "actual_native_agent": "/root/management_fixture_worker",
+  "task_id": "0a74933b707ff5dd1a4eb5ab2148d767",
+  "distinct_fixture_tests": 4,
+  "independent_check_commands": 2,
+  "independently_verified": true,
+  "candidate_clean": true,
+  "meeting_tracks_verified_task": true,
+  "fixture_closed": {
+    "unused_task": "cancelled",
+    "grant": "revoked",
+    "verified_candidate_preserved": true
+  },
+  "customer_sessions_connected": false,
+  "live_ai_score": null,
+  "operational_change": false
+}

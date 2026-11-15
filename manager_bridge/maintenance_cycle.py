@@ -196,6 +196,7 @@ class Cycle:
 
     def _current(self,c,worker_token,row):
         binding,config,task=self._binding(c,worker_token,row['project'],row['task'],row['action'],roles=('worker',))
+        self.store._validate_execution(c,task,check_source_age=False)
         if digest(binding)!=row['fingerprint']:
             raise Conflict('maintenance scope changed')
         if not config['config']['maintenance_enabled']:
@@ -248,14 +249,14 @@ class Cycle:
                 current=self._get(c,worker_token,job_id,roles=('worker',))
                 binding,config,task=self._current(c,worker_token,current)
                 if current['state']!='running' or task['state']!='running':raise Conflict('job cancelled before execution')
-                actor=self.store._authenticate(c,worker_token);self.store._lease(task,actor,lease)
+                actor=self.store._authenticate(c,worker_token);self.store._lease(task,actor,lease,c=c)
             observed=action.observe_source(project)
             if observed!=binding['base_sha']:
                 raise Conflict('source changed before maintenance execution')
             with self.store._transaction() as c:
                 current=self._get(c,worker_token,job_id,roles=('worker',))
                 _,_,task=self._current(c,worker_token,current)
-                actor=self.store._authenticate(c,worker_token);self.store._lease(task,actor,lease)
+                actor=self.store._authenticate(c,worker_token);self.store._lease(task,actor,lease,c=c)
                 if current['state']!='running' or task['state']!='running' or task['lease_expires']<=self.store._now():
                     raise Conflict('execution approval changed during source observation')
 
