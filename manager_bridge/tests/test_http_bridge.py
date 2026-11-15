@@ -44,6 +44,15 @@ class HttpBridgeTests(unittest.TestCase):
         self.assertTrue(response.get('ok'), response)
         return response['task']
 
+    def test_project_overview_requires_manager_and_omits_private_manifest(self):
+        task = self.submit()
+        response = request(self.base, self.manager, 'GET', '/v1/overview?project=bellavita')
+        self.assertEqual(response['overview']['counts']['pending_approval'], 1)
+        self.assertEqual(response['overview']['actions'][0]['task_id'], task['id'])
+        self.assertNotIn(self.manifest['description'], json.dumps(response))
+        self.assertEqual(request(self.base, self.worker, 'GET', '/v1/overview?project=bellavita')['status'], 403)
+        self.assertEqual(request(self.base, self.manager, 'GET', '/v1/overview?project=camp')['status'], 404)
+
     def test_real_http_approval_claim_report_and_independent_review(self):
         task = self.submit()
         self.assertEqual(task['state'], 'pending_approval')

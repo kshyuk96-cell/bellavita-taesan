@@ -317,6 +317,30 @@ class Store:
                     break
             return result
 
+    def overview(self, token, project):
+        """All project counts, bounded action IDs, no prompts/PII/credentials."""
+        from .supervisor import recovery_action
+        with self._transaction() as c:
+            actor = self._authenticate(c, token)
+            self._role(actor, ('owner', 'manager'))
+            self._project_access(c, actor, project)
+            self._expire(c, project)
+            rows = c.execute('SELECT * FROM bridge_tasks WHERE project=? ORDER BY updated DESC,id', (project,)).fetchall()
+            counts = {state: 0 for state in sorted(_STATES)}
+            actions = []
+            for row in rows:
+                counts[row['state']] += 1
+                if row['state'] in ('reviewed', 'cancelled'):
+                    continue
+                failed = bool(row['report'] and any(item['passed'] is False for item in json.loads(row['report'])['checks']))
+                if len(actions) < 100:
+                    actions.append({'task_id': row['id'], 'state': row['state'],
+                                    'action': recovery_action({'state': row['state']}),
+                                    'failed_or_unverified_checks': failed})
+            return {'counts': counts, 'actions': actions,
+                    'actions_truncated': sum(counts[state] for state in counts if state not in ('reviewed', 'cancelled')) > 100,
+                    'operational_deployment_verified': False}
+
     def submit(self, token, request_key, manifest):
         manifest = _manifest(manifest)
         if not isinstance(request_key, str) or not _KEY.fullmatch(request_key):
@@ -368,6 +392,9 @@ class Store:
             self._project_access(c, actor, project)
             self._expire(c, project)
             rows = c.execute("SELECT * FROM bridge_tasks WHERE project=? AND state='queued' ORDER BY created,id", (project,)).fetchall()
+            occupied = c.execute("SELECT manifest FROM bridge_tasks WHERE state IN "
+                                 "('running','reported','needs_verification')").fetchall()
+            reserved_repositories = {json.loads(item['manifest'])['repository'] for item in occupied}
             for row in rows:
                 manifest = json.loads(row['manifest'])
                 if manifest['kind'] not in actor['capabilities']:
@@ -376,6 +403,11 @@ class Store:
                 if approval.get('version') != row['version'] or approval.get('manifest_digest') != row['manifest_digest']:
                     c.execute("UPDATE bridge_tasks SET state='needs_verification',updated=? WHERE id=?", (self._now(), row['id']))
                     self._event(c, row['id'], 'server', 'approval_binding_invalid', 'needs_verification')
+                    continue
+                # Until independent review, reserve the whole repository. Unknown file
+                # scopes must not be inferred from natural language. This is global
+                # across projects which happen to register the same repository.
+                if manifest['repository'] in reserved_repositories:
                     continue
                 lease, expires = secrets.token_hex(32), self._now() + lease_seconds
                 claimed = c.execute('''UPDATE bridge_tasks SET state='running',worker_subject=?,worker_token_hash=?,
