@@ -1,0 +1,56 @@
+{
+  "prepared_on_kst": "2026-11-15",
+  "repository": "kshyuk96-cell/bellavita-taesan",
+  "pull_request": "https://github.com/kshyuk96-cell/bellavita-taesan/pull/20",
+  "pr_state_observed": "draft, open, unmerged",
+  "source_branch": "codex/shop-backend",
+  "runtime_source_commit": "4df6bc54a8a1d1f71fec152447ff9e444097f9d4",
+  "latest_main_observed": "db742efa7ec7291293659e02dd1e50aa26a1465c",
+  "common_base": "9474f6d1d5cd0589ae09c360d90745cbe224d41a",
+  "latest_main_not_integrated": [
+    "db742efa7ec7291293659e02dd1e50aa26a1465c Verify invitation sources and reuse catalog reads (#55)",
+    "768e6329facbf24831b94aa1a07b21f831266f40 Verify source fingerprints before invitation copies and cache catalog reads",
+    "7c88d4e3cd3824f2fe3dff0b04e70b732dfb815d Connect approved ERP invitation and AI gateways (#54)",
+    "d2a367a6a11cb7849afcb5a42db0085fe623db8e Connect approved ERP invitation and existing-key AI gateways",
+    "26511d3cc7943db77691f05beabd65503eb927d8 Release verified Kakao delivery and inventory lookups"
+  ],
+  "dry_merge_conflicts": [
+    "agent.py"
+  ],
+  "actual_merge_performed": false,
+  "last_verified_mock_server_commit": "d423e89f14603001b506b708734beda8b55a16d2",
+  "existing_main_live_commit_observed": "db742efa7ec7291293659e02dd1e50aa26a1465c",
+  "new_40_improvements_deployed": false,
+  "full_regression": {
+    "passed": 189,
+    "seconds": 89.151,
+    "includes_latest_main_changes": false
+  },
+  "schema": {
+    "scope": "fresh isolated empty databases only",
+    "shop_and_legacy_tables": 69,
+    "receiver_tables": 3,
+    "new_main_erp_invitation_journal_not_in_pr_schema": true
+  },
+  "sample_config": "handoff/bellavita.sample.json",
+  "handoff_document": "docs/platform-migration-handoff.md",
+  "runtime_documents": [
+    "docs/prepayment-improvements-batch-01.md",
+    "docs/admin-improvements-batch-02.md",
+    "docs/admin-improvements-batch-03.md",
+    "docs/checkout-improvements-batch-04.md"
+  ],
+  "actual_payments_verified": false,
+  "actual_messages_verified": false,
+  "actual_receipts_verified": false,
+  "production_database_exported": false,
+  "secrets_exported": false,
+  "production_data_migrated": false,
+  "expected_export_artifacts": [
+    "bellavita-pr20-source.tar.gz",
+    "latest-main-reference.tar.gz",
+    "pr20-from-common-base.patch",
+    "manifest.json",
+    "checksums.sha256"
+  ]
+}

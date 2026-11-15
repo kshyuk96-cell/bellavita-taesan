@@ -1,0 +1,83 @@
+{
+  "kind": "migration_reference_not_target_platform_import_schema",
+  "tenant_key": "bellavita",
+  "display_name": "벨라비타",
+  "currency": "KRW",
+  "timezone": "Asia/Seoul",
+  "catalog_source": "assets/shop/catalog.json",
+  "products": [
+    {
+      "source_id": "1454214",
+      "title": "(2~4호 선물형) 신랑신부 사진으로 액자화환 보내기 <웨딩 사진>",
+      "base_price": 110000,
+      "tax_type": null
+    },
+    {
+      "source_id": "1440817",
+      "title": "(2~4호 선물형) 결혼 축하 액자화환 <풍경 사진>",
+      "base_price": 110000,
+      "tax_type": null
+    },
+    {
+      "source_id": "1452802",
+      "title": "(2~4호 선물형) 개업ㆍ행사ㆍ취임 등 축하 액자화환 <풍경 사진>",
+      "base_price": 110000,
+      "tax_type": null
+    },
+    {
+      "source_id": "1969605",
+      "title": "근조 액자화환 <풍경 사진>",
+      "base_price": 110000,
+      "tax_type": null
+    }
+  ],
+  "offer_price_examples": [
+    93500,
+    99000
+  ],
+  "catalog_price_examples": {
+    "base": 110000,
+    "example_option_addition": 55000,
+    "example_total": 165000
+  },
+  "order_stages": [
+    "confirmed",
+    "shipping",
+    "delivered"
+  ],
+  "payment_provider": "payapp",
+  "real_payment_verified": false,
+  "notification_channel": "kakao_alimtalk",
+  "notification_provider": null,
+  "solapi_adapter_present": true,
+  "solapi_account_available": false,
+  "sms_fallback_enabled": false,
+  "receipt_issuer": null,
+  "receipt_real_verified": false,
+  "frame_public_options_mm": [
+    [
+      600,
+      400
+    ],
+    [
+      700,
+      467
+    ]
+  ],
+  "scroll_actual_mm": null,
+  "preview_scroll_ratio_is_not_production_size": true,
+  "default_live_flags": {
+    "payment": false,
+    "messages": false,
+    "receipts": false,
+    "production_handoff": false,
+    "live_ledger_writes": false
+  },
+  "storage_reference": {
+    "single_instance_sqlite": true,
+    "owner_confirmed_production_data_path": "/var/data",
+    "production_files_integrity_verified": false
+  },
+  "production_credentials_included": false,
+  "production_customer_data_included": false
+}
