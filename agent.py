@@ -1,3 +1,4 @@
+import erp_invitations
 """Kakao employee assistant. The model chooses actions; Python controls side effects."""
 import argparse
 import base64
@@ -1188,6 +1189,8 @@ class Handler(BaseHTTPRequestHandler):
                 connection.close()
             return self.send_json(result, status)
         path = urlsplit(self.path).path
+        if erp_invitations.dispatch(self, 'POST', path, ROOT, os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'), invitation, extract_event):
+            return
         if path == '/development-queue':
             try:
                 length = int(self.headers.get('Content-Length', ''))
@@ -1392,6 +1395,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        if erp_invitations.dispatch(self, 'GET', path, ROOT, os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'), invitation, extract_event):
+            return
         if path == '/development-queue':
             with db() as c:
                 if not development_queue.authorized(c, self.headers.get('Authorization', ''), 'GET'):
