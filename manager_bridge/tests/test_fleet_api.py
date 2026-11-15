@@ -62,3 +62,13 @@ class FleetHTTPTests(unittest.TestCase):
         for route,body in [('fleet/inventory',{'projects':[{}]}),('fleet/inventory',{'projects':[[]]}),('fleet/inventory?project=project',{'projects':['project']}),('continuous/status',{'projects':['project'],'limit':True}),('continuous/tick',{'projects':['project'],'instance_id':'host','limit':True,'executor':'command'})]:
             bad=request(base,self.manager,'POST',PREFIX+route,body)
             self.assertEqual(bad['status'],400)
+
+    def test_reserved_routes_accept_only_references_never_private_execution_proof(self):
+        _,base=self.server_start()
+        for action in ('reserved/begin','reserved/bind'):
+            for key in ('lease_token','session','delivery','execution_started','provider'):
+                response=request(base,self.manager,'POST',PREFIX+'fleet/'+action,{'reservation_id':'a'*64,key:'private proof'})
+                self.assertEqual(response['status'],400)
+        response=request(base,self.manager,'POST',PREFIX+'fleet/reserve',{'task_id':'b'*32,'template_ref':'template','request_key':'reserve'})
+        self.assertEqual(response['status'],404)
+        self.assertEqual(self.create_calls,0)

@@ -8,6 +8,9 @@ FLEET={
  'discover':(('project','host_ref'),()),
  'enroll':(('project','host_ref','external_ref'),()),
  'create':(('task_id','template_ref','request_key'),()),
+ 'reserve':(('task_id','template_ref','request_key'),()),
+ 'reserved/begin':(('reservation_id',),()),
+ 'reserved/bind':(('reservation_id',),()),
  'inventory':(('projects',),()),
  'delivery/verify':(('project','host_ref','external_ref','task_id'),()),
 }
@@ -43,9 +46,9 @@ def dispatch(handler,method,path,token,body=None):
             if type(projects) not in (list,tuple) or not 1<=len(projects)<=100 or any(type(p) is not str for p in projects) or len(set(projects))!=len(projects):raise ValueError('bounded explicit projects required')
         elif 'project' in args:projects=[args['project']]
         elif 'task_id' in args:projects=[store._get(c,actor,args['task_id'])['project']]
-        elif 'creation_id' in args:
+        elif 'creation_id' in args or 'reservation_id' in args:
             from .store import NotFound
-            row=c.execute('SELECT project FROM fleet_creates WHERE id=?',(args['creation_id'],)).fetchone() if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='fleet_creates'").fetchone() else None
+            row=c.execute('SELECT project FROM fleet_creates WHERE id=?',(args.get('creation_id',args.get('reservation_id')),)).fetchone() if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='fleet_creates'").fetchone() else None
             if row is None:raise NotFound('creation unavailable')
             projects=[row['project']]
         for project in projects or ():
@@ -62,7 +65,7 @@ def dispatch(handler,method,path,token,body=None):
     if not isinstance(service,expected) or service.store is not store:raise ValueError('exact registered management service required')
     if family=='fleet':
         names={'hosts/register':'register_host','templates/register':'register_template','discover':'discover',
-            'enroll':'enroll','create':'create_for_task','creation':'get_creation','inventory':'inventory','delivery/verify':'verify_delivery'}
+            'enroll':'enroll','create':'create_for_task','reserve':'reserve_for_task','reserved/begin':'begin_reserved_execution','reserved/bind':'bind_reserved_execution','creation':'get_creation','inventory':'inventory','delivery/verify':'verify_delivery'}
         result=getattr(service,names[action])(token,**args)
     else:result=getattr(service,action)(token,**args)
     handler.respond(200,{'ok':True,'result':result})

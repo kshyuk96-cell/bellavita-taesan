@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 from manager_bridge.continuous_host import ContinuousHost,ProjectHost,_git,_private_json,load_host,_validate_resources
 from manager_bridge.continuous_manager import ContinuousManager,ActionRequest
-from manager_bridge.fleet import SessionObservation,Fleet,FleetProvider
+from manager_bridge.fleet import SessionObservation,Fleet,FleetProvider,DeliveryObservation,ReservedExecutionObservation
 from manager_bridge.fleet_codex import ExecutionReceipt
 from manager_bridge.store import Store,Conflict,token_hash,digest
 from manager_bridge.maintenance_registry import Registry
@@ -21,7 +21,7 @@ from manager_bridge.three_tier_runner import FixedReviewRunner
 SESSION='00000000-0000-4000-8000-000000000001'
 
 class DevelopmentFixture:
-    def __init__(self,source,clock):self.source=source;self.clock=clock;self.calls=0;self.fail=False;self.escape=False;self.empty=False
+    def __init__(self,source,clock):self.source=source;self.clock=clock;self.calls=0;self.fail=False;self.escape=False;self.empty=False;self.saved={};self.native_calls=0
     def discover(self,project):
         return (SessionObservation(project,SESSION,SESSION,'codex_cli','fixture/project',_git(self.source,'rev-parse','HEAD').decode().strip(),True,'fixture/receiver',self.clock()),)
     def execute(self,project,assignment,session,*,heartbeat):
@@ -31,7 +31,20 @@ class DevelopmentFixture:
             target=self.source/('escape.py' if self.escape else 'src/main.py')
             target.write_text('value = '+str(self.calls)+'\n')
         heartbeat()
-        return ExecutionReceipt(project,assignment['id'],session,'execution_observed',0,True,1,1,0,({'command_digest':digest('fixture-command'),'exit_code':0},),digest(['fixture',self.calls]),self.clock())
+        receipt=ExecutionReceipt(project,assignment['id'],session,'execution_observed',0,True,1,1,0,({'command_digest':digest('fixture-command'),'exit_code':0},),digest(['fixture',self.calls]),self.clock())
+        self.saved[assignment['id']]=(assignment,receipt)
+        return receipt
+    def ready_for_new(self,project):return True
+    def execute_new(self,project,assignment,reservation_id,*,heartbeat):
+        self.native_calls+=1
+        return self.execute(project,assignment,SESSION,heartbeat=heartbeat)
+    def delivery(self,project,session,task_id):
+        task,receipt=self.saved[task_id]
+        return DeliveryObservation(project,session,task_id,task['version'],task['manifest_digest'],'fixture/actual-execution','commands_observed',1,0,True,'fixture/actual-delivery',self.clock(),digest(task['worker']),token_hash(task['lease_token']))
+    def reserved_observer(self,project,reservation_id,task_id):
+        task,receipt=self.saved[task_id]
+        session=SessionObservation(project,SESSION,SESSION,'codex_cli','fixture/project',task['manifest']['base_sha'],False,'fixture/native-after-execution',self.clock())
+        return ReservedExecutionObservation(reservation_id,session,self.delivery(project,SESSION,task_id))
 
 class HostTests(unittest.TestCase):
     def setUp(self):
@@ -243,6 +256,55 @@ class HostTests(unittest.TestCase):
         self.tick()
         self.assertFalse(sentinel.exists());self.assertEqual(self.host._row(task['id'])['phase'],'executed')
         self.assertEqual(self.core.get(self.manager,task['id'])['state'],'developing')
+    def deferred(self):
+        provider=FleetProvider(self.transport.discover,execution_provisioning=True,delivery_observer=self.transport.delivery,reserved_execution_observer=self.transport.reserved_observer)
+        fleet=Fleet(self.store,self.registry,providers={('project','native-host'):provider})
+        fleet.register_host(self.owner,'project','native-host');fleet.register_template(self.owner,'project','native-template','native-host',max_sessions=4,expires_at=self.now+3600)
+        for key,value in [('session_id',None),('worker_mode','deferred_native'),('fleet_host_ref','native-host'),('fleet_template','native-template')]:object.__setattr__(self.project,key,value)
+        self.host.fleet=fleet
+        return fleet
+    def test_deferred_reservation_does_not_claim_receiver_until_actual_execution(self):
+        fleet=self.deferred();task=self.task();self.tick()
+        self.assertEqual(self.transport.native_calls,0)
+        with self.store._transaction() as c:
+            self.assertEqual(c.execute('SELECT state FROM fleet_creates').fetchone()[0],'reserved')
+            self.assertEqual(c.execute('SELECT count(*) FROM fleet_sessions').fetchone()[0],0)
+        with patch.object(FixedReviewRunner,'__call__',lambda runner,candidate,reviewer,**kw:self.mechanical(runner,candidate,reviewer,**kw)):
+            for _ in range(7):self.tick()
+        self.assertEqual(self.core.get(self.manager,task['id'])['state'],'accepted');self.assertEqual(self.transport.native_calls,1)
+        with self.store._transaction() as c:self.assertEqual(c.execute('SELECT session_id FROM continuous_host_sessions').fetchone()[0],SESSION)
+        child=self.task(base=self.host._row(task['id'])['candidate_head'],dependencies=[task['id']])
+        with patch.object(FixedReviewRunner,'__call__',lambda runner,candidate,reviewer,**kw:self.mechanical(runner,candidate,reviewer,**kw)):
+            for _ in range(8):self.tick()
+        self.assertEqual(self.core.get(self.manager,child['id'])['state'],'accepted')
+        self.assertEqual(self.transport.native_calls,1);self.assertEqual(self.transport.calls,2)
+        with self.store._transaction() as c:self.assertEqual(c.execute('SELECT count(*) FROM fleet_creates').fetchone()[0],1)
+    def test_unknown_deferred_execution_survives_restart_without_second_native_turn(self):
+        self.deferred();task=self.task();self.transport.fail=True
+        self.tick();self.tick();self.now+=31;self.scheduler=ContinuousManager(self.core,handlers=self.host.handlers())
+        for _ in range(4):self.tick()
+        self.assertEqual(self.transport.native_calls,1)
+        with self.store._transaction() as c:self.assertEqual(c.execute('SELECT state FROM fleet_creates').fetchone()[0],'executing')
+        self.assertEqual(self.host._row(task['id'])['phase'],'uncertain')
+    def test_explicit_metadata_only_partial_start_recovers_with_new_template_no_native_replay(self):
+        task=self.task();created=[]
+        provider=FleetProvider(lambda _:(),lambda project,public,key:(created.append(key) or self.transport.discover(project)[0]))
+        fleet=Fleet(self.store,self.registry,providers={('project','old-host'):provider})
+        fleet.register_host(self.owner,'project','old-host');fleet.register_template(self.owner,'project','old-template','old-host',max_sessions=1,expires_at=self.now+3600)
+        for key,value in [('session_id',None),('fleet_host_ref','old-host'),('fleet_template','old-template')]:object.__setattr__(self.project,key,value)
+        self.host.fleet=fleet
+        # Metadata-only create succeeds but the process-scoped receiver vanishes.
+        with patch.object(self.transport,'discover',side_effect=[(SessionObservation('project',SESSION,SESSION,'codex_cli','fixture/project',self.base,True,'fixture/ephemeral',self.now),),()]):self.tick()
+        with self.store._transaction() as c:action=c.execute("SELECT action_key FROM continuous_actions WHERE phase='start'").fetchone()[0]
+        self.assertEqual(len(created),1);self.assertEqual(self.transport.calls,0)
+        newfleet=self.deferred();self.now+=31
+        result=self.scheduler.reconcile(self.manager,['project'],'fixture-instance',action)
+        self.assertEqual(result['actions'][0]['state'],'confirmed')
+        self.assertEqual(self.core.get(self.manager,task['id'])['state'],'development_queued');self.assertEqual(self.transport.calls,0)
+        with self.store._transaction() as c:
+            self.assertEqual(c.execute('SELECT count(*) FROM fleet_creates').fetchone()[0],2)
+            self.assertEqual(c.execute("SELECT count(*) FROM fleet_creates WHERE state='created'").fetchone()[0],1)
+            self.assertEqual(c.execute("SELECT state FROM continuous_actions WHERE action_key=?",(action,)).fetchone()[0],'reconciled')
     def test_start_wrong_source_base_has_no_execution(self):
         task=self.task(base='a'*40)
         for _ in range(2):self.tick()

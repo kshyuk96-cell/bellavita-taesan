@@ -389,3 +389,117 @@ class ReworkDeliveryTests(unittest.TestCase):
         self.callback=mutate
         with self.assertRaises(Conflict):self.check(task)
         with self.store._transaction() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM fleet_deliveries').fetchone()[0],0)
+
+class ReservedExecutionTests(unittest.TestCase):
+    setUp=FleetTests.setUp
+    observation=FleetTests.observation
+    discover=FleetTests.discover
+    create=FleetTests.create
+    task=FleetTests.task
+    template=FleetTests.template
+
+    def setup_reserved(self,cap=2):
+        self.calls=0
+        def observer(*args):self.calls+=1;return self.receipt
+        self.fleet.providers[('project','host')]=FleetProvider(self.discover,self.create,True,None,True,observer)
+        self.template(cap);task=self.task()
+        result=self.fleet.reserve_for_task(self.manager,task['id'],'template','reserve')
+        return task,result
+
+    def lease(self,task):
+        self.coord.readiness(self.manager,token_hash(self.worker),ready=True,reason='ready',ttl=300)
+        self.coord.route(self.manager,task['id'],worker_hash=token_hash(self.worker))
+        return self.store.claim(self.worker,'project',task_id=task['id'])
+
+    def running(self):
+        from manager_bridge.fleet import DeliveryObservation,ReservedExecutionObservation
+        task,reservation=self.setup_reserved();leased=self.lease(task)
+        self.fleet.begin_reserved_execution(self.manager,reservation['id'])
+        evidence=DeliveryObservation('project','native-uuid',task['id'],task['version'],task['manifest_digest'],
+            'codex-execution/'+'a'*64,'commands_observed',1,0,True,'fixture/actual',self.now,digest(leased['worker']),token_hash(leased['lease_token']))
+        self.receipt=ReservedExecutionObservation(reservation['id'],self.observation(external_ref='native-uuid',session_id='native-uuid',can_receive=False),evidence)
+        return task,reservation,leased
+
+    def test_reservation_no_callbacks_or_inventory_session_and_no_old_create(self):
+        task,reservation=self.setup_reserved()
+        self.assertEqual(reservation['state'],'reserved');self.assertEqual(self.calls,0);self.assertEqual(self.create_calls,0)
+        self.assertEqual(self.fleet.inventory(self.manager,['project'])['projects'][0]['sessions'],[])
+        same=self.fleet.reserve_for_task(self.manager,task['id'],'template','reserve');self.assertEqual(same['id'],reservation['id'])
+        with self.assertRaises(Conflict):self.fleet.create_for_task(self.manager,task['id'],'template','old')
+        self.assertEqual(self.create_calls,0)
+
+    def test_begin_is_durable_exact_live_lease_and_not_replayed(self):
+        task,reservation=self.setup_reserved()
+        with self.assertRaises(Conflict):self.fleet.begin_reserved_execution(self.manager,reservation['id'])
+        leased=self.lease(task);self.fleet.begin_reserved_execution(self.manager,reservation['id'])
+        self.assertTrue(self.fleet.authorize_reserved_execution(self.manager,reservation['id'],leased))
+        with self.assertRaises(Conflict):self.fleet.begin_reserved_execution(self.manager,reservation['id'])
+        with self.assertRaises((Conflict,PermissionDenied)):self.fleet.authorize_reserved_execution(self.manager,reservation['id'],{**leased,'lease_token':'wrong'})
+        self.assertEqual(self.calls,0)
+
+    def test_bind_actual_uuid_without_false_future_readiness(self):
+        task,reservation,leased=self.running()
+        result=self.fleet.bind_reserved_execution(self.manager,reservation['id'])
+        self.assertEqual(result['external_ref'],'native-uuid');self.assertEqual(result['state'],'created')
+        session=self.fleet.inventory(self.manager,['project'])['projects'][0]['sessions'][0]
+        self.assertEqual(session['state'],'observed');self.assertFalse(session['host_transport_observed'])
+        self.assertFalse(session['instruction_delivery_verified'])
+        with self.assertRaises(Conflict):self.fleet.bind_reserved_execution(self.manager,reservation['id'])
+        self.assertEqual(self.calls,1)
+
+    def test_old_uncertain_and_reserved_count_against_same_cap(self):
+        task,reservation=self.setup_reserved(cap=1)
+        with self.store._transaction() as c:c.execute("UPDATE fleet_creates SET state='uncertain' WHERE id=?",(reservation['id'],))
+        with self.assertRaises(Conflict):self.fleet.reserve_for_task(self.manager,task['id'],'template','another')
+        same=self.fleet.reserve_for_task(self.manager,task['id'],'template','reserve');self.assertEqual(same['state'],'uncertain')
+        self.assertEqual(self.create_calls,0)
+
+    def test_untyped_wrong_reservation_source_or_lease_receipt_never_binds(self):
+        task,reservation,_=self.running();valid=self.receipt
+        for value in (True,replace(valid,reservation_id='f'*64),replace(valid,session=replace(valid.session,source_sha='b'*40)),replace(valid,delivery=replace(valid.delivery,lease_digest='c'*64))):
+            self.receipt=value
+            with self.assertRaises(Conflict):self.fleet.bind_reserved_execution(self.manager,reservation['id'])
+        self.assertEqual(self.fleet.inventory(self.manager,['project'])['projects'][0]['sessions'],[])
+        self.assertEqual(self.fleet.get_creation(self.manager,reservation['id'])['state'],'executing')
+
+    def test_revocation_or_config_change_during_callback_does_not_bind(self):
+        task,reservation,_=self.running()
+        def revoke(*args):self.store.revoke_token(self.owner,token_hash(self.manager));return self.receipt
+        self.fleet.providers[('project','host')]=FleetProvider(self.discover,None,True,None,True,revoke)
+        with self.assertRaises(PermissionDenied):self.fleet.bind_reserved_execution(self.manager,reservation['id'])
+        with self.store._transaction() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM fleet_sessions').fetchone()[0],0)
+
+    def test_expired_or_changed_lease_cannot_authorize_or_bind(self):
+        task,reservation,leased=self.running()
+        self.now+=301
+        with self.assertRaises(Conflict):self.fleet.authorize_reserved_execution(self.manager,reservation['id'],leased)
+        self.now-=301
+        with self.store._transaction() as c:c.execute('UPDATE bridge_tasks SET lease_hash=? WHERE id=?',('f'*64,task['id']))
+        with self.assertRaises(Conflict):self.fleet.bind_reserved_execution(self.manager,reservation['id'])
+        self.assertEqual(self.calls,0)
+
+    def test_second_reservation_cannot_replay_same_task_lease(self):
+        task,first=self.setup_reserved()
+        second=self.fleet.reserve_for_task(self.manager,task['id'],'template','second')
+        leased=self.lease(task);self.fleet.begin_reserved_execution(self.manager,first['id'])
+        with self.assertRaises(Conflict):self.fleet.begin_reserved_execution(self.manager,second['id'])
+        self.assertEqual(self.fleet.get_creation(self.manager,second['id'])['state'],'reserved')
+        status=self.fleet.get_creation(self.manager,first['id'])
+        self.assertIsNone(status['execution_started']);self.assertEqual(status['execution_outcome'],'unknown')
+
+    def test_unknown_or_failed_native_turn_never_binds_or_replays(self):
+        task,reservation,_=self.running();valid=self.receipt
+        for state in ('uncertain','execution_failed'):
+            self.receipt=replace(valid,delivery=replace(valid.delivery,state=state,completed_commands=0,turn_completed=False))
+            with self.assertRaises(Conflict):self.fleet.bind_reserved_execution(self.manager,reservation['id'])
+        self.assertEqual(self.fleet.get_creation(self.manager,reservation['id'])['state'],'executing')
+        with self.assertRaises(Conflict):self.fleet.begin_reserved_execution(self.manager,reservation['id'])
+        self.assertEqual(self.fleet.inventory(self.manager,['project'])['projects'][0]['sessions'],[])
+
+    def test_completed_turn_with_failed_commands_binds_without_success_claim(self):
+        task,reservation,_=self.running()
+        self.receipt=replace(self.receipt,delivery=replace(self.receipt.delivery,state='execution_failed',failed_commands=1,turn_completed=True))
+        result=self.fleet.bind_reserved_execution(self.manager,reservation['id'])
+        self.assertTrue(result['execution_started']);self.assertEqual(result['execution_outcome'],'execution_failed')
+        self.assertFalse(result['delivery']['instruction_delivery_verified']);self.assertFalse(result['delivery']['tests_verified'])
+        self.assertTrue(self.fleet.get_creation(self.manager,reservation['id'])['execution_started'])

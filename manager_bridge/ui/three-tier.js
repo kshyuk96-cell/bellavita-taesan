@@ -189,7 +189,8 @@
       if (fleet.status==='fulfilled'&&Array.isArray(fleet.value.projects)&&fleet.value.projects.length<=100) {
         for (const project of fleet.value.projects) {
           if (!requested.includes(project.project)||!Array.isArray(project.hosts)||!Array.isArray(project.sessions)||project.sessions.length>200) throw Error('scope');
-          $('tier-runtime').append(el('p',safeText(project.project)+' · 등록 호스트 '+project.hosts.length+'개 · 세션 전체 '+count(project.total_session_count)+'개 중 '+count(project.displayed_session_count)+'개 표시 · 생성 확인 필요 '+count(project.uncertain_creations)+'건'));
+          const ready=project.sessions.filter(session=>session.host_transport_observed===true).length;
+          $('tier-runtime').append(el('p',safeText(project.project)+' · 등록 호스트 '+project.hosts.length+'개 · 세션 전체 '+count(project.total_session_count)+'개 기록 중 '+count(project.displayed_session_count)+'개 표시 · 표시 기록 중 연결 관측 '+ready+'개 · 생성 확인 필요 '+count(project.uncertain_creations)+'건'));
         }
       } else $('tier-runtime').append(el('p','클라우드 연결 목록은 확인하지 못했습니다.','error'));
       if (continuous.status==='fulfilled'&&Array.isArray(continuous.value.actions)&&continuous.value.actions.length<=200) {

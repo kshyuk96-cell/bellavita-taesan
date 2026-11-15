@@ -78,14 +78,28 @@ class DeliveryObservation:
 
 
 @dataclass(frozen=True)
+class ReservedExecutionObservation:
+    reservation_id:str
+    session:SessionObservation
+    delivery:DeliveryObservation
+    def __post_init__(self):
+        if type(self.reservation_id) is not str or not re.fullmatch('[a-f0-9]{64}',self.reservation_id):raise ValueError('exact reservation required')
+        if not isinstance(self.session,SessionObservation) or not isinstance(self.delivery,DeliveryObservation):raise ValueError('typed actual execution required')
+        if self.session.project!=self.delivery.project or self.session.session_id!=self.delivery.session_id:raise ValueError('actual session receipt identity mismatch')
+
+
+@dataclass(frozen=True)
 class FleetProvider:
     discover:object
     create:object=None
     discovery_read_only:bool=True
     delivery_observer:object=None
+    execution_provisioning:bool=False
+    reserved_execution_observer:object=None
     def __post_init__(self):
         if not callable(self.discover) or (self.create is not None and not callable(self.create)) or self.discovery_read_only is not True or (self.delivery_observer is not None and not callable(self.delivery_observer)):
             raise ValueError('trusted host discovery and optional provisioning required')
+        if type(self.execution_provisioning) is not bool or (self.reserved_execution_observer is not None and not callable(self.reserved_execution_observer)) or (self.execution_provisioning and self.reserved_execution_observer is None):raise ValueError('trusted deferred provisioning observer required')
 
 
 class Fleet:
@@ -115,6 +129,9 @@ class Fleet:
                 id TEXT PRIMARY KEY,actor_hash TEXT,project TEXT,task_id TEXT,template_ref TEXT,
                 request_key TEXT,binding TEXT,config_fingerprint TEXT,state TEXT,external_ref TEXT,
                 created REAL,updated REAL,UNIQUE(actor_hash,project,request_key));
+            CREATE TABLE IF NOT EXISTS fleet_reserved_executions (
+                id TEXT PRIMARY KEY,binding TEXT,lease_hash TEXT,worker_hash TEXT,worker_subject_digest TEXT,
+                version INTEGER,manifest_digest TEXT,config_fingerprint TEXT,started REAL);
             CREATE TABLE IF NOT EXISTS fleet_deliveries (
                 project TEXT,host_ref TEXT,external_ref TEXT,task_id TEXT,observation TEXT,config_fingerprint TEXT,
                 observed_at REAL,PRIMARY KEY(project,host_ref,external_ref,task_id));
@@ -169,7 +186,7 @@ class Fleet:
             actor,config=self._auth(c,token,project,('owner',))
             self._host(c,token,project,host_ref)
             if not self.store._now()<expires_at<=self.store._now()+7*86400:raise ValueError('future template expiry within seven days required')
-            if self.providers[(project,host_ref)].create is None:raise Conflict('host session provisioning not configured')
+            if self.providers[(project,host_ref)].create is None and not self.providers[(project,host_ref)].execution_provisioning:raise Conflict('host session provisioning not configured')
             value=(host_ref,config['fingerprint'],actor['token_hash'],max_sessions,float(expires_at))
             old=c.execute('SELECT * FROM fleet_templates WHERE project=? AND template_ref=?',(project,template_ref)).fetchone()
             if old and tuple(old[k] for k in ('host_ref','config_fingerprint','owner_hash','max_sessions','expires'))!=value:
@@ -267,6 +284,7 @@ class Fleet:
         with self.store._transaction() as c:
             task,public=self._approved_task(c,token,task_id);project=task['project']
             actor,config,template=self._template(c,token,project,template_ref)
+            if self.providers[(project,template['host_ref'])].execution_provisioning:raise Conflict('native host requires deferred leased execution reservation')
             binding=digest({'task':task_id,'version':task['version'],'manifest':task['manifest_digest'],
                             'template':template_ref,'host':template['host_ref'],'config':config['fingerprint']})
             old=c.execute('SELECT * FROM fleet_creates WHERE actor_hash=? AND project=? AND request_key=?',(actor['token_hash'],project,request_key)).fetchone()
@@ -313,6 +331,90 @@ class Fleet:
             if isinstance(error,PermissionDenied):raise PermissionDenied('session provisioning authority changed; reconcile without replay') from None
             raise Conflict('session provisioning outcome requires reconciliation; not automatically retried') from None
 
+    def reserve_for_task(self,token,task_id,template_ref,request_key):
+        _task_id(task_id);name(template_ref);name(request_key)
+        with self.store._transaction() as c:
+            task,_=self._approved_task(c,token,task_id);project=task['project']
+            actor,config,template=self._template(c,token,project,template_ref)
+            provider=self.providers.get((project,template['host_ref']))
+            if provider is None or not provider.execution_provisioning:raise Conflict('deferred native execution provisioning unavailable')
+            binding=digest({'task':task_id,'version':task['version'],'manifest':task['manifest_digest'],'template':template_ref,'host':template['host_ref'],'config':config['fingerprint']})
+            old=c.execute('SELECT * FROM fleet_creates WHERE actor_hash=? AND project=? AND request_key=?',(actor['token_hash'],project,request_key)).fetchone()
+            if old:
+                if old['binding']!=binding:raise Conflict('reservation request changed')
+                return self._public_create(old)
+            used=c.execute('SELECT COUNT(*) FROM fleet_creates WHERE project=? AND template_ref=?',(project,template_ref)).fetchone()[0]
+            if used>=template['max_sessions']:raise Conflict('approved new session cap reached')
+            identifier=digest({'actor':actor['token_hash'],'project':project,'request':request_key});now=self.store._now()
+            c.execute("INSERT INTO fleet_creates VALUES (?,?,?,?,?,?,?,?, 'reserved',NULL,?,?)",(identifier,actor['token_hash'],project,task_id,template_ref,request_key,binding,config['fingerprint'],now,now))
+            return self._public_create(c.execute('SELECT * FROM fleet_creates WHERE id=?',(identifier,)).fetchone())
+
+    def _reserved_binding(self,c,token,reservation_id,states):
+        if type(reservation_id) is not str or not re.fullmatch('[a-f0-9]{64}',reservation_id):raise ValueError('exact reservation required')
+        reservation=c.execute('SELECT * FROM fleet_creates WHERE id=?',(reservation_id,)).fetchone()
+        if reservation is None:raise NotFound('reservation unavailable')
+        actor,config,template=self._template(c,token,reservation['project'],reservation['template_ref'])
+        if reservation['state'] not in states:raise Conflict('reservation execution not replayable')
+        task=self.store._get(c,actor,reservation['task_id'])
+        binding=digest({'task':task['id'],'version':task['version'],'manifest':task['manifest_digest'],'template':reservation['template_ref'],'host':template['host_ref'],'config':config['fingerprint']})
+        if binding!=reservation['binding'] or reservation['config_fingerprint']!=config['fingerprint']:raise Conflict('reservation task or configuration changed')
+        if task['state'] not in {'running','reported'} or not task['lease_hash'] or not task['worker_token_hash'] or not task['worker_subject'] or task['lease_expires']<=self.store._now():raise Conflict('live exact assigned execution lease required')
+        approval=json.loads(task['approval'] or '{}');policy=c.execute('SELECT policy_digest FROM bridge_task_policy WHERE task=?',(task['id'],)).fetchone()
+        if approval.get('version')!=task['version'] or approval.get('manifest_digest')!=task['manifest_digest'] or policy is None or approval.get('policy_digest')!=policy['policy_digest']:raise Conflict('exact current approved task required')
+        self.store._validate_execution(c,task,check_source_age=False)
+        worker=c.execute('SELECT * FROM bridge_tokens WHERE token_hash=?',(task['worker_token_hash'],)).fetchone()
+        if worker is None or worker['role']!='worker' or worker['revoked'] is not None or (worker['expires'] is not None and worker['expires']<=self.store._now()) or not self.store._scope({'projects':json.loads(worker['projects'])},task['project']):raise PermissionDenied('assigned worker authorization unavailable')
+        provider=self.providers.get((task['project'],template['host_ref']))
+        if provider is None or not provider.execution_provisioning:raise Conflict('deferred execution provider unavailable')
+        exact=(binding,task['lease_hash'],task['worker_token_hash'],digest(task['worker_subject']),task['version'],task['manifest_digest'],config['fingerprint'])
+        return reservation,task,config,template,provider,exact
+
+    def begin_reserved_execution(self,token,reservation_id):
+        with self.store._transaction() as c:
+            reservation,task,config,template,provider,exact=self._reserved_binding(c,token,reservation_id,{'reserved'})
+            self.store._validate_execution(c,task,check_source_age=True)
+            if c.execute('SELECT 1 FROM fleet_reserved_executions e JOIN fleet_creates r ON r.id=e.id WHERE r.task_id=? AND e.lease_hash=?',(task['id'],task['lease_hash'])).fetchone():raise Conflict('task lease already has a durable native execution intent; do not replay')
+            c.execute('INSERT INTO fleet_reserved_executions VALUES (?,?,?,?,?,?,?,?,?)',(reservation_id,*exact,self.store._now()))
+            c.execute("UPDATE fleet_creates SET state='executing',updated=? WHERE id=?",(self.store._now(),reservation_id))
+            return self._public_create(c.execute('SELECT * FROM fleet_creates WHERE id=?',(reservation_id,)).fetchone())
+
+    def _reserved_live(self,c,token,reservation_id):
+        values=self._reserved_binding(c,token,reservation_id,{'executing'})
+        execution=c.execute('SELECT * FROM fleet_reserved_executions WHERE id=?',(reservation_id,)).fetchone()
+        if execution is None or tuple(execution[k] for k in ('binding','lease_hash','worker_hash','worker_subject_digest','version','manifest_digest','config_fingerprint'))!=values[-1]:raise Conflict('reservation worker lease changed')
+        return values
+
+    def authorize_reserved_execution(self,token,reservation_id,leased_task):
+        from .store import token_hash
+        if type(leased_task) is not dict:raise ValueError('private leased task required')
+        with self.store._transaction() as c:
+            _,task,_,_,_,_=self._reserved_live(c,token,reservation_id)
+            if any(leased_task.get(k)!=task[column] for k,column in (('id','id'),('version','version'),('manifest_digest','manifest_digest'),('worker','worker_subject'))) or token_hash(leased_task.get('lease_token',''))!=task['lease_hash']:raise Conflict('private reservation lease proof mismatch')
+        return True
+
+    def bind_reserved_execution(self,token,reservation_id):
+        with self.store._transaction() as c:reservation,task,config,template,provider,exact=self._reserved_live(c,token,reservation_id)
+        try:item=provider.reserved_execution_observer(task['project'],reservation_id,task['id'])
+        except Exception:raise Conflict('actual reserved execution receipt unavailable; do not retry execution') from None
+        if not isinstance(item,ReservedExecutionObservation) or item.reservation_id!=reservation_id:raise Conflict('typed reservation execution receipt required')
+        session=item.session;delivery=item.delivery
+        if delivery.state=='uncertain' or not delivery.turn_completed:raise Conflict('actual completed reserved turn required; reconcile without execution replay')
+        self._observations((session,),task['project'],config)
+        if session.kind not in {'codex_cli','codex_appserver'} or session.source_sha!=json.loads(task['manifest'])['base_sha']:raise Conflict('actual native session approved source mismatch')
+        expected=(task['project'],task['id'],task['version'],task['manifest_digest'],digest(task['worker_subject']),task['lease_hash'])
+        if (delivery.project,delivery.task_id,delivery.task_version,delivery.manifest_digest,delivery.worker_subject_digest,delivery.lease_digest)!=expected or not 0<=self.store._now()-delivery.observed_at<=self.max_age:raise Conflict('actual reserved execution task binding mismatch')
+        with self.store._transaction() as c:
+            current=self._reserved_live(c,token,reservation_id)
+            if current[-1]!=exact:raise Conflict('reserved execution changed during observation')
+            if c.execute('SELECT 1 FROM fleet_sessions WHERE project=? AND host_ref=? AND external_ref=?',(task['project'],template['host_ref'],session.external_ref)).fetchone():raise Conflict('native session already registered')
+            actor=self.store._authenticate(c,token);self._save_observation(c,actor,config,template['host_ref'],session,enrolled=True)
+            _reject_known_tokens(c,asdict(delivery))
+            c.execute('INSERT OR REPLACE INTO fleet_deliveries VALUES (?,?,?,?,?,?,?)',(task['project'],template['host_ref'],session.external_ref,task['id'],canonical_json(asdict(delivery)),config['fingerprint'],delivery.observed_at))
+            c.execute("UPDATE fleet_creates SET state='created',external_ref=?,updated=? WHERE id=?",(session.external_ref,self.store._now(),reservation_id))
+            result=self._public_create(c.execute('SELECT * FROM fleet_creates WHERE id=?',(reservation_id,)).fetchone())
+            result.update(execution_started=True,execution_outcome=delivery.state,delivery=self._delivery_public(delivery,delivery.state=='commands_observed'))
+            return result
+
     def get_creation(self,token,creation_id):
         if type(creation_id) is not str or not re.fullmatch(r'[a-f0-9]{64}',creation_id):raise ValueError('exact creation reference required')
         with self.store._transaction() as c:
@@ -320,12 +422,16 @@ class Fleet:
             row=c.execute('SELECT * FROM fleet_creates WHERE id=?',(creation_id,)).fetchone()
             if row is None:raise NotFound('session creation record unavailable')
             self._auth(c,token,row['project'])
-            return self._public_create(row)
+            result=self._public_create(row)
+            if row['state']=='created' and c.execute('SELECT 1 FROM fleet_reserved_executions WHERE id=?',(creation_id,)).fetchone():
+                result.update(execution_started=True,execution_outcome='actual_turn_observed')
+            return result
 
     @staticmethod
     def _public_create(row):
         return {'id':row['id'],'project':row['project'],'task_id':row['task_id'],'template_ref':row['template_ref'],
-                'state':row['state'],'external_ref':row['external_ref'],'execution_started':False,
+                'state':row['state'],'external_ref':row['external_ref'],'execution_started':None if row['state']=='executing' else False,
+                'execution_outcome':'unknown' if row['state']=='executing' else 'not_started',
                 'automatic_retry_safe':False,'existing_ui_chat_control_verified':False,'operational_change':False}
 
     def _public_session(self,row,config,*,enrolled=None):
@@ -445,7 +551,7 @@ class Fleet:
                         item.update(state=host_states[row['host_ref']],host_transport_observed=False)
                     self._inventory_delivery(c,token,row,item)
                     sessions.append(item)
-                uncertain=c.execute("SELECT COUNT(*) FROM fleet_creates WHERE project=? AND state IN ('creating','uncertain')",(project,)).fetchone()[0]
+                uncertain=c.execute("SELECT COUNT(*) FROM fleet_creates WHERE project=? AND state IN ('creating','uncertain','reserved','executing')",(project,)).fetchone()[0]
                 session_count=c.execute('SELECT COUNT(*) FROM fleet_sessions WHERE project=?',(project,)).fetchone()[0]
                 output.append({'project':project,'hosts':hosts,'sessions':sessions[:200],'displayed_session_count':min(session_count,200),'total_session_count':session_count,'sessions_truncated':session_count>200,'uncertain_creations':uncertain})
             result={'projects':output,'account_wide_inventory_verified':False,'existing_ui_chat_control_verified':False,'operational_change':False}

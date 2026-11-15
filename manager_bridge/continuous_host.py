@@ -101,6 +101,7 @@ class ProjectHost:
     session_id:str|None=None
     fleet_template:str|None=None
     fleet_host_ref:str|None=None
+    worker_mode:str='metadata'
     review_engine:object=field(default=None,repr=False)
     def __post_init__(self):
         for value in (self.project,self.developer_id,self.reviewer_id):name(value)
@@ -117,6 +118,8 @@ class ProjectHost:
         if not callable(getattr(self.developer_transport,'execute',None)) or not callable(getattr(self.developer_transport,'discover',None)) or not callable(self.reviewer_factory):raise ValueError('registered Codex transports required')
         # Validate private token paths now; values remain host-only and are reread.
         for key in ('developer_token_file','reviewer_token_file'):_token(getattr(self,key))
+        if self.worker_mode not in ('metadata','deferred_native'):raise ValueError('fixed worker provisioning mode required')
+        if self.worker_mode=='deferred_native' and (self.fleet_template is None or self.fleet_host_ref is None or not callable(getattr(self.developer_transport,'execute_new',None))):raise ValueError('registered deferred native transport required')
         if self.fleet_template is not None:name(self.fleet_template)
         if self.fleet_host_ref is not None:name(self.fleet_host_ref)
         if self.session_id is None and self.fleet_template is None:raise ValueError('registered session or approved future-session template required')
@@ -150,7 +153,8 @@ class ContinuousHost:
                 assignment TEXT,phase TEXT,receipt TEXT,candidate_head TEXT,candidate_path TEXT,updated REAL);
                 CREATE TABLE IF NOT EXISTS continuous_host_sessions (
                 project TEXT PRIMARY KEY,session_id TEXT,creation_ref TEXT,updated REAL);
-                CREATE TABLE IF NOT EXISTS continuous_host_history (action_key TEXT PRIMARY KEY,record TEXT NOT NULL);''')
+                CREATE TABLE IF NOT EXISTS continuous_host_history (action_key TEXT PRIMARY KEY,record TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS continuous_host_reservations (task_id TEXT PRIMARY KEY,reservation_id TEXT,start_action_key TEXT,version INTEGER,manifest_digest TEXT,config_fingerprint TEXT,updated REAL);''')
         for project in self.projects:
             if project in core.source_observers or project in core.review_hosts:raise ValueError('do not replace an already registered verification host')
             core.source_observers[project]=self.observe
@@ -177,10 +181,30 @@ class ContinuousHost:
         return ActionReceipt(request.action_key,request.task_id,request.phase,state,
                              'continuous-host/'+request.phase+'/'+suffix,self.store._now())
 
+    def _reservation(self,task,host,token,key):
+        if self.fleet is None:raise Conflict('registered deferred fleet unavailable')
+        with self.store._transaction() as c:
+            row=c.execute('SELECT * FROM continuous_host_reservations WHERE task_id=?',(task['id'],)).fetchone()
+        if row:
+            if (row['version'],row['manifest_digest'])!=(task['version'],task['manifest_digest']):raise Conflict('deferred task binding changed')
+            reserved=self.fleet.get_creation(token,row['reservation_id'])
+        else:
+            stable=digest({'mode':'deferred_native','start_action':key,'task':task['id'],'template':host.fleet_template})
+            reserved=self.fleet.reserve_for_task(token,task['id'],host.fleet_template,stable)
+            config=self.registry.get(token,host.project)
+            with self.store._transaction() as c:
+                c.execute('INSERT INTO continuous_host_reservations VALUES (?,?,?,?,?,?,?)',(task['id'],reserved['id'],key,task['version'],task['manifest_digest'],config['fingerprint'],self.store._now()))
+        if reserved['state']!='reserved' or reserved['task_id']!=task['id'] or reserved['template_ref']!=host.fleet_template:raise Conflict('deferred reservation requires explicit reconciliation')
+        return reserved
+
     def _session(self,task,host,token,key):
         with self.store._transaction() as c:
             prior=c.execute('SELECT session_id FROM continuous_host_sessions WHERE project=?',(host.project,)).fetchone()
         session=prior['session_id'] if prior else host.session_id
+        if session is None and host.worker_mode=='deferred_native':
+            self._reservation(task,host,token,key)
+            if host.developer_transport.ready_for_new(host.project) is not True:raise Conflict('native worker readiness unavailable')
+            return None
         if session is None:
             if self.fleet is None or host.fleet_template is None:raise Conflict('future worker provisioning not connected')
             created=self.fleet.create_for_task(token,task['id'],host.fleet_template,key)
@@ -236,6 +260,12 @@ class ContinuousHost:
             return self._receipt(request,'unavailable','capacity_state_changed')
         # Private host checkpoint is never sent to the model.
         stored_assignment={**assignment,'host_start_sha':source['sha']}
+        reservation=None
+        if session is None:
+            with self.store._transaction() as c:
+                found=c.execute('SELECT reservation_id FROM continuous_host_reservations WHERE task_id=?',(task['id'],)).fetchone()
+            if found is None:raise Conflict('deferred reservation missing before execution')
+            reservation=found['reservation_id'];stored_assignment['host_reservation_id']=reservation
         with self.store._transaction() as c:
             c.execute("INSERT OR REPLACE INTO continuous_host_assignments VALUES (?,?,?,?,?,'executing',NULL,NULL,NULL,?)",
                       (task['id'],task['version'],task['manifest_digest'],request.action_key,canonical_json(stored_assignment),self.store._now()))
@@ -245,11 +275,24 @@ class ContinuousHost:
             if fresh.get('cancel_requested') is not False:raise Conflict('development execution cancelled')
             return True
         try:
-            result=host.developer_transport.execute(host.project,assignment,session,heartbeat=fence)
+            if reservation is not None:
+                fence();self.fleet.begin_reserved_execution(token,reservation)
+                fence();result=host.developer_transport.execute_new(host.project,assignment,reservation,heartbeat=fence)
+            else:result=host.developer_transport.execute(host.project,assignment,session,heartbeat=fence)
             from .fleet_codex import ExecutionReceipt
-            if not isinstance(result,ExecutionReceipt) or result.project!=host.project or result.task_id!=task['id'] or result.session_id!=session or not result.turn_completed or result.process_exit!=0:raise Conflict('actual Codex completion not observed')
+            if not isinstance(result,ExecutionReceipt) or result.project!=host.project or result.task_id!=task['id'] or (session is not None and result.session_id!=session) or not result.turn_completed or result.process_exit!=0:raise Conflict('actual Codex completion not observed')
             fence()
-            if self.fleet is not None and host.fleet_host_ref is not None:
+            # Persist the real receipt before any session-binding effect. A
+            # crash here blocks replay even if the provider's memory is lost.
+            with self.store._transaction() as c:
+                c.execute("UPDATE continuous_host_assignments SET receipt=?,updated=? WHERE task_id=? AND phase='executing'",(canonical_json(asdict(result)),self.store._now(),task['id']))
+            if reservation is not None:
+                bound=self.fleet.bind_reserved_execution(token,reservation)
+                if bound['state']!='created' or bound['external_ref']!=result.session_id:raise Conflict('actual native session binding unverified')
+                session=result.session_id;self._session_refs[(host.project,session)]=bound['external_ref']
+                with self.store._transaction() as c:
+                    c.execute('INSERT OR REPLACE INTO continuous_host_sessions VALUES (?,?,?,?)',(host.project,session,reservation,self.store._now()))
+            elif self.fleet is not None and host.fleet_host_ref is not None:
                 external=self._session_refs.get((host.project,session))
                 if external is None:raise Conflict('executed session identity unavailable')
                 self.fleet.verify_delivery(token,host.project,host.fleet_host_ref,external,task['id'])
@@ -334,8 +377,36 @@ class ContinuousHost:
         self.core.approve_next(token,request.task_id,request.next_task_id,request.candidate_digest,request.action_key,developer_id=host.developer_id)
         return self._receipt(request)
 
+    def _recover_metadata_start(self,request,task,host,token,heartbeat):
+        """Explicitly finish a proven metadata-only old start; never retry it."""
+        if host.worker_mode!='deferred_native' or request.prior_action_key is None or task['state']!='queued' or task.get('worker') is not None or task.get('report') is not None:
+            return self._receipt(request,'unavailable','partial_start_proof_unavailable')
+        with self.store._transaction() as c:
+            actor=self.store._authenticate(c,token)
+            prior=c.execute('SELECT * FROM continuous_actions WHERE action_key=?',(request.prior_action_key,)).fetchone()
+            if prior is None or prior['state']!='uncertain' or prior['phase']!='start' or prior['actor_hash']!=actor['token_hash']:raise Conflict('exact prior uncertain metadata start required')
+            original=json.loads(prior['request'])
+            if any(original.get(k)!=getattr(request,k) for k in ('task_id','project','version','manifest_digest','config_fingerprint')):raise Conflict('prior start binding changed')
+            if c.execute('SELECT 1 FROM continuous_host_assignments WHERE task_id=?',(task['id'],)).fetchone() or c.execute('SELECT 1 FROM hierarchy_tasks WHERE task_id=?',(task['id'],)).fetchone():raise Conflict('partial start already has development effects')
+            if c.execute('SELECT 1 FROM continuous_host_sessions WHERE project=?',(host.project,)).fetchone():raise Conflict('partial start has conflicting actual session')
+            old=c.execute('SELECT * FROM fleet_creates WHERE actor_hash=? AND project=? AND task_id=? AND request_key=?',(actor['token_hash'],host.project,task['id'],request.prior_action_key)).fetchone()
+            if old is None or old['state']!='created' or not old['external_ref'] or old['template_ref']==host.fleet_template or old['config_fingerprint']!=request.config_fingerprint:raise Conflict('original metadata-only creation evidence unavailable')
+            template=c.execute('SELECT host_ref FROM fleet_templates WHERE project=? AND template_ref=?',(host.project,old['template_ref'])).fetchone()
+            expected=digest({'task':task['id'],'version':task['version'],'manifest':task['manifest_digest'],'template':old['template_ref'],'host':template['host_ref'] if template else None,'config':request.config_fingerprint})
+            if old['binding']!=expected or c.execute('SELECT 1 FROM fleet_reserved_executions WHERE id=?',(old['id'],)).fetchone() or c.execute('SELECT 1 FROM fleet_deliveries WHERE task_id=?',(task['id'],)).fetchone():raise Conflict('native execution absence not established')
+        source=_observe(host.source)
+        if source['sha']!=task['manifest']['base_sha'] or not source['tracked_and_visible_untracked_clean']:raise Conflict('partial start approved source changed')
+        heartbeat()
+        # New owner-registered template and derived reservation key. This never
+        # calls the old metadata create method or refunds its consumed budget.
+        if self._session(task,host,token,request.prior_action_key) is not None:raise Conflict('unexpected existing session during partial start')
+        heartbeat();self.core.start(token,task['id'],host.developer_id,request.prior_action_key)
+        return self._receipt(request,suffix='metadata_start_completed_with_native_reservation')
+
     def reconcile(self,request,heartbeat):
-        task,_,token=self._task(request);row=self._row(task['id']);heartbeat()
+        task,host,token=self._task(request);row=self._row(task['id']);heartbeat()
+        with self.store._transaction() as c:managed=c.execute('SELECT 1 FROM hierarchy_tasks WHERE task_id=?',(task['id'],)).fetchone()
+        if managed is None:return self._recover_metadata_start(request,task,host,token,heartbeat)
         if row and row['phase'] in ('executing','uncertain','freezing'):
             return self._receipt(request,'unavailable','action_bound_stop_evidence_required')
         current=self.core.get(token,task['id'])
@@ -385,11 +456,11 @@ def load_host(config_file):
     entries=config['projects']
     if type(entries) is not list or not 1<=len(entries)<=100:raise ValueError('explicit bounded project list required')
     store=Store(database);registry=Registry(store);core=ThreeTier(store,registry)
-    projects={};providers={}
+    projects={};providers={};fleet_box={}
     forbidden=tuple([manager_path,database,data,application,Path(config_file).absolute()]+[Path(value).absolute() for entry in entries if type(entry) is dict for value in (entry.get('developer_token_file','/nonexistent'),entry.get('reviewer_token_file','/nonexistent'))])
     for entry in entries:
         needed={'project','repository','source','candidates','runtime','developer_id','reviewer_id','developer_token_file','reviewer_token_file','checks','developer','reviewer'}
-        if type(entry) is not dict or not needed<=set(entry) or set(entry)-needed-{'session_id','fleet_template','fleet_host_ref'}:raise ValueError('exact project host schema required')
+        if type(entry) is not dict or not needed<=set(entry) or set(entry)-needed-{'session_id','fleet_template','fleet_host_ref','worker_mode'}:raise ValueError('exact project host schema required')
         project=entry['project'];name(project)
         if project in projects:raise ValueError('duplicate project host')
         source=_physical(entry['source']);candidates=_physical(entry['candidates'],private=True)
@@ -420,10 +491,17 @@ def load_host(config_file):
                         task['project']==project and task['version']==assignment['version'] and
                         task['manifest_digest']==assignment['manifest_digest'] and
                         member['credential_hash']==token_hash(current_token) and task['lease_expires']>store._now())
+        def authorize_reservation(project,reservation_id,assignment):
+            fleet=fleet_box.get('fleet')
+            if fleet is None:raise Conflict('deferred fleet authorization unavailable')
+            with store._transaction() as c:
+                row=c.execute('SELECT phase,assignment,version,manifest_digest FROM continuous_host_assignments WHERE task_id=?',(assignment['id'],)).fetchone()
+                if row is None or row['phase']!='executing' or row['version']!=assignment['version'] or row['manifest_digest']!=assignment['manifest_digest'] or json.loads(row['assignment']).get('host_reservation_id')!=reservation_id:raise Conflict('durable native execution attempt unavailable')
+            return fleet.authorize_reserved_execution(_token(manager_path),reservation_id,assignment)
         devsetting=transport_settings['developer']
         developer=CodexHost(devsetting['binary'],devsetting['codex_home'],{
             project:ProjectBinding(project,entry['repository'],source,require_origin=devsetting.get('require_origin',True))},
-            authorize=authorize,clock=store.clock,execution_timeout=devsetting.get('execution_timeout',180))
+            authorize=authorize,authorize_reservation=authorize_reservation if entry.get('worker_mode')=='deferred_native' else None,clock=store.clock,execution_timeout=devsetting.get('execution_timeout',180))
         def reviewer_factory(frozen,*,heartbeat,project=project,repository=entry['repository'],settings=transport_settings['reviewer'],reviewfile=reviewfile,candidates=candidates):
             frozen=_physical(frozen)
             if frozen.parent!=candidates:raise Conflict('review checkout outside registered candidates')
@@ -441,7 +519,7 @@ def load_host(config_file):
             return transport
         projects[project]=ProjectHost(project,entry['repository'],source,candidates,runtime,
             entry['developer_id'],entry['reviewer_id'],devfile,reviewfile,entry['checks'],developer,reviewer_factory,
-            session_id=entry.get('session_id'),fleet_template=entry.get('fleet_template'),fleet_host_ref=entry.get('fleet_host_ref'))
+            session_id=entry.get('session_id'),fleet_template=entry.get('fleet_template'),fleet_host_ref=entry.get('fleet_host_ref'),worker_mode=entry.get('worker_mode','metadata'))
         if entry.get('fleet_template') is not None:
             host_ref=entry.get('fleet_host_ref');name(host_ref)
             providers[(project,host_ref)]=developer.provider(project)
@@ -457,6 +535,7 @@ def load_host(config_file):
     # Success is an actual non-model OS sandbox probe, never a config flag.
     for host in projects.values():host.developer_transport.verify_confidentiality(host.project,forbidden)
     fleet=Fleet(store,registry,providers=providers) if providers else None
+    fleet_box['fleet']=fleet
     host=ContinuousHost(core,manager_path,projects,fleet=fleet)
     controller=ContinuousManager(core,handlers=host.handlers())
     # Validate current scopes without starting work or changing registration.

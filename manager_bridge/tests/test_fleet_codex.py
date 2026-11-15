@@ -15,6 +15,7 @@ class TransportTests(unittest.TestCase):
   self.host=CodexHost(self.binary,self.profile,{'test':ProjectBinding('test','example/test',self.root,require_origin=False)})
   # Fixture-only trusted proof injection; real host requires actual subprocess probe.
   self.host._confidentiality['test']=((),{'verified':True})
+  self.host.ready_for_new=lambda project:True
  def receipt(self,items=(),code=0,session=SESSION):
   events=[{'type':'thread.started','thread_id':session},{'type':'turn.started'},*items,{'type':'turn.completed'}]
   return self.host._receipt('test','a'*32,events,code,SESSION)[0]
@@ -98,13 +99,13 @@ class MetadataFixtureTests(TransportTests):
  def test_discovery_source_change_fails(self):
   Rpc,_=self.rpc([{'data':[]}]);other=dict(self.source(),sha='b'*40)
   with patch.object(self.host,'_source',side_effect=[self.source(),other]),patch('manager_bridge.fleet_codex._Rpc',Rpc),self.assertRaises(TransportUnavailable):self.host.discover('test')
- def test_create_is_metadata_only(self):
+ def test_empty_native_metadata_creation_refused_before_rpc(self):
   from manager_bridge.store import digest
   manifest={'project':'test','repository':'example/test','base_sha':'a'*40,'description':'fixture','checks':['unit'],'kind':'development'}
   task={'state':'queued','version':1,'manifest':manifest,'manifest_digest':digest(manifest),'approval':{'version':1,'manifest_digest':digest(manifest)}}
   Rpc,calls=self.rpc([])
-  with patch.object(self.host,'_source',return_value=self.source()),patch('manager_bridge.fleet_codex._Rpc',Rpc):result=self.host.create('test',task,'b'*64)
-  self.assertEqual(result.session_id,SESSION);self.assertEqual([v[0] for v in calls],['account/read','thread/start']);self.assertEqual(calls[-1][1],{'cwd':str(self.root)})
+  with patch.object(self.host,'_source',return_value=self.source()),patch('manager_bridge.fleet_codex._Rpc',Rpc),self.assertRaises(PermissionError):self.host.create('test',task,'b'*64)
+  self.assertEqual(calls,[])
  def test_create_running_task_rejected(self):
   with patch.object(self.host,'_source',return_value=self.source()),self.assertRaises(PermissionError):self.host.create('test',{'state':'running'},'b'*64)
  def test_run_real_fixture_jsonl_subprocess(self):
@@ -163,8 +164,8 @@ class MetadataFixtureTests(TransportTests):
    if method=='thread/start':calls.append((method,params));raise TransportUnavailable('fixture lost reply')
    return original(instance,method,params)
   Rpc.request=request
-  with patch.object(self.host,'_source',return_value=self.source()),patch('manager_bridge.fleet_codex._Rpc',Rpc),self.assertRaises(TransportUncertain):self.host.create('test',task,'b'*64)
-  self.assertEqual(sum(method=='thread/start' for method,_ in calls),1)
+  with patch.object(self.host,'_source',return_value=self.source()),patch('manager_bridge.fleet_codex._Rpc',Rpc),self.assertRaises(PermissionError):self.host.create('test',task,'b'*64)
+  self.assertEqual(sum(method=='thread/start' for method,_ in calls),0)
  def test_provider_and_delivery_observer_integration(self):
   import hashlib
   from manager_bridge.store import digest
@@ -204,3 +205,65 @@ class MetadataFixtureTests(TransportTests):
   value=next(args[i+1] for i,x in enumerate(args[:-1]) if x=='-c' and args[i+1].startswith('permissions.taesan-worker='))
   fs=tomllib.loads('policy='+value.split('=',1)[1])['policy']['filesystem']
   self.assertNotIn(str(parent),fs);self.assertEqual(fs[str(parent/'private.token')],'deny');self.assertEqual(fs[str(self.root)],'write');self.assertEqual(fs[str(self.profile)],'deny');self.assertEqual(fs[':root'],'deny')
+ def test_rpc_shutdown_closes_stdin_and_allows_bounded_graceful_flush(self):
+  import io
+  from unittest.mock import Mock
+  from manager_bridge.fleet_codex import _Rpc
+  rpc=_Rpc(self.host,'test');process=Mock();process.stdin=io.BytesIO();process.stdout=io.BytesIO();rpc.process=process
+  def finished(timeout):self.assertTrue(process.stdin.closed);self.assertEqual(timeout,5);return 0
+  process.wait.side_effect=finished
+  rpc.__exit__(None,None,None)
+  process.terminate.assert_not_called();self.assertTrue(process.stdout.closed)
+ def new_events(self):return [{'type':'thread.started','thread_id':SESSION},{'type':'turn.started'},*self.command(),{'type':'turn.completed'}]
+ def test_deferred_native_creation_requires_registered_server_authorizer(self):
+  with patch.object(self.host,'_run') as run,self.assertRaises(PermissionError):self.host.execute_new('test',self.approved_task(),'b'*64,heartbeat=lambda:True)
+  run.assert_not_called()
+ def test_deferred_native_creation_requires_existing_executing_reservation(self):
+  self.host.authorize_reservation=lambda *a:False
+  with patch.object(self.host,'_source',return_value=self.source()),patch.object(self.host,'_run') as run,self.assertRaises(PermissionError):self.host.execute_new('test',self.approved_task(),'b'*64,heartbeat=lambda:True)
+  run.assert_not_called();self.assertNotIn(('test','b'*64),self.host._reservation_attempts)
+ def test_deferred_native_creation_exact_actual_uuid_and_lease_receipt(self):
+  self.host.authorize_reservation=lambda *a:True;task=self.approved_task()
+  with patch.object(self.host,'_source',return_value=self.source()),patch.object(self.host,'_run',return_value=(self.new_events(),0)) as run:result=self.host.execute_new('test',task,'b'*64,heartbeat=lambda:True)
+  self.assertEqual(result.session_id,SESSION);self.assertIsNone(run.call_args.kwargs['session_id'])
+  actual=self.host.reserved_execution_observer('test','b'*64,task['id']);self.assertEqual(actual.reservation_id,'b'*64);self.assertEqual(actual.session.session_id,SESSION);self.assertFalse(actual.session.can_receive);self.assertEqual(actual.delivery.state,'commands_observed');self.assertEqual(actual.delivery.session_id,SESSION);self.assertEqual(actual.delivery.task_version,task['version']);self.assertEqual(actual.delivery.manifest_digest,task['manifest_digest']);self.assertTrue(self.host.provider('test').execution_provisioning);self.assertIsNone(self.host.provider('test').create)
+ def test_duplicate_reservation_never_runs_twice(self):
+  self.host.authorize_reservation=lambda *a:True;task=self.approved_task()
+  with patch.object(self.host,'_source',return_value=self.source()),patch.object(self.host,'_run',return_value=(self.new_events(),0)) as run:
+   self.host.execute_new('test',task,'b'*64,heartbeat=lambda:True)
+   with self.assertRaises(TransportUncertain):self.host.execute_new('test',task,'b'*64,heartbeat=lambda:True)
+  self.assertEqual(run.call_count,1)
+ def test_expired_lease_cannot_create_native_session(self):
+  self.host.authorize_reservation=lambda *a:True;task=self.approved_task();task['lease_expires_at']=1
+  with patch.object(self.host,'_source',return_value=self.source()),patch.object(self.host,'_run') as run,self.assertRaises(PermissionError):self.host.execute_new('test',task,'b'*64,heartbeat=lambda:True)
+  run.assert_not_called()
+ def test_unknown_outcome_is_not_retried_or_bound(self):
+  self.host.authorize_reservation=lambda *a:True;task=self.approved_task()
+  with patch.object(self.host,'_source',return_value=self.source()),patch.object(self.host,'_run',side_effect=TransportUncertain('fixture')) as run:
+   with self.assertRaises(TransportUncertain):self.host.execute_new('test',task,'b'*64,heartbeat=lambda:True)
+   with self.assertRaises(TransportUncertain):self.host.execute_new('test',task,'b'*64,heartbeat=lambda:True)
+  self.assertEqual(run.call_count,1)
+  with self.assertRaises(TransportUnavailable):self.host.reserved_execution_observer('test','b'*64,task['id'])
+ def test_native_uuid_not_forged_from_reservation(self):
+  self.host.authorize_reservation=lambda *a:True;task=self.approved_task();events=self.new_events();events[0]['thread_id']='b'*64
+  with patch.object(self.host,'_source',return_value=self.source()),patch.object(self.host,'_run',return_value=(events,0)),self.assertRaises(TransportUncertain):self.host.execute_new('test',task,'b'*64,heartbeat=lambda:True)
+  self.assertFalse(self.host._reserved_deliveries)
+ def test_reserved_source_head_change_is_uncertain(self):
+  self.host.authorize_reservation=lambda *a:True;task=self.approved_task();changed=dict(self.source(),sha='d'*40)
+  with patch.object(self.host,'_source',side_effect=[self.source(),self.source(),self.source(),changed]),patch.object(self.host,'_run',return_value=(self.new_events(),0)),self.assertRaises(TransportUncertain):self.host.execute_new('test',task,'b'*64,heartbeat=lambda:True)
+  self.assertFalse(self.host._reserved_deliveries)
+ def test_readiness_checks_only_subscription_and_source(self):
+  Rpc,calls=self.rpc([])
+  with patch.object(self.host,'_source',return_value=self.source()),patch('manager_bridge.fleet_codex._Rpc',Rpc):self.assertTrue(CodexHost.ready_for_new(self.host,'test'))
+  self.assertEqual([x[0] for x in calls],['account/read'])
+ def test_readiness_refuses_api_key_authentication(self):
+  Rpc,calls=self.rpc([],ready=False)
+  with patch.object(self.host,'_source',return_value=self.source()),patch('manager_bridge.fleet_codex._Rpc',Rpc),self.assertRaises(TransportUnavailable):CodexHost.ready_for_new(self.host,'test')
+  self.assertEqual([x[0] for x in calls],['account/read'])
+ def test_lease_expiry_during_native_execution_is_uncertain_and_unbound(self):
+  self.host.authorize_reservation=lambda *a:True;self.host.clock=lambda:100;task=self.approved_task();task['lease_expires_at']=101
+  def run(*a,**kw):self.host.clock=lambda:102;kw['heartbeat']();return self.new_events(),0
+  with patch.object(self.host,'_source',return_value=self.source()),patch.object(self.host,'_run',side_effect=run),self.assertRaises(PermissionError):self.host.execute_new('test',task,'b'*64,heartbeat=lambda:True)
+  self.assertIn(('test','b'*64),self.host._reservation_attempts);self.assertFalse(self.host._reserved_deliveries)
+ def test_provider_without_reservation_authorizer_cannot_provision(self):
+  p=self.host.provider('test');self.assertFalse(p.execution_provisioning);self.assertIsNone(p.reserved_execution_observer);self.assertIsNone(p.create)
