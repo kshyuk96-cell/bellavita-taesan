@@ -82,7 +82,7 @@ def paid_details(row):
                  if (match := re.search(r'(10|20|30)\s*kg', value, re.I))), '')
     message = data.get('message') or next((v for k,v in data.get('options', []) if '축하 문구' in k), '')
     fields = {k: data.get(k, '') for k in ('venue', 'address', 'sender', 'product', 'title')}
-    fields.update(event_type='결혼', recipient=recipient, event_date=event_date, event_time=event_time,
+    fields.update(event_type='행사' if data.get('product_snapshot',{}).get('event_kind')=='event' else '결혼', recipient=recipient, event_date=event_date, event_time=event_time,
                   photo_phone=data.get('buyer_phone', ''), message=message, size=size, quantity=1,
                   note='초대장 페이앱 주문', source=data.get('source', ''))
     return fields
@@ -99,6 +99,11 @@ def ledger_key(payment_id):
 def save(db, key, extract, write, after_save=None):
     with db() as c:
         row = c.execute('SELECT * FROM order_operations WHERE id=?', (key,)).fetchone()
+    if row['kind']=='payapp':
+        with db() as c:
+            payment=c.execute('SELECT state FROM invitation_orders WHERE id=?',(uuid.UUID(key).hex,)).fetchone()
+        if not payment or payment['state']!='paid':
+            raise ValueError('결제 상태 확인 전에는 주문을 인계할 수 없습니다.')
     if row['state'] == 'saved':
         return row['order_number'], json.loads(row['details'])
     data = json.loads(row['details'])
