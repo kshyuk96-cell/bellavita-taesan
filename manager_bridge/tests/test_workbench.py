@@ -90,6 +90,18 @@ class WorkbenchTests(unittest.TestCase):
         with self.assertRaises(Conflict):
             self.workbench.put_package(self.manager,self.task['id'],self.package)
 
+    def test_review_diff_reports_changed_fields_without_reusing_previous_acknowledgement(self):
+        self.reviewed()
+        first=self.workbench.put_package(self.manager,self.task['id'],self.package)
+        self.workbench.acknowledge(self.owner,self.task['id'],first['revision'],first['package_digest'])
+        self.workbench.put_package(self.manager,self.task['id'],self.package|{'risks':'new fixture risk'})
+        diff=self.workbench.card_diff(self.manager,self.task['id'],1)
+        self.assertEqual(diff['to_revision'],2)
+        self.assertEqual(diff['changes'],[{'field':'risks','before':'fixture risk','after':'new fixture risk'}])
+        self.assertFalse(diff['previous_acknowledgement_applies'])
+        with self.assertRaises(PermissionDenied):self.workbench.card_diff(self.worker,self.task['id'],1)
+        with self.assertRaises(Conflict):self.workbench.card_diff(self.owner,self.task['id'],2)
+
     def test_package_requires_matching_repository_and_no_secret_in_content(self):
         self.reviewed()
         for package in (self.package|{'pr_url':'https://github.com/other/repo/pull/1'},

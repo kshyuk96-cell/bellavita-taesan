@@ -11,6 +11,9 @@ from .workbench import Workbench
 from .trials import TrialRunner
 from .sessions import Sessions
 from .workflow import Workflow
+from .operations import Operations
+from .connections import Connections
+from .release_preflight import ReleasePreflight
 
 
 def _pairs(pairs):
@@ -134,10 +137,12 @@ class Handler(BaseHTTPRequestHandler):
                         pass
                 return self.respond(200,{'ok':True,'logged_out':True},cookie=self._session_cookie('',0))
             token = self.token()
-            if method == 'GET' and parsed.path in ('/v1/tasks', '/v1/overview', '/v1/scorecard', '/v1/dashboard', '/v1/trials', '/v1/digest'):
+            if method == 'GET' and parsed.path in ('/v1/tasks', '/v1/overview', '/v1/scorecard', '/v1/dashboard', '/v1/trials', '/v1/digest', '/v1/connections'):
                 query = parse_qs(parsed.query, strict_parsing=True)
                 if set(query) != {'project'} or len(query['project']) != 1:
                     raise ValueError('project required')
+                if parsed.path == '/v1/connections':
+                    return self.respond(200,{'ok':True,'connections':Connections(store).latest(token,query['project'][0])})
                 if parsed.path == '/v1/digest':
                     return self.respond(200, {'ok': True, 'digest': Workflow(store).preview_digest(token,query['project'][0])})
                 if parsed.path == '/v1/trials':
@@ -151,6 +156,18 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200, {'ok': True, 'tasks': store.list_tasks(token, query['project'][0])})
             if method == 'GET' and parsed.path == '/v1/projects' and not parsed.query:
                 return self.respond(200, {'ok': True, 'projects': Workbench(store).projects(token)})
+            detail_match=re.fullmatch(r'/v1/tasks/([a-f0-9]{32})/(timings|review-diff|preflight)',parsed.path)
+            if method=='GET' and detail_match:
+                task_id,kind=detail_match.groups()
+                if kind=='review-diff':
+                    query=parse_qs(parsed.query,strict_parsing=True)
+                    if set(query)!={'from_revision'} or len(query['from_revision'])!=1:raise ValueError('revision required')
+                    result=Workbench(store).card_diff(token,task_id,int(query['from_revision'][0]))
+                elif parsed.query:
+                    raise ValueError('query not supported')
+                elif kind=='timings':result=Operations(store).timings(token,task_id)
+                else:result=ReleasePreflight(store).latest(token,task_id)
+                return self.respond(200,{'ok':True,'detail':result})
             card_match = re.fullmatch(r'/v1/tasks/([a-f0-9]{32})/review-card', parsed.path)
             if method == 'GET' and card_match and not parsed.query:
                 return self.respond(200, {'ok': True, 'card': Workbench(store).card(token, card_match[1])})
@@ -160,6 +177,11 @@ class Handler(BaseHTTPRequestHandler):
             if method != 'POST' or parsed.query:
                 return self.respond(404, {'ok': False, 'error': 'not_found'})
             data = self.body()
+            if parsed.path=='/v1/capacity':
+                return self.respond(200,{'ok':True,'capacity':Operations(store).set_capacity(token,data.get('project'),
+                    max_active=data['max_active'],max_review=data['max_review'])})
+            if parsed.path=='/v1/connections/inspect':
+                return self.respond(200,{'ok':True,'connections':Connections(store,getattr(self.server,'connection_probes',{})).inspect(token,data['project'])})
             if parsed.path=='/v1/digest/acknowledge':
                 return self.respond(200,{'ok':True,'receipt':Workflow(store).acknowledge_digest(token,data['project'],data['fingerprint'])})
             workflow_match=re.fullmatch(r'/v1/tasks/([a-f0-9]{32})/(planning|change)',parsed.path)
@@ -235,10 +257,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(503, {'ok': False, 'error': 'unavailable'})
 
 
-def make_server(store, host='127.0.0.1', port=8791, *, public_origin=None):
+def make_server(store, host='127.0.0.1', port=8791, *, public_origin=None, connection_probes=None):
     server = ThreadingHTTPServer((host, port), Handler)
     server.store = store
     server.public_origin = public_origin
+    server.connection_probes = dict(connection_probes or {})
     return server
 
 
