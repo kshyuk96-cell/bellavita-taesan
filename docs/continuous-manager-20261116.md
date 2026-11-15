@@ -33,6 +33,8 @@
 
 관리기 코드와 역할 등록 DB, 고정 소스, 독립 검토 런타임, 개인 인증 경로가 있는 전용 클라우드 호스트에서 사용합니다. 비공개 구성 파일은 0600, 상태 디렉터리는 0700이어야 하며 API로 명령·경로·성공 플래그를 주입하지 않습니다. 키 원문은 Git·UI·로그에 저장하지 않습니다.
 
+관리 DB·토큰을 담은 제어 디렉터리와 개발 소스·후보 디렉터리는 별도 트리여야 합니다. 제어 디렉터리 안에 소스나 후보를 넣으면 로더가 실행 전에 거부합니다. 실제 검사에서 디렉터리 접근까지 차단되는 배치만 허용합니다.
+
 ```sh
 python scripts/run_continuous_manager.py --config /private/taesan/host.json --status
 python scripts/run_continuous_manager.py --config /private/taesan/host.json --once

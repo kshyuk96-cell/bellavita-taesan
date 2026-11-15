@@ -190,3 +190,17 @@ class MetadataFixtureTests(TransportTests):
   self.host._confidentiality.clear()
   with patch('manager_bridge.fleet_codex.subprocess.run',return_value=subprocess.CompletedProcess([],1,b'',b'')),self.assertRaises(TransportUnavailable):self.host.verify_confidentiality('test')
   self.assertNotIn('test',self.host._confidentiality)
+ def test_redundant_nested_denies_canonicalized_without_erasing_carveouts(self):
+  import tomllib
+  args=self.host._permission_args('test',False,self.root/'job',(self.root,self.root/'private.token',self.root/'profile'/'key'))
+  value=next(args[i+1] for i,x in enumerate(args[:-1]) if x=='-c' and args[i+1].startswith('permissions.taesan-worker='))
+  fs=tomllib.loads('policy='+value.split('=',1)[1])['policy']['filesystem']
+  # The exact cwd reopens self.root, so nested private denies remain required.
+  self.assertEqual(fs[str(self.root/'private.token')],'deny');self.assertEqual(fs[str(self.profile)],'deny');self.assertNotIn(str(self.profile/'key'),fs)
+ def test_denied_parent_hides_private_sibling_without_nested_mount(self):
+  import tomllib
+  parent=self.root.parent
+  args=self.host._permission_args('test',False,self.root/'job',(parent,parent/'private.token'))
+  value=next(args[i+1] for i,x in enumerate(args[:-1]) if x=='-c' and args[i+1].startswith('permissions.taesan-worker='))
+  fs=tomllib.loads('policy='+value.split('=',1)[1])['policy']['filesystem']
+  self.assertNotIn(str(parent),fs);self.assertEqual(fs[str(parent/'private.token')],'deny');self.assertEqual(fs[str(self.root)],'write');self.assertEqual(fs[str(self.profile)],'deny');self.assertEqual(fs[':root'],'deny')

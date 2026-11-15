@@ -359,7 +359,8 @@ def load_host(config_file):
 
     Database, role memberships, capacity and future-worker templates must already
     exist through the owner's approved registration flow. This loader creates no
-    user credentials, approvals, templates or requirements.
+    user credentials, approvals, templates or requirements. Control state is a
+    separate private directory; source/candidate work roots cannot be inside it.
     """
     from .fleet import Fleet
     from .fleet_codex import CodexHost,ProjectBinding
@@ -392,6 +393,8 @@ def load_host(config_file):
         project=entry['project'];name(project)
         if project in projects:raise ValueError('duplicate project host')
         source=_physical(entry['source']);candidates=_physical(entry['candidates'],private=True)
+        if any(path==data or data in path.parents for path in (source,candidates)):
+            raise ValueError('control data root must be separate from source and candidate work roots')
         if source==application or source in application.parents or application in source.parents:raise ValueError('development source cannot overlap running host application')
         runtime=_physical(entry['runtime']);devfile=_private_file(entry['developer_token_file']);reviewfile=_private_file(entry['reviewer_token_file'])
         dev_token=_token(devfile);review_token=_token(reviewfile)
@@ -448,6 +451,9 @@ def load_host(config_file):
     all_profiles=[settings['codex_home'] for entry in entries for settings in (entry['developer'],entry['reviewer'])]
     for host in projects.values():
         if any(Path(p).absolute()==host.source or host.source in Path(p).absolute().parents or Path(p).absolute() in host.source.parents for p in all_profiles):raise ValueError('coding profile inside project source')
+    # Every coding profile is host-private, including other projects' profiles.
+    # The shared closure is finalized before any developer/reviewer probe runs.
+    forbidden=tuple(dict.fromkeys((*forbidden,*(Path(p).absolute() for p in all_profiles))))
     # Success is an actual non-model OS sandbox probe, never a config flag.
     for host in projects.values():host.developer_transport.verify_confidentiality(host.project,forbidden)
     fleet=Fleet(store,registry,providers=providers) if providers else None

@@ -164,12 +164,24 @@ class HostTests(unittest.TestCase):
         devprofile.mkdir(mode=0o700);reviewprofile.mkdir(mode=0o700)
         application=Path(__file__).absolute().parents[2]
         path=self.root/'config.json'
-        payload={'version':1,'application_root':str(application),'expected_source_commit':'a'*40,'data_root':str(self.root),'database':str(self.store.path),'manager_token_file':str(self.managerfile),'instance_id':'fixture-loader','projects':[{
+        data=self.root/'control';data.mkdir(mode=0o700)
+        database=data/'manager.sqlite3'
+        import shutil
+        shutil.copyfile(self.store.path,database);database.chmod(0o600)
+        payload={'version':1,'application_root':str(application),'expected_source_commit':'a'*40,'data_root':str(data),'database':str(database),'manager_token_file':str(self.managerfile),'instance_id':'fixture-loader','projects':[{
             'project':'project','repository':'fixture/project','source':str(self.source),'candidates':str(self.candidates),'runtime':str(self.runtime),'developer_id':'dev','reviewer_id':'reviewer','developer_token_file':str(self.devfile),'reviewer_token_file':str(self.reviewfile),'checks':{'fixture-check':['/bin/true']},'developer':{'binary':'/bin/true','codex_home':str(devprofile)},'reviewer':{'binary':'/bin/true','codex_home':str(reviewprofile)},'session_id':SESSION}]}
         path.write_text(json.dumps(payload));path.chmod(0o600)
-        with patch('manager_bridge.continuous_host.observe_checkout',return_value={'sha':'a'*40,'tracked_and_visible_untracked_clean':True}), patch('manager_bridge.fleet_codex.CodexHost.verify_confidentiality',return_value={'verified':True,'fixture':True}):
+        with patch('manager_bridge.continuous_host.observe_checkout',return_value={'sha':'a'*40,'tracked_and_visible_untracked_clean':True}), patch('manager_bridge.fleet_codex.CodexHost.verify_confidentiality',return_value={'verified':True,'fixture':True}) as probe:
             host,controller,config=load_host(path)
+            forbidden=probe.call_args.args[1]
+            self.assertIn(devprofile,forbidden);self.assertIn(reviewprofile,forbidden)
         self.assertEqual(config['projects'],('project',));self.assertEqual(self.transport.calls,0)
+        # A forbidden control parent cannot be reopened for model work roots.
+        payload['data_root']=str(self.root);payload['database']=str(self.store.path)
+        path.write_text(json.dumps(payload))
+        with patch('manager_bridge.continuous_host.observe_checkout',return_value={'sha':'a'*40,'tracked_and_visible_untracked_clean':True}), patch('manager_bridge.fleet_codex.CodexHost.verify_confidentiality') as probe:
+            with self.assertRaisesRegex(ValueError,'control data root must be separate'):load_host(path)
+            probe.assert_not_called()
         payload['unknown_command']='/bin/true';path.write_text(json.dumps(payload))
         with self.assertRaises(ValueError):load_host(path)
     def test_cross_project_nested_source_and_trusted_resources_rejected(self):

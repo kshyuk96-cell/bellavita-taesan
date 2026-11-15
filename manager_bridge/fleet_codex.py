@@ -217,6 +217,23 @@ class CodexHost:
         rules[str(jobtmp)]='write'
         for sub in ('.git','.codex','.agents','.aws','.env'):
             if (cwd/sub).exists():rules[str(cwd/sub)]='read' if sub=='.git' else 'deny'
+        # bubblewrap cannot mount a denied child placeholder underneath a
+        # denied parent. Omit only redundant concrete denies; preserve carveouts
+        # beneath a narrower readable/writable subtree. :root is a fallback,
+        # never a reason to erase explicit private-resource policy.
+        concrete={Path(k):v for k,v in rules.items() if k.startswith('/')}
+        for path,access in concrete.items():
+            if access=='deny' and any(path!=allowed and path in allowed.parents for allowed in (cwd,Path(jobtmp))):
+                # Current bubblewrap masks read-only child mounts beneath an
+                # explicit deny. Root fallback denies siblings, probed below.
+                rules.pop(str(path),None)
+        for path,access in tuple(concrete.items()):
+            if access!='deny' or str(path) not in rules:continue
+            ancestors=[parent for parent,mode in concrete.items() if mode=='deny' and str(parent) in rules and parent!=path and parent in path.parents]
+            if not ancestors:continue
+            nearest=max(ancestors,key=lambda p:len(p.parts))
+            reopened=any(mode in ('read','write') and (allowed==path or allowed in path.parents) and len(allowed.parts)>len(nearest.parts) for allowed,mode in concrete.items())
+            if not reopened:rules.pop(str(path),None)
         fs='{'+','.join(json.dumps(k)+'='+json.dumps(v) for k,v in rules.items())+'}'
         profile='{filesystem='+fs+',network={enabled=false}}'
         return ['-c','default_permissions="taesan-worker"','-c','permissions.taesan-worker='+profile,
@@ -240,12 +257,16 @@ class CodexHost:
             git=cwd/'.git';git_sentinel=git/('probe-'+os.urandom(12).hex()) if git.is_dir() else git
             if git.is_dir():git_sentinel.write_text('synthetic')
             alias=cwd/('probe-link-'+os.urandom(12).hex());alias.symlink_to(home_sentinel)
+            sibling_sentinels=[]
+            for parent in forbidden:
+                if parent in cwd.parents and parent.is_dir():
+                    sibling=parent/('probe-sibling-'+os.urandom(12).hex());sibling.write_text('synthetic');sibling_sentinels.append(sibling)
             try:
                 receipts=[]
                 for read_only in (False,True):
                     if heartbeat is not None and heartbeat() is False:raise PermissionDenied('probe authority changed')
                     jobtmp=root/('review' if read_only else 'developer');jobtmp.mkdir(mode=0o700)
-                    checks=[str(sentinel),str(home_sentinel),str(alias),*(str(p) for p in forbidden)]
+                    checks=[str(sentinel),str(home_sentinel),str(alias),*(str(p) for p in sibling_sentinels),*(str(p) for p in forbidden)]
                     script="""import os,sys,json,socket
 paths=json.loads(sys.argv[1]);inside=sys.argv[2];tmp=sys.argv[3];ro=sys.argv[4]=='1';git=sys.argv[5]
 def writable(path):
@@ -292,6 +313,7 @@ print(json.dumps(result));sys.exit(0 if result['outside_denied'] and result['git
             finally:
                 inside.unlink(missing_ok=True);alias.unlink(missing_ok=True);home_sentinel.unlink(missing_ok=True)
                 if git.is_dir():git_sentinel.unlink(missing_ok=True)
+                for sibling in sibling_sentinels:sibling.unlink(missing_ok=True)
 
     def _binding(self,project):
         name(project)
@@ -399,6 +421,9 @@ print(json.dumps(result));sys.exit(0 if result['outside_denied'] and result['git
         try:permission_args=self._permission_args(project,read_only,jobtmp,forbidden)
         except Exception:
             shutil.rmtree(jobtmp,ignore_errors=True);raise
+        # Codex rust-v0.167.0 exec/src/lib.rs thread_resume_params_from_config
+        # forwards the active named config profile as explicit resume.permissions.
+        # exec has no -P flag; -s would override and weaken this named policy.
         argv=[str(self.binary),*permission_args,'-a','never','-C',str(binding.cwd),'exec','--ignore-user-config']
         if session_id is not None:argv+=['resume']
         argv+=['--json']
