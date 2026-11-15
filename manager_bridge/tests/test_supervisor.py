@@ -46,7 +46,7 @@ class SupervisorTests(unittest.TestCase):
         task = self.store.submit(self.owner, key, manifest)
         return self.store.approve(self.owner, task['id'], task['version'], task['manifest_digest'])
 
-    def reported(self, allowed_paths=None, extra_file=None):
+    def reported(self, allowed_paths=None, extra_file=None, native=False):
         if allowed_paths is None:
             self.approved()
         else:
@@ -69,8 +69,9 @@ class SupervisorTests(unittest.TestCase):
         artifact = self.runner._artifact(target, task['id'], self.work)
         report = {'head_sha': self.base, 'summary': 'fixture\n' + json.dumps(artifact),
                   'checks': [{'name': name, 'passed': True} for name in
-                             ('codex_exit_zero', 'model_turn_completed', 'command_tools_succeeded',
-                              'approved_base_preserved', 'git_diff_check')]}
+                             (('native_agent_completed', 'native_tests_passed', 'approved_base_preserved', 'git_diff_check') if native else
+                              ('codex_exit_zero', 'model_turn_completed', 'command_tools_succeeded',
+                               'approved_base_preserved', 'git_diff_check'))]}
         return self.store.report(self.worker, task['id'], task['lease_token'], report), target
 
     def commands(self, program=None):
@@ -143,6 +144,19 @@ class SupervisorTests(unittest.TestCase):
         with self.assertRaisesRegex(VerificationBlocked, '승인 파일 범위'):
             verify_report(self.store, self.manager, task['id'], self.runner, self.commands())
         self.assertEqual(self.store.get_task(self.manager, task['id'])['state'], 'reported')
+
+    def test_native_result_requires_exact_parent_handoff_before_independent_review(self):
+        task, _ = self.reported(native=True)
+        with self.assertRaises(VerificationBlocked):
+            verify_report(self.store, self.manager, task['id'], self.runner, self.commands())
+        handoff = Mock()
+        handoff.snapshot.return_value = {'phase':'reported','task_id':'f'*32,'version':1,
+            'manifest_digest':task['manifest_digest'],'agent_ref':'/root/fixture_worker'}
+        with self.assertRaises(VerificationBlocked):
+            verify_report(self.store, self.manager, task['id'], self.runner, self.commands(), native_handoff=handoff)
+        handoff.snapshot.return_value['task_id'] = task['id']
+        reviewed = verify_report(self.store, self.manager, task['id'], self.runner, self.commands(), native_handoff=handoff)
+        self.assertEqual(reviewed['state'], 'reviewed')
 
     def test_changed_files_block_review_even_if_worker_claimed_success(self):
         task, target = self.reported()

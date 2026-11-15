@@ -7,6 +7,8 @@ from urllib.parse import parse_qs, urlsplit
 
 from .store import Store
 from .coordination import Coordination
+from .workbench import Workbench
+from .trials import TrialRunner
 
 
 def _pairs(pairs):
@@ -34,6 +36,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(payload)))
         self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
         self.end_headers()
         self.wfile.write(payload)
 
@@ -58,6 +62,22 @@ class Handler(BaseHTTPRequestHandler):
         return result
 
     def do_GET(self):
+        static = {'/dashboard': ('index.html', 'text/html; charset=utf-8'),
+                  '/dashboard.js': ('dashboard.js', 'application/javascript; charset=utf-8'),
+                  '/dashboard.css': ('dashboard.css', 'text/css; charset=utf-8')}
+        if self.path in static:
+            from pathlib import Path
+            name, mime = static[self.path]
+            payload = (Path(__file__).parent / 'ui' / name).read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Type', mime)
+            self.send_header('Content-Length', str(len(payload)))
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('X-Content-Type-Options', 'nosniff')
+            self.send_header('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         if self.path == '/healthz':
             return self.respond(200, {'status': 'ok'})
         self.handle_api('GET')
@@ -70,21 +90,38 @@ class Handler(BaseHTTPRequestHandler):
             token = self.token()
             store = self.server.store
             parsed = urlsplit(self.path)
-            if method == 'GET' and parsed.path in ('/v1/tasks', '/v1/overview', '/v1/scorecard'):
+            if method == 'GET' and parsed.path in ('/v1/tasks', '/v1/overview', '/v1/scorecard', '/v1/dashboard', '/v1/trials'):
                 query = parse_qs(parsed.query, strict_parsing=True)
                 if set(query) != {'project'} or len(query['project']) != 1:
                     raise ValueError('project required')
+                if parsed.path == '/v1/trials':
+                    return self.respond(200, {'ok': True, 'trials': TrialRunner(store).status(token, query['project'][0])})
+                if parsed.path == '/v1/dashboard':
+                    return self.respond(200, {'ok': True, 'dashboard': Workbench(store).dashboard(token, query['project'][0])})
                 if parsed.path == '/v1/scorecard':
                     return self.respond(200, {'ok': True, 'scorecard': Coordination(store).scorecard(token, query['project'][0])})
                 if parsed.path == '/v1/overview':
                     return self.respond(200, {'ok': True, 'overview': store.overview(token, query['project'][0])})
                 return self.respond(200, {'ok': True, 'tasks': store.list_tasks(token, query['project'][0])})
+            if method == 'GET' and parsed.path == '/v1/projects' and not parsed.query:
+                return self.respond(200, {'ok': True, 'projects': Workbench(store).projects(token)})
+            card_match = re.fullmatch(r'/v1/tasks/([a-f0-9]{32})/review-card', parsed.path)
+            if method == 'GET' and card_match and not parsed.query:
+                return self.respond(200, {'ok': True, 'card': Workbench(store).card(token, card_match[1])})
             match = re.fullmatch(r'/v1/tasks/([a-f0-9]{24,64})', parsed.path)
             if method == 'GET' and match and not parsed.query:
                 return self.respond(200, {'ok': True, 'task': store.get_task(token, match[1])})
             if method != 'POST' or parsed.query:
                 return self.respond(404, {'ok': False, 'error': 'not_found'})
             data = self.body()
+            card_match = re.fullmatch(r'/v1/tasks/([a-f0-9]{32})/review-card(/acknowledge)?', parsed.path)
+            if card_match:
+                workbench=Workbench(store)
+                if card_match[2]:
+                    result=workbench.acknowledge(token,card_match[1],data['revision'],data['package_digest'])
+                else:
+                    result=workbench.put_package(token,card_match[1],data)
+                return self.respond(200, {'ok':True,'review_card':result})
             if parsed.path == '/v1/tasks':
                 result = store.submit(token, data['request_key'], data['manifest'])
             elif parsed.path == '/v1/worker/claim':

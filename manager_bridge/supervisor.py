@@ -28,7 +28,7 @@ def recovery_action(task):
     }[state]
 
 
-def verify_report(store, token, task_id, runner, check_commands):
+def verify_report(store, token, task_id, runner, check_commands, *, native_handoff=None):
     """Independent exact-artifact review, with local explicit check commands.
 
     This does not grant production approval. Existing generic review API remains
@@ -50,8 +50,17 @@ def verify_report(store, token, task_id, runner, check_commands):
                 or not Path(argv[0]).is_absolute()):
             raise VerificationBlocked('관리자가 지정한 절대 경로 실행 명령이 필요해요.')
     checks = {item['name']: item['passed'] for item in report['checks']}
-    required = ('codex_exit_zero', 'model_turn_completed', 'command_tools_succeeded',
-                'approved_base_preserved', 'git_diff_check')
+    native_snapshot = None
+    if native_handoff is not None:
+        native_snapshot = native_handoff.snapshot()
+        if (native_snapshot.get('phase') != 'reported' or native_snapshot.get('task_id') != task_id
+                or native_snapshot.get('version') != task['version']
+                or native_snapshot.get('manifest_digest') != task['manifest_digest']):
+            raise VerificationBlocked('상위 런타임의 정확한 네이티브 인계 보고가 필요해요.')
+        required = ('native_agent_completed', 'native_tests_passed', 'approved_base_preserved', 'git_diff_check')
+    else:
+        required = ('codex_exit_zero', 'model_turn_completed', 'command_tools_succeeded',
+                    'approved_base_preserved', 'git_diff_check')
     if any(checks.get(name) is not True for name in required):
         raise VerificationBlocked('실행 실패 또는 도구 결과 미확인 작업은 완료 처리하지 않아요.')
     expected_root = runner.work_root.resolve(strict=True)
@@ -106,6 +115,9 @@ def verify_report(store, token, task_id, runner, check_commands):
         raise Conflict('검증 중 작업 상태가 바뀌었어요.')
     evidence = {'task_id': task_id, 'version': task['version'], 'manifest_digest': task['manifest_digest'],
                 'report_digest': digest(report), 'artifact_digest': before['git_diff_digest'], 'checks': outcomes}
+    evidence['execution_adapter'] = 'native_parent' if native_snapshot else 'codex_cli'
+    if native_snapshot:
+        evidence['native_agent_ref'] = native_snapshot['agent_ref']
     fingerprint = digest(evidence)
     folder = expected_root / ('artifacts-' + task_id)
     path = folder / ('independent-review-' + fingerprint + '.json')
@@ -116,6 +128,14 @@ def verify_report(store, token, task_id, runner, check_commands):
         json.dump(evidence, output, ensure_ascii=False, sort_keys=True)
         output.flush()
         os.fsync(output.fileno())
+    with store._transaction() as c:
+        actor = store._authenticate(c, token)
+        store._role(actor, ('owner', 'manager'))
+        exact = store._get(c, actor, task_id)
+        if exact['state'] != 'reported' or digest(json.loads(exact['report'])) != digest(report):
+            raise Conflict('독립 후보 기록 전 작업 상태가 바뀌었어요.')
+        c.execute('INSERT OR REPLACE INTO bridge_verified_candidates VALUES (?,?,?,?,?,?)',
+                  (task_id, digest(report), report['head_sha'], before['git_diff_digest'], int(before['dirty']), store._now()))
     return store.review(token, task_id, task['version'], task['manifest_digest'], 'independent-artifact:' + fingerprint)
 
 
