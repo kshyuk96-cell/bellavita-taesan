@@ -1,0 +1,78 @@
+[
+  {
+    "source": "cloud-worker-first",
+    "receipt": {
+      "thread_id": "01a1de8c-cae0-7163-bba3-696ddba2abf4",
+      "state": "dialogue_completed",
+      "reason": "dialogue_only",
+      "process_exit_code": 0,
+      "dialogue_completed": true,
+      "command_attempts": 0,
+      "command_successes": 0,
+      "command_failures": 0,
+      "testcase_count": null,
+      "tests_passed": null,
+      "independently_verified": false,
+      "operational_change": false,
+      "existing_cloud_windows_connected": false,
+      "raw_content_retained": false
+    }
+  },
+  {
+    "source": "cloud-worker-second",
+    "receipt": {
+      "thread_id": "01a1de8c-cae0-7163-bba3-696ddba2abf4",
+      "state": "dialogue_completed",
+      "reason": "dialogue_only",
+      "process_exit_code": 0,
+      "dialogue_completed": true,
+      "command_attempts": 0,
+      "command_successes": 0,
+      "command_failures": 0,
+      "testcase_count": null,
+      "tests_passed": null,
+      "independently_verified": false,
+      "operational_change": false,
+      "existing_cloud_windows_connected": false,
+      "raw_content_retained": false
+    }
+  },
+  {
+    "source": "cloud-worker-tests",
+    "receipt": {
+      "thread_id": "01a1de8c-cae0-7163-bba3-696ddba2abf4",
+      "state": "execution_failed",
+      "reason": "command_failed",
+      "process_exit_code": 0,
+      "dialogue_completed": true,
+      "command_attempts": 1,
+      "command_successes": 0,
+      "command_failures": 1,
+      "testcase_count": null,
+      "tests_passed": null,
+      "independently_verified": false,
+      "operational_change": false,
+      "existing_cloud_windows_connected": false,
+      "raw_content_retained": false
+    }
+  },
+  {
+    "source": "cloud-worker-tests-managed",
+    "receipt": {
+      "thread_id": "01a1de8c-cae0-7163-bba3-696ddba2abf4",
+      "state": "execution_failed",
+      "reason": "command_failed",
+      "process_exit_code": 0,
+      "dialogue_completed": true,
+      "command_attempts": 1,
+      "command_successes": 0,
+      "command_failures": 1,
+      "testcase_count": null,
+      "tests_passed": null,
+      "independently_verified": false,
+      "operational_change": false,
+      "existing_cloud_windows_connected": false,
+      "raw_content_retained": false
+    }
+  }
+]
