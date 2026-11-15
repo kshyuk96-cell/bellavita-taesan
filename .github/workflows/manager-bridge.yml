@@ -6,16 +6,23 @@ on:
       - 'manager_bridge/**'
       - 'tests/test_manager_bridge.py'
       - 'scripts/maintenance_fixture.py'
+      - 'scripts/prepare_connection_review.py'
+      - 'scripts/export_model_lab.py'
+      - 'tests/test_manager_host.py'
       - '.github/workflows/manager-bridge.yml'
   push:
     branches:
       - 'codex/taesan-manager-*'
       - 'codex/taesan-maintenance-*'
       - 'codex/taesan-delegated-*'
+      - 'codex/taesan-connection-*'
     paths:
       - 'manager_bridge/**'
       - 'tests/test_manager_bridge.py'
       - 'scripts/maintenance_fixture.py'
+      - 'scripts/prepare_connection_review.py'
+      - 'scripts/export_model_lab.py'
+      - 'tests/test_manager_host.py'
       - '.github/workflows/manager-bridge.yml'
 
 permissions:

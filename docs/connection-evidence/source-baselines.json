@@ -1,0 +1,159 @@
+{
+  "profiles": [
+    {
+      "project": "bellavita-shop",
+      "company": "bellavita",
+      "name": "벨라비타 쇼핑몰",
+      "pin": {
+        "project": "bellavita-shop",
+        "source_kind": "github",
+        "source_ref": "kshyuk96-cell/bellavita-taesan",
+        "branch": "codex/shop-backend",
+        "sha": "d5047f3345b757edfcfbd81a73c609c0392007dd",
+        "revision": "github-d5047f3"
+      },
+      "observed_at": 1794729203.0522518,
+      "observation_time_source": "validation_record_write_after_independent_run",
+      "source_clean": true,
+      "fixture_tests": {
+        "passed": 189,
+        "failed": 0,
+        "skipped": 0
+      },
+      "build": "not_applicable",
+      "additional_checks": [
+        "mock_business_rehearsal",
+        "mock_four_product_catalog"
+      ],
+      "ordered_steps": [
+        "python_fixture_tests",
+        "business_rehearsal",
+        "catalog_rehearsal"
+      ],
+      "scope": "development_source_snapshot_synthetic_providers",
+      "operational_mutations": false,
+      "secure_sandbox_verified": false,
+      "existing_codex_window_connected": false,
+      "deployed_model_verified": false,
+      "receiver_enabled": false,
+      "customer_launch_verified": false
+    },
+    {
+      "project": "bellavita-erp",
+      "company": "bellavita",
+      "name": "벨라비타 ERP",
+      "pin": {
+        "project": "bellavita-erp",
+        "source_kind": "sites",
+        "source_ref": "appgprj_6af874873e148191b9677cca35f00557",
+        "branch": "main",
+        "sha": "2c10b03db14c607fb4c61e09cbdf52ec7b406f40",
+        "revision": "sites-v20"
+      },
+      "observed_at": 1794729288.2565708,
+      "observation_time_source": "validation_record_write_after_independent_run",
+      "source_clean": true,
+      "fixture_tests": {
+        "passed": 97,
+        "failed": 0,
+        "skipped": 6
+      },
+      "build": "verified",
+      "additional_checks": [
+        "python_invitation_14_pass",
+        "loopback_bridge_pass"
+      ],
+      "ordered_steps": [
+        "install_trusted_dependencies",
+        "build",
+        "node_fixture_tests",
+        "python_invitation_fixtures",
+        "loopback_bridge"
+      ],
+      "scope": "development_source_snapshot_synthetic_providers",
+      "operational_mutations": false,
+      "secure_sandbox_verified": false,
+      "existing_codex_window_connected": false,
+      "deployed_model_verified": false,
+      "receiver_enabled": false,
+      "customer_launch_verified": false
+    },
+    {
+      "project": "hope-sunrise",
+      "company": "hope-sunrise",
+      "name": "희망일출",
+      "pin": {
+        "project": "hope-sunrise",
+        "source_kind": "sites",
+        "source_ref": "appgprj_6af86d66b7108191a8dd1052c4a7302f",
+        "branch": "main",
+        "sha": "d4da64b3791bb8dd7a96cf2f974c784385e79687",
+        "revision": "sites-v20"
+      },
+      "observed_at": 1794729045.5854118,
+      "observation_time_source": "validation_record_write_after_independent_run",
+      "source_clean": true,
+      "fixture_tests": {
+        "passed": 222,
+        "failed": 0,
+        "skipped": 0
+      },
+      "build": "verified",
+      "additional_checks": [
+        "file_runner_23_pass_is_not_individual_case_count"
+      ],
+      "ordered_steps": [
+        "direct_node_case_tests",
+        "build",
+        "worker_syntax_check"
+      ],
+      "scope": "development_source_snapshot_synthetic_providers",
+      "operational_mutations": false,
+      "secure_sandbox_verified": false,
+      "existing_codex_window_connected": false,
+      "deployed_model_verified": false,
+      "receiver_enabled": false,
+      "customer_launch_verified": false
+    },
+    {
+      "project": "funeral-association",
+      "company": "funeral-association",
+      "name": "장례지도사협회",
+      "pin": {
+        "project": "funeral-association",
+        "source_kind": "github",
+        "source_ref": "kshyuk96-cell/association-aftercare-platform",
+        "branch": "main",
+        "sha": "8f1e4fa331dbf460f0fcbea432c0fa360cc1b4ba",
+        "revision": "github-8f1e4fa"
+      },
+      "observed_at": 1794729066.0243607,
+      "observation_time_source": "validation_record_write_after_independent_run",
+      "source_clean": true,
+      "fixture_tests": {
+        "passed": 61,
+        "failed": 0,
+        "skipped": 0
+      },
+      "build": "verified",
+      "additional_checks": [
+        "typescript_pass",
+        "build_tracing_warnings_9"
+      ],
+      "ordered_steps": [
+        "install_trusted_dependencies",
+        "node_unit_contract_tests",
+        "typescript",
+        "build"
+      ],
+      "scope": "development_source_snapshot_synthetic_providers",
+      "operational_mutations": false,
+      "secure_sandbox_verified": false,
+      "existing_codex_window_connected": false,
+      "deployed_model_verified": false,
+      "receiver_enabled": false,
+      "customer_launch_verified": false
+    }
+  ],
+  "operational_change": false
+}

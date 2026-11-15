@@ -1,0 +1,74 @@
+{
+  "status": "proposal_only_not_deployed",
+  "target": "separate_taesan_manager_review_host",
+  "existing_customer_services_modified": false,
+  "resources_created": false,
+  "source": {
+    "repository": "kshyuk96-cell/bellavita-taesan",
+    "branch": "codex/taesan-connection-rehearsal-20261115",
+    "base_commit": "e7faded99e1fe8b769fb51f0ec963c75a693de2b",
+    "approved_candidate_commit": null,
+    "require_exact_40_character_candidate_commit": true,
+    "automatic_deploy": false
+  },
+  "runtime": {
+    "python": "3.12",
+    "entrypoint": "python -m manager_bridge.manager_host",
+    "serve_requires_explicit_flag": true,
+    "public_origin": null,
+    "port_source": "PORT",
+    "host": "0.0.0.0",
+    "health_path": "/healthz",
+    "health_proves_operational_connections": false,
+    "worker_callbacks": "not_configured",
+    "source_observers": "not_configured",
+    "agent_transports": "not_configured"
+  },
+  "storage": {
+    "declared_persistent_root": "/var/data",
+    "private_data_directory": "/var/data/taesan-manager",
+    "database": "maintenance.sqlite3",
+    "legacy_database_compatibility": "manager.sqlite3 only when explicitly selected; never auto-copy or auto-rename",
+    "existing_bootstrap_required": true,
+    "private_directory_permissions": "0700",
+    "private_file_permissions": "0600",
+    "owner_manager_profiles_required": true,
+    "bootstrap_accounts_generated_on_start": false,
+    "restart_persistence_verified": false,
+    "disk_size_and_snapshot_policy": null
+  },
+  "approvals_required_before_creation": [
+    "exact_candidate_commit_and_included_scope",
+    "provider_workspace_service_name_and_region",
+    "compute_plan_price_and_budget",
+    "persistent_disk_size_price_and_backup_policy",
+    "public_origin_and_access_review",
+    "bootstrap_owner_manager_scope_confirmation"
+  ],
+  "cost": {
+    "plan_selected": false,
+    "price_verified": false,
+    "monthly_amount": null,
+    "billing_change_approved": false
+  },
+  "rollout": {
+    "bootstrap_validation_first": true,
+    "all_four_project_execution_flags": false,
+    "schedules_created": false,
+    "live_customer_credential_copy": false,
+    "post_creation_checks": [
+      "exact_source_commit",
+      "https_proxy_and_origin",
+      "health_and_unauthenticated_request_denial",
+      "owner_manager_scope_and_worker_denial",
+      "data_path_and_restart_persistence",
+      "no_customer_service_or_schedule_change"
+    ]
+  },
+  "rollback": {
+    "strategy": "stop_new_manager_host_and_preserve_its_private_state_for_reconciliation",
+    "previous_manager_release_commit": null,
+    "customer_application_rollback": "not_applicable_no_customer_deployment_in_scope",
+    "database_disk_external_effects_automatically_reverted": false
+  }
+}
