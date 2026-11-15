@@ -329,18 +329,22 @@ class Store:
             self._expire(c, project)
             rows = c.execute('SELECT * FROM bridge_tasks WHERE project=? ORDER BY updated DESC,id', (project,)).fetchall()
             counts = {state: 0 for state in sorted(_STATES)}
-            actions = []
+            actions, action_count = [], 0
             for row in rows:
                 counts[row['state']] += 1
-                if row['state'] in ('reviewed', 'cancelled'):
+                if row['state'] == 'reviewed':
                     continue
+                if row['state'] == 'cancelled' and (row['worker_subject'] is None or c.execute(
+                        'SELECT 1 FROM bridge_stop_confirmations WHERE task=?', (row['id'],)).fetchone()):
+                    continue
+                action_count += 1
                 failed = bool(row['report'] and any(item['passed'] is False for item in json.loads(row['report'])['checks']))
                 if len(actions) < 100:
                     actions.append({'task_id': row['id'], 'state': row['state'],
                                     'action': recovery_action({'state': row['state']}),
                                     'failed_or_unverified_checks': failed})
             return {'counts': counts, 'actions': actions,
-                    'actions_truncated': sum(counts[state] for state in counts if state not in ('reviewed', 'cancelled')) > 100,
+                    'actions_truncated': action_count > 100,
                     'operational_deployment_verified': False}
 
     def submit(self, token, request_key, manifest):
@@ -392,6 +396,14 @@ class Store:
             self._event(c, task_id, actor['subject'], 'approved', 'queued', approval)
             return self._public(self._get(c, actor, task_id))
 
+    @staticmethod
+    def _reserved_repositories(c):
+        rows = c.execute("SELECT manifest FROM bridge_tasks t WHERE "
+            "state IN ('running','reported','needs_verification') OR "
+            "(state='cancelled' AND worker_subject IS NOT NULL AND NOT EXISTS "
+            "(SELECT 1 FROM bridge_stop_confirmations s WHERE s.task=t.id))").fetchall()
+        return {json.loads(row['manifest'])['repository'] for row in rows}
+
     def claim(self, token, project, *, lease_seconds=300):
         _lease_seconds(lease_seconds)
         with self._transaction() as c:
@@ -399,10 +411,13 @@ class Store:
             self._role(actor, ('worker',))
             self._project_access(c, actor, project)
             self._expire(c, project)
+            busy = c.execute("SELECT 1 FROM bridge_tasks t WHERE worker_token_hash=? AND "
+                "(state IN ('running','needs_verification') OR (state='cancelled' AND NOT EXISTS "
+                "(SELECT 1 FROM bridge_stop_confirmations s WHERE s.task=t.id)))", (actor['token_hash'],)).fetchone()
+            if busy:
+                return None
             rows = c.execute("SELECT * FROM bridge_tasks WHERE project=? AND state='queued' ORDER BY created,id", (project,)).fetchall()
-            occupied = c.execute("SELECT manifest FROM bridge_tasks WHERE state IN "
-                                 "('running','reported','needs_verification')").fetchall()
-            reserved_repositories = {json.loads(item['manifest'])['repository'] for item in occupied}
+            reserved_repositories = self._reserved_repositories(c)
             for row in rows:
                 manifest = json.loads(row['manifest'])
                 if manifest['kind'] not in actor['capabilities']:

@@ -248,7 +248,7 @@ class CodexRunner:
     def _env(self, home):
         return {'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8', 'HOME': str(home),
                 'CODEX_HOME': str(self.codex_home), 'GIT_CONFIG_NOSYSTEM': '1',
-                'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_TERMINAL_PROMPT': '0', **self.network_environment}
+                'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_TERMINAL_PROMPT': '0', 'PYTHONDONTWRITEBYTECODE': '1', **self.network_environment}
 
     def _git(self, repo, *arguments):
         result = self.command(['/usr/bin/git', '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false',
@@ -349,7 +349,7 @@ class CodexRunner:
         arguments = ['/usr/bin/git', '-c', 'core.fsmonitor=false', '-C', str(target)]
         patch = self.command([*arguments, 'diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--'],
                              env=self._env(runtime_home), capture_output=True, timeout=20, check=False)
-        listed = self.command([*arguments, 'ls-files', '--others', '--exclude-standard', '-z'],
+        listed = self.command([*arguments, 'ls-files', '--others', '-z'],
                               env=self._env(runtime_home), capture_output=True, timeout=20, check=False)
         if patch.returncode or listed.returncode or len(patch.stdout) > 16_000_000 or len(listed.stdout) > MAX_JSON:
             raise WorkerError('검토할 작업폴더 자료 한도를 확인하지 못했어요.')
@@ -380,7 +380,7 @@ class CodexRunner:
         digest = _manifest_digest(inventory)
         evidence = {'worktree_path': str(target), 'git_diff_digest': digest,
                     'dirty': bool(patch.stdout or files), 'new_file_count': len(files),
-                    'inventory_scope': 'tracked_diff_and_nonignored_new_files',
+                    'inventory_scope': 'tracked_diff_and_all_new_files',
                     'artifact_access_verified': False, 'review_state': 'awaiting_independent_review',
                     **inventory}
         return evidence

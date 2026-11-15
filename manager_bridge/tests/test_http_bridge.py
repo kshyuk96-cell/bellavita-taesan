@@ -70,6 +70,10 @@ class HttpBridgeTests(unittest.TestCase):
         lease = self.post(self.worker, '/v1/worker/claim', {'project': 'bellavita'})['task']
         self.assertEqual(lease['execution_policy'], policy)
         self.assertEqual(self.post(self.manager, path+'/route', {})['status'], 409)
+        self.assertTrue(self.post(self.manager, path+'/cancel', {})['ok'])
+        stopped = {'version': 1, 'digest': task['manifest_digest'], 'evidence_reference': 'fixture:independent-process-exit'}
+        self.assertEqual(self.post(self.worker, path+'/stopped', stopped)['status'], 403)
+        self.assertTrue(self.post(self.manager, path+'/stopped', stopped)['stopped']['stop_confirmed'])
         score = request(self.base, self.manager, 'GET', '/v1/scorecard?project=bellavita')['scorecard']
         self.assertIsNone(score['real']['dimensions']['judgment']['sample_score'])
         self.assertEqual(request(self.base, self.worker, 'GET', '/v1/scorecard?project=bellavita')['status'], 403)

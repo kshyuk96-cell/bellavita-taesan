@@ -100,7 +100,7 @@ class Handler(BaseHTTPRequestHandler):
                                                        reason=data['reason'], ttl=data.get('ttl', 60))
                 return self.respond(200, {'ok': True, 'readiness': result})
             else:
-                match = re.fullmatch(r'/v1/tasks/([a-f0-9]{24,64})/(approve|review|cancel|policy|route|failure|evaluation)', parsed.path)
+                match = re.fullmatch(r'/v1/tasks/([a-f0-9]{24,64})/(approve|review|cancel|policy|route|failure|evaluation|stopped)', parsed.path)
                 if not match:
                     return self.respond(404, {'ok': False, 'error': 'not_found'})
                 task, action = match.groups()
@@ -117,6 +117,9 @@ class Handler(BaseHTTPRequestHandler):
                         dimension=data['dimension'], source=data['source'], passed=data['passed'],
                         critical=data['critical'], evidence=data['evidence'])
                     return self.respond(200, {'ok': True, 'evaluation': result})
+                elif action == 'stopped':
+                    result = Coordination(store).confirm_stopped(token, task, data['version'], data['digest'], data['evidence_reference'])
+                    return self.respond(200, {'ok': True, 'stopped': result})
                 elif action == 'approve':
                     result = store.approve(token, task, data['version'], data['digest'], policy_digest=data.get('policy_digest'))
                 elif action == 'review':

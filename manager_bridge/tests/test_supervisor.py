@@ -130,6 +130,14 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(len(evidence), 1)
         self.assertEqual(evidence[0].stat().st_mode & 0o777, 0o600)
 
+    def test_ignored_new_file_is_included_and_out_of_scope_creation_is_blocked(self):
+        (self.repo / '.git' / 'info' / 'exclude').write_text('outside.txt\n')
+        task, target = self.reported(allowed_paths=['README.md'], extra_file='outside.txt')
+        inventory = self.runner.inspect_artifact(target, self.work)
+        self.assertIn('outside.txt', [item['path'] for item in inventory['new_files']])
+        with self.assertRaisesRegex(VerificationBlocked, '승인 파일 범위'):
+            verify_report(self.store, self.manager, task['id'], self.runner, self.commands())
+
     def test_matching_report_hash_still_cannot_hide_out_of_scope_file(self):
         task, target = self.reported(allowed_paths=['README.md'], extra_file='outside.txt')
         with self.assertRaisesRegex(VerificationBlocked, '승인 파일 범위'):

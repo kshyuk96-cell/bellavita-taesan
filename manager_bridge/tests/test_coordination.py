@@ -92,6 +92,26 @@ class CoordinationTests(unittest.TestCase):
         with self.assertRaises(Conflict):
             self.coordination.route(self.manager, task['id'])
 
+    def test_cancelled_execution_reserves_worker_and_repository_until_stop_confirmed(self):
+        first = self.managed('first')
+        self.ready(self.worker)
+        self.coordination.route(self.manager, first['id'])
+        self.store.claim(self.worker, 'a')
+        self.store.cancel(self.manager, first['id'])
+        second = self.managed('second')
+        self.assertEqual(self.coordination.route(self.manager, second['id'])['status'], 'repository_busy_or_stop_unconfirmed')
+        self.assertIsNone(self.store.claim(self.worker, 'a'))
+        overview = self.store.overview(self.manager, 'a')
+        self.assertTrue(any(item['task_id'] == first['id'] and item['action'] == 'confirm_worker_stopped_no_replay'
+                            for item in overview['actions']))
+        with self.assertRaises(PermissionDenied):
+            self.coordination.confirm_stopped(self.worker, first['id'], 1, first['manifest_digest'], 'fixture:stopped')
+        with self.assertRaises(Conflict):
+            self.coordination.confirm_stopped(self.manager, first['id'], 2, first['manifest_digest'], 'fixture:stopped')
+        self.coordination.confirm_stopped(self.manager, first['id'], 1, first['manifest_digest'], 'fixture:independent-process-exit')
+        self.assertEqual(self.coordination.route(self.manager, second['id'])['status'], 'routed')
+        self.assertEqual(self.store.claim(self.worker, 'a')['id'], second['id'])
+
     def test_stale_or_revoked_health_is_not_executable(self):
         task = self.managed()
         self.ready(self.worker)
@@ -150,6 +170,18 @@ class CoordinationTests(unittest.TestCase):
         self.store.review(self.manager, parent['id'], 1, parent['manifest_digest'], 'fixture:parent-checked')
         self.assertEqual(restarted.route(self.manager, child['id'])['status'], 'routed')
         self.assertEqual(self.store.claim(self.worker, 'a')['id'], child['id'])
+
+    def test_failed_parent_report_cannot_unlock_dependency_via_manual_review(self):
+        parent = self.managed('parent')
+        child = self.managed('child', [parent['id']])
+        self.ready(self.worker)
+        self.coordination.route(self.manager, parent['id'])
+        claim = self.store.claim(self.worker, 'a')
+        report = self.report | {'checks': [{'name': 'actual-command', 'passed': False}]}
+        self.store.report(self.worker, parent['id'], claim['lease_token'], report)
+        self.store.review(self.manager, parent['id'], 1, parent['manifest_digest'], 'fixture:reviewed-failure')
+        self.assertEqual(self.coordination.route(self.manager, child['id'])['status'], 'waiting_dependencies')
+        self.assertIsNone(self.store.claim(self.worker, 'a'))
 
     def test_unapproved_or_self_dependency_cannot_create_a_cycle(self):
         parent = self.submit('parent')

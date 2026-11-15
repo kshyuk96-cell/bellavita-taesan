@@ -71,6 +71,8 @@ class Coordination:
                 task TEXT PRIMARY KEY,worker_hash TEXT NOT NULL,routed REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS bridge_failure_records (
                 task TEXT PRIMARY KEY,plan TEXT NOT NULL,recorded REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS bridge_stop_confirmations (
+                task TEXT PRIMARY KEY,evidence TEXT NOT NULL,actor TEXT NOT NULL,recorded REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS bridge_evaluations (
                 task TEXT NOT NULL,case_id TEXT NOT NULL,dimension TEXT NOT NULL,source TEXT NOT NULL,
                 passed INTEGER NOT NULL,critical INTEGER NOT NULL,evidence TEXT NOT NULL,recorded REAL NOT NULL,
@@ -153,6 +155,8 @@ class Coordination:
             if not self.dependencies_ready(c, json.loads(policy['policy'])):
                 return {'status': 'waiting_dependencies', 'task_id': task_id}
             manifest, now = json.loads(row['manifest']), self.store._now()
+            if manifest['repository'] in self.store._reserved_repositories(c):
+                return {'status': 'repository_busy_or_stop_unconfirmed', 'task_id': task_id, 'execution_started': False}
             workers = c.execute('''SELECT t.* FROM bridge_tokens t JOIN bridge_worker_health h
                 ON t.token_hash=h.worker_hash WHERE t.role='worker' AND t.revoked IS NULL
                 AND (t.expires IS NULL OR t.expires>?) AND h.ready=1 AND h.expires>?
@@ -161,8 +165,9 @@ class Coordination:
                 if (row['project'] not in json.loads(worker['projects'])
                         or manifest['kind'] not in json.loads(worker['capabilities'])):
                     continue
-                busy = c.execute("SELECT 1 FROM bridge_tasks WHERE worker_token_hash=? AND state IN "
-                                 "('running','needs_verification')", (worker['token_hash'],)).fetchone()
+                busy = c.execute("SELECT 1 FROM bridge_tasks t WHERE worker_token_hash=? AND "
+                    "(state IN ('running','needs_verification') OR (state='cancelled' AND NOT EXISTS "
+                    "(SELECT 1 FROM bridge_stop_confirmations s WHERE s.task=t.id)))", (worker['token_hash'],)).fetchone()
                 if busy:
                     continue
                 c.execute('INSERT OR REPLACE INTO bridge_task_route VALUES (?,?,?)',
@@ -217,7 +222,36 @@ class Coordination:
                     or row['manifest_digest'] != dependency['manifest_digest'] or not row['review']
                     or json.loads(row['review']).get('report_digest') != digest(json.loads(row['report']))):
                 return False
+            report = json.loads(row['report'])
+            review = json.loads(row['review'])
+            for check in report['checks']:
+                artifact_attested = (check['name'] == 'artifact_access_verified' and
+                    review.get('evidence_reference', '').startswith('independent-artifact:'))
+                if check['passed'] is not True and not artifact_attested:
+                    return False
         return True
+
+    def confirm_stopped(self, token, task_id, version, manifest_digest, evidence_reference):
+        import re
+        if (not isinstance(evidence_reference, str) or
+                not re.fullmatch(r'[A-Za-z0-9_:/#.-]{1,500}', evidence_reference) or token in evidence_reference):
+            raise ValueError('실제 프로세스/플랫폼 종료를 독립 확인한 참조가 필요해요.')
+        with self.store._transaction() as c:
+            actor = self.store._authenticate(c, token)
+            self.store._role(actor, ('owner', 'manager'))
+            row = self.store._get(c, actor, task_id)
+            if (row['state'] != 'cancelled' or row['worker_subject'] is None
+                    or type(version) is not int or row['version'] != version
+                    or row['manifest_digest'] != manifest_digest):
+                raise Conflict('실행 이력이 있는 취소 작업의 정확한 버전을 대조해야 해요.')
+            old = c.execute('SELECT evidence FROM bridge_stop_confirmations WHERE task=?', (task_id,)).fetchone()
+            if old and old['evidence'] != evidence_reference:
+                raise Conflict('이미 기록한 종료 확인을 덮어쓰지 않았어요.')
+            if not old:
+                c.execute('INSERT INTO bridge_stop_confirmations VALUES (?,?,?,?)',
+                          (task_id, evidence_reference, actor['subject'], self.store._now()))
+                self.store._event(c, task_id, actor['subject'], 'execution_stop_confirmed', 'cancelled')
+            return {'task_id': task_id, 'state': 'cancelled', 'stop_confirmed': True, 'execution_replayed': False}
 
     def record_failure(self, token, task_id, code):
         with self.store._transaction() as c:
@@ -302,7 +336,7 @@ def main(argv=None):
     from urllib.parse import quote
     from .control import request, secret
     parser = argparse.ArgumentParser(description='태산이 작업 정책·배정·평가 연결')
-    parser.add_argument('action', choices=('policy', 'route', 'failure', 'evaluation', 'readiness', 'scorecard'))
+    parser.add_argument('action', choices=('policy', 'route', 'failure', 'evaluation', 'readiness', 'scorecard', 'stopped'))
     parser.add_argument('--url', default='http://127.0.0.1:8791')
     parser.add_argument('--token-file', type=Path, required=True)
     parser.add_argument('--task')
