@@ -81,6 +81,10 @@ class Coordination:
                 passed INTEGER NOT NULL,critical INTEGER NOT NULL,evidence TEXT NOT NULL,recorded REAL NOT NULL,
                 PRIMARY KEY(task,case_id,source));
         ''')
+        from .sessions import Sessions
+        from .workflow import Workflow
+        Sessions.create_tables(c)
+        Workflow.create_tables(c)
 
     def set_policy(self, token, task_id, version, manifest_digest, *, allowed_paths, dependencies):
         allowed = validate_paths(allowed_paths)

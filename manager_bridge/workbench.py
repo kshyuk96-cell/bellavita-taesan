@@ -29,10 +29,12 @@ class Workbench:
             actor = self.store._authenticate(c, token)
             self.store._role(actor, ('owner', 'manager'))
             self.store._project_access(c, actor, project)
-            rows = c.execute('''SELECT id,state,worker_subject,updated,manifest FROM bridge_tasks
-                WHERE project=? ORDER BY updated DESC,id LIMIT 101''', (project,)).fetchall()
+            rows = c.execute('''SELECT t.id,t.state,t.worker_subject,t.updated,t.manifest,p.priority,p.due FROM bridge_tasks t
+                LEFT JOIN bridge_task_planning p ON p.task=t.id WHERE t.project=? ORDER BY t.updated DESC,t.id LIMIT 101''', (project,)).fetchall()
             tasks = [{'id': row['id'], 'state': row['state'], 'worker': row['worker_subject'],
-                      'kind': json.loads(row['manifest'])['kind'], 'updated_at': row['updated']} for row in rows[:100]]
+                      'kind': json.loads(row['manifest'])['kind'], 'updated_at': row['updated'],
+                      'priority':row['priority'] or 0,'due_at':row['due'],
+                      'overdue':bool(row['due'] and row['due']<self.store._now() and row['state'] not in ('reviewed','cancelled'))} for row in rows[:100]]
         return {'project': project, **overview, 'tasks': tasks, 'tasks_truncated': len(rows)>100,
                 'connection_scope': 'this_registered_manager_server', 'background_execution_guaranteed': False}
 
