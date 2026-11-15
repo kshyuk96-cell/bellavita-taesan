@@ -60,6 +60,8 @@ API 키를 이 패키지에 넣지 않는다. 기존 Responses 모델/ERP AI 게
 
 ## 검증
 
+최신 main `db742ef` 기반 후보에서 신규 코어 104개, 기존 회귀 51개, 총 155개 통과. 이전 관리 개발 브랜치 기반에서도 기존 회귀 246개와 신규 104개, 총 350개가 통과했지만 그 관리 코드는 이 PR에 포함하지 않는다.
+
 - 신규 코어: `python -m unittest discover -s taesan_core/tests -t . -v`
 - 전체 회귀: 임시 `TAESAN_DATA`, 가상 직원·비밀값, 모의 제공자로 `python -m unittest discover -s tests -q`
 - `git diff --check`
