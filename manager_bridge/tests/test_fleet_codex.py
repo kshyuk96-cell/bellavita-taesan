@@ -16,6 +16,8 @@ class TransportTests(unittest.TestCase):
   # Fixture-only trusted proof injection; real host requires actual subprocess probe.
   self.host._confidentiality['test']=((),{'verified':True})
   self.host.ready_for_new=lambda project:True
+  self.journal=[]
+  self.host.diagnostic_sink=lambda record:(self.journal.append(record) or True)
  def receipt(self,items=(),code=0,session=SESSION):
   events=[{'type':'thread.started','thread_id':session},{'type':'turn.started'},*items,{'type':'turn.completed'}]
   return self.host._receipt('test','a'*32,events,code,SESSION)[0]
@@ -267,3 +269,29 @@ class MetadataFixtureTests(TransportTests):
   self.assertIn(('test','b'*64),self.host._reservation_attempts);self.assertFalse(self.host._reserved_deliveries)
  def test_provider_without_reservation_authorizer_cannot_provision(self):
   p=self.host.provider('test');self.assertFalse(p.execution_provisioning);self.assertIsNone(p.reserved_execution_observer);self.assertIsNone(p.create)
+ def test_native_process_identity_journal_precedes_input_and_completion(self):
+  self.binary.write_text('#!/usr/bin/python3\nimport sys,json\nsys.stdin.read()\nfor x in '+repr(self.new_events())+':print(json.dumps(x))\n')
+  self.host._run('test','PRIVATE_PROMPT_MARKER',session_id=None,read_only=False,heartbeat=lambda:True,context={'task_id':'a'*32})
+  stages=[r['stage'] for r in self.journal]
+  self.assertLess(stages.index('spawned'),stages.index('input_ready'));self.assertLess(stages.index('process_completed'),stages.index('events_observed'))
+  start=next(r for r in self.journal if r['stage']=='spawned');self.assertEqual(set(start['identity']),{'boot_id','pid','pgid','sid','start_ticks'})
+  completed=next(r for r in self.journal if r['stage']=='process_completed');self.assertEqual(completed['actual_exit'],0);self.assertEqual(len(completed['stdout_digest']),64)
+  stop=next(r for r in self.journal if r['stage']=='stopped');self.assertFalse(stop['stop']['safe_for_recovery']);self.assertFalse(stop['stop']['namespace_verified']);self.assertNotIn('PRIVATE_PROMPT_MARKER',repr(self.journal));self.assertNotIn('python -m unittest',repr(self.journal))
+ def test_failed_preinput_journal_cannot_run_model_fixture(self):
+  marker=self.root/'model-ran'
+  self.binary.write_text('#!/usr/bin/python3\nimport sys,pathlib\nsys.stdin.read()\npathlib.Path('+repr(str(marker))+').write_text("ran")\n')
+  self.host.diagnostic_sink=lambda r:False
+  with self.assertRaises(TransportUncertain):self.host._run('test','fixture',session_id=None,read_only=False,heartbeat=lambda:True)
+  self.assertFalse(marker.exists())
+ def test_missing_journal_rejects_before_process_launch(self):
+  self.host.diagnostic_sink=None
+  with patch.object(self.host,'process_factory') as spawn,self.assertRaises(PermissionError):self.host._run('test','fixture',session_id=None,read_only=False,heartbeat=lambda:True)
+  spawn.assert_not_called()
+ def test_receipt_failure_uses_fixed_reason_without_raw_event(self):
+  events=[{'type':'secret-fixture-event','payload':'PRIVATE_OUTPUT_MARKER'}]
+  with self.assertRaises(TransportUncertain):self.host._receipt_diagnostic('test','a'*32,events,0)
+  record=self.journal[-1];self.assertEqual(record['stage'],'receipt_failed');self.assertEqual(record['category'],'unsupported_event');self.assertNotIn('PRIVATE_OUTPUT_MARKER',repr(record));self.assertNotIn('secret-fixture-event',repr(record))
+ def test_event_diagnostics_bound_sequences_and_omit_outputs(self):
+  events=[{'type':'item.completed','item':{'type':'command_execution','exit_code':0,'command':'PRIVATE_COMMAND_MARKER','aggregated_output':'PRIVATE_OUTPUT_MARKER'}}]*300
+  facts=self.host._event_facts(events)
+  self.assertEqual(len(facts['event_types']),256);self.assertTrue(facts['event_sequence_truncated']);self.assertEqual(facts['event_counts']['item.completed'],300);self.assertEqual(len(facts['command_exit_codes']),300);self.assertNotIn('PRIVATE_',repr(facts))

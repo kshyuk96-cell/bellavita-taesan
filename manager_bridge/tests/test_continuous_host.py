@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
-from manager_bridge.continuous_host import ContinuousHost,ProjectHost,_git,_private_json,load_host,_validate_resources
+from manager_bridge.continuous_host import ContinuousHost,ProjectHost,_git,_private_json,load_host,_validate_resources,_transport_journal
 from manager_bridge.continuous_manager import ContinuousManager,ActionRequest
 from manager_bridge.fleet import SessionObservation,Fleet,FleetProvider,DeliveryObservation,ReservedExecutionObservation
 from manager_bridge.fleet_codex import ExecutionReceipt
@@ -305,6 +305,22 @@ class HostTests(unittest.TestCase):
             self.assertEqual(c.execute('SELECT count(*) FROM fleet_creates').fetchone()[0],2)
             self.assertEqual(c.execute("SELECT count(*) FROM fleet_creates WHERE state='created'").fetchone()[0],1)
             self.assertEqual(c.execute("SELECT state FROM continuous_actions WHERE action_key=?",(action,)).fetchone()[0],'reconciled')
+    def test_durable_diagnostics_accept_fixed_metadata_reject_raw_output_and_tokens(self):
+        sink=_transport_journal(self.store,'project','developer')
+        record={'version':1,'project':'project','stage':'spawned','category':'none','observed_at':self.now,'identity':{'boot_id':SESSION,'pid':123,'pgid':123,'sid':123,'start_ticks':123},'context':{'task_id':'a'*32}}
+        self.assertIs(sink(record),True)
+        self.assertIs(sink({**record,'stage':'run_failed','category':'process','identity':None}),True)
+        with self.assertRaises(ValueError):sink({**record,'stdout':'must never persist'})
+        with self.assertRaises(ValueError):sink({**record,'context':{'prompt':'must never persist'}})
+        with self.assertRaises(ValueError):sink({**record,'task_id':self.dev})
+        with self.store._transaction() as c:
+            rows=c.execute('SELECT record FROM continuous_transport_diagnostics').fetchall()
+            self.assertEqual(len(rows),2);self.assertNotIn(self.dev,rows[0][0])
+    def test_error_categories_are_fixed_and_never_retain_exception_text(self):
+        task=self.task();self.transport.fail=True;self.tick();self.tick()
+        with self.store._transaction() as c:
+            row=c.execute('SELECT stage,category FROM continuous_host_diagnostics').fetchone()
+            self.assertEqual(tuple(row),('resumed_requested','timeout'))
     def test_start_wrong_source_base_has_no_execution(self):
         task=self.task(base='a'*40)
         for _ in range(2):self.tick()

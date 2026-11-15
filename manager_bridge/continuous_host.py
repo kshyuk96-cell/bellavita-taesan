@@ -154,7 +154,8 @@ class ContinuousHost:
                 CREATE TABLE IF NOT EXISTS continuous_host_sessions (
                 project TEXT PRIMARY KEY,session_id TEXT,creation_ref TEXT,updated REAL);
                 CREATE TABLE IF NOT EXISTS continuous_host_history (action_key TEXT PRIMARY KEY,record TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS continuous_host_reservations (task_id TEXT PRIMARY KEY,reservation_id TEXT,start_action_key TEXT,version INTEGER,manifest_digest TEXT,config_fingerprint TEXT,updated REAL);''')
+                CREATE TABLE IF NOT EXISTS continuous_host_reservations (task_id TEXT PRIMARY KEY,reservation_id TEXT,start_action_key TEXT,version INTEGER,manifest_digest TEXT,config_fingerprint TEXT,updated REAL);
+                CREATE TABLE IF NOT EXISTS continuous_host_diagnostics (id INTEGER PRIMARY KEY AUTOINCREMENT,task_id TEXT,action_key TEXT,stage TEXT,category TEXT,recorded REAL);''')
         for project in self.projects:
             if project in core.source_observers or project in core.review_hosts:raise ValueError('do not replace an already registered verification host')
             core.source_observers[project]=self.observe
@@ -180,6 +181,21 @@ class ContinuousHost:
         from .continuous_manager import ActionReceipt
         return ActionReceipt(request.action_key,request.task_id,request.phase,state,
                              'continuous-host/'+request.phase+'/'+suffix,self.store._now())
+
+    def _diagnose(self,request,stage,error):
+        """Fixed categories only: never retain provider messages or tracebacks."""
+        from .fleet_codex import TransportUnavailable,TransportUncertain
+        allowed={'execution_intent_persisted','reservation_begin','native_requested','resumed_requested','native_receipt_received','native_receipt_persisted','session_bind_requested','session_bound','execution_finalized'}
+        if stage not in allowed:stage='execution_intent_persisted'
+        category=('transport_uncertain' if isinstance(error,TransportUncertain) else
+                  'transport_unavailable' if isinstance(error,TransportUnavailable) else
+                  'authorization_rejected' if isinstance(error,PermissionDenied) else
+                  'host_conflict' if isinstance(error,Conflict) else
+                  'timeout' if isinstance(error,TimeoutError) else
+                  'host_io' if isinstance(error,OSError) else
+                  'interrupted' if isinstance(error,(KeyboardInterrupt,SystemExit)) else 'unexpected_host_failure')
+        with self.store._transaction() as c:
+            c.execute('INSERT INTO continuous_host_diagnostics(task_id,action_key,stage,category,recorded) VALUES (?,?,?,?,?)',(request.task_id,request.action_key,stage,category,self.store._now()))
 
     def _reservation(self,task,host,token,key):
         if self.fleet is None:raise Conflict('registered deferred fleet unavailable')
@@ -274,11 +290,17 @@ class ContinuousHost:
             fresh=self.store.heartbeat(developer,task['id'],assignment['lease_token'],lease_seconds=300,progress='registered_codex_execution')
             if fresh.get('cancel_requested') is not False:raise Conflict('development execution cancelled')
             return True
+        stage='execution_intent_persisted'
         try:
             if reservation is not None:
+                stage='reservation_begin'
                 fence();self.fleet.begin_reserved_execution(token,reservation)
+                stage='native_requested'
                 fence();result=host.developer_transport.execute_new(host.project,assignment,reservation,heartbeat=fence)
-            else:result=host.developer_transport.execute(host.project,assignment,session,heartbeat=fence)
+            else:
+                stage='resumed_requested'
+                result=host.developer_transport.execute(host.project,assignment,session,heartbeat=fence)
+            stage='native_receipt_received'
             from .fleet_codex import ExecutionReceipt
             if not isinstance(result,ExecutionReceipt) or result.project!=host.project or result.task_id!=task['id'] or (session is not None and result.session_id!=session) or not result.turn_completed or result.process_exit!=0:raise Conflict('actual Codex completion not observed')
             fence()
@@ -286,7 +308,9 @@ class ContinuousHost:
             # crash here blocks replay even if the provider's memory is lost.
             with self.store._transaction() as c:
                 c.execute("UPDATE continuous_host_assignments SET receipt=?,updated=? WHERE task_id=? AND phase='executing'",(canonical_json(asdict(result)),self.store._now(),task['id']))
+            stage='native_receipt_persisted'
             if reservation is not None:
+                stage='session_bind_requested'
                 bound=self.fleet.bind_reserved_execution(token,reservation)
                 if bound['state']!='created' or bound['external_ref']!=result.session_id:raise Conflict('actual native session binding unverified')
                 session=result.session_id;self._session_refs[(host.project,session)]=bound['external_ref']
@@ -296,10 +320,12 @@ class ContinuousHost:
                 external=self._session_refs.get((host.project,session))
                 if external is None:raise Conflict('executed session identity unavailable')
                 self.fleet.verify_delivery(token,host.project,host.fleet_host_ref,external,task['id'])
+            stage='session_bound'
             with self.store._transaction() as c:
                 c.execute("UPDATE continuous_host_assignments SET phase='executed',receipt=?,updated=? WHERE task_id=? AND phase='executing'",
                           (canonical_json(asdict(result)),self.store._now(),task['id']))
-        except BaseException:
+        except BaseException as error:
+            self._diagnose(request,stage,error)
             with self.store._transaction() as c:c.execute("UPDATE continuous_host_assignments SET phase='uncertain',updated=? WHERE task_id=?",(self.store._now(),task['id']))
             raise
         return self._receipt(request)
@@ -425,6 +451,29 @@ class ContinuousHost:
                 'dispatch_rework':lambda r,h:self.dispatch(r,h,rework=True),'reconcile':self.reconcile,'approve_next':self.next}
 
 
+def _transport_journal(store,project,role):
+    """Private, bounded structured observations; never process output content."""
+    if role not in ('developer','reviewer'):raise ValueError('fixed journal role required')
+    with store._transaction() as c:
+        c.execute('CREATE TABLE IF NOT EXISTS continuous_transport_diagnostics (id INTEGER PRIMARY KEY AUTOINCREMENT,project TEXT,role TEXT,record TEXT,record_digest TEXT,recorded REAL)')
+    def persist(record):
+        from .fleet_codex import DIAGNOSTIC_KEYS
+        from .agent_directory import _reject_known_tokens
+        if type(record) is not dict or set(record)-DIAGNOSTIC_KEYS or record.get('project')!=project or record.get('version')!=1:raise ValueError('fixed structured diagnostic schema required')
+        if record.get('stage') not in {'spawned','input_ready','process_completed','events_observed','stopped','run_failed','source_checked','source_failed','receipt_completed','receipt_failed'} or record.get('category') not in {'none','authorization','timeout','output_bound','process','json','event_bound','receipt_sequence','unsupported_event','command_outcome','native_identity','process_outcome','source','unknown'}:raise ValueError('fixed diagnostic vocabulary required')
+        nested={'context':{'task_id','task_version','manifest_digest','reservation_id','candidate_digest'},'identity':{'boot_id','pid','pgid','sid','start_ticks'},'stop':{'exact_process_gone','pid_reused','original_group_gone','descendants_verified','namespace_verified','safe_for_recovery'}}
+        for key,allowed in nested.items():
+            if key=='identity' and record.get(key) is None:continue
+            if key in record and (type(record[key]) is not dict or set(record[key])-allowed):raise ValueError('bounded structured diagnostic facts required')
+        raw=canonical_json(record)
+        if len(raw.encode())>64000:raise ValueError('bounded diagnostic journal required')
+        with store._transaction() as c:
+            _reject_known_tokens(c,record)
+            c.execute('INSERT INTO continuous_transport_diagnostics(project,role,record,record_digest,recorded) VALUES (?,?,?,?,?)',(project,role,raw,digest(record),store._now()))
+        return True
+    return persist
+
+
 def load_host(config_file):
     """Load only fixed private host paths; no dynamic imports or HTTP commands.
 
@@ -501,7 +550,7 @@ def load_host(config_file):
         devsetting=transport_settings['developer']
         developer=CodexHost(devsetting['binary'],devsetting['codex_home'],{
             project:ProjectBinding(project,entry['repository'],source,require_origin=devsetting.get('require_origin',True))},
-            authorize=authorize,authorize_reservation=authorize_reservation if entry.get('worker_mode')=='deferred_native' else None,clock=store.clock,execution_timeout=devsetting.get('execution_timeout',180))
+            authorize=authorize,authorize_reservation=authorize_reservation if entry.get('worker_mode')=='deferred_native' else None,diagnostic_sink=_transport_journal(store,project,'developer'),clock=store.clock,execution_timeout=devsetting.get('execution_timeout',180))
         def reviewer_factory(frozen,*,heartbeat,project=project,repository=entry['repository'],settings=transport_settings['reviewer'],reviewfile=reviewfile,candidates=candidates):
             frozen=_physical(frozen)
             if frozen.parent!=candidates:raise Conflict('review checkout outside registered candidates')
@@ -514,7 +563,7 @@ def load_host(config_file):
                             actor['subject']==reviewer['subject'] and task['project']==project)
             transport=CodexHost(settings['binary'],settings['codex_home'],{
                 project:ProjectBinding(project,repository,frozen,require_origin=settings.get('require_origin',True))},
-                authorize_review=authorize_review,clock=store.clock,execution_timeout=settings.get('execution_timeout',180))
+                authorize_review=authorize_review,diagnostic_sink=_transport_journal(store,project,'reviewer'),clock=store.clock,execution_timeout=settings.get('execution_timeout',180))
             transport.verify_confidentiality(project,forbidden,heartbeat=heartbeat)
             return transport
         projects[project]=ProjectHost(project,entry['repository'],source,candidates,runtime,
