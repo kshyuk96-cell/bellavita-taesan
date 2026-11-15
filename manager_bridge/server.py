@@ -69,10 +69,12 @@ class Handler(BaseHTTPRequestHandler):
             token = self.token()
             store = self.server.store
             parsed = urlsplit(self.path)
-            if method == 'GET' and parsed.path == '/v1/tasks':
+            if method == 'GET' and parsed.path in ('/v1/tasks', '/v1/overview'):
                 query = parse_qs(parsed.query, strict_parsing=True)
                 if set(query) != {'project'} or len(query['project']) != 1:
                     raise ValueError('project required')
+                if parsed.path == '/v1/overview':
+                    return self.respond(200, {'ok': True, 'overview': store.overview(token, query['project'][0])})
                 return self.respond(200, {'ok': True, 'tasks': store.list_tasks(token, query['project'][0])})
             match = re.fullmatch(r'/v1/tasks/([a-f0-9]{24,64})', parsed.path)
             if method == 'GET' and match and not parsed.query:

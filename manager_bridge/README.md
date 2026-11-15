@@ -131,3 +131,21 @@ python -m manager_bridge.session_worker --base-url http://127.0.0.1:8791 --token
 별도 Python 서버 프로세스를 두 번 종료·교체하는 통합 시험을 추가했다. 동일 SQLite와 인증으로 이미 전달된 작업의 임대권을 이어받고, 보고 후 서버를 다시 시작해 대조·독립 검토·인계 종료까지 확인한다. 서버 감사 기록의 작업과 보고가 각각 1개임을 검사하며 실제 플랫폼 호출·AI·운영 계정은 사용하지 않는다. 시작 실패도 임시 프로세스와 파일을 정리한다.
 
 현재 전체 시험은 100개이며, 관리 브리지 66개는 추가 패키지 없는 Python 환경에서도 실행된다. `.github/workflows/manager-bridge.yml`이 관리 코드 변경 시 이 시험을 자동 실행한다. 저장소 읽기 권한만 사용하고 체크아웃 인증을 보존하지 않으며, 배포·실제 계정·결제·발송 단계가 없다. 로컬 통과와 GitHub 실행 결과는 별도로 보고한다.
+
+## 승인된 관리 개선 5건 · 2026-11-15
+
+1. **환경 선점검**: 전용 CLI 워커는 작업을 받기 전에 `codex sandbox`에서 고정된 임시 파일 읽기·쓰기 시험을 합니다. 모델을 호출하지 않습니다. 실패하면 `environment_blocked`로 멈추며 작업은 대기열에 남습니다. 로그인 성공과 실제 개발 실행 가능 상태를 구별합니다. 별도 호스트나 관리형 하위 에이전트 연결은 각각 실제 도구와 권한이 확인돼야 합니다.
+2. **독립 증거 검증**: `supervisor.verify_report`는 고정된 작업폴더와 승인 기준 커밋, 보고 당시 변경 해시를 실제 파일과 대조합니다. 관리자가 미리 지정한 모든 검증 명령이 통과하고 검사 중 결과물이 바뀌지 않아야 검토 기록을 남깁니다. 작업 본문을 셸 명령으로 실행하지 않으며, 검증 출력 원문은 저장하지 않습니다. CLI 종료가 0이어도 내부 명령이 실패하면 이 검증은 거부합니다. 기존 수동 `review`는 관리자의 근거 기록 기능으로 유지됩니다.
+3. **중단 복구**: 기존 `NativeHandoff`의 영구 인계 기록과 대조·복구 기능을 재사용합니다. `supervisor.recovery_action`과 `recovery` 명령은 현재 서버 상태에 맞는 다음 행동을 표시합니다. 실행 중·만료·응답 유실 작업을 새 작업으로 재실행하지 않습니다. 외부 CLI의 프로세스 재개를 자동 수행하는 기능은 아닙니다.
+4. **충돌 방지**: 파일 범위가 명세에 없으므로 같은 저장소 전체를 보수적으로 예약합니다. 실행 중·보고 후 독립 검토 전·만료 후 확인 대기 작업이 있으면 같은 저장소의 다음 작업을 배정하지 않습니다. 서로 다른 프로젝트가 같은 저장소를 등록한 경우에도 적용됩니다. 다른 저장소는 독립 배정할 수 있습니다. 취소는 기존 임대 중단 절차를 사용하며, 종료 확인 전 후속 실행은 관리자가 점검해야 합니다.
+5. **통합 현황**: `GET /v1/overview?project=PROJECT`와 `control overview`는 모든 작업의 상태별 건수 및 최대 100개 후속 행동을 반환합니다. 잘린 목록은 명시하고, 본문·개인정보·임대권·토큰은 포함하지 않습니다. 자동 카톡 발송이나 외부 알림을 추가하지 않습니다.
+
+독립 검증은 저장소 코드를 실행하므로 운영 자격증명이 없는 격리된 검증 호스트에서 사용합니다. 검증 명령 JSON은 관리자가 만든 소유자 전용 파일이어야 합니다. 예시는 다음과 같습니다.
+
+```sh
+python -m manager_bridge.control overview --url http://127.0.0.1:8791 --token-file /private/manager.token --project bellavita
+python -m manager_bridge.supervisor recovery --data /private/manager-data --token-file /private/manager.token --project bellavita --task TASK_ID
+python -m manager_bridge.supervisor verify --data /private/manager-data --token-file /private/manager.token --project bellavita --task TASK_ID --work-root /private/worker-work --codex-home /private/verifier-profile --checks-file /private/checks.json
+```
+
+실제 전용 CLI 시험에서는 새 기기 로그인 후 모델 응답과 작업 보고까지 확인했습니다. 하지만 하위 명령은 이 클라우드 환경의 sandbox/bubblewrap 제한으로 실패하여 파일 읽기와 개발 완료는 입증하지 못했습니다. 이 후보의 모델 없는 실제 sandbox 점검도 `sandbox_unavailable`을 반환했습니다. 샌드박스를 해제해 우회하지 않으며, 운영 배포·원장 변경은 없습니다. 공식 CLI의 비활성 플러그인 캐시는 재사용할 수 있지만 활성 플러그인·MCP·훅 설정과 심볼릭 링크는 계속 거부합니다.

@@ -175,6 +175,10 @@ class WorkerClient:
 
     def run_once(self, runner):
         try:
+            if isinstance(runner, CodexRunner):
+                readiness = runner.check_environment()
+                if readiness.get('ready') is not True:
+                    return {'status': 'environment_blocked', 'reason': readiness['reason']}
             task = self.claim()
             if task is None:
                 return {'status': 'idle'}
@@ -296,6 +300,30 @@ class CodexRunner:
         except Exception:
             raise WorkerError('전용 실행 환경을 먼저 준비해 주세요.') from None
 
+    def check_environment(self):
+        """Exercise the actual sandbox without an AI call, before taking a lease."""
+        try:
+            self.preflight()
+            with tempfile.TemporaryDirectory(prefix='probe-', dir=self.work_root) as folder:
+                probe = Path(folder)
+                (probe / 'input.txt').write_text('taesan-probe')
+                program = ("from pathlib import Path; "
+                           "assert Path('input.txt').read_text() == 'taesan-probe'; "
+                           "Path('output.txt').write_text('taesan-probe'); "
+                           "print('TAESAN_SANDBOX_READY')")
+                result = self.command([str(self.codex_bin), 'sandbox', '--cd', folder,
+                    '-c', 'sandbox_mode="workspace-write"',
+                    '-c', 'sandbox_workspace_write.network_access=false',
+                    '-c', 'mcp_servers={}', '/usr/bin/python3', '-c', program],
+                    cwd=folder, env=self._env(probe), capture_output=True, text=True,
+                    timeout=15, check=False)
+                ready = (result.returncode == 0 and 'TAESAN_SANDBOX_READY' in result.stdout
+                         and (probe / 'output.txt').is_file()
+                         and (probe / 'output.txt').read_text() == 'taesan-probe')
+                return {'ready': ready, 'reason': 'ready' if ready else 'sandbox_unavailable'}
+        except Exception:
+            return {'ready': False, 'reason': 'environment_unverified'}
+
     def _stop(self, process):
         try:
             if process.poll() is None:
@@ -314,7 +342,7 @@ class CodexRunner:
         except Exception:
             raise LeaseStopped('하위 작업 종료를 확인하지 못해 후속 작업을 중지했어요.') from None
 
-    def _artifact(self, target, task_id, runtime_home):
+    def inspect_artifact(self, target, runtime_home):
         arguments = ['/usr/bin/git', '-c', 'core.fsmonitor=false', '-C', str(target)]
         patch = self.command([*arguments, 'diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--'],
                              env=self._env(runtime_home), capture_output=True, timeout=20, check=False)
@@ -352,6 +380,10 @@ class CodexRunner:
                     'inventory_scope': 'tracked_diff_and_nonignored_new_files',
                     'artifact_access_verified': False, 'review_state': 'awaiting_independent_review',
                     **inventory}
+        return evidence
+
+    def _artifact(self, target, task_id, runtime_home):
+        evidence = self.inspect_artifact(target, runtime_home)
         folder = _private_directory(self.work_root / ('artifacts-' + task_id))
         manifest = folder / 'worktree-artifact.json'
         descriptor = os.open(manifest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -428,6 +460,25 @@ class CodexRunner:
                         raise WorkerError('하위 실행 출력 한도를 넘어 작업을 멈췄어요.')
                     self.stop_event.wait(0.05)
                 code = process.wait(timeout=2)
+                output.seek(0)
+                command_count, tools_ok, turn_ok = 0, True, False
+                for line in output.read(MAX_JSON + 1).decode(errors='replace').splitlines():
+                    try:
+                        event = json.loads(line)
+                    except ValueError:
+                        tools_ok = False
+                        continue
+                    if not isinstance(event, dict):
+                        tools_ok = False
+                        continue
+                    turn_ok = turn_ok or event.get('type') == 'turn.completed'
+                    if event.get('type') in ('error', 'turn.failed'):
+                        tools_ok = False
+                    item = event.get('item')
+                    if event.get('type') == 'item.completed' and isinstance(item, dict):
+                        if item.get('type') == 'command_execution':
+                            command_count += 1
+                            tools_ok = tools_ok and type(item.get('exit_code')) is int and item['exit_code'] == 0
             if not pulse() or task['lease_expires_at'] <= self.clock():
                 raise LeaseStopped('최종 보고 전 작업 임대를 확인하지 못했어요.')
             head = self._git(target, 'rev-parse', 'HEAD')
@@ -440,6 +491,8 @@ class CodexRunner:
                                 '요청별 테스트·원격 자료 접근·운영 반영은 별도 검토 대기입니다.\n'
                                 + json.dumps(artifact, ensure_ascii=False, separators=(',', ':'))),
                     'checks': [{'name': 'codex_exit_zero', 'passed': code == 0},
+                               {'name': 'model_turn_completed', 'passed': turn_ok},
+                               {'name': 'command_tools_succeeded', 'passed': command_count > 0 and tools_ok},
                                {'name': 'approved_base_preserved', 'passed': head == base},
                                {'name': 'git_diff_check', 'passed': difference.returncode == 0},
                                {'name': 'artifact_access_verified', 'passed': False}]}
@@ -497,7 +550,7 @@ def main(argv=None):
         while not stop.is_set():
             result = client.run_once(runner)
             print(json.dumps(result), flush=True)
-            if args.once or result['status'] in ('uncertain', 'stopped'):
+            if args.once or result['status'] in ('uncertain', 'stopped', 'environment_blocked'):
                 return 0 if result['status'] in ('idle', 'reported') else 1
             stop.wait(args.poll_seconds)
     except (WorkerError, OSError, ValueError):

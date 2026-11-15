@@ -88,14 +88,14 @@ def main(argv=None):
     manager.add_argument('--owner-token-file', required=True, type=Path)
     manager.add_argument('--projects', required=True)
     manager.add_argument('--name', required=True)
-    for action in ('submit', 'approve', 'review', 'cancel', 'list', 'get'):
+    for action in ('submit', 'approve', 'review', 'cancel', 'list', 'overview', 'get'):
         sub = commands.add_parser(action)
         sub.add_argument('--url', default='http://127.0.0.1:8791')
         sub.add_argument('--token-file', required=True, type=Path)
         if action == 'submit':
             sub.add_argument('--manifest', required=True, type=Path)
             sub.add_argument('--request-key', required=True)
-        elif action == 'list':
+        elif action in ('list', 'overview'):
             sub.add_argument('--project', required=True)
         else:
             sub.add_argument('--task', required=True)
@@ -151,8 +151,8 @@ def main(argv=None):
                 payload = {'request_key': args.request_key,
                            'manifest': json.loads(args.manifest.read_text())}
                 path, method = '/v1/tasks', 'POST'
-            elif action == 'list':
-                path, method, payload = '/v1/tasks?project=' + quote(args.project, safe=''), 'GET', None
+            elif action in ('list', 'overview'):
+                path, method, payload = ('/v1/overview' if action == 'overview' else '/v1/tasks') + '?project=' + quote(args.project, safe=''), 'GET', None
             else:
                 if not re.fullmatch(r'[a-f0-9]{24,64}', args.task):
                     raise ValueError('작업 식별값을 확인해 주세요.')

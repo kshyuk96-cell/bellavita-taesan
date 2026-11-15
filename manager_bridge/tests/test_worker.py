@@ -283,6 +283,19 @@ class CodexRunnerTests(unittest.TestCase):
         self.assertEqual(len(artifact['git_diff_digest']), 64)
         self.assertTrue(Path(artifact['artifact_manifest_path']).is_file())
 
+    def test_zero_cli_exit_cannot_hide_failed_internal_command(self):
+        def failed_command(arguments, **options):
+            process = self.factory(arguments, **options)
+            options['stdout'].write(json.dumps({'type': 'item.completed', 'item': {
+                'type': 'command_execution', 'exit_code': 1,
+                'aggregated_output': 'fixture sandbox unavailable'}}).encode() + b'\n')
+            return process
+        result = self.runner(process_factory=failed_command).run(self.assignment, pulse=lambda: True)
+        checks = {check['name']: check['passed'] for check in result['checks']}
+        self.assertTrue(checks['codex_exit_zero'])
+        self.assertTrue(checks['model_turn_completed'])
+        self.assertFalse(checks['command_tools_succeeded'])
+
     def test_failure_after_cli_start_is_not_reported_as_never_executed(self):
         runner = self.runner()
         with patch.object(runner, '_artifact', side_effect=OSError('fixture artifact unavailable')):
