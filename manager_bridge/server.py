@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 from .store import Store
+from .coordination import Coordination
 
 
 def _pairs(pairs):
@@ -69,10 +70,12 @@ class Handler(BaseHTTPRequestHandler):
             token = self.token()
             store = self.server.store
             parsed = urlsplit(self.path)
-            if method == 'GET' and parsed.path in ('/v1/tasks', '/v1/overview'):
+            if method == 'GET' and parsed.path in ('/v1/tasks', '/v1/overview', '/v1/scorecard'):
                 query = parse_qs(parsed.query, strict_parsing=True)
                 if set(query) != {'project'} or len(query['project']) != 1:
                     raise ValueError('project required')
+                if parsed.path == '/v1/scorecard':
+                    return self.respond(200, {'ok': True, 'scorecard': Coordination(store).scorecard(token, query['project'][0])})
                 if parsed.path == '/v1/overview':
                     return self.respond(200, {'ok': True, 'overview': store.overview(token, query['project'][0])})
                 return self.respond(200, {'ok': True, 'tasks': store.list_tasks(token, query['project'][0])})
@@ -92,13 +95,33 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200, {'ok': True, 'heartbeat': result})
             elif parsed.path == '/v1/worker/report':
                 result = store.report(token, data['id'], data['lease_token'], data['report'])
+            elif parsed.path == '/v1/manager/readiness':
+                result = Coordination(store).readiness(token, data['worker_hash'], ready=data['ready'],
+                                                       reason=data['reason'], ttl=data.get('ttl', 60))
+                return self.respond(200, {'ok': True, 'readiness': result})
             else:
-                match = re.fullmatch(r'/v1/tasks/([a-f0-9]{24,64})/(approve|review|cancel)', parsed.path)
+                match = re.fullmatch(r'/v1/tasks/([a-f0-9]{24,64})/(approve|review|cancel|policy|route|failure|evaluation|stopped)', parsed.path)
                 if not match:
                     return self.respond(404, {'ok': False, 'error': 'not_found'})
                 task, action = match.groups()
-                if action == 'approve':
-                    result = store.approve(token, task, data['version'], data['digest'])
+                if action == 'policy':
+                    result = Coordination(store).set_policy(token, task, data['version'], data['digest'],
+                        allowed_paths=data['allowed_paths'], dependencies=data['dependencies'])
+                    return self.respond(200, {'ok': True, 'policy': result})
+                elif action == 'route':
+                    return self.respond(200, {'ok': True, 'route': Coordination(store).route(token, task)})
+                elif action == 'failure':
+                    return self.respond(200, {'ok': True, 'failure': Coordination(store).record_failure(token, task, data['code'])})
+                elif action == 'evaluation':
+                    result = Coordination(store).record_evaluation(token, task, case_id=data['case_id'],
+                        dimension=data['dimension'], source=data['source'], passed=data['passed'],
+                        critical=data['critical'], evidence=data['evidence'])
+                    return self.respond(200, {'ok': True, 'evaluation': result})
+                elif action == 'stopped':
+                    result = Coordination(store).confirm_stopped(token, task, data['version'], data['digest'], data['evidence_reference'])
+                    return self.respond(200, {'ok': True, 'stopped': result})
+                elif action == 'approve':
+                    result = store.approve(token, task, data['version'], data['digest'], policy_digest=data.get('policy_digest'))
                 elif action == 'review':
                     result = store.review(token, task, data['version'], data['digest'], data['evidence_reference'])
                 else:

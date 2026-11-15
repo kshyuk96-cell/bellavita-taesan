@@ -60,6 +60,20 @@ class SessionDispatchTests(unittest.TestCase):
         self.assertEqual(self.verify.call_count, 2)
         self.assertNotIn('private task output', json.dumps(result))
 
+    def test_session_dispatch_rejects_tampered_approved_policy(self):
+        from manager_bridge.store import digest
+        policy = {'allowed_paths': ['src/'], 'dependencies': []}
+        self.task['execution_policy'] = policy
+        self.task['approval']['policy_digest'] = digest(policy)
+        result = self.dispatch()
+        self.assertEqual(result['status'], 'queued')
+        self.assertIn('allowed_paths', self.run.call_args.args[0][5])
+        self.run.reset_mock()
+        self.task['execution_policy']['allowed_paths'] = ['other/']
+        with self.assertRaises(DispatchRejected):
+            self.dispatch()
+        self.run.assert_not_called()
+
     def test_remote_token_only_in_fixed_environment_name_never_argv_and_resume_remains_unverified(self):
         target = replace(self.target, remote='wss://fixture.invalid:443', credential_file=str(self.secret), resume=True)
         result = self.dispatch(target)

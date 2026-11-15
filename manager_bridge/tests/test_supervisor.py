@@ -46,11 +46,26 @@ class SupervisorTests(unittest.TestCase):
         task = self.store.submit(self.owner, key, manifest)
         return self.store.approve(self.owner, task['id'], task['version'], task['manifest_digest'])
 
-    def reported(self):
-        self.approved()
+    def reported(self, allowed_paths=None, extra_file=None):
+        if allowed_paths is None:
+            self.approved()
+        else:
+            from manager_bridge.coordination import Coordination
+            from manager_bridge.store import digest, token_hash
+            manifest = {'project': 'a', 'repository': 'fixture/repo', 'base_sha': self.base,
+                        'description': 'fixture', 'checks': ['read fixture'], 'kind': 'development'}
+            task = self.store.submit(self.owner, 'one', manifest)
+            coordination = Coordination(self.store)
+            policy = coordination.set_policy(self.owner, task['id'], 1, task['manifest_digest'],
+                                             allowed_paths=allowed_paths, dependencies=[])
+            self.store.approve(self.owner, task['id'], 1, task['manifest_digest'], policy_digest=digest(policy))
+            coordination.readiness(self.manager, token_hash(self.worker), ready=True, reason='ready')
+            coordination.route(self.manager, task['id'])
         task = self.store.claim(self.worker, 'a')
         target = self.work / ('task-' + task['id'] + '-v1')
         self.git('worktree', 'add', '--detach', '-q', str(target), self.base)
+        if extra_file:
+            (target / extra_file).write_text('fixture generated outside scope')
         artifact = self.runner._artifact(target, task['id'], self.work)
         report = {'head_sha': self.base, 'summary': 'fixture\n' + json.dumps(artifact),
                   'checks': [{'name': name, 'passed': True} for name in
@@ -114,6 +129,20 @@ class SupervisorTests(unittest.TestCase):
         evidence = list((self.work / ('artifacts-' + task['id'])).glob('independent-review-*.json'))
         self.assertEqual(len(evidence), 1)
         self.assertEqual(evidence[0].stat().st_mode & 0o777, 0o600)
+
+    def test_ignored_new_file_is_included_and_out_of_scope_creation_is_blocked(self):
+        (self.repo / '.git' / 'info' / 'exclude').write_text('outside.txt\n')
+        task, target = self.reported(allowed_paths=['README.md'], extra_file='outside.txt')
+        inventory = self.runner.inspect_artifact(target, self.work)
+        self.assertIn('outside.txt', [item['path'] for item in inventory['new_files']])
+        with self.assertRaisesRegex(VerificationBlocked, '승인 파일 범위'):
+            verify_report(self.store, self.manager, task['id'], self.runner, self.commands())
+
+    def test_matching_report_hash_still_cannot_hide_out_of_scope_file(self):
+        task, target = self.reported(allowed_paths=['README.md'], extra_file='outside.txt')
+        with self.assertRaisesRegex(VerificationBlocked, '승인 파일 범위'):
+            verify_report(self.store, self.manager, task['id'], self.runner, self.commands())
+        self.assertEqual(self.store.get_task(self.manager, task['id'])['state'], 'reported')
 
     def test_changed_files_block_review_even_if_worker_claimed_success(self):
         task, target = self.reported()

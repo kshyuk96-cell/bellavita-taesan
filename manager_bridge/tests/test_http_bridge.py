@@ -53,6 +53,31 @@ class HttpBridgeTests(unittest.TestCase):
         self.assertEqual(request(self.base, self.worker, 'GET', '/v1/overview?project=bellavita')['status'], 403)
         self.assertEqual(request(self.base, self.manager, 'GET', '/v1/overview?project=camp')['status'], 404)
 
+    def test_managed_policy_route_readiness_and_scorecard_over_real_http(self):
+        from manager_bridge.store import digest, token_hash
+        task = self.submit()
+        path = '/v1/tasks/' + task['id']
+        body = {'version': 1, 'digest': task['manifest_digest'], 'allowed_paths': ['README.md'], 'dependencies': []}
+        self.assertEqual(self.post(self.manager, path+'/policy', body)['status'], 403)
+        policy = self.post(self.owner, path+'/policy', body)['policy']
+        approval = {'version': 1, 'digest': task['manifest_digest']}
+        self.assertEqual(self.post(self.owner, path+'/approve', approval)['status'], 409)
+        self.assertTrue(self.post(self.owner, path+'/approve', approval | {'policy_digest': digest(policy)})['ok'])
+        health = {'worker_hash': token_hash(self.worker), 'ready': True, 'reason': 'ready'}
+        self.assertEqual(self.post(self.worker, '/v1/manager/readiness', health)['status'], 403)
+        self.assertTrue(self.post(self.manager, '/v1/manager/readiness', health)['ok'])
+        self.assertEqual(self.post(self.manager, path+'/route', {})['route']['status'], 'routed')
+        lease = self.post(self.worker, '/v1/worker/claim', {'project': 'bellavita'})['task']
+        self.assertEqual(lease['execution_policy'], policy)
+        self.assertEqual(self.post(self.manager, path+'/route', {})['status'], 409)
+        self.assertTrue(self.post(self.manager, path+'/cancel', {})['ok'])
+        stopped = {'version': 1, 'digest': task['manifest_digest'], 'evidence_reference': 'fixture:independent-process-exit'}
+        self.assertEqual(self.post(self.worker, path+'/stopped', stopped)['status'], 403)
+        self.assertTrue(self.post(self.manager, path+'/stopped', stopped)['stopped']['stop_confirmed'])
+        score = request(self.base, self.manager, 'GET', '/v1/scorecard?project=bellavita')['scorecard']
+        self.assertIsNone(score['real']['dimensions']['judgment']['sample_score'])
+        self.assertEqual(request(self.base, self.worker, 'GET', '/v1/scorecard?project=bellavita')['status'], 403)
+
     def test_real_http_approval_claim_report_and_independent_review(self):
         task = self.submit()
         self.assertEqual(task['state'], 'pending_approval')

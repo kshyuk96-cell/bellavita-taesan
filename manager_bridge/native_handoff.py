@@ -100,6 +100,8 @@ class NativeHandoff:
             task = json.loads(row['task'])
             result.update(task_id=task['id'], version=task['version'], manifest_digest=task['manifest_digest'],
                           manifest=task['manifest'])
+            if 'execution_policy' in task:
+                result['execution_policy'] = task['execution_policy']
         return result
 
     def snapshot(self):

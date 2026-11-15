@@ -75,6 +75,18 @@ def verify_report(store, token, task_id, runner, check_commands):
             or before['git_diff_digest'] != claimed.get('git_diff_digest')
             or recorded.get('worktree_path') != str(target)):
         raise VerificationBlocked('보고 이후 변경된 작업폴더는 완료 처리하지 않아요.')
+    from .coordination import Coordination, scope_violations
+    policy = Coordination(store).get_policy(token, task_id)
+    if policy:
+        changed = runner.command(['/usr/bin/git', '-c', 'core.fsmonitor=false', '-C', str(target),
+            'diff', '--no-ext-diff', '--no-textconv', '--no-renames', '--name-only', '-z', 'HEAD', '--'],
+            env=runner._env(expected_root), capture_output=True, timeout=20, check=False)
+        if changed.returncode != 0:
+            raise VerificationBlocked('변경 파일 목록을 대조하지 못했어요.')
+        paths = [name.decode('utf-8') for name in changed.stdout.split(b'\0') if name]
+        paths += [item['path'] for item in before['new_files']]
+        if scope_violations(paths, policy['allowed_paths']):
+            raise VerificationBlocked('승인 파일 범위 밖의 변경이 있어 통합 검토를 보류했어요.')
     outcomes = []
     for name, argv in check_commands.items():
         try:

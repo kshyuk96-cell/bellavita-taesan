@@ -156,6 +156,8 @@ class Store:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,task TEXT NOT NULL,actor TEXT NOT NULL,
                     action TEXT NOT NULL,state TEXT NOT NULL,recorded REAL NOT NULL,payload_digest TEXT);
             ''')
+            from .coordination import Coordination
+            Coordination.create_tables(c)
 
     @contextmanager
     def _transaction(self):
@@ -327,18 +329,22 @@ class Store:
             self._expire(c, project)
             rows = c.execute('SELECT * FROM bridge_tasks WHERE project=? ORDER BY updated DESC,id', (project,)).fetchall()
             counts = {state: 0 for state in sorted(_STATES)}
-            actions = []
+            actions, action_count = [], 0
             for row in rows:
                 counts[row['state']] += 1
-                if row['state'] in ('reviewed', 'cancelled'):
+                if row['state'] == 'reviewed':
                     continue
+                if row['state'] == 'cancelled' and (row['worker_subject'] is None or c.execute(
+                        'SELECT 1 FROM bridge_stop_confirmations WHERE task=?', (row['id'],)).fetchone()):
+                    continue
+                action_count += 1
                 failed = bool(row['report'] and any(item['passed'] is False for item in json.loads(row['report'])['checks']))
                 if len(actions) < 100:
                     actions.append({'task_id': row['id'], 'state': row['state'],
                                     'action': recovery_action({'state': row['state']}),
                                     'failed_or_unverified_checks': failed})
             return {'counts': counts, 'actions': actions,
-                    'actions_truncated': sum(counts[state] for state in counts if state not in ('reviewed', 'cancelled')) > 100,
+                    'actions_truncated': action_count > 100,
                     'operational_deployment_verified': False}
 
     def submit(self, token, request_key, manifest):
@@ -366,23 +372,37 @@ class Store:
             self._event(c, task_id, actor['subject'], 'submitted', 'pending_approval', manifest)
             return self._public(self._get(c, actor, task_id))
 
-    def approve(self, token, task_id, version, manifest_digest):
+    def approve(self, token, task_id, version, manifest_digest, *, policy_digest=None):
         with self._transaction() as c:
             actor = self._authenticate(c, token)
             self._role(actor, ('owner',))
             row = self._get(c, actor, task_id)
             if type(version) is not int or version != row['version'] or manifest_digest != row['manifest_digest']:
                 raise Conflict('승인할 요청의 버전과 내용이 현재 검토안과 달라요.')
+            policy_row = c.execute('SELECT policy_digest FROM bridge_task_policy WHERE task=?', (task_id,)).fetchone()
+            expected_policy = policy_row['policy_digest'] if policy_row else None
+            if policy_digest != expected_policy:
+                raise Conflict('파일 범위·선행 작업 정책의 다이제스트까지 대조해야 승인할 수 있어요.')
             if row['state'] in ('queued', 'running', 'reported', 'reviewed') and row['approval']:
                 return self._public(row)
             if row['state'] != 'pending_approval':
                 raise Conflict('이 상태의 작업은 다시 개발 승인하지 않아요.')
             approval = {'actor': actor['subject'], 'version': version, 'manifest_digest': manifest_digest,
                         'approved_at': self._now()}
+            if expected_policy is not None:
+                approval['policy_digest'] = expected_policy
             c.execute("UPDATE bridge_tasks SET state='queued',approval=?,updated=? WHERE id=? AND state='pending_approval'",
                       (canonical_json(approval), self._now(), task_id))
             self._event(c, task_id, actor['subject'], 'approved', 'queued', approval)
             return self._public(self._get(c, actor, task_id))
+
+    @staticmethod
+    def _reserved_repositories(c):
+        rows = c.execute("SELECT manifest FROM bridge_tasks t WHERE "
+            "state IN ('running','reported','needs_verification') OR "
+            "(state='cancelled' AND worker_subject IS NOT NULL AND NOT EXISTS "
+            "(SELECT 1 FROM bridge_stop_confirmations s WHERE s.task=t.id))").fetchall()
+        return {json.loads(row['manifest'])['repository'] for row in rows}
 
     def claim(self, token, project, *, lease_seconds=300):
         _lease_seconds(lease_seconds)
@@ -391,10 +411,13 @@ class Store:
             self._role(actor, ('worker',))
             self._project_access(c, actor, project)
             self._expire(c, project)
+            busy = c.execute("SELECT 1 FROM bridge_tasks t WHERE worker_token_hash=? AND "
+                "(state IN ('running','needs_verification') OR (state='cancelled' AND NOT EXISTS "
+                "(SELECT 1 FROM bridge_stop_confirmations s WHERE s.task=t.id)))", (actor['token_hash'],)).fetchone()
+            if busy:
+                return None
             rows = c.execute("SELECT * FROM bridge_tasks WHERE project=? AND state='queued' ORDER BY created,id", (project,)).fetchall()
-            occupied = c.execute("SELECT manifest FROM bridge_tasks WHERE state IN "
-                                 "('running','reported','needs_verification')").fetchall()
-            reserved_repositories = {json.loads(item['manifest'])['repository'] for item in occupied}
+            reserved_repositories = self._reserved_repositories(c)
             for row in rows:
                 manifest = json.loads(row['manifest'])
                 if manifest['kind'] not in actor['capabilities']:
@@ -404,6 +427,19 @@ class Store:
                     c.execute("UPDATE bridge_tasks SET state='needs_verification',updated=? WHERE id=?", (self._now(), row['id']))
                     self._event(c, row['id'], 'server', 'approval_binding_invalid', 'needs_verification')
                     continue
+                policy_row = c.execute('SELECT * FROM bridge_task_policy WHERE task=?', (row['id'],)).fetchone()
+                if policy_row:
+                    from .coordination import Coordination
+                    policy = json.loads(policy_row['policy'])
+                    if (approval.get('policy_digest') != policy_row['policy_digest']
+                            or not Coordination.dependencies_ready(c, policy)):
+                        continue
+                    route = c.execute('SELECT worker_hash FROM bridge_task_route WHERE task=?', (row['id'],)).fetchone()
+                    health = c.execute('SELECT ready,expires FROM bridge_worker_health WHERE worker_hash=?',
+                                       (actor['token_hash'],)).fetchone()
+                    if (not route or route['worker_hash'] != actor['token_hash'] or not health
+                            or not health['ready'] or health['expires'] <= self._now()):
+                        continue
                 # Until independent review, reserve the whole repository. Unknown file
                 # scopes must not be inferred from natural language. This is global
                 # across projects which happen to register the same repository.
@@ -416,7 +452,10 @@ class Store:
                 if not claimed.rowcount:
                     continue
                 self._event(c, row['id'], actor['subject'], 'claimed', 'running')
-                return {**self._public(self._get(c, actor, row['id'])), 'lease_token': lease}
+                assignment = {**self._public(self._get(c, actor, row['id'])), 'lease_token': lease}
+                if policy_row:
+                    assignment['execution_policy'] = policy
+                return assignment
             return None
 
     def _lease(self, row, actor, lease):
