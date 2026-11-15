@@ -16,6 +16,9 @@ def dispatch(handler,method,path,token,body=None):
     if url.scheme or url.netloc or url.fragment:raise ValueError('relative runtime path required')
     if not url.path.startswith(PREFIX):return False
     route=url.path[len(PREFIX):]
+    if route.startswith(('fleet/','continuous/')):
+        from .fleet_api import dispatch as management_dispatch
+        return management_dispatch(handler,method,path,token,body)
     if route.startswith('three-tier/'):
         from .three_tier_api import dispatch as hierarchy_dispatch
         return hierarchy_dispatch(handler,method,path,token,body)

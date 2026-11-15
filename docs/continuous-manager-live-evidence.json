@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "implementation_commit": "59c133458d82bd64aecf0ad96638b1ade76f9c04",
+  "scope": "private synthetic registered cloud Codex CLI; not customer or existing UI execution",
+  "actual_workflow": {
+    "tasks": [
+      {
+        "task_label": "task_a",
+        "task_id_digest": "93cad9d1cd9ef491460db52e94b37c74214e9fca22f9a39ffe365ae064f58f24",
+        "candidate_head": "5ec176c48caae15bf85652d547723174eaecc80a",
+        "manifest_digest": "5b500debd656d66cd76337b4004546866cd49bedd0210bc4a0c228f9b732e335",
+        "session_digest": "5266653cebdb69bd2134081543ceb4fbe97bab14c30633fe1245c0627e3e9867",
+        "state": "accepted",
+        "actual_cli_exit": 0,
+        "actual_command_count": 4,
+        "actual_command_failures": 0,
+        "independent_check_exits": [
+          0,
+          0
+        ],
+        "independent_semantic_recommendation": "pass",
+        "receipt_digest": "49a55d59d39bc0c3270d4f138cce0aa3a908ec5ccde15767dd2621af23e78f2a"
+      },
+      {
+        "task_label": "task_b",
+        "task_id_digest": "0e13d6f07f482c18bc5c1f2e323ed78680a86cf7dcb289eb75f98c954fa6a129",
+        "candidate_head": "88683ad94e0a34380017cc0ccd75ecd3cd880165",
+        "manifest_digest": "ea9df67570cceabcd5ac52d03dc520c7b5e3c9cf0664fe655715e5a787bb4284",
+        "session_digest": "5266653cebdb69bd2134081543ceb4fbe97bab14c30633fe1245c0627e3e9867",
+        "state": "accepted",
+        "actual_cli_exit": 0,
+        "actual_command_count": 2,
+        "actual_command_failures": 0,
+        "independent_check_exits": [
+          0,
+          0,
+          0
+        ],
+        "independent_semantic_recommendation": "pass",
+        "receipt_digest": "bec856bd2fab06b04eb8516e34f8169a9c92cb6a01dd0027456bc47104bf53c4"
+      }
+    ],
+    "native_worker_reservations": 1,
+    "distinct_native_developer_sessions": 1,
+    "next_assignments_approved_by_manager": 1,
+    "core_accepted_tasks": 2,
+    "actual_developer_commands": 6,
+    "independent_fixed_checks": 5
+  },
+  "restart": {
+    "ticks": 2,
+    "assignments_unchanged": true,
+    "accepted_states_unchanged": true,
+    "model_process_spawns_before": 4,
+    "model_process_spawns_after": 4,
+    "additional_model_process_spawns": 0,
+    "source_head_unchanged": true
+  },
+  "inventory_metadata_only": {
+    "owned_github_repositories": 5,
+    "owned_sites": 24,
+    "distinct_existing_ui_references": 11,
+    "existing_ui_references_resolved_on_registered_host": 0,
+    "account_wide_control_verified": false
+  },
+  "retained_failed_scenarios": {
+    "metadata_only_attempts": 3,
+    "metadata_attempt_model_turns": 0,
+    "unknown_native_attempts": 2,
+    "v1_v2_data_and_modified_source_preserved": true,
+    "promoted_to_success": false,
+    "replayed": false
+  },
+  "validation": {
+    "full_repository_tests": 1636,
+    "full_repository_tests_passed": true,
+    "actual_namespace_fixture_run": true,
+    "javascript_ui_tests": 15
+  },
+  "limits": {
+    "existing_ui_chat_control_verified": false,
+    "always_on_host_verified": false,
+    "paid_api_calls": 0,
+    "production_deployment_performed": false,
+    "operational_sheet_writes": 0,
+    "new_paid_resources": 0,
+    "expired_execution_recovery_enabled": false
+  }
+}

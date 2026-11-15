@@ -43,7 +43,7 @@ class Element {
 const html=fs.readFileSync(root+'/three-tier.html','utf8'),elements={};
 for(const match of html.matchAll(/<([a-z]+)\b[^>]*\bid="([^"]+)"/g))elements[match[2]]=new Element(match[1],match[2]);
 const document={getElementById:id=>{assert(elements[id],'missing shell element '+id);return elements[id];},createElement:tag=>new Element(tag)};
-const requests=[];let mode='success',resolvePending=null;
+const requests=[];let mode='success',resolvePending=null,runtimePending=[];
 const token='m'.repeat(44),injection='<img src=x onerror="globalThis.executed=true">';
 const task={task_id:'task-one',state:'accepted',state_label:'기술 인수 완료',head_sha:'a'.repeat(40),technical_accepted:true,rework_count:0,checks:{passed:1,failed:0,unmeasured:0}};
 function summary(){return {snapshot_scope:'authorized_registered_hierarchy',operational_change:false,
@@ -54,12 +54,18 @@ async function fetch(path,options){
  requests.push({path,options:{...options,headers:{...options.headers}}});
  if(path==='/v1/auth/logout')return response({ok:true});
  if(path==='/v1/auth/redeem')return response({ok:true});
+ if(path.endsWith('/fleet/inventory')||path.endsWith('/continuous/status')){
+  if(mode==='runtime_pending')return new Promise(resolve=>{runtimePending.push({resolve,path});});
+  if(mode==='runtime_expired')return response({ok:false},403);
+  return response({ok:true,result:path.endsWith('/fleet/inventory')?{operational_change:false,projects:[{project:'a',hosts:[],sessions:[],total_session_count:7,displayed_session_count:0,uncertain_creations:1}]}:{operational_change:false,actions:[],leader_observed:true,always_on_verified:false}});
+ }
  assert.strictEqual(path,'/v1/representative/runtime/three-tier/overview');
  if(mode==='pending')return new Promise(resolve=>{resolvePending=resolve;});
  if(mode==='expired')return response({ok:false},401);
  if(mode==='not_configured')return response({ok:true,result:{state:'not_configured',operational_change:false}});
  if(mode==='network')throw Error('private backend diagnostic must not be shown');
  const result=summary();
+ if(mode==='pages'){result.total_tasks=90;result.displayed_tasks=1;result.freshness_checks=0;result.next_cursor='a'.repeat(32);result.projects[0].total_tasks=90;result.projects[0].tasks=[{...task,technical_accepted:false,source_freshness:'not_checked'}];}
  if(mode==='contradiction'){result.projects[0].tasks=[{...task,technical_accepted:false,acceptance_needs_verification:true}];}
  return response({ok:true,result});
 }
@@ -118,6 +124,27 @@ async function connect({bearer=true,code=''}={}){
   await elements['tier-connect'].events.submit({preventDefault(){}});
   assert.strictEqual(requests.length,0);assert.strictEqual(elements['tier-token'].value,'');
   assert(!allText().includes(token));assert(allText().includes('전용 관리 토큰만'));
+ }else if(scenario==='pagination'){
+  mode='pages';await connect();assert(!elements['tier-next'].disabled);assert(allText().includes('전체 90건 중 현재 1건'));assert(allText().includes('현재 소스 최신성 미점검'));
+  await elements['tier-next'].events.click();const read=requests[requests.length-1];assert.strictEqual(JSON.parse(read.options.body).cursor,'a'.repeat(32));
+  elements['tier-projects'].events.input();assert(elements['tier-next'].disabled);
+ }else if(scenario==='runtime_read'){
+  await connect();assert.strictEqual(requests.filter(r=>r.path.includes('/fleet/')).length,0);
+  await elements['tier-runtime-read'].events.click();assert(elements['tier-runtime'].textContent.includes('세션 전체 7개'));assert(elements['tier-runtime'].textContent.includes('현재 관측: 있음'));
+  for(const read of requests.filter(r=>r.path.includes('/fleet/')||r.path.includes('/continuous/'))){assert.strictEqual(read.options.headers.Authorization,'Bearer '+token);assert.strictEqual(read.options.headers['X-Taesan-Client'],'dashboard');assert.strictEqual(read.options.credentials,'omit');}
+  elements['tier-projects'].events.input();assert.strictEqual(elements['tier-runtime'].children.length,0);
+ }else if(scenario==='runtime_stale'){
+  await connect();mode='runtime_pending';const pending=elements['tier-runtime-read'].events.click();assert.strictEqual(runtimePending.length,2);
+  await elements['tier-disconnect'].events.click();for(const item of runtimePending)item.resolve(response({ok:true,result:item.path.endsWith('/fleet/inventory')?{operational_change:false,projects:[]}:{operational_change:false,actions:[],leader_observed:true}}));
+  await pending;assert.strictEqual(elements['tier-runtime'].children.length,0);assert(elements['tier-runtime-read'].disabled);
+ }else if(scenario==='runtime_cookie_scope'){
+  await connect({bearer:false,code:'ABCDEFGHIJKL'});mode='runtime_pending';const pending=elements['tier-runtime-read'].events.click();
+  for(const read of requests.filter(r=>r.path.includes('/fleet/')||r.path.includes('/continuous/'))){assert.strictEqual(read.options.credentials,'same-origin');assert(!('Authorization' in read.options.headers));assert.strictEqual(read.options.headers['X-Taesan-Client'],'dashboard');}
+  elements['tier-projects'].value='b';elements['tier-projects'].events.input();
+  for(const item of runtimePending)item.resolve(response({ok:true,result:item.path.endsWith('/fleet/inventory')?{operational_change:false,projects:[]}:{operational_change:false,actions:[],leader_observed:true}}));await pending;
+  assert.strictEqual(elements['tier-runtime'].children.length,0);
+ }else if(scenario==='runtime_revoked'){
+  await connect();mode='runtime_expired';await elements['tier-runtime-read'].events.click();assert.strictEqual(elements['tier-runtime'].children.length,0);assert(elements['tier-refresh'].disabled);assert(allText().includes('만료·해제'));
  }else throw Error('unknown scenario');
  process.stdout.write('OK '+scenario+'\n');
 })().catch(()=>{process.stderr.write('UI behavior assertion failed\n');process.exitCode=1;});
@@ -145,6 +172,12 @@ class ThreeTierUIShellTests(unittest.TestCase):
             result=subprocess.run([node,str(path),str(UI),scenario],capture_output=True,text=True,timeout=15)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(result.stdout,'OK '+scenario+'\n')
+
+    def test_pagination_preserves_scope_and_distinguishes_history(self):self.run_scenario('pagination')
+    def test_runtime_read_is_explicit_and_uses_existing_auth(self):self.run_scenario('runtime_read')
+    def test_runtime_stale_response_cannot_restore_disconnected_view(self):self.run_scenario('runtime_stale')
+    def test_runtime_cookie_csrf_and_changed_scope_guard(self):self.run_scenario('runtime_cookie_scope')
+    def test_runtime_revocation_clears_all_views(self):self.run_scenario('runtime_revoked')
 
     def test_bearer_is_memory_only_and_dom_output_is_safe(self):self.run_scenario('memory_auth')
     def test_cookie_auth_uses_existing_csrf_request_boundary(self):self.run_scenario('cookie_csrf')

@@ -1,0 +1,26 @@
+# Deployment draft only. Install after host paths, pinned config and isolation
+# probes are validated. This file does not provision or enable a service.
+[Unit]
+Description=Taesan registered cloud development supervisor
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=taesan-manager
+Group=taesan-manager
+UMask=0077
+WorkingDirectory=/opt/taesan/app
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/taesan/venv/bin/python /opt/taesan/app/scripts/run_continuous_manager.py --config /var/lib/taesan/host.json
+Restart=on-failure
+RestartSec=15
+KillMode=control-group
+TimeoutStopSec=60
+NoNewPrivileges=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target

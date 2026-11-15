@@ -13,6 +13,7 @@ on:
       - 'scripts/export_conversation_benchmark.py'
       - 'scripts/rehearse_conversation.py'
       - 'scripts/run_project_receiver.py'
+      - 'scripts/run_continuous_manager.py'
       - 'scripts/rehearse_project_runtime.py'
       - 'tests/test_manager_host.py'
       - '.github/workflows/manager-bridge.yml'
@@ -25,6 +26,7 @@ on:
       - 'codex/taesan-project-*'
       - 'codex/taesan-conversation-*'
       - 'codex/taesan-three-tier-*'
+      - 'codex/taesan-continuous-*'
     paths:
       - 'manager_bridge/**'
       - 'taesan_core/**'
@@ -36,6 +38,7 @@ on:
       - 'scripts/export_conversation_benchmark.py'
       - 'scripts/rehearse_conversation.py'
       - 'scripts/run_project_receiver.py'
+      - 'scripts/run_continuous_manager.py'
       - 'scripts/rehearse_project_runtime.py'
       - 'tests/test_manager_host.py'
       - '.github/workflows/manager-bridge.yml'
