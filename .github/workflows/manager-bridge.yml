@@ -8,6 +8,8 @@ on:
       - 'scripts/maintenance_fixture.py'
       - 'scripts/prepare_connection_review.py'
       - 'scripts/export_model_lab.py'
+      - 'scripts/run_project_receiver.py'
+      - 'scripts/rehearse_project_runtime.py'
       - 'tests/test_manager_host.py'
       - '.github/workflows/manager-bridge.yml'
   push:
@@ -16,12 +18,15 @@ on:
       - 'codex/taesan-maintenance-*'
       - 'codex/taesan-delegated-*'
       - 'codex/taesan-connection-*'
+      - 'codex/taesan-project-*'
     paths:
       - 'manager_bridge/**'
       - 'tests/test_manager_bridge.py'
       - 'scripts/maintenance_fixture.py'
       - 'scripts/prepare_connection_review.py'
       - 'scripts/export_model_lab.py'
+      - 'scripts/run_project_receiver.py'
+      - 'scripts/rehearse_project_runtime.py'
       - 'tests/test_manager_host.py'
       - '.github/workflows/manager-bridge.yml'
 

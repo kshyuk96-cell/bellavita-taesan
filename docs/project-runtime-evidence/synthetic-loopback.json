@@ -1,0 +1,56 @@
+{
+  "scope": "synthetic_loopback_only",
+  "source_snapshots_verified": 4,
+  "source_commits": {
+    "bellavita-shop": "d5047f3345b757edfcfbd81a73c609c0392007dd",
+    "bellavita-erp": "2c10b03db14c607fb4c61e09cbdf52ec7b406f40",
+    "hope-sunrise": "d4da64b3791bb8dd7a96cf2f974c784385e79687",
+    "funeral-association": "8f1e4fa331dbf460f0fcbea432c0fa360cc1b4ba"
+  },
+  "business_reads": {
+    "bellavita-erp/orders.list": {
+      "state": "ok",
+      "count": 1
+    },
+    "bellavita-shop/orders.list": {
+      "state": "ok",
+      "count": 1
+    },
+    "hope-sunrise/products.list": {
+      "state": "ok",
+      "count": 1
+    },
+    "hope-sunrise/inquiries.list": {
+      "state": "ok",
+      "count": 1
+    },
+    "funeral-association/access.status": {
+      "state": "ok",
+      "count": 1
+    },
+    "funeral-association/obituary.get": {
+      "state": "ok",
+      "count": 1
+    }
+  },
+  "cross_project_access_denied": true,
+  "event_states": [
+    "recorded",
+    "duplicate",
+    "recorded",
+    "needs_reconciliation"
+  ],
+  "source_change_detected_and_acknowledged": true,
+  "missing_model_not_measured": true,
+  "sandbox": {
+    "available": false,
+    "state": "sandbox_unavailable",
+    "isolation_verified": false
+  },
+  "customer_providers_connected": false,
+  "existing_codex_windows_connected": false,
+  "operational_change": false,
+  "payments_executed": false,
+  "messages_sent": false,
+  "schedules_created": false
+}

@@ -40,6 +40,9 @@ def dispatch(handler, method, path, token, body=None):
     url=urlsplit(path)
     if url.scheme or url.netloc or url.fragment:raise ValueError('relative API path required')
     if not url.path.startswith(PREFIX):return False
+    if url.path.startswith(PREFIX+'runtime/'):
+        from .runtime_api import dispatch as runtime_dispatch
+        return runtime_dispatch(handler,method,path,token,body)
     route=url.path[len(PREFIX):]
     get_specs={
         'intake':('id',), 'delegation':('id',), 'agents':('project',),
