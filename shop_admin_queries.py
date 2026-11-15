@@ -12,12 +12,15 @@ ATTENTION_SQL={
     'payment':"o.state IN ('requesting','waiting','failed')",
     'alerts':"EXISTS(SELECT 1 FROM shop_messages m WHERE m.order_id=o.id AND m.state IN ('failed','uncertain'))",
     'receipts':"EXISTS(SELECT 1 FROM shop_cash_receipts r WHERE r.order_id=o.id AND r.state IN ('failed','uncertain','held'))"}
-KEYS=('q','order','state','stage','from_date','to_date','page','task','task_owner','task_priority','attention')
+SORTS={'':'기본 · 결제 확인 우선','newest':'주문 최신순','event':'행사 임박순'}
+KEYS=('q','order','state','stage','from_date','to_date','page','task','task_owner','task_priority','attention','sort','expanded')
 PAGE_SIZE=30
 
 
 def filters(fields):
     result={key:str(fields.get(key,'')).strip() for key in KEYS}
+    if result['sort'] not in SORTS:raise ValueError('정렬 기준을 확인해 주세요.')
+    if result['expanded'] and not re.fullmatch(r'[0-9]{1,2}(?:\.[0-9]{1,2}){0,11}',result['expanded']):raise ValueError('상세 펼침 정보를 확인해 주세요.')
     if result['attention'] not in ATTENTION:raise ValueError('확인 필요 항목을 선택해 주세요.')
     if len(result['q'])>100:raise ValueError('검색어는 100자 이내로 입력하세요.')
     if result['task_priority'] not in ('','high','normal','low'):raise ValueError('업무 우선순위 검색을 확인하세요.')
@@ -35,7 +38,7 @@ def filters(fields):
     return result
 
 
-def select(c,fields):
+def parts(fields):
     f=filters(fields);clauses=[];args=[]
     if f['order']:clauses.append('o.id=?');args.append(f['order'])
     if f['q']:
@@ -58,8 +61,23 @@ def select(c,fields):
         clauses.append('EXISTS(SELECT 1 FROM shop_operator_tasks t WHERE '+' AND '.join(work)+')')
     sql=' FROM invitation_orders o JOIN shop_offers s ON s.id=o.job LEFT JOIN shop_fulfillment f ON f.order_id=o.id'
     if clauses:sql+=' WHERE '+' AND '.join(clauses)
+    return f,sql,args
+
+
+def ordering(f):
+    if f['sort']=='newest':return 'o.created DESC,o.id',[]
+    if f['sort']=='event':
+        now=dt.datetime.now(ZoneInfo('Asia/Seoul')).isoformat()
+        event="json_extract(o.details,'$.event_time')"
+        return f"CASE WHEN {event}>=? THEN 0 WHEN {event} IS NULL OR {event}='' THEN 2 ELSE 1 END,CASE WHEN {event}>=? THEN {event} END ASC,CASE WHEN {event}<? THEN {event} END DESC,o.created DESC,o.id",[now,now,now]
+    return "(o.state='requesting') DESC,o.created DESC,o.id",[]
+
+
+def select(c,fields):
+    f,sql,args=parts(fields)
     total=c.execute('SELECT count(*)'+sql,args).fetchone()[0];pages=max(1,math.ceil(total/PAGE_SIZE));page=min(int(f['page']),pages);f['page']=str(page)
-    rows=c.execute("SELECT o.*"+sql+" ORDER BY (o.state='requesting') DESC,o.created DESC,o.id LIMIT ? OFFSET ?",[*args,PAGE_SIZE,(page-1)*PAGE_SIZE]).fetchall()
+    order,order_args=ordering(f)
+    rows=c.execute('SELECT o.*'+sql+' ORDER BY '+order+' LIMIT ? OFFSET ?',[*args,*order_args,PAGE_SIZE,(page-1)*PAGE_SIZE]).fetchall()
     return rows,{'filters':f,'total':total,'page':page,'pages':pages,'displayed':len(rows)}
 
 
@@ -73,6 +91,7 @@ def redirect(path,fields):
     pairs=parse_qsl(encoded,keep_blank_values=True,max_num_fields=len(KEYS))
     if any(k not in KEYS for k,_ in pairs) or len({k for k,_ in pairs})!=len(pairs):raise ValueError('화면 복귀 정보를 확인하세요.')
     f=filters(dict(pairs))
+    if '_return_details' in fields:f=filters(dict(f,expanded=fields['_return_details']))
     order=fields.get('order_id','');product=fields.get('product_id','')
     anchor='order-'+order if re.fullmatch('[a-f0-9]{32}',order) else 'product-'+product if re.fullmatch('[a-f0-9]{32}',product) else fields.get('_return_anchor','admin-orders')
     if anchor not in ('admin-orders','admin-products','admin-delivery','admin-reports','admin-settings') and not re.fullmatch(r'(order|product)-[a-f0-9]{32}',anchor):anchor='admin-orders'
@@ -82,14 +101,15 @@ def redirect(path,fields):
 def controls(path,meta):
     from html import escape
     f=meta['filters']
-    def select(name,labels):return '<label>'+{'state':'결제 상태','stage':'배송 상태','attention':'확인 필요 항목'}[name]+'<select name="'+name+'">'+''.join('<option value="'+code+'"'+(' selected' if f[name]==code else '')+'>'+label+'</option>' for code,label in labels.items())+'</select></label>'
+    def select(name,labels):return '<label>'+{'state':'결제 상태','stage':'배송 상태','attention':'확인 필요 항목','sort':'정렬'}[name]+'<select name="'+name+'">'+''.join('<option value="'+code+'"'+(' selected' if f[name]==code else '')+'>'+label+'</option>' for code,label in labels.items())+'</select></label>'
     form='<form method="get" action="'+escape(path)+'" class="admin-search"><h3>전체 주문 검색·필터</h3><label>검색어<input name="q" maxlength="100" value="'+escape(f['q'])+'" placeholder="주문번호·주문자·휴대폰·문구·상품·행사장"></label><div class="search-grid">'+select('state',STATES)+select('stage',STAGES)+select('attention',ATTENTION)
     for key,label in [('from_date','행사 시작일'),('to_date','행사 종료일')]:form+='<label>'+label+'<input type="date" name="'+key+'" value="'+escape(f[key])+'"></label>'
     form+='<label>업무 상태<select name="task">'+''.join('<option value="'+k+'"'+(' selected' if f['task']==k else '')+'>'+v+'</option>' for k,v in [('', '업무 조건 없음'),('open','미처리 업무 있음'),('overdue','기한 초과 업무 있음'),('soon','24시간 이내 기한 업무 있음'),('done','완료 업무 있음')])+'</select></label><label>업무 담당자<input name="task_owner" maxlength="60" value="'+escape(f['task_owner'])+'"></label>'
     form+='<label>업무 우선순위<select name="task_priority">'+''.join('<option value="'+k+'"'+(' selected' if f['task_priority']==k else '')+'>'+v+'</option>' for k,v in [('', '전체 우선순위'),('high','높음'),('normal','보통'),('low','낮음')])+'</select></label>'
-    form+='</div><button>검색</button> <a href="'+escape(path)+'#admin-orders">조건 초기화</a></form>'
+    form+=select('sort',SORTS)+'</div><button>검색</button> <a href="'+escape(path)+'#admin-orders">조건 초기화</a></form>'
     info='<p id="shop-result-count" role="status">전체 일치 '+str(meta['total'])+'건 · '+str(meta['page'])+'/'+str(meta['pages'])+'쪽 · 이번 쪽 '+str(meta['displayed'])+'건 (최대 30건)</p>'
     paging='<nav class="order-pagination" aria-label="주문 페이지">'
     for page,label in [(meta['page']-1,'이전'),(meta['page']+1,'다음')]:
         if 1<=page<=meta['pages']:paging+='<a href="'+escape(path+'?'+query(f,page=str(page)))+'#admin-orders">'+label+'</a> '
-    return form+info+paging+'</nav>'
+    import shop_admin_review
+    return form+shop_admin_review.search_assistance(path,meta)+info+paging+'</nav>'

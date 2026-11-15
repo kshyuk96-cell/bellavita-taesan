@@ -24,6 +24,7 @@ import shop_admin_layout
 import shop_readiness
 import external_backups
 import shop_admin_queries
+import shop_admin_review
 import shop_admin_workflow
 import shop_admin_daily
 import shop_admin_training
@@ -367,7 +368,12 @@ def admin_page(connection, path, origin, fields=None, root=None):
             details.append(('페이앱 통보', f'{label} · {event["payment_number"]} · {event["amount"]:,}원 · {event["provider_time"]}'))
         for check in connection.execute('SELECT * FROM payment_checks WHERE order_id=? ORDER BY id', (row['id'],)):
             details.append(('관리자 대조 기록', f'{check["checked"][:16]} · {check["payment_number"]} · {check["note"]}'))
-        content = ''.join(f'<dt>{key}</dt><dd>{escape(value)}</dd>' for key, value in details)
+        content=''
+        for key,value in details:
+            if key=='주문자':value=shop_admin_review.highlight(order['buyer'],query)+' · '+shop_admin_review.phone_control(order['buyer_phone'])
+            elif key in ('주문번호','상품','보내시는 분','선택 사항','직접 입력 문구','설치 장소'):value=shop_admin_review.highlight(value,query)
+            else:value=escape(value)
+            content+=f'<dt>{key}</dt><dd>{value}</dd>'
         check_form = ''
         if row['state'] in ('requesting', 'waiting', 'failed'):
             check_form = ('<p>페이앱 판매자 결제현황에서 주문번호(연동 변수), 접수 시각, 전화번호와 원금액을 대조하세요. '
@@ -381,15 +387,16 @@ def admin_page(connection, path, origin, fields=None, root=None):
                                  + '<label><input type="checkbox" name="compared" value="yes" required>'
                                    '페이앱 원거래와 주문을 직접 대조했습니다</label>', '대조 기록 저장'))
         search_text=' '.join(str(value) for value in (row['id'],order['buyer'],order['buyer_phone'],order['sender'],order['message'],order['title'],order['venue']))
-        orders.append(f'<li id="order-{row["id"]}" data-shop-order="{row["id"]}" data-search="{escape(search_text)}" data-queues="{",".join(shop_dashboard.categories(connection,row))}"><details><summary>{escape(order["title"])} · {order["amount"]:,}원 · '
-                      f'{STATES.get(row["state"], "확인 필요")} · 주문 {row["id"]}<small class="order-identity">주문자 {escape(order["buyer"])} · 행사 {escape(order["event_time"][:16].replace("T"," "))}</small><span class="order-next">{escape(shop_dashboard.next_action(connection,row))}</span></summary>'
-                      f'<div class="order-tools"><button type="button" data-copy-order="{row["id"]}">주문번호 복사</button><button type="button" data-copy-link="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}">고객 상태 링크 복사</button><input class="copy-source" readonly aria-label="복사할 값" value="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}"></div>'+shop_admin_team.focus(connection,row)+f'<details class="order-reference"><summary>접수 원본·결제 통보 기록</summary><dl>{content}</dl></details>{check_form}' + shop_admin_daily.summary_tools(connection,row) + shop_admin_team.response_tools(connection,row) + shop_admin_workflow.timeline(connection,row) + order_ops.controls(connection, row, path) + shop_admin_workflow.handover(connection,row,path) + shop_admin_daily.tasks(connection,row,path) + '</details></li>')
+        queues=shop_dashboard.categories(connection,row)
+        orders.append(f'<li id="order-{row["id"]}" data-shop-order="{row["id"]}" data-search="{escape(search_text)}" data-queues="{",".join(queues)}"><details><summary>{shop_admin_review.highlight(order["title"],query)} · {order["amount"]:,}원 · '
+                      f'{STATES.get(row["state"], "확인 필요")} · 주문 {shop_admin_review.highlight(row["id"],query)}<small class="order-identity">주문자 {shop_admin_review.highlight(order["buyer"],query)} · 행사 {escape(order["event_time"][:16].replace("T"," "))}</small>'+shop_admin_review.status_badge(row['state'],queues)+f'<span class="order-next">{escape(shop_dashboard.next_action(connection,row))}</span></summary>'
+                      f'<div class="order-tools"><button type="button" data-copy-order="{row["id"]}">주문번호 복사</button><button type="button" data-copy-link="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}">고객 상태 링크 복사</button><input class="copy-source" readonly aria-label="복사할 값" value="{escape(origin+"/invitation-orders/"+row["id"]+"/receipt")}"></div>'+shop_admin_review.installation(order,row['id'])+shop_admin_team.focus(connection,row,query)+f'<details class="order-reference"><summary>접수 원본·결제 통보 기록</summary><dl>{content}</dl></details>{check_form}' + shop_admin_daily.summary_tools(connection,row) + shop_admin_team.response_tools(connection,row) + shop_admin_workflow.timeline(connection,row) + order_ops.controls(connection, row, path) + shop_admin_workflow.handover(connection,row,path) + shop_admin_daily.tasks(connection,row,path) + '</details></li>')
 
     notification_settings = ('<section><h2>직원 주문 알림</h2>'
         + form('save_notifications', field('알림 받을 직원 휴대폰 · 쉼표 또는 줄바꿈으로 구분', 'staff_phones',
                                            '\n'.join(order_ops.phones(connection)), multiline=True, optional=True), '직원 알림 번호 저장')
-        + '<p>결제 확인 후 직원·주문자에게 문구 샘플을 첨부합니다. 배송 상태 변경도 알립니다. '
-          '실제 MMS 발송은 발신번호 등록과 발송 설정이 필요합니다. 결과 불명인 알림은 자동 재발송하지 않습니다.</p>'
+        + '<p>결제 확인 후 직원·주문자에게 카카오 알림톡으로 문구 샘플 확인 링크를 전달합니다. 배송 상태 변경도 알립니다. '
+          '실제 알림톡 발송은 채널·승인 템플릿과 발송 설정이 필요합니다. 문자 대체 발송은 끄며, 결과 불명인 알림은 자동 재발송하지 않습니다.</p>'
         + ('<p>실제 알림 발송 활성화</p>' if order_messages.configured() else '<p>실제 알림 발송 꺼짐 또는 설정 미완료 · 대기열만 보관</p>')
         + ('<p>직원 알림 번호가 없습니다.</p>' if not order_ops.phones(connection) else '') + '</section>')
 

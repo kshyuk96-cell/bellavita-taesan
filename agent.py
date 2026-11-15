@@ -1580,14 +1580,15 @@ class Handler(BaseHTTPRequestHandler):
                     if hashlib.sha256(content).hexdigest()!=photo['sha256']:raise ValueError('photo_changed')
                 except (OSError,ValueError):return self.order_message('배송 사진 무결성·백업을 확인해 주세요.',503)
             self.send_response(200);self.send_header('Content-Type','image/jpeg');self.send_header('Cache-Control','private, no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Content-Length',str(len(content)));self.end_headers();return self.wfile.write(content)
-        for suffix in ('/settlement.xlsx','/sales.xlsx','/assignment-batch.csv','/diagnostics.json'):
+        for suffix in ('/settlement.xlsx','/sales.xlsx','/assignment-batch.csv','/diagnostics.json','/orders.csv'):
             admin_export=shop.ADMIN_PATH.fullmatch(path.removesuffix(suffix)) if path.endswith(suffix) else None
             if admin_export:
                 if not shop.admin_authorized(*admin_export.groups(),os.environ['TAESAN_WEBHOOK_SECRET']):return self.order_message('관리자 링크가 만료됐어요.',403)
                 try:
                     fields=dict(parse_qsl(urlsplit(self.path).query))
                     with db() as c:
-                        if suffix=='/settlement.xlsx':content,filename=shop_settlement.workbook(c,fields)
+                        if suffix=='/orders.csv':content,filename=shop.shop_admin_review.export_csv(c,fields)
+                        elif suffix=='/settlement.xlsx':content,filename=shop_settlement.workbook(c,fields)
                         elif suffix=='/sales.xlsx':content,filename=shop_sales.workbook(c,fields)
                         elif suffix=='/assignment-batch.csv':
                             if not re.fullmatch(r'[a-f0-9]{32}',fields.get('batch','')):raise ValueError('검토 기록을 선택해 주세요.')

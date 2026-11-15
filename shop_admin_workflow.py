@@ -28,7 +28,7 @@ def save_search(c,f):
     if len(encoded)>2400:raise ValueError('검색 조건을 확인하세요.')
     pairs=parse_qsl(encoded,keep_blank_values=True,max_num_fields=len(shop_admin_queries.KEYS))
     if any(k not in shop_admin_queries.KEYS for k,_ in pairs) or len({k for k,_ in pairs})!=len(pairs):raise ValueError('검색 조건을 확인하세요.')
-    filters=shop_admin_queries.filters(dict(pairs));filters.pop('page',None)
+    filters=shop_admin_queries.filters(dict(pairs));filters.pop('page',None);filters.pop('expanded',None)
     if c.execute('SELECT 1 FROM shop_saved_searches WHERE name=?',(name,)).fetchone():raise ValueError('같은 이름이 있습니다. 다른 이름으로 저장하거나 기존 검색을 삭제하세요.')
     if c.execute('SELECT count(*) FROM shop_saved_searches').fetchone()[0]>=20:raise ValueError('저장 검색은 최대 20개입니다. 사용하지 않는 검색을 삭제하세요.')
     c.execute('INSERT INTO shop_saved_searches VALUES (?,?,?,?)',(secrets.token_hex(16),name,json.dumps(filters,ensure_ascii=False),now()))

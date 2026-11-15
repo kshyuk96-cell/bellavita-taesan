@@ -4,6 +4,7 @@ import shop_admin_queries
 import shop_product_guidance
 import shop_admin_team
 import shop_admin_feature_search
+from pathlib import Path
 
 
 def render(page,readiness,*,path='',filters=None,saved=False,feature_favorites=''):
@@ -52,7 +53,8 @@ def render(page,readiness,*,path='',filters=None,saved=False,feature_favorites='
     style.text+='\n.product-note-preview{padding:12px;background:#f4f8ef;border-left:3px solid #315840;margin:14px 0}.quick-task{margin:8px 0}.favorite-item{padding:10px 0;border-bottom:1px solid #dce3d8}#admin-feature-results{display:flex;gap:8px;flex-wrap:wrap}.admin-feature-search{scroll-margin-top:110px}details,aside{scroll-margin-top:110px}'
     style.text+='\n.feature-pinned{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.feature-pinned p{width:100%}.shift-history pre{white-space:pre-wrap;overflow-wrap:anywhere}.admin-group section,.admin-search{scroll-margin-top:110px}'
     tree.append(style)
-    script=html.Element('script');script.text=SCRIPT+shop_product_guidance.SCRIPT+shop_admin_team.SCRIPT+shop_admin_feature_search.SCRIPT;tree.append(script)
+    style.text+='\n.active-order-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.active-order-filters a{border:1px solid #b6c8b2;padding:7px 10px;border-radius:16px;overflow-wrap:anywhere}mark.order-match{background:#fff0a6;color:#202b1f}.order-badge{display:block;padding:5px 9px;margin:8px 0;border-left:4px solid #996920;background:#fff2d6;color:#62430b}.order-badge-cancelled{border-color:#963f38;background:#fbece9;color:#7f3029}.admin-phone button{margin:4px}.installation-copy textarea{min-height:100px}.order-search-help li{border:0;padding:4px;list-style:disc;margin-left:20px}.order-search-help,.empty-order-help{margin:12px 0;padding:12px;border:1px solid #cbd6c5;border-radius:8px}.filtered-order-export{display:inline-block;min-height:36px;overflow-wrap:anywhere}'
+    script=html.Element('script');script.text=SCRIPT+shop_product_guidance.SCRIPT+shop_admin_team.SCRIPT+shop_admin_feature_search.SCRIPT+Path(__file__).with_name('shop_admin_review.js').read_text(encoding='utf-8');tree.append(script)
     return '<!doctype html>'+html.tostring(tree,encoding='unicode',method='html')
 
 
@@ -60,7 +62,7 @@ SCRIPT="""
 (()=>{
 const status=document.getElementById('shop-action-status');
 if(/^#product-[a-f0-9]{32}$/.test(location.hash)){const section=document.getElementById(location.hash.slice(1));const detail=section?.querySelector('details');if(detail)detail.open=true;}
-if(document.querySelector('.admin-saved')&&/^#order-[a-f0-9]{32}$/.test(location.hash)&&!document.getElementById(location.hash.slice(1))){const link=document.createElement('a');link.href=location.pathname+'?order='+location.hash.slice(7)+location.hash;link.textContent=' 변경한 주문 바로 열기';document.querySelector('.admin-saved').append(link);}
+if(document.querySelector('.admin-saved')&&/^#order-[a-f0-9]{32}$/.test(location.hash)&&!document.getElementById(location.hash.slice(1))){const link=document.createElement('a');link.href=location.pathname+'?'+new URLSearchParams({order:location.hash.slice(7),expanded:new URLSearchParams(location.search).get('expanded')||''})+location.hash;link.textContent=' 변경한 주문 바로 열기';document.querySelector('.admin-saved').append(link);}
 for(const button of document.querySelectorAll('[data-copy-order],[data-copy-link],[data-copy-summary]'))button.addEventListener('click',async()=>{
  const value=button.dataset.copyOrder||button.dataset.copyLink||button.dataset.copySummary;
  try{if(!navigator.clipboard)throw Error('clipboard');await navigator.clipboard.writeText(value);status.textContent='복사했습니다. 해당 주문 담당자·주문자에게만 전달하세요.';button.textContent='복사 완료';}

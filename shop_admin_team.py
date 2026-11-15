@@ -89,10 +89,11 @@ def product_note(c,identity,path):
     return shortcuts.note_preview(latest)+body+'</details>'
 
 
-def focus(c,row):
+def focus(c,row,query=''):
     order=json.loads(order_amendments.effective(c,row)['details'])
     pairs=[('행사 시간',order['event_time'][:16].replace('T',' ')),('설치 장소',order['venue']+' · '+order['address']),('보내는 분',order['sender']),('문구',order['message'] or ' / '.join(v for k,v in order['options'] if '문구' in k) or '선택 사항 확인'),('선택 사항',' / '.join(k+' '+v for k,v in order['options']))]
-    return '<div class="order-focus"><h3>작업 핵심 정보</h3><p>승인된 정정 반영 · 원접수 정보는 아래 기록에서 확인합니다.</p><dl>'+''.join('<dt>'+label+'</dt><dd>'+escape(value)+'</dd>' for label,value in pairs)+'</dl></div>'
+    import shop_admin_review
+    return '<div class="order-focus"><h3>작업 핵심 정보</h3><p>승인된 정정 반영 · 원접수 정보는 아래 기록에서 확인합니다.</p><dl>'+''.join('<dt>'+label+'</dt><dd>'+shop_admin_review.highlight(value,query)+'</dd>' for label,value in pairs)+'</dl></div>'
 
 
 def shift_report(c,fields,clock=None):

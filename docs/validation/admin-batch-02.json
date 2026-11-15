@@ -1,0 +1,186 @@
+{
+  "checked_on_kst": "2026-11-15",
+  "batch": 2,
+  "features": 10,
+  "source_parent": "ccfb4bb62d87e6167074bde47d52729eea522537",
+  "scope": "integration-ready admin improvements; no server rollout",
+  "runtime_sha256": {
+    "agent.py": "25407c39748ce47b43fe0ecaff85dfbd5b2a7c7df846b4a6c1c88b041c2dfd58",
+    "shop.py": "f1df8add489a5a88d53690042ab72b5cb09739a991704001fd449b047f08dede",
+    "shop_admin_layout.py": "9946f43e12875fa4c8d8c25427ed7e409fb5c085474cc99736659e709ff2bbf7",
+    "shop_admin_queries.py": "dedc015f86a22624c352346779e34ff995800276401cc69ebf534cd3682f0fb7",
+    "shop_admin_team.py": "a7f0eadda92b2ff09f377ae0d7756d08d950dfd4da2463d1ff8683675d385312",
+    "shop_admin_workflow.py": "780b7783867940833034adf1d8533c4b010b53314764693c2794607fb08d9c26",
+    "shop_admin_review.py": "890e6ac3008667741819b3b01a1ff817d3cd6262f5279f6c0ed71dff2bd4bdc8",
+    "shop_admin_review.js": "dfe8e1db92a3b8bbd13cd845bb6af56e7a8e4d1d392595d912f7569e98a27f8d"
+  },
+  "full_regression": {
+    "passed": 184,
+    "seconds": 86.583
+  },
+  "final_display_refinements_followed_by": {
+    "focused_tests_passed": 10,
+    "seconds": 5.857,
+    "modules": [
+      "test_admin_review_batch02",
+      "test_admin_team"
+    ]
+  },
+  "new_browser": {
+    "results": [
+      {
+        "width": 390,
+        "active_filter_remove": true,
+        "safe_match_highlight": true,
+        "sort_modes": true,
+        "masked_phone_reveal_and_collapse": true,
+        "all_pages_filtered_csv": true,
+        "empty_result_recovery": true,
+        "nested_details_after_save": true,
+        "installation_copy_fallback": true,
+        "cancel_hold_badges": true,
+        "search_examples": true,
+        "horizontal_overflow": false
+      },
+      {
+        "width": 1280,
+        "active_filter_remove": true,
+        "safe_match_highlight": true,
+        "sort_modes": true,
+        "masked_phone_reveal_and_collapse": true,
+        "all_pages_filtered_csv": true,
+        "empty_result_recovery": true,
+        "nested_details_after_save": true,
+        "installation_copy_fallback": true,
+        "cancel_hold_badges": true,
+        "search_examples": true,
+        "horizontal_overflow": false
+      }
+    ],
+    "javascript_errors": [],
+    "financial_state_and_order_details_preserved": true,
+    "personal_browser_storage_used": false,
+    "actual_payments": false,
+    "actual_messages": false
+  },
+  "existing_browser": {
+    "usability": {
+      "scenarios": [
+        {
+          "width": 375,
+          "off_page_alert_and_receipt_links": true,
+          "all_record_search": true,
+          "combined_filters": true,
+          "pagination_30": true,
+          "next_action_visible": true,
+          "clipboard_fallback": true,
+          "saved_context_preserved": true,
+          "manual_search": true,
+          "overflow": false
+        },
+        {
+          "width": 1280,
+          "off_page_alert_and_receipt_links": true,
+          "all_record_search": true,
+          "combined_filters": true,
+          "pagination_30": true,
+          "next_action_visible": true,
+          "clipboard_fallback": true,
+          "saved_context_preserved": true,
+          "manual_search": true,
+          "overflow": false
+        }
+      ],
+      "javascript_errors": [],
+      "live_side_effects": false
+    },
+    "workflow": {
+      "scenarios": [
+        {
+          "width": 375,
+          "saved_search_persists": true,
+          "handover_saved": true,
+          "timeline_groups": 4,
+          "product_preview_and_audit": true,
+          "backup_warning": true,
+          "all_record_search": true,
+          "combined_filters": true,
+          "pagination_30": true,
+          "next_action_visible": true,
+          "clipboard_fallback": true,
+          "saved_context_preserved": true,
+          "manual_search": true,
+          "overflow": false
+        },
+        {
+          "width": 1280,
+          "saved_search_persists": true,
+          "handover_saved": true,
+          "timeline_groups": 4,
+          "product_preview_and_audit": true,
+          "backup_warning": true,
+          "all_record_search": true,
+          "combined_filters": true,
+          "pagination_30": true,
+          "next_action_visible": true,
+          "clipboard_fallback": true,
+          "saved_context_preserved": true,
+          "manual_search": true,
+          "overflow": false
+        }
+      ],
+      "javascript_errors": [],
+      "live_side_effects": false
+    },
+    "daily": {
+      "scenarios": [
+        {
+          "width": 375,
+          "seoul_today_link": true,
+          "task_create_and_complete": true,
+          "overdue_owner_filter": true,
+          "payment_state_preserved": true,
+          "customer_summary_excludes_internal_note": true,
+          "clipboard_fallback": true,
+          "duplicate_and_negative_option_validation": true,
+          "training_five_cases_and_reset": true,
+          "training_posts": 0,
+          "overflow": false
+        },
+        {
+          "width": 1280,
+          "seoul_today_link": true,
+          "task_create_and_complete": true,
+          "overdue_owner_filter": true,
+          "payment_state_preserved": true,
+          "customer_summary_excludes_internal_note": true,
+          "clipboard_fallback": true,
+          "duplicate_and_negative_option_validation": true,
+          "training_five_cases_and_reset": true,
+          "training_posts": 0,
+          "overflow": false
+        }
+      ],
+      "javascript_errors": [],
+      "live_side_effects": false
+    }
+  },
+  "csv_checks": {
+    "all_70_synthetic_orders_across_pages": true,
+    "state_and_attention_filters": true,
+    "masked_contacts": true,
+    "formula_escape": true,
+    "unauthorized_denied": true,
+    "no_store_response": true,
+    "limit_10000": true
+  },
+  "phone_mask_scope": "display convenience for authenticated admins; raw authorized HTML is not redacted",
+  "database_schema_changed": false,
+  "personal_browser_storage_used": false,
+  "production_deployed": false,
+  "verification_server_redeployed": false,
+  "real_payments": false,
+  "real_messages": false,
+  "real_receipts": false,
+  "integration_document": "docs/admin-improvements-batch-02.md"
+}
