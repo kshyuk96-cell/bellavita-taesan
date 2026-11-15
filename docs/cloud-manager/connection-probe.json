@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "manager_request_id": "taesan-cloud-only-20261115-01",
+  "purpose": "Verify official GitHub Codex development handoff without a PC",
+  "state": "awaiting_cloud_agent",
+  "allowed_paths": ["docs/cloud-manager/connection-probe.json"],
+  "required_check": "python -m unittest manager_bridge.tests.test_delegation_batch -q",
+  "check_result": null,
+  "operational_change": false
+}
