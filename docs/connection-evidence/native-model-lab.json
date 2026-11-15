@@ -1,0 +1,42 @@
+{
+  "bank_version": "synthetic-text-business-lab-v1",
+  "catalog_hash": "5c159b8ae97c277110ece1d013a256dbdface03144b97c24f8820aebf56b0e91",
+  "source": "native_model_lab",
+  "status": "graded",
+  "score": 100,
+  "total": 100,
+  "observed": 100,
+  "areas": {
+    "intent": {
+      "total": 25,
+      "observed": 25,
+      "passed": 25
+    },
+    "conditions": {
+      "total": 25,
+      "observed": 25,
+      "passed": 25
+    },
+    "context": {
+      "total": 25,
+      "observed": 25,
+      "passed": 25
+    },
+    "grounding": {
+      "total": 25,
+      "observed": 25,
+      "passed": 25
+    }
+  },
+  "unsafe_execution": 0,
+  "unsupported_completion": 0,
+  "invalid_answers": 0,
+  "target_met": true,
+  "model_identity_verified": false,
+  "operational_score_verified": false,
+  "passed": 100,
+  "failures": [],
+  "observer_reference": "native/root/model_lab_first-and-last",
+  "model_id": null,
+  "measurement": "synthetic_text_model_lab"
+}
