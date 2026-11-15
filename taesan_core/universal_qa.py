@@ -1,5 +1,6 @@
 """Portable, trusted-adapter contract QA. Pure fixtures are never operational proof."""
 from dataclasses import dataclass
+from copy import deepcopy
 import hashlib
 import json
 import re
@@ -66,6 +67,42 @@ class Adapter:
             raise CoreError('trusted callable adapter required')
 
 
+CONTRACT_SCHEMA = 'universal-qa-contract/v1'
+CONTRACT_FIELDS = ('id', 'adapter', 'group', 'coverage_key', 'priority', 'risk',
+                   'inputs', 'expected', 'oracle', 'state_rationale', 'state_key')
+FORMULA_FIELDS = ('id', 'expression', 'variables', 'units', 'rounding', 'expected')
+
+
+def scenario_contract_row(row):
+    """Project an observation onto immutable manager-owned contract fields."""
+    value = {key: row[key] for key in CONTRACT_FIELDS}
+    value['formula'] = ({key: row['formula'][key] for key in FORMULA_FIELDS}
+                        if row.get('formula') is not None else None)
+    return value
+
+
+def build_contract(scenarios, registrations):
+    """Manager builds/reviews this BEFORE accepting any worker report.
+
+    Persist it in a trusted manager-owned location. Reconstructing it from the
+    submitted report defeats priority, oracle, formula and coverage protection.
+    """
+    rows = {}
+    for s in scenarios:
+        if s.id in rows:
+            raise CoreError('duplicate contract scenario')
+        row = {'id':s.id, 'adapter':s.adapter, 'group':s.group, 'coverage_key':s.coverage_key,
+               'priority':s.risk.priority, 'risk':vars(s.risk), 'inputs':s.inputs,
+               'expected':s.expected, 'oracle':s.oracle, 'state_rationale':s.state_rationale,
+               'state_key':fingerprint([s.adapter,s.inputs]), 'formula':s.formula}
+        rows[s.id] = scenario_contract_row(row)
+    # Detach trusted state from mutable scenario/report objects. A worker must
+    # never be able to modify a manager manifest through a shared dictionary.
+    return json.loads(json.dumps({'schema_version':CONTRACT_SCHEMA,
+            'adapter_versions':{a.name:a.version for a in registrations}, 'scenarios':rows},
+            ensure_ascii=False, allow_nan=False))
+
+
 def run_scenarios(scenarios, adapters, *, source_revision, seed, required_coverage):
     """Execute registered Python callables only; no eval/exec/import of submitted code.
 
@@ -75,12 +112,13 @@ def run_scenarios(scenarios, adapters, *, source_revision, seed, required_covera
     """
     if not re.fullmatch('[0-9a-f]{40}', source_revision):
         raise CoreError('exact source revision required')
-    scenarios = list(scenarios)
+    scenarios = deepcopy(list(scenarios))
     if not scenarios or len({s.id for s in scenarios}) != len(scenarios):
         raise CoreError('nonempty unique scenarios required')
     registry = {a.name: a for a in adapters}
     if len(registry) != len(adapters):
         raise CoreError('duplicate adapter')
+    contract_digest = fingerprint(build_contract(scenarios, adapters))
     rows, observed, failures = [], set(), set()
     executed = asserted = 0
     for s in scenarios:
@@ -95,7 +133,7 @@ def run_scenarios(scenarios, adapters, *, source_revision, seed, required_covera
             executed += 1
             row['executed'] = True
             try:
-                result = adapter.execute(s.inputs)
+                result = adapter.execute(json.loads(json.dumps(s.inputs, allow_nan=False)))
                 if type(result) is not dict or 'actual' not in result or not result.get('evidence'):
                     raise CoreError('adapter evidence missing')
                 fingerprint(result)
@@ -115,6 +153,7 @@ def run_scenarios(scenarios, adapters, *, source_revision, seed, required_covera
               'scope': 'pure synthetic fixtures; no real users, UI, production or AI ability measurement',
               'source_revision': source_revision, 'seed': seed,
               'adapter_versions': {a.name: a.version for a in adapters},
+              'contract_digest': contract_digest,
               'coverage': {'required': sorted(set(required_coverage)), 'observed': sorted(observed)},
               'counts': {'generated': len(rows), 'executed': executed, 'asserted': asserted,
                          'unique_failures': len(failures),
