@@ -407,10 +407,15 @@ class Store:
             "state IN ('running','reported','needs_verification') OR "
             "(state='cancelled' AND worker_subject IS NOT NULL AND NOT EXISTS "
             "(SELECT 1 FROM bridge_stop_confirmations s WHERE s.task=t.id))").fetchall()
-        return {json.loads(row['manifest'])['repository'] for row in rows}
+        repositories = {json.loads(row['manifest'])['repository'] for row in rows}
+        if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='maintenance_check_reservations'").fetchone():
+            repositories.update(row['repository'] for row in c.execute('SELECT repository FROM maintenance_check_reservations'))
+        return repositories
 
-    def claim(self, token, project, *, lease_seconds=300):
+    def claim(self, token, project, *, lease_seconds=300, task_id=None):
         _lease_seconds(lease_seconds)
+        if task_id is not None:
+            _task_id(task_id)
         with self._transaction() as c:
             actor = self._authenticate(c, token)
             self._role(actor, ('worker',))
@@ -422,8 +427,9 @@ class Store:
             if busy:
                 return None
             rows = c.execute("SELECT t.* FROM bridge_tasks t LEFT JOIN bridge_task_planning p ON p.task=t.id "
-                "WHERE t.project=? AND t.state='queued' ORDER BY COALESCE(p.priority,0) DESC,"
-                "COALESCE(p.due,1e30),t.created,t.id", (project,)).fetchall()
+                "WHERE t.project=? AND t.state='queued' " + ("AND t.id=? " if task_id is not None else "") +
+                "ORDER BY COALESCE(p.priority,0) DESC,COALESCE(p.due,1e30),t.created,t.id",
+                (project,task_id) if task_id is not None else (project,)).fetchall()
             from .operations import Operations
             if Operations.capacity_blocked(c,project):
                 return None

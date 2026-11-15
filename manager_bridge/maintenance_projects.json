@@ -1,0 +1,26 @@
+{
+  "bellavita-shop": {
+    "company": "bellavita", "name": "벨라비타 쇼핑몰",
+    "source_kind": "github", "source_ref": "kshyuk96-cell/bellavita-taesan",
+    "branch": "codex/shop-backend", "maintenance_enabled": false,
+    "services": [{"kind":"render","id":"srv-dbs3drbrjlhs73d278sg","url":"https://bellavita-shop-verification-v3b4.onrender.com","purpose":"review"}]
+  },
+  "bellavita-erp": {
+    "company": "bellavita", "name": "벨라비타 ERP",
+    "source_kind": "sites", "source_ref": "appgprj_6af874873e148191b9677cca35f00557",
+    "branch": "main", "maintenance_enabled": false,
+    "services": [{"kind":"sites","id":"appgprj_6af874873e148191b9677cca35f00557","url":"https://bellavita-erp-workbench.shrewdmaxim1.chatgpt.site","purpose":"review"}]
+  },
+  "hope-sunrise": {
+    "company": "hope-sunrise", "name": "희망일출",
+    "source_kind": "sites", "source_ref": "appgprj_6af86d66b7108191a8dd1052c4a7302f",
+    "branch": "main", "maintenance_enabled": false,
+    "services": [{"kind":"sites","id":"appgprj_6af86d66b7108191a8dd1052c4a7302f","url":"https://hope-sunrise-travel.shrewdmaxim1.chatgpt.site","purpose":"review"}]
+  },
+  "funeral-association": {
+    "company": "funeral-association", "name": "장례지도사협회",
+    "source_kind": "github", "source_ref": "kshyuk96-cell/association-aftercare-platform",
+    "branch": "main", "maintenance_enabled": false,
+    "services": [{"kind":"render","id":"srv-dbsfj4mi0phs73d0a8mg","url":"https://association-integration-review-gfja.onrender.com","purpose":"review"}]
+  }
+}
