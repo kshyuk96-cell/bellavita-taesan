@@ -424,6 +424,9 @@ class Store:
             rows = c.execute("SELECT t.* FROM bridge_tasks t LEFT JOIN bridge_task_planning p ON p.task=t.id "
                 "WHERE t.project=? AND t.state='queued' ORDER BY COALESCE(p.priority,0) DESC,"
                 "COALESCE(p.due,1e30),t.created,t.id", (project,)).fetchall()
+            from .operations import Operations
+            if Operations.capacity_blocked(c,project):
+                return None
             reserved_repositories = self._reserved_repositories(c)
             for row in rows:
                 manifest = json.loads(row['manifest'])

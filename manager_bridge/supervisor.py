@@ -5,6 +5,7 @@ worker output. Run on an isolated verification host: tests execute repository
 code. A review binds the exact worker report plus independently read artifacts.
 """
 import json
+import time
 from pathlib import Path
 
 from .store import Conflict, digest
@@ -98,6 +99,7 @@ def verify_report(store, token, task_id, runner, check_commands, *, native_hando
             raise VerificationBlocked('승인 파일 범위 밖의 변경이 있어 통합 검토를 보류했어요.')
     outcomes = []
     for name, argv in check_commands.items():
+        started=time.monotonic()
         try:
             result = runner.command(list(argv), cwd=target, env=runner._env(expected_root),
                                     capture_output=True, timeout=60, check=False)
@@ -106,7 +108,7 @@ def verify_report(store, token, task_id, runner, check_commands, *, native_hando
         if result.returncode != 0:
             raise VerificationBlocked('독립 검증이 실패했어요.')
         # Never retain raw test output (may contain source data or secrets).
-        outcomes.append({'name': name, 'argv_digest': digest(list(argv)), 'passed': True})
+        outcomes.append({'name': name, 'argv_digest': digest(list(argv)), 'passed': True, 'elapsed_seconds':round(max(0,time.monotonic()-started),6)})
     after = runner.inspect_artifact(target, expected_root)
     if before['git_diff_digest'] != after['git_diff_digest']:
         raise VerificationBlocked('검증 중 결과물이 바뀌어 다시 대조해야 해요.')
@@ -134,6 +136,9 @@ def verify_report(store, token, task_id, runner, check_commands, *, native_hando
         exact = store._get(c, actor, task_id)
         if exact['state'] != 'reported' or digest(json.loads(exact['report'])) != digest(report):
             raise Conflict('독립 후보 기록 전 작업 상태가 바뀌었어요.')
+        for outcome in outcomes:
+            c.execute('INSERT OR REPLACE INTO bridge_verification_timings VALUES (?,?,?,?,?)',
+                      (task_id,digest(report),outcome['name'],outcome['elapsed_seconds'],store._now()))
         c.execute('INSERT OR REPLACE INTO bridge_verified_candidates VALUES (?,?,?,?,?,?)',
                   (task_id, digest(report), report['head_sha'], before['git_diff_digest'], int(before['dirty']), store._now()))
     return store.review(token, task_id, task['version'], task['manifest_digest'], 'independent-artifact:' + fingerprint)

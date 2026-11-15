@@ -3,6 +3,7 @@ import json
 import re
 
 from .coordination import Coordination
+from .operations import Operations
 from .store import Conflict, canonical_json, digest, _text, _sha
 
 
@@ -61,6 +62,7 @@ class Workbench:
                 'can_acknowledge': actor['role']=='owner' and task['state']=='reviewed' and bool(package) and bool(verified)
                     and not verified['dirty'] and verified['head_sha']==json.loads(package['package'])['details']['candidate_sha']
                     and verified['report_digest']==json.loads(package['package'])['report_digest'],
+                'timings':Operations(self.store).timings(token,task_id),
                 'deployment_executed': False}
 
     def put_package(self, token, task_id, package):
@@ -106,6 +108,23 @@ class Workbench:
                       (task_id,revision,canonical_json(bound),fingerprint,self.store._now()))
             self.store._event(c,task_id,actor['subject'],'review_card_created','reviewed',bound)
             return {'revision':revision,'package_digest':fingerprint}
+
+    def card_diff(self,token,task_id,from_revision):
+        if type(from_revision) is not int or from_revision<1:
+            raise ValueError('비교할 이전 검토안 번호가 필요해요.')
+        with self.store._transaction() as c:
+            actor=self.store._authenticate(c,token);self.store._role(actor,('owner','manager'))
+            self.store._get(c,actor,task_id)
+            old=c.execute('SELECT * FROM bridge_review_cards WHERE task=? AND revision=?',(task_id,from_revision)).fetchone()
+            latest=c.execute('SELECT * FROM bridge_review_cards WHERE task=? ORDER BY revision DESC LIMIT 1',(task_id,)).fetchone()
+            if not old or not latest or from_revision>=latest['revision']:
+                raise Conflict('이전안과 현재안을 정확히 선택해 주세요.')
+            before=json.loads(old['package']);after=json.loads(latest['package'])
+            fields=[{'field':key,'before':before['details'][key],'after':after['details'][key]}
+                    for key in sorted(before['details']) if before['details'][key]!=after['details'][key]]
+            return {'task_id':task_id,'from_revision':from_revision,'to_revision':latest['revision'],
+                    'from_digest':old['package_digest'],'to_digest':latest['package_digest'],'changes':fields,
+                    'previous_acknowledgement_applies':False,'deployment_executed':False}
 
     def acknowledge(self,token,task_id,revision,package_digest):
         with self.store._transaction() as c:

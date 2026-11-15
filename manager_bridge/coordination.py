@@ -85,6 +85,8 @@ class Coordination:
         from .workflow import Workflow
         Sessions.create_tables(c)
         Workflow.create_tables(c)
+        from .operations import Operations
+        Operations.create_tables(c)
 
     def set_policy(self, token, task_id, version, manifest_digest, *, allowed_paths, dependencies):
         allowed = validate_paths(allowed_paths)
@@ -156,6 +158,9 @@ class Coordination:
             row = self.store._get(c, actor, task_id)
             if row['state'] != 'queued':
                 raise Conflict('아직 실행하지 않은 승인 대기 작업만 배정 대상을 바꿀 수 있어요.')
+            from .operations import Operations
+            if Operations.capacity_blocked(c,row['project']):
+                return {'status':'capacity_wait','task_id':task_id,'execution_started':False}
             policy = c.execute('SELECT * FROM bridge_task_policy WHERE task=?', (task_id,)).fetchone()
             if not policy or json.loads(row['approval']).get('policy_digest') != policy['policy_digest']:
                 raise Conflict('승인에 결합된 작업 정책이 필요해요.')
