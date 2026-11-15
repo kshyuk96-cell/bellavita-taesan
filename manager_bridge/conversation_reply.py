@@ -87,7 +87,7 @@ def render_reply(reply, project, action=None):
     status = query.get('status')
     if type(status) is str and status in STATUS_NAMES:filters.append(STATUS_NAMES[status])
     if filters:prefix += ' · ' + ' · '.join(filters)
-    message = prefix + ': ' + str(count) + '건입니다.'
+    message = prefix + ': 표시 ' + str(count) + '건입니다.'
     items = result.get('items')
     if count and type(items) is list:
         ids = [_identifier(item.get('id')) for item in items[:3] if type(item) is dict]
@@ -98,8 +98,12 @@ def render_reply(reply, project, action=None):
         if statuses and not query.get('status'):message += ' 조회 상태 ' + ' · '.join(statuses) + '.'
     total = result.get('total_matched')
     if result.get('truncated') is True:
-        if type(total) is int and total >= count:message += ' 전체 ' + str(total) + '건 중 일부입니다.'
+        if type(total) is int and total >= count:message += ' 조회된 범위의 ' + str(total) + '건 중 일부입니다.'
         else:message += ' 일부 결과입니다.'
+    coverage = result.get('coverage')
+    if not (type(coverage) is dict and coverage.get('verified') is True and coverage.get('complete') is True and type(coverage.get('receipt')) is str and coverage['receipt'] and type(total) is int and total >= count):
+        message += ' 전체 건수는 확인되지 않았습니다.'
+    else:message += ' 전체 ' + str(total) + '건입니다.'
     evidence = data.get('evidence') if type(data.get('evidence')) is dict else {}
     observed = _time(result.get('observed_at', evidence.get('observed_at')))
     if observed:message += ' 기준 ' + observed + ' KST.'
