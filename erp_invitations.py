@@ -13,6 +13,7 @@ import http.client
 import io
 import ipaddress
 import json
+import math
 import os
 import re
 import secrets
@@ -57,6 +58,9 @@ def clean_values(values):
     for key in ('sourceUrl',*IMAGE_FIELDS):
         value=out[key]
         if value and not (key in IMAGE_FIELDS and re.fullmatch(r'attachment:[a-f0-9]{32}',value)) and not safe_https(value):raise ValueError('HTTPS 주소를 확인하세요: '+key)
+    crop=values.get('weddingCrop')
+    if crop is not None and (type(crop) not in (int,float) or not math.isfinite(crop) or not 0<=crop<=100):raise ValueError('사진 위치는 0~100으로 입력하세요.')
+    if crop is not None:out['weddingCrop']=crop
     out['hostSide']='bride' if out['hostSide']=='bride' else 'groom'
     out['wreathRestriction']=values.get('wreathRestriction') is True
     out['images']=[u for u in values.get('images',[]) if isinstance(u,str) and safe_https(u)][:20]
@@ -118,6 +122,7 @@ class Engine:
         with self.db() as db:
             db.execute('CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, invitation_id TEXT NOT NULL, version INTEGER NOT NULL, action TEXT NOT NULL, hash TEXT NOT NULL, input TEXT NOT NULL, state TEXT NOT NULL, result TEXT, public_id TEXT NOT NULL, created_at TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS publications(key TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, result TEXT NOT NULL)')
+            db.execute('CREATE TABLE IF NOT EXISTS publication_ids(key TEXT PRIMARY KEY, public_id TEXT UNIQUE NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS uploads(id TEXT PRIMARY KEY, digest TEXT UNIQUE NOT NULL, path TEXT NOT NULL)')
             recover=[r['id'] for r in db.execute("SELECT id FROM jobs WHERE state IN ('queued','running')")]
         for key in recover:self.schedule(key)
@@ -137,7 +142,7 @@ class Engine:
         if not isinstance(data,dict):raise ValueError('입력 형식 오류')
         key=data.get('requestId','');inv=data.get('invitationId','');version=data.get('version')
         if not re.fullmatch(r'[\w-]{10,100}',key) or not re.fullmatch(r'[\w-]{10,130}',inv) or type(version) is not int or not 0<version<100000:raise ValueError('요청 ID 또는 버전 오류')
-        if data.get('action') not in ('parse','preview','publish') or data.get('kind') not in ('event','wedding') or data.get('orderMode')!='blogpay-direct':raise ValueError('ERP 주문 경로를 확인하세요.')
+        if data.get('action') not in ('parse','preview','publish') or data.get('kind') not in ('event','wedding') or data.get('orderMode') not in ('blogpay-direct','invitation-checkout'):raise ValueError('ERP 주문 경로를 확인하세요.')
         if not isinstance(data.get('source'),str) or not 0<len(data['source'])<=6000 or len(set(re.findall(r'https?://[^\s<>]+',data['source'])))>1:raise ValueError('원본은 6,000자 이하로 입력하세요.')
         data={**data,'values':clean_values(data.get('values',{}))};hashed=digest(data)
         with LOCK,self.db() as db:
@@ -147,7 +152,12 @@ class Engine:
                 pending=db.execute("SELECT id FROM jobs WHERE state IN ('queued','running') AND invitation_id=?",(inv,)).fetchone()
                 if pending:raise ValueError('기존 요청 상태를 먼저 확인하세요: '+pending['id'])
                 if db.execute("SELECT COUNT(*) FROM jobs WHERE state IN ('queued','running')").fetchone()[0]>=20:raise ValueError('제작 대기 중입니다. 잠시 후 요청하세요.')
-                db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?,?)',(key,inv,version,data['action'],hashed,json.dumps(data,ensure_ascii=False),'queued',None,secrets.token_hex(16),dt.datetime.now(render.SEOUL).isoformat()))
+                public_id=secrets.token_hex(16)
+                if data['orderMode']=='invitation-checkout':
+                    publication_key=f"{inv}:{version}:invitation-checkout"
+                    db.execute('INSERT OR IGNORE INTO publication_ids VALUES(?,?)',(publication_key,public_id))
+                    public_id=db.execute('SELECT public_id FROM publication_ids WHERE key=?',(publication_key,)).fetchone()[0]
+                db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?,?)',(key,inv,version,data['action'],hashed,json.dumps(data,ensure_ascii=False),'queued',None,public_id,dt.datetime.now(render.SEOUL).isoformat()))
         if not old:self.schedule(key)
         return self.get(key)
 
@@ -261,6 +271,15 @@ class Engine:
         if len({p['productId'] for p in result})!=2 or len({p['orderUrl'] for p in result})!=2:raise ValueError('가격별 서로 다른 두 상품을 확인하세요.')
         return result
 
+    def checkout_products(self,title):
+        # Existing event-specific goods only: no template cloning or public-shop fallback.
+        snapshots=self.legacy.find_order_products(title)
+        if set(snapshots)!=set(PRICES):raise ValueError('해당 행사명의 93,500원·99,000원 상품을 모두 등록해야 합니다.')
+        if len({str(x.get('number')) for x in snapshots.values()})!=2:raise ValueError('두 가격의 상품번호가 서로 달라야 합니다.')
+        for price,product in snapshots.items():
+            if product.get('price')!=price or not re.fullmatch(r'[0-9]{1,20}',str(product.get('number',''))):raise ValueError('상품번호와 가격을 확인하세요.')
+        return snapshots
+
     def prepare(self,data):
         v=data['values'];kind=data['kind'];required=missing(kind,v)
         if required:raise ValueError('필요한 항목: '+', '.join(required))
@@ -269,17 +288,32 @@ class Engine:
         year,month=(when.year+1,1) if when.month==12 else (when.year,when.month+1)
         expires=dt.date(year,month,min(when.day,calendar.monthrange(year,month)[1])).isoformat()
         if dt.datetime.now(render.SEOUL).date().isoformat()>expires:raise ValueError('공유 기간이 지난 행사입니다.')
-        items=self.products(render.product_name(v,kind))
+        own=data['orderMode']=='invitation-checkout'
+        snapshots=self.checkout_products(render.product_name(v,kind)) if own else None
+        if own:
+            with self.db() as db:public_id=db.execute('SELECT public_id FROM publication_ids WHERE key=?',(f"{data['invitationId']}:{data['version']}:invitation-checkout",)).fetchone()[0]
+            items=[{'price':price,'productId':str(snapshots[price]['number']),'orderUrl':f'{self.origin}/i/{public_id}/{price}/order','verified':True} for price in PRICES]
+        else:items=self.products(render.product_name(v,kind))
         photos={key:self.image(v[key]) for key in IMAGE_FIELDS if v.get(key)}
         image,boxes=render.composite(v,kind,photos);sample=render.image_bytes(image)
         hero=render.image_bytes(photos['hero']) if kind=='wedding' else b''
         og=render.thumbnail(v,kind)
         hashes={k:hashlib.sha256(render.image_bytes(photo)).hexdigest() for k,photo in photos.items()}
-        fingerprint=digest({'values':v,'kind':kind,'items':items,'images':hashes})
+        fingerprint=digest({'values':v,'kind':kind,'items':items,'images':hashes,'orderMode':data['orderMode'],'products':snapshots})
         warnings_out=[]
         if len(set(hashes.values()))<len(hashes):warnings_out.append('사진 중복이 있습니다. 대표·제작 액자·족자의 사진 구성을 확인하세요.')
         if kind=='event' and not photos.get('logo'):warnings_out.append('로고·행사 이미지가 없어 행사명으로 시안을 구성했습니다. 설치 예시를 확인하세요.')
-        return {'status':'done','items':items,'fingerprint':fingerprint,'expires':expires,'warnings':warnings_out}, {'sample.webp':sample,'hero.webp':hero,'thumbnail.jpg':og,'layout.json':json.dumps(boxes,ensure_ascii=False).encode()}
+        assets={'sample.webp':sample,'hero.webp':hero,'thumbnail.jpg':og,'layout.json':json.dumps(boxes,ensure_ascii=False).encode()}
+        if own:
+            _,date,clock=render.date_words(v)
+            for price,product in snapshots.items():
+                snapshot={**product,'date':date,'clock':clock,'venue':v['venue'],'address':v['address'],'source':v['sourceUrl'],
+                          'event_time':when.isoformat(),'event_kind':kind,'erp_publication':public_id}
+                if kind=='wedding' and hero:
+                    snapshot['wedding_photo']=f'{self.origin}/erp/i/{public_id}/hero.webp'
+                    if 'weddingCrop' in v:snapshot['wedding_crop']=v['weddingCrop']
+                assets[f'{price}.order.json']=json.dumps(snapshot,ensure_ascii=False).encode()
+        return {'status':'done','items':items,'fingerprint':fingerprint,'expires':expires,'warnings':warnings_out},assets
 
     def recover_publication(self,row,data):
         """Recover the completed filesystem commit if the process died before journal commit."""
@@ -292,8 +326,9 @@ class Engine:
                   and result.get('fingerprint')==data.get('fingerprint')
                   and len(items)==2 and {i.get('price') for i in items}==set(PRICES)
                   and all((folder/name).is_file() for name in ('93500.html','99000.html','sample.webp','thumbnail.jpg')))
+        if data['orderMode']=='invitation-checkout':complete=complete and all((self.root.parent/'invitations'/row['public_id']/f'{price}.order.json').is_file() for price in PRICES)
         if not complete:raise ValueError('저장된 발행 결과의 두 가격을 확인해야 합니다. 기존 요청 ID를 유지해 주세요.')
-        publication_key=f"{data['invitationId']}:{data['version']}"
+        publication_key=f"{data['invitationId']}:{data['version']}"+(':invitation-checkout' if data['orderMode']=='invitation-checkout' else '')
         with self.db() as db:
             old=db.execute('SELECT fingerprint FROM publications WHERE key=?',(publication_key,)).fetchone()
             if old and old['fingerprint']!=result['fingerprint']:raise ValueError('발행 원장의 버전이 일치하지 않습니다.')
@@ -311,7 +346,7 @@ class Engine:
             if recovered:result=recovered
             elif action=='parse':result=self.parse(data)
             else:
-                publication_key=f"{data['invitationId']}:{data['version']}"
+                publication_key=f"{data['invitationId']}:{data['version']}"+(':invitation-checkout' if data['orderMode']=='invitation-checkout' else '')
                 with self.db() as db:published=db.execute('SELECT * FROM publications WHERE key=?',(publication_key,)).fetchone()
                 if action=='publish' and published:
                     if published['fingerprint']!=data.get('fingerprint'):raise ValueError('발행 버전이 이미 존재합니다. 내용을 바꾸려면 ERP 보정값을 새 버전으로 저장하세요.')
@@ -332,6 +367,10 @@ class Engine:
                         origin=self.origin+'/erp/i/'+row['public_id']
                         for name,raw in assets.items():
                             if raw:(public/name).write_bytes(raw)
+                        if data['orderMode']=='invitation-checkout':
+                            orders=self.root.parent/'invitations'/row['public_id'];orders.mkdir(parents=True,exist_ok=True)
+                            for price in PRICES:
+                                temp=orders/f'{price}.order.tmp';temp.write_bytes(assets[f'{price}.order.json']);temp.replace(orders/f'{price}.order.json')
                         items=[]
                         for item in result['items']:
                             price=item['price'];url=origin+f'/{price}.html'
@@ -423,6 +462,19 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
             size=int(handler.headers.get('Content-Length','0'))
             if not 0<size<=5*1024*1024:raise ValueError('사진 크기 오류')
             handler.send_json(worker.upload(handler.rfile.read(size)),201);return True
+        order_preview=re.fullmatch(r'/erp/invitations/jobs/([\w-]{10,100})/order-preview/(93500|99000)',path)
+        if method=='GET' and order_preview:
+            with worker.db() as db:row=db.execute("SELECT id FROM jobs WHERE id=? AND action='preview' AND state='done'",(order_preview[1],)).fetchone()
+            if not row:handler.send_json({'error':'검증된 주문서 미리보기 없음'},404);return True
+            snapshot=worker.root/'private'/row['id']/f'{order_preview[2]}.order.json'
+            if not snapshot.is_file():handler.send_json({'error':'자체 주문서 검토 전입니다.'},409);return True
+            product=json.loads(snapshot.read_text())
+            page=legacy.checkout.render(product,'#',can_pay=False)
+            hero=worker.root/'private'/row['id']/'hero.webp'
+            if product.get('wedding_photo') and hero.is_file():page=page.replace(product['wedding_photo'],render.data_image(hero.read_bytes()))
+            raw=page.encode()
+            handler.send_response(200);handler.send_header('Content-Type','text/html; charset=utf-8');handler.send_header('Cache-Control','no-store');handler.end_headers();handler.wfile.write(raw)
+            return True
         match=re.fullmatch(r'/erp/invitations/jobs/([\w-]{10,100})(/preview)?',path)
         if method=='GET' and match:
             result=worker.get(match[1])

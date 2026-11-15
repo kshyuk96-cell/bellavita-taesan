@@ -4,3 +4,6 @@ taesan-data/
 .env.*
 *.sqlite*
 credentials*.json
+
+# Local synthetic checkout screenshots and SQLite fixtures
+work/
