@@ -295,3 +295,30 @@ class MetadataFixtureTests(TransportTests):
   events=[{'type':'item.completed','item':{'type':'command_execution','exit_code':0,'command':'PRIVATE_COMMAND_MARKER','aggregated_output':'PRIVATE_OUTPUT_MARKER'}}]*300
   facts=self.host._event_facts(events)
   self.assertEqual(len(facts['event_types']),256);self.assertTrue(facts['event_sequence_truncated']);self.assertEqual(facts['event_counts']['item.completed'],300);self.assertEqual(len(facts['command_exit_codes']),300);self.assertNotIn('PRIVATE_',repr(facts))
+ def prelude(self,item=None,kind='item.completed'):
+  return [{'type':'thread.started','thread_id':SESSION},{'type':kind,'item':item or {'id':'warning','type':'error','message':'Synthetic non-fatal startup warning'}},{'type':'turn.started'},*self.command(),{'type':'turn.completed'}]
+ def test_documented_nonfatal_startup_error_item_is_not_execution_evidence(self):
+  r,_=self.host._receipt('test','a'*32,self.prelude(),0,SESSION)
+  self.assertEqual(r.command_attempts,1);self.assertEqual(r.command_successes,1);self.assertIsNone(r.testcase_count)
+ def test_top_level_startup_error_is_still_fatal(self):
+  events=self.prelude();events[1]={'type':'error','message':'fatal'}
+  with self.assertRaises(TransportUncertain):self.host._receipt('test','a'*32,events,0,SESSION)
+ def test_execution_prelude_remains_rejected(self):
+  for typ in ('command_execution','file_change','mcp_tool_call','agent_message','unknown'):
+   with self.subTest(typ=typ),self.assertRaises(TransportUncertain):self.host._receipt('test','a'*32,self.prelude({'id':'outside','type':typ}),0,SESSION)
+ def test_started_or_updated_warning_is_not_accepted(self):
+  for kind in ('item.started','item.updated'):
+   with self.subTest(kind=kind),self.assertRaises(TransportUncertain):self.host._receipt('test','a'*32,self.prelude(kind=kind),0,SESSION)
+ def test_startup_warning_requires_exact_bounded_documented_shape(self):
+  for item in ({'id':'w','type':'error'}, {'id':'w','type':'error','message':None}, {'id':'w','type':'error','message':'x','command':'forged'}, {'id':'w','type':'error','message':'x'*32769}):
+   with self.subTest(item_keys=list(item)),self.assertRaises(TransportUncertain):self.host._receipt('test','a'*32,self.prelude(item),0,SESSION)
+ def test_startup_warning_id_cannot_be_reused_by_command(self):
+  with self.assertRaises(TransportUncertain):self.host._receipt('test','a'*32,self.prelude({'id':'cmd1','type':'error','message':'warning'}),0,SESSION)
+ def test_startup_warning_count_is_bounded(self):
+  events=[{'type':'thread.started','thread_id':SESSION}]+[{'type':'item.completed','item':{'id':str(i),'type':'error','message':'warning'}} for i in range(17)]+[{'type':'turn.started'},{'type':'turn.completed'}]
+  with self.assertRaises(TransportUncertain):self.host._receipt('test','a'*32,events,0,SESSION)
+ def test_warning_body_never_enters_structural_journal(self):
+  facts=self.host._event_facts(self.prelude({'id':'w','type':'error','message':'PRIVATE_WARNING_MARKER'}));self.assertIn('error',facts['item_types']);self.assertNotIn('PRIVATE_WARNING_MARKER',repr(facts))
+ def test_unknown_item_type_diagnostics_remain_fixed_other(self):
+  events=[{'type':'item.completed','item':{'type':v,'message':'PRIVATE_BODY'}} for v in ('new_enum','sk_secret','ghp_secret','x'*65,'bad type','other_enum')]
+  facts=self.host._event_facts(events);self.assertEqual(facts['item_types'],['other']*6);self.assertNotIn('PRIVATE_BODY',repr(facts));self.assertNotIn('new_enum',repr(facts))

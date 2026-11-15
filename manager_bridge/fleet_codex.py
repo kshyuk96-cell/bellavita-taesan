@@ -242,7 +242,7 @@ class CodexHost:
     @staticmethod
     def _event_facts(events):
         known={'thread.started','turn.started','turn.completed','turn.failed','error','item.started','item.updated','item.completed'}
-        item_known={'command_execution','agent_message','reasoning','file_change','mcp_tool_call','web_search','todo_list'}
+        item_known={'command_execution','agent_message','reasoning','file_change','mcp_tool_call','web_search','todo_list','error'}
         sequence=[];items=[];exits=[];sessions=[]
         for event in events:
             if type(event) is not dict:sequence.append('other');continue
@@ -557,7 +557,7 @@ print(json.dumps(result));sys.exit(0 if result['outside_denied'] and result['git
             shutil.rmtree(jobtmp,ignore_errors=True)
             if identity is not None:emit('stopped',identity=identity,stop=self._stop_observation(identity))
     def _receipt(self,project,task_id,events,code,session_id=None):
-        phase='initial';pending={};completed=set();commands=[];actual=None;messages=[]
+        phase='initial';pending={};completed=set();commands=[];actual=None;messages=[];prelude_warnings=0
         if type(code) is not int:raise TransportUncertain('actual process outcome required')
         for event in events:
             if type(event) is not dict:raise TransportUncertain('malformed Codex event')
@@ -576,7 +576,15 @@ print(json.dumps(result));sys.exit(0 if result['outside_denied'] and result['git
                 phase='completed'
             elif kind in {'turn.failed','error'}:raise TransportUncertain('Codex turn failed; reconcile before retry')
             elif kind in {'item.started','item.updated','item.completed'}:
-                if phase!='turn' or type(event.get('item')) is not dict:raise TransportUncertain('Codex item outside active turn')
+                item=event.get('item')
+                # Official CLI 0.167 collect_warning/ConfigWarning/DeprecationNotice
+                # emits a non-fatal completed ErrorItem before turn.started.
+                # This is informational only and never command/test evidence.
+                if phase=='thread' and kind=='item.completed' and type(item) is dict and item.get('type')=='error':
+                    ident=item.get('id');message=item.get('message')
+                    if set(item)!={'id','type','message'} or type(ident) is not str or not 1<=len(ident)<=200 or ident in completed or type(message) is not str or not 1<=len(message)<=32768 or prelude_warnings>=16:raise TransportUncertain('invalid informational startup warning')
+                    completed.add(ident);prelude_warnings+=1;continue
+                if phase!='turn' or type(item) is not dict:raise TransportUncertain('Codex item outside active turn')
                 item=event['item'];ident=item.get('id');typ=item.get('type')
                 if type(ident) is not str or not 1<=len(ident)<=200 or type(typ) is not str or ident in completed:raise TransportUncertain('Codex item identity invalid')
                 if kind=='item.started':
