@@ -1,0 +1,11 @@
+{
+  "scope": "recorded_plan_replay_with_fixture_providers",
+  "live_model_called": false,
+  "read_plans_replayed": 65,
+  "passed": 65,
+  "failures": [],
+  "customer_services_called": false,
+  "voice_or_image_recognition_measured": false,
+  "operational_score_verified": false,
+  "operational_change": false
+}

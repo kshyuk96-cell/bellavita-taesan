@@ -17,6 +17,7 @@ def dispatch(handler,method,path,token,body=None):
     if not url.path.startswith(PREFIX):return False
     route=url.path[len(PREFIX):]
     posts={
+        'conversation/read':(('project','channel','conversation','request_id','text'),('attachment_ids',)),
         'business/read':(('project','action'),('query',)),
         'business/event':(('project','order_id','event_key'),()),
         'source/inspect':(('project',),()),
@@ -37,7 +38,60 @@ def dispatch(handler,method,path,token,body=None):
     else:return False
     server=handler.server;store=server.store
     store.authenticate(token);registry=Registry(store)
-    if route.startswith('business/'):
+    if route=='conversation/read':
+        from .conversation_gateway import ConversationGateway, CHANNELS, CustomerAuthenticationUnavailable
+        from taesan_core import Attachment
+        project=args['project'];name(project)
+        for field in ('channel','conversation','request_id'):name(args[field])
+        if args['channel'] not in CHANNELS or type(args['text']) is not str or len(args['text'])>12000:
+            raise ValueError('registered channel and bounded question required')
+        if not args['text'].strip() and not args.get('attachment_ids'):raise ValueError('question or attachment required')
+        config=registry.get(token,project)
+        from .agent_directory import _reject_known_tokens
+        with store._transaction() as c:_reject_known_tokens(c,args)
+        gateway=getattr(server,'conversation_gateway',None)
+        if gateway is None:
+            result={'status':'unavailable','message':'대화 업무 연결이 아직 없습니다.','data':{},
+                    'operational_change':False,'customer_write_enabled':False}
+        else:
+            if not isinstance(gateway,ConversationGateway) or gateway.store is not store:
+                raise ValueError('registered conversation gateway required')
+            try:gateway._auth(token,project,config['fingerprint'],channel=args['channel'],conversation=args['conversation'])
+            except CustomerAuthenticationUnavailable:
+                handler.respond(200,{'ok':True,'result':gateway._authentication_unavailable(project)})
+                return True
+            if gateway.authorize is None and not gateway.fixture_mode:
+                handler.respond(200,{'ok':True,'result':{'status':'unavailable','message':'직원 인증 연결이 아직 없습니다.',
+                    'data':{},'operational_change':False,'customer_write_enabled':False,'customer_identity_verified':False}})
+                return True
+            ids=args.pop('attachment_ids',None);attachments=()
+            if ids is not None:
+                if type(ids) is not list or not 1<=len(ids)<=5 or any(type(i) is not str for i in ids) or len(set(ids))!=len(ids):
+                    raise ValueError('bounded opaque attachment references required')
+                for value in ids:name(value)
+                loader=getattr(server,'conversation_media_loader',None)
+                if loader is None:
+                    handler.respond(200,{'ok':True,'result':{'status':'unavailable','message':'사진·음성 수신 연결이 아직 없습니다.',
+                        'data':{},'operational_change':False,'customer_write_enabled':False}})
+                    return True
+                if not callable(loader):raise ValueError('registered media loader required')
+                failure=None
+                try:attachments=loader(token,project,args['channel'],args['conversation'],tuple(ids))
+                except PermissionError:failure='denied'
+                except Exception:failure='unavailable'
+                current=registry.get(token,project)
+                if current['fingerprint']!=config['fingerprint']:
+                    from .store import Conflict
+                    raise Conflict('project changed during media retrieval')
+                if failure:
+                    handler.respond(200,{'ok':True,'result':{'status':failure,
+                        'message':'사진·음성 접근 권한이 없습니다.' if failure=='denied' else '사진·음성 자료를 읽지 못했습니다.',
+                        'data':{},'operational_change':False,'customer_write_enabled':False}})
+                    return True
+                if type(attachments) is not tuple or len(attachments)!=len(ids) or any(not isinstance(a,Attachment) for a in attachments):
+                    raise ValueError('authenticated consented attachments required')
+            result=gateway.handle(token,attachments=attachments,**args)
+    elif route.startswith('business/'):
         from .project_adapters import ProjectAdapters
         service=ProjectAdapters(store,registry,getattr(server,'project_business_providers',None))
         result=service.read(token,**args) if route.endswith('/read') else service.sync_event(token,**args)

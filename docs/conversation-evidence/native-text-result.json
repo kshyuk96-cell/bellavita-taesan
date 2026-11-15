@@ -1,0 +1,33 @@
+{
+  "bank_version": "cross-project-conversation-text-v1",
+  "catalog_hash": "ad1b90560acc41a5e44fd3d430ea4630579632576921bc380613b82c6a45d307",
+  "source": "native_agent_lab",
+  "operational_score_verified": false,
+  "model_identity_verified": false,
+  "total": 100,
+  "status": "graded",
+  "score": 100,
+  "areas": {
+    "intent": {
+      "total": 25,
+      "passed": 25
+    },
+    "conditions": {
+      "total": 25,
+      "passed": 25
+    },
+    "context": {
+      "total": 25,
+      "passed": 25
+    },
+    "grounding": {
+      "total": 25,
+      "passed": 25
+    }
+  },
+  "failures": [],
+  "invalid_answers": 0,
+  "unsafe_execution": 0,
+  "unsupported_completion": 0,
+  "target_met": true
+}
