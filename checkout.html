@@ -188,7 +188,7 @@ $catalog_style
 <header>벨라비타</header>
 <main>
 <h1>$checkout_heading</h1>
-<form action="$action" method="post" id="order" data-force-message="$force_message">
+<form action="$action" method="post" id="order" data-force-message="$force_message" data-can-submit="$can_submit">
 <input type="hidden" name="attempt" value="$attempt"><input type="hidden" name="product_revision" value="$product_revision">
 <section class="product" aria-label="상품 정보">
 $pictures
@@ -234,7 +234,7 @@ $installation
 </section>
 <section>
 <h2>주문 정보 수집 동의</h2>
-<details class="consent-details"><summary>수집 항목과 이용 목적 보기</summary><p>벨라비타는 주문 확인, 행사장 설치, 샘플 이미지·주문 및 배송 알림, 설치 사진 전송과 고객 문의 처리를 위해 주문자 이름·휴대폰 번호, 보내시는 분, 주문 옵션과 축하 문구를 수집합니다. 결제를 위해 상품명, 결제금액, 주문자 연락처를 페이앱에 전달합니다. 현금영수증 신청 시 발급용 휴대폰·사업자번호를 페이앱에 전달합니다. 주문·배송 담당 직원이 주문 정보를 확인하며, 문자 알림 발송을 위해 발송 대행사에 연락처·알림 내용·문구 샘플 이미지를 전달합니다. 주문 정보는 거래 확인과 관련 법령에 따른 보관에 사용합니다. 필수 항목 수집을 거부할 수 있으며, 거부 시 주문을 진행할 수 없습니다. 문의 031-8067-8580</p></details>
+<details class="consent-details"><summary>수집 항목과 이용 목적 보기</summary><p>벨라비타는 주문 확인, 행사장 설치, 샘플 이미지·주문 및 배송 알림, 설치 사진 전송과 고객 문의 처리를 위해 주문자 이름·휴대폰 번호, 보내시는 분, 주문 옵션과 축하 문구를 수집합니다. 결제를 위해 상품명, 결제금액, 주문자 연락처를 페이앱에 전달합니다. 현금영수증 신청 시 발급용 휴대폰·사업자번호를 페이앱에 전달합니다. 주문·배송 담당 직원이 주문 정보를 확인하며, 카카오 알림톡 발송을 위해 발송 대행사에 연락처·알림 내용·문구 샘플 확인 링크를 전달합니다. 주문 정보는 거래 확인과 관련 법령에 따른 보관에 사용합니다. 필수 항목 수집을 거부할 수 있으며, 거부 시 주문을 진행할 수 없습니다. 문의 031-8067-8580</p></details>
 <label><input type="checkbox" name="consent" value="yes" required>주문 정보 수집에 동의합니다.</label>
 $notice
 <button type="submit" $button_state>결제하기</button>
@@ -619,6 +619,12 @@ function syncBuyer() {
 sender.addEventListener('input', syncBuyer);
 sender.addEventListener('change', syncBuyer);
 sameBuyer.addEventListener('change', syncBuyer);
+form.addEventListener('bellavita:checkout-reset', () => {
+  separateBuyer = '';
+  syncBuyer();
+  update();
+  updateSender();
+});
 form.addEventListener('input', update);
 form.addEventListener('change', update);
 form.addEventListener('submit', () => { form.querySelector('button[type="submit"]').disabled = true; });
@@ -640,5 +646,6 @@ syncBuyer();
 update();
 setupMobileSteps();
 </script>
+<script>$preflight_script</script>
 </body>
 </html>

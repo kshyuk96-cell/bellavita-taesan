@@ -1,0 +1,115 @@
+{
+  "checked_on_kst": "2026-11-15",
+  "batch": 1,
+  "features": 10,
+  "source_parent": "0cac58ee5decad52f41718e99060b75421f62afb",
+  "scope": "prepayment customer assistance; integration-ready PR source only",
+  "runtime_sha256": {
+    "checkout.html": "e2ef77c9faa09a86cf8ae46e112e676779108b0d94b71fff31866429dafa5631",
+    "checkout.py": "b42510ac1a80793a5a3896b6457cc37fd94e2921fe7638fe712c2671f61f5e30",
+    "checkout_preflight.js": "f66f4673d88518e7081452630f44b3b0b159f00889c1f69aa9ab2860332bc5ab",
+    "tests/browser_checkout_preflight.py": "6a915f10a6e736c47162076f4a3dce7575d17b2c508cfbf507ae365e19455166"
+  },
+  "full_unit_regression": {
+    "passed": 180,
+    "seconds": 83.956,
+    "command": ".venv/bin/python -m unittest discover -s tests"
+  },
+  "preflight_browser": {
+    "results": [
+      {
+        "width": 390,
+        "live_summary": true,
+        "edit_focus": true,
+        "character_counts": true,
+        "phone_validation_and_cleanup": true,
+        "receipt_validation_and_modes": true,
+        "error_summary_and_recovery": true,
+        "required_progress": true,
+        "dirty_navigation_warning": true,
+        "mobile_amount_and_review": true,
+        "confirmed_reset": true,
+        "no_personal_browser_storage": true,
+        "no_horizontal_overflow": true
+      },
+      {
+        "width": 1280,
+        "live_summary": true,
+        "edit_focus": true,
+        "character_counts": true,
+        "phone_validation_and_cleanup": true,
+        "receipt_validation_and_modes": true,
+        "error_summary_and_recovery": true,
+        "required_progress": true,
+        "dirty_navigation_warning": true,
+        "mobile_amount_and_review": true,
+        "confirmed_reset": true,
+        "no_personal_browser_storage": true,
+        "no_horizontal_overflow": true
+      }
+    ],
+    "invitation_results": [
+      {
+        "width": 390,
+        "static_installation_summary": true,
+        "legacy_receipt_disabled": true,
+        "live_scroll_preserved": true,
+        "edit_mobile_step": true,
+        "reset_clears_scroll_and_steps": true
+      },
+      {
+        "width": 1280,
+        "static_installation_summary": true,
+        "legacy_receipt_disabled": true,
+        "live_scroll_preserved": true,
+        "edit_mobile_step": true,
+        "reset_clears_scroll_and_steps": true
+      }
+    ],
+    "javascript_errors": [],
+    "orders_created": 0,
+    "unexpected_order_requests": 0,
+    "captured_mock_handoffs": 1,
+    "double_submit_blocked": true,
+    "submit_has_no_leave_warning": true,
+    "sender_preview_mocked": true,
+    "external_requests": 0,
+    "real_payment": false
+  },
+  "existing_catalog_browser": {
+    "target": "Python backend storefront",
+    "results": [
+      {
+        "width": 375,
+        "four_products": true,
+        "frame_ratio": 1.5,
+        "scroll_ratio": 0.667,
+        "same_buyer": true,
+        "server_price_preview": 165000,
+        "long_message_visible": true,
+        "overflow": false
+      },
+      {
+        "width": 1280,
+        "four_products": true,
+        "frame_ratio": 1.5,
+        "scroll_ratio": 0.667,
+        "same_buyer": true,
+        "server_price_preview": 165000,
+        "long_message_visible": true,
+        "overflow": false
+      }
+    ],
+    "javascript_errors": [],
+    "live_requests": false
+  },
+  "bug_fixed": "summary buttons replaced on change could lose first click; reuse DOM rows; immediate post-input edit scenario passed",
+  "database_schema_changed": false,
+  "production_deployed": false,
+  "verification_server_redeployed": false,
+  "live_payapp_called": false,
+  "live_messages_sent": false,
+  "live_receipts_issued": false,
+  "personal_browser_storage_used": false,
+  "integration_document": "docs/prepayment-improvements-batch-01.md"
+}
