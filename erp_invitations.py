@@ -20,6 +20,7 @@ import socket
 import sqlite3
 import ssl
 import threading
+import time
 import warnings
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -197,8 +198,31 @@ class Engine:
                 for tail in ('Name','Parents','Relation'):values[side+tail]=fields.get(side+'_'+tail.lower(),'')
             warnings_out.append('원본을 모두 읽지 못했습니다. 누락된 항목만 보완해 주세요. 원본 링크는 유지했습니다.')
         values=clean_values(values)
+        if data['kind']=='event' and not values['host']:
+            labelled=re.search(r'(?:주최(?:\s*측)?|주관)\s*[:：]\s*([^\n.;。]{1,100})',source)
+            if labelled:values['host']=labelled.group(1).strip()
         if data['kind']=='wedding' and values['groomName'] and values['brideName']:values['name']=values['groomName']+' '+values['brideName']+' 결혼'
         return {'status':'done','values':values,'missing':missing(data['kind'],values),'warnings':warnings_out}
+
+    def template_check(self,number,client=None):
+        if not isinstance(number,str) or not re.fullmatch(r'[0-9]{1,20}',number):raise ValueError('복제 원본 상품 번호를 확인해 주세요.')
+        if client is None:
+            from blogpay import BlogPay
+            client=BlogPay(os.getenv('BLOGPAY_SHOP_ID',''),os.getenv('BLOGPAY_API_TOKEN',''))
+            with self.legacy.PRODUCT_LOCK:return self.template_check(number,client)
+        row=client.detail(number)
+        images=client.image_checksums(row)
+        settings=client.settings(row)
+        eligible=('쌀빛그림화환' in row.get('goodName','') and str(row.get('isRecommend'))=='0'
+                  and str(row.get('isShow'))=='0' and str(row.get('optionState'))=='1'
+                  and not row.get('addNormalOption') and bool(images and images[0])
+                  and int(row.get('enablePayMethod') or 0)>0)
+        fingerprint=digest({'productId':number,'name':row.get('goodName'),'price':row.get('goodPrice'),
+                            'settings':settings,'images':[x.hex() if x else None for x in images]})
+        return {'productId':number,'name':row.get('goodName',''),'price':int(row.get('goodPrice') or 0),
+                'eligible':eligible,'fingerprint':fingerprint,'optionGroups':[x.get('noTitle','') for x in row.get('normalOption') or []],
+                'checks':{'notOnMain':str(row.get('isRecommend'))=='0','sourceHidden':str(row.get('isShow'))=='0',
+                          'hasImages':bool(images and images[0]),'paymentEnabled':int(row.get('enablePayMethod') or 0)>0}}
 
     def products(self,title):
         from blogpay import BlogPay
@@ -206,8 +230,23 @@ class Engine:
         if not shop or not token:raise ValueError('기존 블로그페이 서버 연결을 확인하세요.')
         client=BlogPay(shop,token)
         with self.legacy.PRODUCT_LOCK:
-            rows=client.existing_products(title)
-            if set(rows)!=set(PRICES):raise ValueError('해당 행사명의 93,500원·99,000원 기존 상품을 모두 확인해 주세요. 자동 복제는 활성화하지 않았습니다.')
+            cached=getattr(self,'catalog_cache',None)
+            if cached is None or time.monotonic()-getattr(self,'catalog_cached_at',0)>300:
+                self.catalog_cache=list(client.products(all_pages=True))
+                self.catalog_cached_at=time.monotonic()
+            rows=client.existing_products(title,self.catalog_cache)
+            if set(rows)!=set(PRICES):
+                template=os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID','').strip()
+                pinned=os.getenv('BLOGPAY_INVITATION_TEMPLATE_FINGERPRINT','').strip()
+                if os.getenv('BLOGPAY_INVITATION_AUTO_CREATE')!='1' or not template or not pinned:
+                    raise ValueError('해당 행사명의 두 가격 상품이 없습니다. 검증한 복제 원본 상품 번호를 지정해 주세요.')
+                check=self.template_check(template,client)
+                if not check['eligible'] or check['fingerprint']!=pinned:raise ValueError('복제 원본 설정이 검증값과 다릅니다. 원본을 다시 확인해 주세요.')
+                client.ensure_links(title,self.root,int(template))
+                if self.template_check(template,client)['fingerprint']!=pinned:raise ValueError('복제 중 원본 설정이 변경됐습니다. 저장된 상품을 먼저 확인해 주세요.')
+                self.catalog_cache=list(client.products(all_pages=True));self.catalog_cached_at=time.monotonic()
+                rows=client.existing_products(title,self.catalog_cache)
+                if set(rows)!=set(PRICES):raise ValueError('두 가격의 복제 결과를 모두 확인해야 합니다. 기존 복제 원장을 유지합니다.')
             result=[]
             for price in PRICES:
                 row=client.detail(rows[price]['goodNum'])
@@ -371,6 +410,10 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
     if erp_ai.dispatch(handler,method,path):return True
     worker=engine(root,origin,legacy,extract)
     try:
+        if method=='POST' and path=='/erp/invitations/template-check':
+            size=int(handler.headers.get('Content-Length','0'))
+            if not 0<size<=1000:raise ValueError('원본 상품 번호 입력을 확인하세요.')
+            data=json.loads(handler.rfile.read(size));handler.send_json(worker.template_check(data.get('productId')));return True
         if method=='POST' and path=='/erp/invitations/jobs':
             size=int(handler.headers.get('Content-Length','0'))
             if not 0<size<=80000:raise ValueError('입력 크기 오류')
