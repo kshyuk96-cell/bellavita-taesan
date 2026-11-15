@@ -24,6 +24,8 @@ REASONS = {
     'capacity_limit':'작업 상한 도달', 'review_backlog':'검토 대기 적체',
     'rework_limit':'태산이 원인 재분석 필요', 'rework_limit_reached':'태산이 원인 재분석 필요',
     'candidate_changed':'후보 변경으로 재검토 필요', 'source_changed':'소스 변경으로 재검토 필요',
+    'source_freshness_not_checked':'현재 소스 최신성 미점검·이전 인수 기록',
+    'source_unavailable':'현재 소스 최신성 확인 불가', 'authority_changed':'현재 작업 권한 재확인 필요',
     'configuration_changed':'설정 변경으로 재검토 필요', 'config_changed':'설정 변경으로 재검토 필요',
     'independent_check_failed':'독립 검증 실패·보완 필요',
     'review_lease_expired':'검토 만료·실행 대조 필요',
@@ -88,14 +90,16 @@ def _task(project,value):
             'artifact_digest':_hex(source.get('artifact_digest'),_DIGEST),
             'developer_id':_reference(value.get('developer_id')),'reviewer_id':_reference(value.get('reviewer_id')),
             'rework_count':_count(value.get('rework_count')),'review_state':review,'checks':checks,
-            'technical_accepted':accepted,'operational_approved':False,'deployment_verified':False,
+            'technical_accepted':accepted,'acceptance_recorded':value.get('acceptance_recorded') is True or accepted,
+            'source_freshness':value.get('source_freshness') if value.get('source_freshness') in {'checked','not_checked','unavailable','not_applicable'} else 'unknown',
+            'operational_approved':False,'deployment_verified':False,
             'connection_verified':value.get('connection_verified') is True,
             'requires_owner_decision':value.get('requires_owner_decision') is True,
             'blocked_reason':reason,'blocked_label':REASONS.get(reason,'태산이 확인 필요') if reason else None,
             'acceptance_needs_verification':state=='accepted' and not accepted}
 
 
-def build_summary(core,token,projects):
+def build_summary(core,token,projects,*,limit=None,cursor=None,freshness_limit=None):
     """Project exactly one freshly authorized core overview into a safe view.
 
     Every requested project is authorized before the callback and rechecked after
@@ -109,7 +113,11 @@ def build_summary(core,token,projects):
         raise ValueError('explicit unique bounded project list required')
     for project in projects:name(project)
     configs={project:registry.get(token,project) for project in projects}
-    raw=core.overview(token,projects)
+    options={}
+    if limit is not None:options['limit']=limit
+    if cursor is not None:options['cursor']=cursor
+    if freshness_limit is not None:options['freshness_limit']=freshness_limit
+    raw=core.overview(token,projects,**options)
     if type(raw) is not dict or raw.get('operational_change') is not False or type(raw.get('projects')) is not list:
         raise ValueError('read-only core overview required')
     entries=raw['projects']
@@ -135,16 +143,30 @@ def build_summary(core,token,projects):
             role=member.get('role')
             if role in roles:roles[role]+=1
             connected+=member.get('connection_verified') is True
+        recorded=entry.get('state_counts')
+        if recorded is not None and (type(recorded) is not dict or set(recorded)-(set(STATES)|{'unknown'}) or any(type(v) is not int or v<0 for v in recorded.values())):raise ValueError('actual stored state counts required')
+        total_tasks=entry.get('total_tasks')
+        if total_tasks is not None and (type(total_tasks) is not int or total_tasks<len(tasks) or (recorded is not None and sum(recorded.values())!=total_tasks)):raise ValueError('exact bounded task totals required')
+        members_total=entry.get('members_total',len(members))
+        if type(members_total) is not int or members_total<len(members):raise ValueError('exact registered member count required')
+        actual_roles=entry.get('role_counts')
+        if actual_roles is not None:
+            if type(actual_roles) is not dict or set(actual_roles)-set(roles) or any(type(v) is not int or v<0 for v in actual_roles.values()) or sum(actual_roles.values())!=members_total:raise ValueError('exact role counts required')
+            roles={role:actual_roles.get(role,0) for role in roles}
         review_pending=sum(task['state'] in {'candidate_ready','reviewing'} for task in tasks)
         developing=sum(task['state'] in {'developing','rework_developing','needs_verification'} for task in tasks)
-        backlog=bool(configured and review_pending>=max_review)
+        review_recorded=sum(recorded.get(state,0) for state in ('candidate_ready','reviewing')) if recorded is not None else None
+        active_recorded=sum(recorded.get(state,0) for state in ('developing','rework_developing','needs_verification')) if recorded is not None else None
+        backlog=bool(configured and (review_recorded if review_recorded is not None else review_pending)>=max_review)
         project_view={'project':project,'name':configs[project]['config']['name'],
                       'company':configs[project]['config']['company'],'config_fingerprint':configs[project]['fingerprint'],
                       'capacity':{'configured':configured,'max_active':max_active if configured else None,
                                   'max_review':max_review if configured else None,'review_backlog_observed':backlog,
-                                  'active_displayed':developing,'review_pending_displayed':review_pending},
-                      'roles':roles,'registered_members':len(members),'connection_verified_members':connected,
-                      'tasks':tasks,'displayed_tasks':len(tasks),'tasks_truncated':len(rows)>200 or entry.get('tasks_truncated') is True,
+                                  'active_displayed':developing,'review_pending_displayed':review_pending,
+                                  'active_recorded':active_recorded,'review_pending_recorded':review_recorded},
+                      'roles':roles,'registered_members':members_total,'members_displayed':len(members),'members_truncated':entry.get('members_truncated') is True,'connection_verified_members':connected,
+                      'tasks':tasks,'displayed_tasks':len(tasks),'total_tasks':total_tasks,'state_counts_recorded':recorded,
+                      'tasks_truncated':len(rows)>200 or entry.get('tasks_truncated') is True,
                       'operational_change':False,'operational_approved':False,'deployment_verified':False}
         result.append(project_view)
         for task in tasks:
@@ -156,12 +178,22 @@ def build_summary(core,token,projects):
             elif task['state'] in {'review_failed','needs_verification','unknown'} or task['acceptance_needs_verification']:
                 attention.append({'project':project,'task_id':task['task_id'],'reason':task['blocked_reason'],
                                   'message':task['blocked_label'] or '태산이 검토·보완 필요'})
+    total_tasks=raw.get('total_tasks')
+    displayed=sum(len(project['tasks']) for project in result)
+    if total_tasks is not None and (type(total_tasks) is not int or total_tasks<displayed):raise ValueError('exact global task total required')
+    if total_tasks is not None and all(project['total_tasks'] is not None for project in result) and sum(project['total_tasks'] for project in result)!=total_tasks:raise ValueError('global and project task totals disagree')
     # No model/CPU/billing metrics are invented from task count or elapsed time.
     response={'projects':result,'counts_displayed':totals,'owner_decisions':decisions,'manager_attention':attention,
               'owner_decision_count':len(decisions),'manager_attention_count':len(attention),
               'operational_change':False,'operational_approved':False,'deployment_verified':False,
               'existing_chat_control_verified':False,'background_management_verified':False,
-              'usage_or_cost_measured':False,'snapshot_scope':'authorized_registered_hierarchy'}
+              'usage_or_cost_measured':False,'snapshot_scope':'authorized_registered_hierarchy',
+              'total_tasks':total_tasks,
+              'displayed_tasks':sum(len(project['tasks']) for project in result),
+              'next_cursor':raw.get('next_cursor') if type(raw.get('next_cursor')) is str and re.fullmatch(r'[a-f0-9]{32}',raw['next_cursor']) else None,
+              'tasks_truncated':raw.get('truncated') is True or any(project['tasks_truncated'] for project in result),
+              'counts_scope':raw.get('counts_scope') if raw.get('counts_scope')=='page_start_task_set_current_recorded_states' else 'displayed_page',
+              'freshness_checks':raw.get('freshness_checks') if type(raw.get('freshness_checks')) is int and 0<=raw['freshness_checks']<=20 else None}
     for project in projects:
         if registry.get(token,project)['fingerprint']!=configs[project]['fingerprint']:
             raise Conflict('project changed during dashboard collection')
@@ -209,11 +241,13 @@ def render_dashboard(summary):
             check=task.get('checks',{})
             detail='통과 '+str(check.get('passed',0))+' / 실패 '+str(check.get('failed',0))+' / 미측정 '+str(check.get('unmeasured',0))
             status=str(task.get('state_label','확인 필요'))
-            if task.get('acceptance_needs_verification') is True:status+=' · 인수 근거 재확인 필요'
+            if task.get('source_freshness')=='not_checked':status='이전 인수 기록 · 현재 소스 최신성 미점검'
+            elif task.get('acceptance_needs_verification') is True:status+=' · 인수 근거 재확인 필요'
             out.append('<tr><td>'+escape(str(task.get('task_id','')))+'<br><small>보완 '+escape(str(task.get('rework_count') or 0))+'회</small></td><td>'+escape(status)+'<br><small>'+escape(str(task.get('blocked_label') or ''))+'</small></td><td><code>'+escape(str(task.get('head_sha') or '후보 미확인'))+'</code></td><td>'+escape(detail)+'<br><small>운영 배포 미확인</small></td></tr>')
         if not project['tasks']:out.append('<tr><td colspan="4">현재 표시할 작업이 없습니다.</td></tr>')
         out.append('</tbody></table></div>')
-        if project.get('tasks_truncated') is True:out.append('<p>일부 작업만 표시했습니다. 전체 건수로 해석하지 마십시오.</p>')
+        if type(project.get('total_tasks')) is int:out.append('<p>기록된 전체 '+str(project['total_tasks'])+'건 중 현재 '+str(project.get('displayed_tasks',len(project['tasks'])))+'건 표시.</p>')
+        if project.get('tasks_truncated') is True:out.append('<p>일부 작업만 표시했습니다. 표시 건수를 전체 건수로 해석하지 마십시오.</p>')
         out.append('</section>')
     out.append('</div></main></html>')
     return ''.join(out)

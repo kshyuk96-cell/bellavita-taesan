@@ -19,8 +19,8 @@ POSTS={
     'decision':(('task_id','candidate_digest'),('decision',)),
     'rework/claim':(('task_id',),('lease_seconds',)),
     'next':(('current_task_id','next_task_id','expected_parent_digest','request_key'),('developer_id',)),
-    'overview':(('projects',),()),
-    'dashboard':(('projects',),()),
+    'overview':(('projects',),('limit','cursor','freshness_limit')),
+    'dashboard':(('projects',),('limit','cursor','freshness_limit')),
 }
 
 

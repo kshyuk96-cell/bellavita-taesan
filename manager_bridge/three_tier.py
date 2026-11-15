@@ -129,6 +129,10 @@ class ThreeTier:
                 task_id TEXT PRIMARY KEY, project TEXT, version INTEGER, manifest_digest TEXT, config_fingerprint TEXT,
                 state TEXT, developer_id TEXT, reviewer_id TEXT, rework_count INTEGER, candidate TEXT,
                 evidence TEXT, lease_hash TEXT, lease_expires REAL, request_key TEXT, reason TEXT, updated REAL);
+            CREATE TABLE IF NOT EXISTS hierarchy_rework_checkpoints (
+                task_id TEXT,lease_hash TEXT,version INTEGER,manifest_digest TEXT,config_fingerprint TEXT,
+                developer_id TEXT,worker_hash TEXT,rework_count INTEGER,candidate TEXT,
+                PRIMARY KEY(task_id,lease_hash));
             CREATE TABLE IF NOT EXISTS hierarchy_review_runs (task_id TEXT,lease_hash TEXT,state TEXT,candidate_digest TEXT,PRIMARY KEY(task_id,lease_hash));
             CREATE TABLE IF NOT EXISTS hierarchy_review_limits (scope TEXT PRIMARY KEY,max_active INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS hierarchy_next_assignments (request_key TEXT PRIMARY KEY,parent_id TEXT,next_id TEXT,parent_digest TEXT,developer_id TEXT,created REAL);
@@ -495,7 +499,13 @@ class ThreeTier:
             policy=json.loads(c.execute('SELECT policy FROM bridge_task_policy WHERE task=?',(task_id,)).fetchone()['policy'])
             from .coordination import Coordination
             if not Coordination.dependencies_ready(c,policy):raise Conflict('approved dependencies changed')
+            if not 1<=row['rework_count']<=2 or row['candidate'] is None:raise Conflict('approved frozen rework checkpoint required')
+            candidate=json.loads(row['candidate']);source=dict(candidate['source']);source['changed_paths']=tuple(source['changed_paths'])
+            observation=SourceObservation(**source)
+            expected=self._candidate(self.store._public(task),config,developer,observation)
+            if candidate['digest']!=expected['digest'] or candidate['identity']!=expected['identity']:raise Conflict('exact approved rework candidate binding required')
             lease=secrets.token_hex(32);expires=self.store._now()+lease_seconds
+            c.execute('INSERT INTO hierarchy_rework_checkpoints VALUES (?,?,?,?,?,?,?,?,?)',(task_id,hashlib.sha256(lease.encode()).hexdigest(),task['version'],task['manifest_digest'],config['fingerprint'],row['developer_id'],actor['token_hash'],row['rework_count'],canonical_json(candidate)))
             c.execute("UPDATE bridge_tasks SET state='running',lease_hash=?,lease_expires=?,report=NULL,review=NULL,updated=? WHERE id=?",(hashlib.sha256(lease.encode()).hexdigest(),expires,self.store._now(),task_id))
             c.execute("UPDATE hierarchy_tasks SET state='rework_developing',candidate=NULL,evidence=NULL,reviewer_id=NULL,reason=NULL,updated=? WHERE task_id=?",(self.store._now(),task_id))
             self._event(c,task_id,'rework_claimed','rework_developing')
@@ -592,31 +602,88 @@ class ThreeTier:
             if reason:result.update(technical_accepted=False,review_state='not_measured',blocked_reason=reason)
             return result
 
-    def overview(self,token,projects):
-        if type(projects) not in (list,tuple) or not 1<=len(projects)<=100 or len(set(projects))!=len(projects):raise ValueError('explicit bounded projects required')
-        results=[];freshness={}
-        with self.store._transaction() as c:
-            actor=self.store._authenticate(c,token);self.store._role(actor,('owner','manager'))
-            for project in projects:self._config(c,token,project,('owner','manager'))
-            candidates=[row['task_id'] for row in c.execute("SELECT task_id,project FROM hierarchy_tasks WHERE state IN ('accepted','review_passed')") if row['project'] in projects]
-        for task_id in candidates:freshness[task_id]=self._read_freshness(token,task_id)
+    def overview(self,token,projects,*,limit=50,cursor=None,freshness_limit=3):
+        """Read a bounded global page, with expensive freshness checks capped.
+
+        Cursor pins the task row set's high-water mark, project order, current
+        configuration and authenticated credential. Counts describe that row set
+        in its current stored states, not an immutable historical-state snapshot.
+        Unchecked acceptance is history, never current executable authorization.
+        """
+        if type(projects) not in (list,tuple) or not 1<=len(projects)<=100 or any(type(p) is not str for p in projects) or len(set(projects))!=len(projects):raise ValueError('explicit bounded projects required')
+        for project in projects:name(project)
+        if type(limit) is not int or not 1<=limit<=200:raise ValueError('page limit must be 1 to 200')
+        if type(freshness_limit) is not int or not 0<=freshness_limit<=20:raise ValueError('bounded freshness budget required')
+        if cursor is not None and (type(cursor) is not str or len(cursor)!=32 or any(x not in '0123456789abcdef' for x in cursor)):raise ValueError('opaque page cursor required')
+        marks=','.join('?' for _ in projects)
         with self.store._transaction() as c:
             actor=self.store._authenticate(c,token);self.store._role(actor,('owner','manager'))
             configs={project:self._config(c,token,project,('owner','manager')) for project in projects}
-            for project,config in configs.items():
-                members=[]
-                for member in c.execute('SELECT * FROM hierarchy_members WHERE project=? ORDER BY member_id',(project,)):
-                    members.append({'member_id':member['member_id'],'role':member['role'],'subject':member['subject'],'agent_id':member['agent_id'],'connection_verified':False})
+            binding=digest({'projects':list(projects),'configs':{p:v['fingerprint'] for p,v in configs.items()}})
+            c.execute('CREATE TABLE IF NOT EXISTS hierarchy_overview_cursors (id TEXT PRIMARY KEY,actor TEXT NOT NULL,binding TEXT NOT NULL,anchor INTEGER NOT NULL,last_row INTEGER NOT NULL,expires REAL NOT NULL)')
+            c.execute('DELETE FROM hierarchy_overview_cursors WHERE expires<=?',(self.store._now(),))
+            if cursor is None:
+                anchor=c.execute('SELECT COALESCE(MAX(rowid),0) FROM hierarchy_tasks WHERE project IN ('+marks+')',tuple(projects)).fetchone()[0]
+                last=anchor+1
+            else:
+                saved=c.execute('SELECT * FROM hierarchy_overview_cursors WHERE id=?',(cursor,)).fetchone()
+                if saved is None or saved['actor']!=actor['token_hash'] or saved['binding']!=binding:raise Conflict('page cursor expired or scope changed')
+                anchor,last=saved['anchor'],saved['last_row']
+            page=[dict(row) for row in c.execute('SELECT rowid AS page_row,* FROM hierarchy_tasks WHERE project IN ('+marks+') AND rowid<=? AND rowid<? ORDER BY rowid DESC LIMIT ?',(*projects,anchor,last,limit+1))]
+            more=len(page)>limit;page=page[:limit]
+            # No full-table source traversal: only the displayed, bounded window.
+            refresh=[(row['task_id'],json.loads(row['candidate'])['digest'] if row['candidate'] else None) for row in page if row['state'] in ('accepted','review_passed')][:freshness_limit]
+        freshness={task_id:(self._read_freshness(token,task_id),candidate_digest) for task_id,candidate_digest in refresh}
+        with self.store._transaction() as c:
+            actor=self.store._authenticate(c,token);self.store._role(actor,('owner','manager'))
+            current={project:self._config(c,token,project,('owner','manager')) for project in projects}
+            if any(current[p]['fingerprint']!=configs[p]['fingerprint'] for p in projects):raise Conflict('project changed during overview collection')
+            counts={project:{} for project in projects}
+            for row in c.execute('SELECT project,state,COUNT(*) AS amount FROM hierarchy_tasks WHERE project IN ('+marks+') AND rowid<=? GROUP BY project,state',(*projects,anchor)):
+                label=row['state'] if row['state'] in STATES else 'unknown'
+                counts[row['project']][label]=counts[row['project']].get(label,0)+row['amount']
+            selected={project:[] for project in projects}
+            for original in page:
+                row=c.execute('SELECT * FROM hierarchy_tasks WHERE task_id=?',(original['task_id'],)).fetchone()
+                if row is None:continue
+                task=self.store._get(c,actor,row['task_id']);item=self._public(c,task,row)
+                recorded=row['state']=='accepted';reason=None;fresh='not_applicable'
+                if row['state'] in ('accepted','review_passed'):
+                    fresh='not_checked'
+                    if row['task_id'] in freshness:
+                        reason,checked_digest=freshness[row['task_id']]
+                        actual=json.loads(row['candidate'])['digest'] if row['candidate'] else None
+                        if actual!=checked_digest:reason='source_changed'
+                        fresh='checked' if reason is None else 'unavailable'
+                    else:reason='source_freshness_not_checked'
+                try:self._bound(c,token,row['task_id'])
+                except (Conflict,PermissionDenied,NotFound):reason='authority_changed'
+                if row['config_fingerprint']!=current[row['project']]['fingerprint']:reason='configuration_changed'
+                if reason:item.update(technical_accepted=False,review_state='not_measured',blocked_reason=reason)
+                item.update(source_freshness=fresh,acceptance_recorded=recorded)
+                selected[row['project']].append(item)
+            results=[];all_counts={}
+            for project in projects:
+                config=current[project]
+                members=[{'member_id':row['member_id'],'role':row['role'],'subject':row['subject'],'agent_id':row['agent_id'],'connection_verified':False} for row in c.execute('SELECT * FROM hierarchy_members WHERE project=? ORDER BY member_id LIMIT 200',(project,))]
+                role_counts={row['role']:row['amount'] for row in c.execute('SELECT role,COUNT(*) AS amount FROM hierarchy_members WHERE project=? GROUP BY role',(project,))}
+                member_total=sum(role_counts.values())
                 policies={row['scope']:dict(row) for row in c.execute('SELECT * FROM bridge_capacity_limits WHERE scope IN (?,?)',('*',project))}
-                p=policies.get(project,{})
-                tasks=[]
-                for row in c.execute('SELECT * FROM hierarchy_tasks WHERE project=? ORDER BY updated,task_id',(project,)):
-                    task=self.store._get(c,actor,row['task_id']);item=self._public(c,task,row)
-                    reason=freshness.get(row['task_id'])
-                    try:self._bound(c,token,row['task_id'])
-                    except (Conflict,PermissionDenied,NotFound):reason=reason or 'authority_changed'
-                    if row['config_fingerprint']!=config['fingerprint']:reason='configuration_changed'
-                    if reason:item.update(technical_accepted=False,review_state='not_measured',blocked_reason=reason)
-                    tasks.append(item)
-                results.append({'project':project,'config_fingerprint':config['fingerprint'],'capacity':{'configured':'*' in policies and project in policies,'max_active':p.get('max_active'),'max_review':p.get('max_review')},'members':members,'tasks':tasks})
-        return {'projects':results,'operational_change':False,'existing_chat_control_verified':False}
+                policy=policies.get(project,{})
+                total=sum(counts[project].values());tasks=selected[project]
+                for state,amount in counts[project].items():all_counts[state]=all_counts.get(state,0)+amount
+                results.append({'project':project,'config_fingerprint':config['fingerprint'],
+                    'capacity':{'configured':'*' in policies and project in policies,'max_active':policy.get('max_active'),'max_review':policy.get('max_review')},
+                    'members':members,'members_total':member_total,'members_truncated':member_total>len(members),'role_counts':role_counts,
+                    'tasks':tasks,'total_tasks':total,'displayed_tasks':len(tasks),'tasks_truncated':total>len(tasks),'state_counts':counts[project]})
+            next_cursor=None
+            if more and page:
+                # Short lived metadata only; bound server-side storage even if a
+                # caller continually asks for another copy of a read cursor.
+                c.execute('DELETE FROM hierarchy_overview_cursors WHERE id IN (SELECT id FROM hierarchy_overview_cursors ORDER BY expires,id LIMIT MAX(0,(SELECT COUNT(*) FROM hierarchy_overview_cursors)-1023))')
+                next_cursor=secrets.token_hex(16)
+                c.execute('INSERT INTO hierarchy_overview_cursors VALUES (?,?,?,?,?,?)',(next_cursor,actor['token_hash'],binding,anchor,page[-1]['page_row'],self.store._now()+300))
+            return {'projects':results,'total_tasks':sum(all_counts.values()),'displayed_tasks':sum(len(v) for v in selected.values()),
+                    'state_counts':all_counts,'next_cursor':next_cursor,'truncated':more,'freshness_checks':len(refresh),
+                    'counts_scope':'page_start_task_set_current_recorded_states','pagination_order':'task_creation_desc',
+                    'operational_change':False,'existing_chat_control_verified':False}
