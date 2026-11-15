@@ -4,10 +4,14 @@ on:
   pull_request:
     paths:
       - 'manager_bridge/**'
+      - 'taesan_core/**'
+      - 'tests/test_taesan_core.py'
       - 'tests/test_manager_bridge.py'
       - 'scripts/maintenance_fixture.py'
       - 'scripts/prepare_connection_review.py'
       - 'scripts/export_model_lab.py'
+      - 'scripts/export_conversation_benchmark.py'
+      - 'scripts/rehearse_conversation.py'
       - 'scripts/run_project_receiver.py'
       - 'scripts/rehearse_project_runtime.py'
       - 'tests/test_manager_host.py'
@@ -19,12 +23,17 @@ on:
       - 'codex/taesan-delegated-*'
       - 'codex/taesan-connection-*'
       - 'codex/taesan-project-*'
+      - 'codex/taesan-conversation-*'
     paths:
       - 'manager_bridge/**'
+      - 'taesan_core/**'
+      - 'tests/test_taesan_core.py'
       - 'tests/test_manager_bridge.py'
       - 'scripts/maintenance_fixture.py'
       - 'scripts/prepare_connection_review.py'
       - 'scripts/export_model_lab.py'
+      - 'scripts/export_conversation_benchmark.py'
+      - 'scripts/rehearse_conversation.py'
       - 'scripts/run_project_receiver.py'
       - 'scripts/rehearse_project_runtime.py'
       - 'tests/test_manager_host.py'
@@ -55,5 +64,9 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: '1'
         run: python -m unittest discover -s manager_bridge/tests -t . -q
+      - name: Validate reused portable company core
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python -m unittest discover -s taesan_core/tests -t . -q
       - name: Check whitespace
         run: git diff --check HEAD^ HEAD

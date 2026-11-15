@@ -1,0 +1,86 @@
+{
+  "source_commit": "4fd2ec13f6d810a3713617528a4cbcf75324e0aa",
+  "source_prs": [
+    56,
+    57
+  ],
+  "exact_files_reused": 19,
+  "files": [
+    {
+      "path": "taesan_core/__init__.py",
+      "sha256": "9038c193fe2e9b24c232bb17a30d5c22028491ccc7707539d2bb753d4b6f5c5a"
+    },
+    {
+      "path": "taesan_core/adapters.py",
+      "sha256": "4fb984cf1da45a50d4c7f01b0b7c64b97c30aace85602c25506fbc736987ab9e"
+    },
+    {
+      "path": "taesan_core/catalog.py",
+      "sha256": "be6a8360f0852abb9f647bbf6e4df92d094213b89a816546b140cf9c660afb6a"
+    },
+    {
+      "path": "taesan_core/commerce.py",
+      "sha256": "9ad8198963e69a60ac0b522e00d4bd144cd1ca861043fcf498f6814dd87b6946"
+    },
+    {
+      "path": "taesan_core/company_evaluation.py",
+      "sha256": "69cef7cd498172f45757a3e0f172204e05801717615f16d76901821da5c35ee0"
+    },
+    {
+      "path": "taesan_core/core.py",
+      "sha256": "f617792eb55c9886f1d88ef2cf18fc70661760c201a1e79a6c2adbc40c382591"
+    },
+    {
+      "path": "taesan_core/evaluation.py",
+      "sha256": "c488e78b5e0841ef5149f4820559f08755d996a459e597d040266601e01b1840"
+    },
+    {
+      "path": "taesan_core/order_drafts.py",
+      "sha256": "d18247b79229e58479a77b3ff7e1b42fbfac17984430ef1e256f2615fa0ae97c"
+    },
+    {
+      "path": "taesan_core/order_duplicates.py",
+      "sha256": "99b559475c13a7be2e5367c75107095860d39930dc1aa07dfe4e811db04340c0"
+    },
+    {
+      "path": "taesan_core/order_workflow.py",
+      "sha256": "a486632cfb05127f18fcef7e4679f7493aef30cc0de17f61483cf82dd11687f4"
+    },
+    {
+      "path": "taesan_core/tests/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "taesan_core/tests/test_adapters.py",
+      "sha256": "9ed7af85fe39babcc1ee3170a247aed9ab9074f34b4e087bfd57ef78167a36cd"
+    },
+    {
+      "path": "taesan_core/tests/test_commerce.py",
+      "sha256": "7c57996a1140be125480447116caeb8c6a315260a15fe9a40f3cf56cb1ac54ee"
+    },
+    {
+      "path": "taesan_core/tests/test_company_evaluation.py",
+      "sha256": "d53409eab2967ce3fdc131ff6c8949ffc1e13480fceb3c50bee25e86768d084a"
+    },
+    {
+      "path": "taesan_core/tests/test_core.py",
+      "sha256": "eedab5b6fb6a9e187bd42a87c8f052d8ef0cc638e145d77c51184ab49182c83f"
+    },
+    {
+      "path": "taesan_core/tests/test_evaluation.py",
+      "sha256": "c5c531d61214d9febb50e37ea7a4722cc35089f3726c97f9328af61bf466333a"
+    },
+    {
+      "path": "taesan_core/tests/test_order_duplicates.py",
+      "sha256": "f88f9fd8da7d4b61441b2caf8cbfe17402e94c66080264ca2da79dcc97ded414"
+    },
+    {
+      "path": "taesan_core/tests/test_order_provider.py",
+      "sha256": "91f2b88771a7046e06fad56aff09bc58bc2e0d79659e1e528945f2bd20fb624b"
+    },
+    {
+      "path": "taesan_core/tests/test_order_workflow.py",
+      "sha256": "b60273bf5ca9e552a7787593003f9043b3e11093607152fad0237084c6e7de14"
+    }
+  ]
+}
