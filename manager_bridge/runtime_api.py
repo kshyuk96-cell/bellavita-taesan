@@ -17,6 +17,8 @@ def dispatch(handler,method,path,token,body=None):
     if not url.path.startswith(PREFIX):return False
     route=url.path[len(PREFIX):]
     posts={
+        'conversation/export':(('project','channel','conversation','snapshot_id'),()),
+        'conversation/select':(('project','channel','conversation','request_id','selection_id','generation'),()),
         'conversation/read':(('project','channel','conversation','request_id','text'),('attachment_ids',)),
         'business/read':(('project','action'),('query',)),
         'business/event':(('project','order_id','event_key'),()),
@@ -39,6 +41,17 @@ def dispatch(handler,method,path,token,body=None):
     else:return False
     server=handler.server;store=server.store
     store.authenticate(token);registry=Registry(store)
+    if route in {'conversation/export','conversation/select'}:
+        from .conversation_gateway import ConversationGateway
+        gateway=getattr(server,'conversation_gateway',None)
+        registry.get(token,args['project'])
+        if not isinstance(gateway,ConversationGateway) or gateway.store is not store:
+            raise ValueError('registered conversation gateway required')
+        from .agent_directory import _reject_known_tokens
+        with store._transaction() as c:_reject_known_tokens(c,args)
+        result=(gateway.export(token,**args) if route=='conversation/export' else gateway.select(token,**args))
+        handler.respond(200,{'ok':True,'result':result})
+        return True
     if route=='conversation/read':
         from .conversation_gateway import ConversationGateway, CHANNELS, CustomerAuthenticationUnavailable
         from taesan_core import Attachment

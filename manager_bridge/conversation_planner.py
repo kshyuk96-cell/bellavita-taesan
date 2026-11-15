@@ -54,6 +54,8 @@ SAFE_MESSAGES = frozenset({
     '부고 번호만 알려주십시오.',
     '조회 계획을 확인했습니다.',
     '등록된 조회 규칙으로 해석했습니다.',
+    '다시 조회할 이전 조건이 없습니다. 조회할 업무를 알려주십시오.',
+    '어느 날짜인지 요일까지 지정해 주십시오.',
 })
 
 _MUTATION = re.compile(r'(?:취소|결제|등록|수정|변경|입고|환불|삭제|발송|승인)(?:\s*(?:처리|진행))?\s*(?:해|하자|시켜|하라고|해주세요|해줘|하세요|할게|진행해)|(?:문자|카톡)\s*(?:보내|발송)|바꿔|지워|삭제해')
@@ -129,6 +131,36 @@ def _id(text):
     return values
 
 
+
+_REFRESH = re.compile(r'^(?:(?:아까|이전|직전|같은)\s*(?:조회\s*)?조건(?:으로|대로)?\s*)?(?:다시|재)\s*(?:조회|검색|봐)(?:해줘|해주세요|해|줘|주세요)?[.!?\s]*$')
+_REMOVE = re.compile(r'^(?:(?:조회|검색)\s*조건(?:에서)?\s*)?(?:(날짜|상태|주문번호|개수)(?:만)?\s*(?:빼고|빼줘|제외|해제)|전체\s*(상태)(?:로)?)(?:\s*(?:다시\s*)?(?:조회|보여줘|봐줘)(?:해줘|해주세요)?)?[.!?\s]*$')
+_WEEKDAYS = '월화수목금토일'
+
+
+def _natural_dates(text,today):
+    dates=[]
+    for word,offset in (('오늘',0),('내일',1),('어제',-1),('모레',2)):
+        if word in text:dates.append((today+timedelta(days=offset)).isoformat())
+    for week,day in re.findall(r'(이번|다음)\s*주\s*([월화수목금토일])요일',text):
+        monday=today-timedelta(days=today.weekday())
+        dates.append((monday+timedelta(days=_WEEKDAYS.index(day)+(7 if week=='다음' else 0))).isoformat())
+    return dates
+
+
+def _context_command(project,text,context):
+    if _REFRESH.fullmatch(text):
+        return ('refresh',Plan(context['tool'],dict(context['arguments']),False) if context else None)
+    match=_REMOVE.fullmatch(text)
+    if match:
+        if not context:return ('remove',None)
+        field=match.group(1) or match.group(2)
+        key={'날짜':'date','상태':'status','주문번호':'id','개수':'limit'}[field]
+        if key not in CATALOG[project][context['tool']]:return ('remove',None)
+        args=dict(context['arguments']);args.pop(key,None)
+        return ('remove',Plan(context['tool'],_args(project,context['tool'],args),False))
+    return None
+
+
 def _filter_delta(project,text,context,today):
     """Recognize only a current read query's explicit field change.
 
@@ -145,7 +177,7 @@ def _filter_delta(project,text,context,today):
     if key not in spec:return None
     if field=='주문번호' and tool not in {'erp.orders','shop.orders'}:return None
     if key=='date':
-        offsets={'오늘':0,'내일':1,'어제':-1}
+        offsets={'오늘':0,'내일':1,'어제':-1,'모레':2}
         if value in offsets:value=(today+timedelta(days=offsets[value])).isoformat()
     elif key=='id':
         if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}',value):return None
@@ -185,7 +217,12 @@ class Planner:
         if not candidate:return self._reply('clarify','조회할 업무를 알려주십시오.',source)
         if _ACK.fullmatch(candidate):return self._reply('clarify','확인할 조회 업무를 알려주십시오.',source)
         if _project_conflict(project,candidate):return self._reply('clarify','현재 선택한 회사·업무와 요청 대상이 다릅니다.',source)
-        delta=_filter_delta(project,candidate,context,today)
+        command=_context_command(project,candidate,context)
+        if command and command[1] is None:
+            return self._reply('clarify','다시 조회할 이전 조건이 없습니다. 조회할 업무를 알려주십시오.',source)
+        if re.search(r'주말',candidate) or (re.search(r'[월화수목금토일]요일',candidate) and not re.search(r'(?:이번|다음)\s*주\s*[월화수목금토일]요일',candidate)):
+            return self._reply('clarify','어느 날짜인지 요일까지 지정해 주십시오.',source)
+        delta=command[1] if command else _filter_delta(project,candidate,context,today)
         missing_id=bool(context and context['tool']=='association.obituary' and 'id' not in context['arguments'])
         if missing_id and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}',candidate):
             if candidate.casefold() in {'y','n','cancel','delete','update','write','register','pay','refund','send','admin','administrator','root'}:
@@ -197,7 +234,7 @@ class Planner:
         if re.search(r'미완료|미배송|아직.*완료',candidate):return self._reply('clarify','미완료에 포함할 원본 상태를 확인해 주십시오.',source)
         if project=='bellavita-erp' and '완료' in compact and not ('제작완료' in compact or '배송완료' in compact):
             return self._reply('clarify','제작완료와 배송완료 중 어떤 상태인지 알려주십시오.',source)
-        if project!='bellavita-erp' and re.search(r'오늘|내일|어제|\d{4}-\d{2}-\d{2}',candidate):
+        if project!='bellavita-erp' and re.search(r'오늘|내일|어제|모레|(?:이번|다음)\s*주\s*[월화수목금토일]요일|\d{4}-\d{2}-\d{2}',candidate):
             return self._reply('unsupported','이 업무의 날짜 조건은 아직 연결되지 않았습니다.',source)
         if len(_id(candidate))>1:return self._reply('clarify','조회할 번호를 하나만 알려주십시오.',source)
         if self.observe is not None:
@@ -218,6 +255,9 @@ class Planner:
                 if type(follow) is not bool or follow and (not context or context['tool']!=value['tool']):raise CoreError('current same-tool context required')
                 plan=Plan(value['tool'],args,follow)
                 if delta is not None and plan!=delta:raise CoreError('explicit query change must preserve scoped read context')
+                if re.search(r'모레|(?:이번|다음)\s*주\s*[월화수목금토일]요일',candidate):
+                    natural=list(dict.fromkeys(_natural_dates(candidate,today)+re.findall(r'\d{4}-\d{2}-\d{2}',candidate)))
+                    if len(natural)!=1 or args.get('date')!=natural[0]:raise CoreError('explicit calendar date must match host calendar')
                 return PlannerResult('planned',plan,'조회 계획을 확인했습니다.',source)
             except (CoreError,ValueError,TypeError,KeyError):return self._reply('failed','대화 해석 결과를 검증하지 못했습니다.',source)
         if delta is not None:return PlannerResult('planned',delta,'등록된 조회 규칙으로 해석했습니다.',source)
@@ -239,14 +279,12 @@ class Planner:
             if access:tool='association.access'
             elif obituary:tool='association.obituary'
         follow=False
-        short=bool(re.fullmatch(r'(?:그럼\s*|그러면\s*)?(?:오늘|내일|어제|\d{4}-\d{2}-\d{2}|\d+\s*번|접수|제작\s*완료|배송\s*완료|완료|미확인|결제\s*완료|부분\s*취소|취소|결제\s*대기|초안|공개|게시|상담\s*접수|상담\s*중|견적\s*작성|견적\s*전달|예약\s*요청|종결)(?:만|은|로|으로|도)?[?!.\s]*',text))
+        short=bool(re.fullmatch(r'(?:그럼\s*|그러면\s*)?(?:오늘|내일|어제|모레|(?:이번|다음)\s*주\s*[월화수목금토일]요일|\d{4}-\d{2}-\d{2}|\d+\s*번|접수|제작\s*완료|배송\s*완료|완료|미확인|결제\s*완료|부분\s*취소|취소|결제\s*대기|초안|공개|게시|상담\s*접수|상담\s*중|견적\s*작성|견적\s*전달|예약\s*요청|종결)(?:만|은|로|으로|도)?[?!.\s]*',text))
         if context and short:
             tool=context['tool'];follow=True
         if tool is None:return self._reply('clarify','조회할 업무와 필요한 조건을 알려주십시오.',source)
         args={};spec=CATALOG[project][tool]
-        dates=[]
-        for word,offset in (('오늘',0),('내일',1),('어제',-1)):
-            if word in text:dates.append((today+timedelta(days=offset)).isoformat())
+        dates=_natural_dates(text,today)
         for value in re.findall(r'\d{4}-\d{2}-\d{2}',text):
             try:dates.append(datetime.strptime(value,'%Y-%m-%d').date().isoformat())
             except ValueError:return self._reply('clarify','유효한 날짜를 알려주십시오.',source)

@@ -111,7 +111,7 @@ class ConversationReplyTests(unittest.TestCase):
         reply=self.reply(count=3,items=[{'id':'13370'},{'id':'13370'},{'id':'fixture-order-long-'+'a'*50}],
             truncated=True,total_matched=150)
         text=render_reply(reply,'bellavita-shop','shop.orders')
-        self.assertEqual(text.count('13370'),1);self.assertIn('전체 150건',text);self.assertLessEqual(len(text),360)
+        self.assertEqual(text.count('13370'),1);self.assertIn('범위의 150건',text);self.assertIn('전체 건수는 확인되지',text);self.assertLessEqual(len(text),360)
 
     def test_clarification_names_only_known_missing_fields(self):
         reply=Reply('clarify','secret arbitrary provider text',{'missing':['id']})

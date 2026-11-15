@@ -58,8 +58,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install existing image comparison dependency
-        run: python -m pip install "Pillow>=11,<14"
+      - name: Install image comparison and result export dependencies
+        run: python -m pip install "Pillow>=11,<14" "openpyxl==3.1.5"
       - name: Validate independent manager protocol with fixture providers
         env:
           PYTHONDONTWRITEBYTECODE: '1'
