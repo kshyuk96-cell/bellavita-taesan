@@ -5,13 +5,16 @@ on:
     paths:
       - 'manager_bridge/**'
       - 'tests/test_manager_bridge.py'
+      - 'scripts/maintenance_fixture.py'
       - '.github/workflows/manager-bridge.yml'
   push:
     branches:
       - 'codex/taesan-manager-*'
+      - 'codex/taesan-maintenance-*'
     paths:
       - 'manager_bridge/**'
       - 'tests/test_manager_bridge.py'
+      - 'scripts/maintenance_fixture.py'
       - '.github/workflows/manager-bridge.yml'
 
 permissions:
