@@ -198,6 +198,46 @@ class MergeRehearsalTests(unittest.TestCase):
         self.assertEqual(result['status'],'clean_rehearsal')
         self.assertNotIn('fixture-private-key',str(result))
 
+    def test_linked_detached_worktree_without_extension_is_supported_without_config_changes(self):
+        linked=self.root/'linked'
+        self.git('worktree','add','--detach','-q',str(linked),self.base)
+        common_config=(self.repo/'.git/config').read_bytes()
+        linked_runner=MergeRehearsal({'linked':{'repository':'fixture/repo','path':linked}})
+        index_path=subprocess.check_output(['/usr/bin/git','-C',str(linked),'rev-parse',
+            '--path-format=absolute','--git-path','index'],text=True).strip()
+        before_index=Path(index_path).read_bytes()
+        result=linked_runner.run('linked','fixture/repo',self.base,self.base)
+        self.assertEqual(result['status'],'clean_rehearsal')
+        self.assertEqual(common_config,(self.repo/'.git/config').read_bytes())
+        self.assertEqual(before_index,Path(index_path).read_bytes())
+        self.assertEqual((linked/'shared.txt').read_bytes(),b'base\n')
+        worktree_config=Path(subprocess.check_output(['/usr/bin/git','-C',str(linked),'rev-parse',
+            '--path-format=absolute','--git-path','config.worktree'],text=True).strip())
+        self.assertFalse(worktree_config.exists())
+
+    def test_existing_physical_worktree_config_is_checked_even_when_extension_is_disabled(self):
+        linked=self.root/'linked'
+        self.git('worktree','add','--detach','-q',str(linked),self.base)
+        worktree_config=Path(subprocess.check_output(['/usr/bin/git','-C',str(linked),'rev-parse',
+            '--path-format=absolute','--git-path','config.worktree'],text=True).strip())
+        marker=self.root/'unsafe-driver'
+        worktree_config.write_text('[merge "unsafe"]\n driver = touch '+str(marker)+'\n')
+        runner=MergeRehearsal({'linked':{'repository':'fixture/repo','path':linked}})
+        with self.assertRaises(RehearsalError):runner.run('linked','fixture/repo',self.base,self.base)
+        self.assertFalse(marker.exists())
+
+    def test_symlink_and_nonregular_physical_worktree_configs_are_rejected(self):
+        linked=self.root/'linked'
+        self.git('worktree','add','--detach','-q',str(linked),self.base)
+        worktree_config=Path(subprocess.check_output(['/usr/bin/git','-C',str(linked),'rev-parse',
+            '--path-format=absolute','--git-path','config.worktree'],text=True).strip())
+        external=self.root/'external-config';external.write_text('[core]\n bare = false\n')
+        runner=MergeRehearsal({'linked':{'repository':'fixture/repo','path':linked}})
+        worktree_config.symlink_to(external)
+        with self.assertRaises(RehearsalError):runner.run('linked','fixture/repo',self.base,self.base)
+        worktree_config.unlink();os.mkfifo(worktree_config)
+        with self.assertRaises(RehearsalError):runner.run('linked','fixture/repo',self.base,self.base)
+
     def test_full_commit_ids_registration_and_commit_object_type_are_required(self):
         for left,right in (('main',self.base),(self.base[:7],self.base),('f'*40,self.base)):
             with self.assertRaises(RehearsalError):self.run_merge(left,right)

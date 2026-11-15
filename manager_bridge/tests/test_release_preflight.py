@@ -14,7 +14,7 @@ class PreflightTests(unittest.TestCase):
         self.task=self.store.submit(self.manager,'one',{'project':'a','repository':'fixture/a','base_sha':'b'*40,'description':'fixture','checks':['fixture'],'kind':'test'})
         self.repo=dict(repository='fixture/a',main_sha='a'*40,candidate_sha='b'*40,rollback_sha='a'*40,
             candidate_contains_main=True,rollback_exists=True,receipt='fixture:git',observed_at=1000)
-        self.live=dict(repository='fixture/a',branch='main',live_sha='a'*40,status='live',deploy_id='dep-fixture',
+        self.live=dict(service_id='srv-fixture',repository='fixture/a',branch='main',live_sha='a'*40,status='live',deploy_id='dep-fixture',
             health_ready=True,auto_deploy=True,disk_attached=True,receipt='fixture:render',observed_at=1000)
 
     def reviewed(self,passed=True):
@@ -26,7 +26,7 @@ class PreflightTests(unittest.TestCase):
             c.execute('INSERT INTO bridge_verified_candidates VALUES (?,?,?,?,?,?)',(task['id'],digest(report),'b'*40,'f'*64,0,self.now))
 
     def run_check(self):
-        return ReleasePreflight(self.store,repository_observer=lambda *_:self.repo,service_observer=lambda *_:self.live).run(
+        return ReleasePreflight(self.store,repository_observer=lambda *_:self.repo,service_observer=lambda *_:self.live,service_id='srv-fixture').run(
             self.manager,self.task['id'],rollback_sha='a'*40)
 
     def test_matching_actual_bound_observations_only_prepare_owner_review(self):
@@ -46,6 +46,13 @@ class PreflightTests(unittest.TestCase):
         empty=ReleasePreflight(self.store).run(self.manager,self.task['id'],rollback_sha='a'*40)
         self.assertIn('repository_connection_required',empty['issues'])
         with self.assertRaises(PermissionDenied):ReleasePreflight(self.store).run(self.worker,self.task['id'],rollback_sha='a'*40)
+
+    def test_wrong_service_id_or_missing_binding_cannot_use_other_main_preview(self):
+        self.reviewed();self.live['service_id']='srv-other-preview'
+        self.assertIn('service_observation_unverified',self.run_check()['issues'])
+        result=ReleasePreflight(self.store,repository_observer=lambda *_:self.repo,service_observer=lambda *_:self.live).run(
+            self.manager,self.task['id'],rollback_sha='a'*40)
+        self.assertIn('service_identity_not_bound',result['issues'])
 
     def test_manual_review_of_failed_checks_does_not_become_ready(self):
         self.reviewed(False);self.assertIn('candidate_independent_verification_required',self.run_check()['issues'])

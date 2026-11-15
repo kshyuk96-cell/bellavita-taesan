@@ -7,8 +7,11 @@ from .store import digest, _sha
 
 
 class ReleasePreflight:
-    def __init__(self,store,*,repository_observer=None,service_observer=None):
+    def __init__(self,store,*,repository_observer=None,service_observer=None,service_id=None):
         self.store,self.repository_observer,self.service_observer=store,repository_observer,service_observer
+        if service_id is not None and (not isinstance(service_id,str) or not re.fullmatch(r'srv-[A-Za-z0-9_-]{1,100}',service_id)):
+            raise ValueError('고정된 운영 서비스 ID가 필요해요.')
+        self.service_id=service_id
         with store._transaction() as c:
             c.execute('''CREATE TABLE IF NOT EXISTS bridge_release_preflights (
                 task TEXT PRIMARY KEY,report TEXT NOT NULL,fingerprint TEXT NOT NULL,recorded REAL NOT NULL)''')
@@ -36,6 +39,7 @@ class ReleasePreflight:
                 valid=False
             repo=json.loads(task['manifest'])['repository'];project=task['project']
         issues=[] if valid else ['candidate_independent_verification_required']
+        if self.service_id is None:issues.append('service_identity_not_bound')
         snapshots={}
         for name,observer in (('repository',self.repository_observer),('service',self.service_observer)):
             if not callable(observer):issues.append(name+'_connection_required');continue
@@ -51,10 +55,10 @@ class ReleasePreflight:
                     if value['candidate_sha']!=candidate or value['rollback_sha']!=rollback_sha or value['repository']!=repo:
                         raise ValueError('source binding mismatch')
                 else:
-                    if set(value)!={'repository','branch','live_sha','status','deploy_id','health_ready','auto_deploy','disk_attached','receipt','observed_at'}:
+                    if set(value)!={'service_id','repository','branch','live_sha','status','deploy_id','health_ready','auto_deploy','disk_attached','receipt','observed_at'}:
                         raise ValueError('invalid service snapshot')
                     _sha(value['live_sha'])
-                    if (value['repository']!=repo or value['branch']!='main' or
+                    if (value['service_id']!=self.service_id or value['repository']!=repo or value['branch']!='main' or
                         value['status'] not in ('live','pending','failed') or
                         not isinstance(value['deploy_id'],str) or not re.fullmatch(r'dep-[A-Za-z0-9_-]{1,100}',value['deploy_id']) or
                         any(type(value[key]) is not bool for key in ('health_ready','auto_deploy','disk_attached'))):

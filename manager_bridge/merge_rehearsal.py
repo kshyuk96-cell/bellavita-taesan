@@ -61,6 +61,64 @@ class MergeRehearsal:
         except (OSError, subprocess.TimeoutExpired):
             raise RehearsalError('Git 예행 검증 실행을 확인하지 못했어요.') from None
 
+    def _config_snapshots(self, repo, home):
+        """Inspect physical common/worktree configs without --worktree mode.
+
+        That mode fails on linked worktrees when extensions.worktreeConfig is
+        disabled. Existing physical files are checked even while inactive, and
+        only safe copies are passed to config parsing (never external includes).
+        """
+        copies = []
+        _, common_raw = self._git(repo, home, 'rev-parse', '--path-format=absolute', '--git-common-dir')
+        _, worktree_raw = self._git(repo, home, 'rev-parse', '--absolute-git-dir')
+        for filename, raw in (('config', common_raw), ('config.worktree', worktree_raw)):
+            try:
+                directory = raw.decode('utf-8').strip()
+            except UnicodeError:
+                raise RehearsalError('Git 설정 파일 경로 형식을 확인하지 못했어요.') from None
+            # --git-path config.worktree canonicalizes an existing final symlink
+            # and would hide it. Join the physical filename to the metadata dir.
+            path = Path(directory) / filename
+            try:
+                safe_path = path.resolve(strict=False) == path
+            except (OSError, RuntimeError):
+                safe_path = False
+            if (not path.is_absolute() or any(ord(char) < 32 for char in directory) or not safe_path):
+                raise RehearsalError('Git 설정 파일의 심볼릭 링크 경로는 사용할 수 없어요.')
+            descriptor = None
+            try:
+                descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                before = os.fstat(descriptor)
+                if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_size > MAX_OUTPUT:
+                    raise RehearsalError('Git 설정은 한도 안의 일반 파일이어야 해요.')
+                pieces, consumed = [], 0
+                while True:
+                    piece = os.read(descriptor, min(65536, MAX_OUTPUT + 1 - consumed))
+                    if not piece:
+                        break
+                    consumed += len(piece)
+                    if consumed > MAX_OUTPUT:
+                        raise RehearsalError('Git 설정 파일 크기 한도를 초과했어요.')
+                    pieces.append(piece)
+                after = os.fstat(descriptor)
+                if ((before.st_size, before.st_mtime_ns, before.st_ctime_ns) !=
+                        (after.st_size, after.st_mtime_ns, after.st_ctime_ns) or consumed != before.st_size):
+                    raise RehearsalError('Git 설정을 확인하는 동안 파일이 바뀌었어요.')
+                copy = home / ('source-' + filename)
+                copy_fd = os.open(copy, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                with os.fdopen(copy_fd, 'wb') as output:
+                    output.write(b''.join(pieces))
+                copies.append(copy)
+            except FileNotFoundError:
+                if filename == 'config':
+                    raise RehearsalError('기본 Git 설정 파일을 찾지 못했어요.') from None
+            except OSError:
+                raise RehearsalError('Git 설정 파일을 안전하게 읽지 못했어요.') from None
+            finally:
+                if descriptor is not None:
+                    os.close(descriptor)
+        return copies
+
     def _file_digest(self, root_fd, name, remaining):
         """Hash beneath an already-open root; never follow a symlink target.
 
@@ -172,16 +230,16 @@ class MergeRehearsal:
             raise RehearsalError('등록된 저장소를 찾지 못했어요.') from None
         with tempfile.TemporaryDirectory(prefix='taesan-merge-rehearsal-') as folder:
             home = Path(folder)
-            # --no-includes avoids opening arbitrary included config during the
-            # check. Query both common and worktree files before merge-tree.
-            for location in ('--local', '--worktree'):
-                code, keys = self._git(repo, home, 'config', location, '--no-includes', '--name-only',
+            # Safe physical config snapshots support both linked and ordinary
+            # worktrees without changing extensions.worktreeConfig.
+            for config in self._config_snapshots(repo, home):
+                code, keys = self._git(home, home, 'config', '--file', str(config), '--no-includes', '--name-only',
                                        '--get-regexp', _DANGEROUS_CONFIG, accepted=(0, 1))
                 if code == 0 or keys:
                     raise RehearsalError('외부 도구·드라이버·include Git 설정이 있어 예행 검증하지 않았어요.')
                 # A normal HTTPS/SSH origin may stay, but no transport is allowed
                 # in any invocation. Refuse helper URLs before object lookup.
-                _, urls = self._git(repo, home, 'config', location, '--no-includes', '--null',
+                _, urls = self._git(home, home, 'config', '--file', str(config), '--no-includes', '--null',
                                     '--get-regexp', r'^remote\..*\.(url|pushurl)$', accepted=(0, 1))
                 for record in urls.split(b'\0'):
                     if not record:
