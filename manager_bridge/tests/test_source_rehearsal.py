@@ -16,7 +16,7 @@ class SourceRehearsal(unittest.TestCase):
                      'observed_at':1000,'fixture_tests':{'passed':5,'failed':0,'skipped':0},'build':'not_applicable'}
 
     def git(self,*args):
-        return subprocess.check_output(['/usr/bin/git','-c','core.hooksPath=/dev/null','-C',str(self.path),*args],stderr=subprocess.DEVNULL,text=True).strip()
+        return subprocess.check_output(['/usr/bin/git','-c','core.hooksPath=/dev/null','-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-C',str(self.path),*args],stderr=subprocess.DEVNULL,text=True).strip()
 
     def test_copy_and_tests_cannot_attest_sandbox_or_live_connections(self):
         host=snapshot_profile(self.record,self.path)
