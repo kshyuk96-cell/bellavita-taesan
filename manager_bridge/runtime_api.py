@@ -16,6 +16,9 @@ def dispatch(handler,method,path,token,body=None):
     if url.scheme or url.netloc or url.fragment:raise ValueError('relative runtime path required')
     if not url.path.startswith(PREFIX):return False
     route=url.path[len(PREFIX):]
+    if route.startswith('three-tier/'):
+        from .three_tier_api import dispatch as hierarchy_dispatch
+        return hierarchy_dispatch(handler,method,path,token,body)
     posts={
         'conversation/export':(('project','channel','conversation','snapshot_id'),()),
         'conversation/select':(('project','channel','conversation','request_id','selection_id','generation'),()),

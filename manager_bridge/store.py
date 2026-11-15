@@ -46,6 +46,43 @@ _STATES = frozenset({'pending_approval', 'queued', 'running', 'reported', 'revie
                      'cancelled', 'needs_verification'})
 
 
+def _hierarchy_enabled(c, project):
+    return bool(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='hierarchy_members'").fetchone() and
+                c.execute('SELECT 1 FROM hierarchy_members WHERE project=?',(project,)).fetchone())
+
+
+def _hierarchy_claim_allowed(c, actor, task):
+    """Legacy transports cannot bypass managed assignment or required capacity."""
+    if not _hierarchy_enabled(c,task['project']):return True
+    row=c.execute('SELECT * FROM hierarchy_tasks WHERE task_id=?',(task['id'],)).fetchone()
+    if row is None or row['state']!='development_queued' or row['version']!=task['version'] or row['manifest_digest']!=task['manifest_digest']:return False
+    config=c.execute('SELECT fingerprint FROM maintenance_projects WHERE project=?',(task['project'],)).fetchone()
+    if config is None or config['fingerprint']!=row['config_fingerprint']:return False
+    member=c.execute('SELECT * FROM hierarchy_members WHERE project=? AND member_id=?',(task['project'],row['developer_id'])).fetchone()
+    if member is None or member['role']!='developer' or member['credential_hash']!=actor['token_hash'] or member['subject']!=actor['subject'] or member['config_fingerprint']!=config['fingerprint']:return False
+    for scope in ('*',task['project']):
+        if not c.execute('SELECT 1 FROM bridge_capacity_limits WHERE scope=?',(scope,)).fetchone():return False
+        if not c.execute('SELECT 1 FROM hierarchy_review_limits WHERE scope=?',(scope,)).fetchone():return False
+    return True
+
+
+def _hierarchy_acceptance(c,task):
+    """Only exact technical acceptance releases a managed dependency."""
+    if not _hierarchy_enabled(c,task['project']):return True
+    row=c.execute('SELECT * FROM hierarchy_tasks WHERE task_id=?',(task['id'],)).fetchone()
+    if row is None or row['state']!='accepted' or row['version']!=task['version'] or row['manifest_digest']!=task['manifest_digest']:return False
+    config=c.execute('SELECT fingerprint FROM maintenance_projects WHERE project=?',(task['project'],)).fetchone()
+    if config is None or row['config_fingerprint']!=config['fingerprint']:return False
+    if not row['candidate'] or not row['evidence'] or not task['review']:return False
+    candidate=json.loads(row['candidate']);evidence=json.loads(row['evidence']);review=json.loads(task['review'])
+    assessment=evidence.get('code_assessment')
+    if json.loads(task['manifest'])['kind']=='development' and not (type(assessment) is dict and assessment.get('recommendation')=='pass' and assessment.get('candidate_digest')==candidate.get('digest') and assessment.get('reviewer_subject')==evidence.get('reviewer_subject')):return False
+    return bool(evidence.get('isolation_verified') is True and evidence.get('candidate_digest')==candidate.get('digest') and
+                review.get('scope')=='three_tier_technical_only' and review.get('candidate_digest')==candidate.get('digest') and
+                review.get('evidence_digest')==digest(evidence) and review.get('report_digest')==digest(json.loads(task['report'])) and
+                evidence.get('checks') and all(type(x.get('exit_code')) is int and x['exit_code']==0 for x in evidence['checks']))
+
+
 def canonical_json(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)
 
@@ -435,6 +472,7 @@ class Store:
                 return None
             reserved_repositories = self._reserved_repositories(c)
             for row in rows:
+                if not _hierarchy_claim_allowed(c,actor,row):continue
                 manifest = json.loads(row['manifest'])
                 if manifest['kind'] not in actor['capabilities']:
                     continue
@@ -471,6 +509,9 @@ class Store:
                     (actor['subject'], actor['token_hash'], hashlib.sha256(lease.encode()).hexdigest(), expires, self._now(), row['id']))
                 if not claimed.rowcount:
                     continue
+                if _hierarchy_enabled(c,project):
+                    c.execute("UPDATE hierarchy_tasks SET state='developing',updated=? WHERE task_id=? AND state='development_queued'",(self._now(),row['id']))
+                    c.execute('INSERT INTO hierarchy_events(task_id,kind,state,recorded,payload_digest) VALUES (?,?,?,?,NULL)',(row['id'],'development_claimed','developing',self._now()))
                 self._event(c, row['id'], actor['subject'], 'claimed', 'running')
                 assignment = {**self._public(self._get(c, actor, row['id'])), 'lease_token': lease}
                 if policy_row:
@@ -533,6 +574,7 @@ class Store:
             actor = self._authenticate(c, token)
             self._role(actor, ('owner', 'manager'))
             row = self._get(c, actor, task_id)
+            if _hierarchy_enabled(c,row['project']):raise Conflict('managed tasks require independent three-tier technical acceptance')
             if type(version) is not int or version != row['version'] or manifest_digest != row['manifest_digest'] or row['state'] != 'reported':
                 raise Conflict('보고된 정확한 검토안에만 관리자 검토를 기록할 수 있어요.')
             review = {'actor': actor['subject'], 'version': version, 'manifest_digest': manifest_digest,

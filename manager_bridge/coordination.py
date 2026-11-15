@@ -240,6 +240,8 @@ class Coordination:
                     or row['manifest_digest'] != dependency['manifest_digest'] or not row['review']
                     or json.loads(row['review']).get('report_digest') != digest(json.loads(row['report']))):
                 return False
+            from .store import _hierarchy_acceptance
+            if not _hierarchy_acceptance(c,row):return False
             report = json.loads(row['report'])
             review = json.loads(row['review'])
             for check in report['checks']:
