@@ -1585,7 +1585,7 @@ class Handler(BaseHTTPRequestHandler):
             if admin_export:
                 if not shop.admin_authorized(*admin_export.groups(),os.environ['TAESAN_WEBHOOK_SECRET']):return self.order_message('관리자 링크가 만료됐어요.',403)
                 try:
-                    fields=dict(parse_qsl(urlsplit(self.path).query))
+                    fields=dict(parse_qsl(urlsplit(self.path).query,keep_blank_values=suffix=='/orders.csv'))
                     with db() as c:
                         if suffix=='/orders.csv':content,filename=shop.shop_admin_review.export_csv(c,fields)
                         elif suffix=='/settlement.xlsx':content,filename=shop_settlement.workbook(c,fields)

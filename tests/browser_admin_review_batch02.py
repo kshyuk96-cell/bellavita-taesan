@@ -56,7 +56,9 @@ def main():
                 with page.expect_navigation():page.locator('.admin-search').get_by_role('button',name='검색',exact=True).click()
                 assert page.locator('[data-shop-order]').first.get_attribute('data-shop-order')!=oid
                 page.goto(upstream+fixture.admin+'?page=3&sort=newest')
-                with page.expect_download() as download:page.get_by_role('link',name='검색 결과 전체 CSV 받기').click()
+                page.get_by_role('link',name='검색 결과 전체 CSV 받기').click()
+                with page.expect_download() as download:page.get_by_role('dialog').get_by_role('link',name='확인 후 CSV 받기').click()
+                page.get_by_role('dialog').get_by_role('button',name='취소',exact=True).click()
                 Path('test-artifacts').mkdir(exist_ok=True);target=Path(f'test-artifacts/search-export-{width}.csv');download.value.save_as(target)
                 records=list(csv.reader(target.open(encoding='utf-8-sig')));assert len(records)==71
                 assert all('****' in r[5] for r in records[1:])

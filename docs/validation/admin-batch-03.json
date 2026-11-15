@@ -1,0 +1,145 @@
+{
+  "checked_on_kst": "2026-11-15",
+  "batch": 3,
+  "features": 10,
+  "source_parent": "cf96d6fa6820e7a1995ecab7638b4a26c7a3c16d",
+  "scope": "integration-ready admin save, expiry and export assistance; no rollout",
+  "runtime_sha256": {
+    "agent.py": "d83df4dcfbda369a4fbec3ba1b272d26d1239b50e2d1438271fece0f7e1f5df6",
+    "shop_admin_layout.py": "5e49a77377c243c56d2944fb779654769c7b695186966ce01bb89b61bef75af4",
+    "shop_admin_manual.py": "5d4b7f44ad6e20c71a52a0ba711497bf92bd2d276a347688a51b031127b0f60e",
+    "shop_admin_review.py": "fc49ab291448edf90240bae70be2a79db9fa3d0b8dff5947174b0e7e4018f11d",
+    "shop_admin_review.js": "f3e98c01387b02f9c620a8743872d834c192914402797a2dc6b59d790e5945d9",
+    "shop_admin_guard.js": "e61565fb3f766d32214dd6358f42d4ae555523d2f2ce39ab958d30473f3dea07"
+  },
+  "full_regression": {
+    "passed": 187,
+    "seconds": 88.251
+  },
+  "new_server_tests": {
+    "passed": 3,
+    "seconds": 1.78
+  },
+  "new_browser": {
+    "results": [
+      {
+        "width": 390,
+        "dirty_exit_warning": true,
+        "double_submit_single_post": true,
+        "invalid_form_does_not_lock": true,
+        "expiry_countdown_and_warning": true,
+        "expired_inputs_preserved_and_saves_blocked": true,
+        "unapplied_search_blocks_export_preview": true,
+        "csv_count_preview": 70,
+        "selected_columns_export": true,
+        "phone_remasked_after_60s": true,
+        "keyboard_search_shortcut": true,
+        "context_manual_links": 5,
+        "nested_order_navigation": true,
+        "horizontal_overflow": false
+      },
+      {
+        "width": 1280,
+        "dirty_exit_warning": true,
+        "double_submit_single_post": true,
+        "invalid_form_does_not_lock": true,
+        "expiry_countdown_and_warning": true,
+        "expired_inputs_preserved_and_saves_blocked": true,
+        "unapplied_search_blocks_export_preview": true,
+        "csv_count_preview": 70,
+        "selected_columns_export": true,
+        "phone_remasked_after_60s": true,
+        "keyboard_search_shortcut": true,
+        "context_manual_links": 5,
+        "nested_order_navigation": true,
+        "horizontal_overflow": false
+      }
+    ],
+    "javascript_errors": [],
+    "order_state_and_details_unchanged": true,
+    "actual_provider_calls": 0,
+    "browser_personal_storage_used": false
+  },
+  "final_disabled_style_browser_recheck": "passed",
+  "existing_browser": {
+    "batch02": {
+      "results": [
+        {
+          "width": 390,
+          "active_filter_remove": true,
+          "safe_match_highlight": true,
+          "sort_modes": true,
+          "masked_phone_reveal_and_collapse": true,
+          "all_pages_filtered_csv": true,
+          "empty_result_recovery": true,
+          "nested_details_after_save": true,
+          "installation_copy_fallback": true,
+          "cancel_hold_badges": true,
+          "search_examples": true,
+          "horizontal_overflow": false
+        },
+        {
+          "width": 1280,
+          "active_filter_remove": true,
+          "safe_match_highlight": true,
+          "sort_modes": true,
+          "masked_phone_reveal_and_collapse": true,
+          "all_pages_filtered_csv": true,
+          "empty_result_recovery": true,
+          "nested_details_after_save": true,
+          "installation_copy_fallback": true,
+          "cancel_hold_badges": true,
+          "search_examples": true,
+          "horizontal_overflow": false
+        }
+      ],
+      "javascript_errors": [],
+      "financial_state_and_order_details_preserved": true,
+      "personal_browser_storage_used": false,
+      "actual_payments": false,
+      "actual_messages": false
+    },
+    "daily": {
+      "scenarios": [
+        {
+          "width": 375,
+          "seoul_today_link": true,
+          "task_create_and_complete": true,
+          "overdue_owner_filter": true,
+          "payment_state_preserved": true,
+          "customer_summary_excludes_internal_note": true,
+          "clipboard_fallback": true,
+          "duplicate_and_negative_option_validation": true,
+          "training_five_cases_and_reset": true,
+          "training_posts": 0,
+          "overflow": false
+        },
+        {
+          "width": 1280,
+          "seoul_today_link": true,
+          "task_create_and_complete": true,
+          "overdue_owner_filter": true,
+          "payment_state_preserved": true,
+          "customer_summary_excludes_internal_note": true,
+          "clipboard_fallback": true,
+          "duplicate_and_negative_option_validation": true,
+          "training_five_cases_and_reset": true,
+          "training_posts": 0,
+          "overflow": false
+        }
+      ],
+      "javascript_errors": [],
+      "live_side_effects": false
+    }
+  },
+  "bug_fixed": "explicit empty columns query was dropped and exported all fields; keep blank query values for order CSV and reject invalid selection",
+  "expiry_scope": "browser time-flow guards plus separate server expired-signature rejection; countdown is advisory",
+  "personal_browser_storage_used": false,
+  "database_schema_changed": false,
+  "production_deployed": false,
+  "verification_server_redeployed": false,
+  "actual_payments": false,
+  "actual_messages": false,
+  "actual_receipts": false,
+  "integration_document": "docs/admin-improvements-batch-03.md"
+}

@@ -5,6 +5,9 @@ import shop_product_guidance
 import shop_admin_team
 import shop_admin_feature_search
 from pathlib import Path
+import re
+import time
+import shop_admin_manual
 
 
 def render(page,readiness,*,path='',filters=None,saved=False,feature_favorites=''):
@@ -32,6 +35,15 @@ def render(page,readiness,*,path='',filters=None,saved=False,feature_favorites='
             query=html.Element('input',type='hidden',name='_return_query',value=shop_admin_queries.query(filters or {}));form.append(query)
             ancestor=next((x for x in form.iterancestors() if x.get('id','').startswith('admin-')),None)
             form.append(html.Element('input',type='hidden',name='_return_anchor',value=ancestor.get('id') if ancestor is not None else 'admin-orders'))
+        for key,number in [('orders',2),('products',7),('delivery',5),('reports',9),('settings',8)]:
+            help_link=html.Element('a',href=shop_admin_manual.section_link(path,number),attrib={'class':'context-manual'})
+            help_link.text=labels[key]+' 도움말';groups[key].insert(1,help_link)
+        match=re.fullmatch(r'/shop/admin/([0-9]{10})/[a-f0-9]{64}',path)
+        if match:
+            banner=html.Element('aside',attrib={'class':'admin-session','data-admin-expiry':match[1],'data-admin-now':str(time.time()),'aria-label':'관리자 링크 유효 시간'})
+            text=html.Element('p',attrib={'class':'admin-session-time'});text.text='관리자 링크 유효 시간 확인 중'
+            notice=html.Element('p',attrib={'class':'admin-session-notice','role':'status'});notice.text='대표 카카오의 쇼핑몰 관리에서 새 링크를 받을 수 있습니다.'
+            banner.extend([text,notice]);main.insert(2,banner)
     main.insert(2,nav)
     main.insert(3,html.fragment_fromstring(shop_admin_feature_search.markup(feature_favorites)))
     if saved:
@@ -54,7 +66,8 @@ def render(page,readiness,*,path='',filters=None,saved=False,feature_favorites='
     style.text+='\n.feature-pinned{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.feature-pinned p{width:100%}.shift-history pre{white-space:pre-wrap;overflow-wrap:anywhere}.admin-group section,.admin-search{scroll-margin-top:110px}'
     tree.append(style)
     style.text+='\n.active-order-filters{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.active-order-filters a{border:1px solid #b6c8b2;padding:7px 10px;border-radius:16px;overflow-wrap:anywhere}mark.order-match{background:#fff0a6;color:#202b1f}.order-badge{display:block;padding:5px 9px;margin:8px 0;border-left:4px solid #996920;background:#fff2d6;color:#62430b}.order-badge-cancelled{border-color:#963f38;background:#fbece9;color:#7f3029}.admin-phone button{margin:4px}.installation-copy textarea{min-height:100px}.order-search-help li{border:0;padding:4px;list-style:disc;margin-left:20px}.order-search-help,.empty-order-help{margin:12px 0;padding:12px;border:1px solid #cbd6c5;border-radius:8px}.filtered-order-export{display:inline-block;min-height:36px;overflow-wrap:anywhere}'
-    script=html.Element('script');script.text=SCRIPT+shop_product_guidance.SCRIPT+shop_admin_team.SCRIPT+shop_admin_feature_search.SCRIPT+Path(__file__).with_name('shop_admin_review.js').read_text(encoding='utf-8');tree.append(script)
+    style.text+='\nbutton:disabled,input[type=submit]:disabled{opacity:.5;cursor:not-allowed}.admin-session{padding:10px 14px;border:1px solid #cbd6c5;border-radius:8px;margin:12px 0}.admin-session.soon,.admin-form-dirty{border-left:4px solid #a06c14}.admin-session.expired{border-color:#a43d30}.admin-form-status,.search-unapplied{color:#704c15}.order-inner-nav{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}.context-manual{display:inline-block;margin:4px 0 12px}.admin-export-dialog{width:min(90vw,600px);box-sizing:border-box;border:1px solid #bacab6;border-radius:12px;max-height:85vh;overflow:auto}.admin-export-dialog::backdrop{background:#0007}.admin-export-dialog label{font-weight:400}.admin-export-dialog a[aria-disabled=true]{pointer-events:none;color:#777}.admin-export-dialog .export-actions{display:flex;gap:16px;align-items:center;flex-wrap:wrap}'
+    script=html.Element('script');script.text=SCRIPT+shop_product_guidance.SCRIPT+shop_admin_team.SCRIPT+shop_admin_feature_search.SCRIPT+Path(__file__).with_name('shop_admin_review.js').read_text(encoding='utf-8')+Path(__file__).with_name('shop_admin_guard.js').read_text(encoding='utf-8');tree.append(script)
     return '<!doctype html>'+html.tostring(tree,encoding='unicode',method='html')
 
 
