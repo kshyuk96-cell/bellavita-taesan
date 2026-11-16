@@ -57,6 +57,8 @@ class SourceWatch:
             if not isinstance(probe,HeadProbe):raise ValueError('typed registered head probe required')
         with store._transaction() as c:
             c.executescript('''
+            CREATE TABLE IF NOT EXISTS manager_source_observation_status (
+              project TEXT PRIMARY KEY,config_fingerprint TEXT,state TEXT,checked_at REAL);
             CREATE TABLE IF NOT EXISTS manager_source_heads (
               project TEXT PRIMARY KEY,config_fingerprint TEXT,sha TEXT,revision TEXT,
               reference TEXT,observed_at REAL,sequence INTEGER);
@@ -109,13 +111,17 @@ class SourceWatch:
             result={'project':project,'state':state,'previous_sha':prior['sha'] if matching else None,
                     'head_sha':None,'event_id':None,'checked_at':self.store._now(),
                     'approval_granted':False,'source_modified':False,'tasks_replayed':False}
-            if observed is None:return result
+            def finish():
+                c.execute('INSERT OR REPLACE INTO manager_source_observation_status VALUES (?,?,?,?)',
+                          (project,config['fingerprint'],result['state'],result['checked_at']))
+                return result
+            if observed is None:return finish()
             try:_reject_known_tokens(c,observed.__dict__)
             except ValueError:
-                result['state']='unknown';return result
+                result['state']='unknown';return finish()
             # A delayed older response cannot roll back a newer observed baseline.
             if matching and observed.observed_at<prior['observed_at']:
-                result['state']='stale';return result
+                result['state']='stale';return finish()
             sequence=prior['sequence'] if matching else 0
             result.update(head_sha=observed.sha,revision=observed.revision,reference=observed.reference,
                           observed_at=observed.observed_at)
@@ -131,7 +137,7 @@ class SourceWatch:
                 result.update(state='changed',event_id=key)
             c.execute('INSERT OR REPLACE INTO manager_source_heads VALUES (?,?,?,?,?,?,?)',
                 (project,config['fingerprint'],observed.sha,observed.revision,observed.reference,observed.observed_at,sequence))
-            return result
+            return finish()
 
     def pending(self,token,projects,*,limit=100):
         if type(projects) not in (tuple,list) or not 1<=len(projects)<=20 or len(set(projects))!=len(projects):

@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "implementation_commit": "457d071555918cc9026972596a1dceba4d28e6ed",
+  "scope": "private synthetic local governance HTTP service with real subscribed Codex CLI and isolated review",
+  "workflow": {
+    "business_proposals": 2,
+    "owner_approved_batches": 2,
+    "native_worker_reservations": 1,
+    "distinct_native_developer_sessions": 1,
+    "manager_next_assignments": 1,
+    "accepted_tasks": [
+      {
+        "task_id_digest": "008509864c1e9a4eebbb7ce8a09404e1a6846d771c8081c3b0056174603af3eb",
+        "version": 1,
+        "manifest_digest": "5c834516561ad4117949c926d61e8c71b19e6b52ecf3536e9d754191e36f9c86",
+        "candidate_digest": "7add2b1b4fd50f20acbe14b0e3a536d3ee62fb32173e7117d2e5dd29dbc19802",
+        "candidate_head": "6957388aefbe1d37a4258cb3c24c52928ecd2dcd",
+        "session_digest": "d78eadc0a98b9e7795a3d03476dbeab24bc843e610b2f1418184a8630c46afac",
+        "state": "accepted",
+        "native_process_exit": 0,
+        "native_commands": 5,
+        "native_command_failures": 0,
+        "independent_check_exits": [
+          0,
+          0
+        ],
+        "semantic_recommendation": "pass",
+        "business_batch_digest": "8d6a1b4cacf29ed80c2ebe1fcd9dd5ba9576a49ed233c5a60fa84b513516644c",
+        "mandatory_qa": {
+          "admitted": true,
+          "scope": "synthetic_only",
+          "policy_digest": "36b898c8f6ff75c56b8fd6d10268c2603fbc14e3608c3babc878cf80bba3ae7f",
+          "contract_digest": "2310c24e7974de251b2c66be059c8af224f7ff0ab455f7a117a50f90efc2587e",
+          "report_digest": "e44718e6763e6cc3dc70cfbddff1c0b11710ead96a5f66c960ea5553d4f4d7b2",
+          "verified_counts": {
+            "asserted": 2,
+            "executed": 2,
+            "generated": 2,
+            "unique_failures": 0
+          }
+        }
+      },
+      {
+        "task_id_digest": "64b306e49cdff08901f9fa3435454512d4bed44bd7b99e88c8d9568c22a7a3ec",
+        "version": 1,
+        "manifest_digest": "9e82556b80518c5009783896e2134fde6816ae4a6c159c75c45067b5265eba2b",
+        "candidate_digest": "47e6f0211a5b26b03d7929c3c7012aa9f6f7e41be7f7b2ddf6bc1c4061ad5279",
+        "candidate_head": "6d7311f23274150eb36760e68c1adcb27314fdc2",
+        "session_digest": "d78eadc0a98b9e7795a3d03476dbeab24bc843e610b2f1418184a8630c46afac",
+        "state": "accepted",
+        "native_process_exit": 0,
+        "native_commands": 4,
+        "native_command_failures": 0,
+        "independent_check_exits": [
+          0,
+          0,
+          0
+        ],
+        "semantic_recommendation": "pass",
+        "business_batch_digest": "588ae81c63410597894f322876a033bb6b5790965b6e4914938a6d2a3c626fde",
+        "mandatory_qa": {
+          "admitted": true,
+          "scope": "synthetic_only",
+          "policy_digest": "36b898c8f6ff75c56b8fd6d10268c2603fbc14e3608c3babc878cf80bba3ae7f",
+          "contract_digest": "2310c24e7974de251b2c66be059c8af224f7ff0ab455f7a117a50f90efc2587e",
+          "report_digest": "a6c34ea9957b062b06ff2bd04ff97040a4b63e4f7ad67b9c30c94c862ddbb82c",
+          "verified_counts": {
+            "asserted": 2,
+            "executed": 2,
+            "generated": 2,
+            "unique_failures": 0
+          }
+        }
+      }
+    ]
+  },
+  "qa_provenance": "Two synthetic QA scenarios per task assert persisted actual isolated-check exit codes; not thousands of customer journeys or real UI tests. Separate common QA engine evidence is in docs/qa/.",
+  "source_observer_scope": "Static virtual remote baseline for this private fixture, not an actual GitHub or Sites fetch. Customer read-only handoff observations are separate.",
+  "restart": {
+    "canonical_service_run": true,
+    "ticks": 2,
+    "before_counts": {
+      "continuous_host_assignments": 2,
+      "continuous_host_diagnostics": 0,
+      "fleet_creates": 1,
+      "manager_proposal_batches": 2,
+      "hierarchy_next_assignments": 1,
+      "continuous_host_sessions": 1,
+      "recorded_developer_model_receipts": 2,
+      "recorded_reviewer_model_assessments": 2
+    },
+    "after_counts": {
+      "continuous_host_assignments": 2,
+      "continuous_host_diagnostics": 0,
+      "fleet_creates": 1,
+      "manager_proposal_batches": 2,
+      "hierarchy_next_assignments": 1,
+      "continuous_host_sessions": 1,
+      "recorded_developer_model_receipts": 2,
+      "recorded_reviewer_model_assessments": 2
+    },
+    "execution_evidence_unchanged": true,
+    "source_unchanged": true,
+    "listener_closed": true,
+    "always_on_verified": false
+  },
+  "validation": {
+    "full_repository_tests": 1707,
+    "full_repository_tests_passed": true,
+    "actual_namespace_and_loopback_tests": true,
+    "durable_enrollment_bypass_review_passed": true
+  },
+  "limits": {
+    "customer_project_execution_enabled": false,
+    "real_ui_users_tested": 0,
+    "existing_codex_ui_control_verified": false,
+    "always_on_host_deployed": false,
+    "main_merged": false,
+    "operational_sheet_writes": 0,
+    "paid_api_calls": 0,
+    "new_paid_resources": 0,
+    "old_unknown_attempts_replayed": false
+  },
+  "native_workflow_execution_commit": "c2a324d60e0b923a0a636d531fd7dbcaced48708"
+}
