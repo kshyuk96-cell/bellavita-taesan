@@ -11,7 +11,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 import zipfile
-ALLOWED = {'client.py','render_child.py','company_renderer.py','asset_bundle.py','company/__init__.py','company/render.py','company/sender.py','company/event_scroll.py','manifest.json'}
+ALLOWED = {'client.py','render_child.py','company_renderer.py','asset_bundle.py','company/__init__.py','company/render.py','company/sender.py','company/event_scroll.py','legacy_adapter.py','legacy_vision.py','legacy/server.py','legacy/automation.py','legacy/invitation.py','legacy/messages.json','legacy/face_detection_yunet_2023mar.onnx','legacy/YUNET-LICENSE.txt','manifest.json'}
 
 
 def download_runtime(origin, token, expected_digest):
