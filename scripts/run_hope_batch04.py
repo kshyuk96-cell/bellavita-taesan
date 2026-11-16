@@ -12,7 +12,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from manager_bridge.hope_service_runtime import ActualServiceProfile
 from manager_bridge.hope_registered_runtime import HopeProfile,HopeRegistry,HopeEngine,HopeArtifacts
 from manager_bridge.hope_shared_inventory import provision_exchange
-from manager_bridge.hope_batch04 import contract,evaluate,customer_report
+from manager_bridge.hope_batch04 import contract,evaluate,customer_report,PAYMENT_PLANS
 from manager_bridge.hope_batch04_probes import independent_race,persistent_checks
 from manager_bridge.hope_persistent_manager import PersistentManager
 from manager_bridge.qa_jobs import QAJobs
@@ -33,6 +33,17 @@ def export(root,raw,result,report,patch,manager):
     for slot in raw['artifacts']['inventory']['slots']:
         used=sum(r['quantity']-r['released'] for r in raw['artifacts']['inventory']['leases'] if r['slot']==slot['slot'] and r['status']!='released')
         formula.append(dict(id=slot['slot'],expression='available+sum(quantity-released)=capacity',variables=dict(available=slot['available'],allocated=used),units='TEST room',rounding='exact integer',expected=slot['capacity'],actual=slot['available']+used,status='PASS' if slot['available']+used==slot['capacity'] else 'FAIL',approval='approved QA fixture only; supplier not connected'))
+    money=[]
+    flows=[('duplicate',raw['artifacts']['duplicate']),('partial',raw['artifacts']['partial'])]+[(r['slot'],r['afterRefund']) for r in raw['artifacts']['travelUnknown']]
+    for label,state in flows:
+        plan=PAYMENT_PLANS[label]
+        for index,booking in enumerate(state['bookings']):
+            variables=dict(total=sum(plan.values()),paid_principal=50000 if label=='travel-deposit' else 600000,bonus_available=25000 if label=='travel-deposit' else 150000,special_available=0 if label=='travel-deposit' else 100000,bonus_cap_bps=1000,signup_fee_excluded=True)
+            order=['DP=min(total,paid_principal)','BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)','SP=min(total-DP-BP,special_available)','card=total-DP-BP-SP']
+            expressions=dict(DP=order[0],BP=order[1],SP=order[2],card=order[3],CP='0; CP operational policy pending')
+            for book_name,expected in plan.items():money.append(dict(id=label+'-'+str(index)+'-'+book_name,expression=expressions[book_name],variables=variables,calculation_order=order,units='KRW / point TEST 1:1',rounding='exact integer fixture; BP cap floor',condition='U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption',policy_approval='customer example only; operational approval pending',expected=expected,actual=booking['plan'][book_name],status='PASS' if expected==booking['plan'][book_name] else 'FAIL'))
+    ms=book.create_sheet('독립결제기대값');ms.append(['ID','조건','계산식','변수','계산순서','단위','반올림','정책승인','기대값','실제값','판정'])
+    for m in money:ms.append([m['id'],m['condition'],m['expression'],text(m['variables']),text(m['calculation_order']),m['units'],m['rounding'],m['policy_approval'],m['expected'],m['actual'],m['status']])
     fs=book.create_sheet('독립재고대사');fs.append(['자원','계산식','변수','기대값','실제값','판정'])
     for f in formula:fs.append([f['id'],f['expression'],text(f['variables']),f['expected'],f['actual'],f['status']])
     faultsheet=book.create_sheet('결함주입');faultsheet.append(['오류','독립검출','검출내역','대상자체검출'])
@@ -42,12 +53,13 @@ def export(root,raw,result,report,patch,manager):
     doc.add_paragraph('후보 '+raw['source_revision']+'; '+text(result['counts'])+'; 공급사·실제 PG·브라우저·운영 배포 미적용.')
     doc.add_paragraph('독립 Docker 실행자 둘이 같은 테스트 SQLite의 마지막1석을 경쟁. 실제 관리기 프로세스를 중지·재시작하고 running job 재실행 거절·산출물 회수를 확인. 원본 서비스에 공유 공급사가 연결되었다는 뜻이 아닙니다.')
     for f in formula:doc.add_paragraph(f['id']+' expected='+str(f['expected'])+' actual='+str(f['actual'])+' '+f['status'])
+    for m in money:doc.add_paragraph(m['id']+' '+m['expression']+' '+text(m['variables'])+' expected='+str(m['expected'])+' actual='+str(m['actual'])+' '+m['status'])
     for f in result['fault_injection']:doc.add_paragraph(f['id']+' independent='+str(f['detected'])+' target='+str(f['target_detected'])+' '+text(f['issues']))
     doc.save(root/'customer-report.docx')
     if load_workbook(root/'customer-report.xlsx',read_only=True)['시나리오결과'].max_row!=39 or not Document(root/'customer-report.docx').paragraphs:raise ValueError('customer report format incomplete')
     for name,value in [('actual-source-evidence',raw),('common-report',result['common_report']),('trusted-contract',result['trusted_contract'])]:
         with gzip.GzipFile(filename=str(root/(name+'.json.gz')),mode='wb',mtime=0) as stream:stream.write(json.dumps(value,ensure_ascii=False,sort_keys=True).encode())
-    for name,value in [('customer-report',report),('formula-report',dict(source_revision=raw['source_revision'],stock=formula,fault_injection=result['fault_injection'],domain_issues=result['domain_issues'],supplier_connected=False)),('defect-retest',dict(original=raw['baseline_revision'],candidate=raw['source_revision'],browser_verified=False,supplier_connected=False,defects=report['defects'])),('batch-summary',dict(source_revision=raw['source_revision'],engine_revision=raw['engine_revision'],counts=result['counts'],admission=result['admission'],manager=manager,browser_plan=result['browser_plan'],runtime_provenance=raw['runtime_provenance'],source_provenance=raw['source_provenance']))]:
+    for name,value in [('customer-report',report),('formula-report',dict(source_revision=raw['source_revision'],stock=formula,money=money,fault_injection=result['fault_injection'],domain_issues=result['domain_issues'],supplier_connected=False)),('defect-retest',dict(original=raw['baseline_revision'],candidate=raw['source_revision'],browser_verified=False,supplier_connected=False,defects=report['defects'])),('batch-summary',dict(source_revision=raw['source_revision'],engine_revision=raw['engine_revision'],counts=result['counts'],admission=result['admission'],manager=manager,browser_plan=result['browser_plan'],runtime_provenance=raw['runtime_provenance'],source_provenance=raw['source_provenance']))]:
         (root/(name+'.json')).write_text(json.dumps(value,ensure_ascii=False,indent=2)+'\n')
     (root/'source-candidate.patch').write_bytes(patch)
 

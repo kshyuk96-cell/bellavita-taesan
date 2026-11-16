@@ -83,6 +83,7 @@ def independent_domain_check(state):
         if sum(r['quote']['refundTotal']+r['quote']['fee']-r['quote'].get('additionalDue',0) for r in refunds)>booking['total']:issues.append('excess_refund_total')
         for book in ('DP','BP','SP','CP','card'):
             if sum(r['quote']['refund'][book] for r in refunds)>booking['plan'][book]:issues.append('excess_refund_source')
+            if booking.get('status')=='cancelled' and booking.get('pointsCommitted') is True and refunds and all(r['quote']['fee']==0 for r in refunds) and sum(r['quote']['refund'][book] for r in refunds)!=booking['plan'][book]:issues.append('full_refund_source_mismatch')
         if booking.get('status') in ('confirmed','cancelled','departed','completed'):
             paid=sum(i['amount'] for i in state['invoices'] if i.get('bookingId')==booking['id'] and i['kind']=='travel' and i['status']=='paid')
             if paid!=booking['plan']['card']:issues.append('paid_invoice_card_mismatch')

@@ -111,12 +111,12 @@ if(config.role!=='main'){
    const invoice=(await c.state()).state.invoices.find(i=>i.bookingId===book.result.id&&i.subtype===subtype);assert(invoice.amount>0);
    await c.command('registerCard',{scenario:'unknown'});await c.command('payInvoice',{invoiceId:invoice.id});const retry=await c.call('/review/api/command',{action:'payInvoice',invoiceId:invoice.id,requestId:crypto.randomUUID()});
    const cancellation=await c.call('/review/api/command',{action:'requestRefund',bookingId:book.result.id,rooms:1,requestId:crypto.randomUUID()});
-   await c.login('admin');const expiry=await c.call('/review/api/command',{action:'expireHolds',requestId:crypto.randomUUID()});await c.command('reconcilePayment');await c.login('member');
+   await c.login('admin');const expiry=await c.call('/review/api/command',{action:'expireHolds',requestId:crypto.randomUUID()});const pendingReceipts=(await document(c)).meta.receipts.filter(r=>r.kind==='travel'&&r.invoiceId===invoice.id&&r.status==='accepted_pending_query').map(r=>({invoiceId:r.invoiceId,eventKey:r.eventKey,amount:r.amount,status:r.status}));await c.command('reconcilePayment');await c.login('member');
    await c.command('registerCard',{scenario:'success'});for(const i of (await c.state()).state.invoices.filter(i=>i.bookingId===book.result.id&&i.status==='unpaid'))await c.command('payInvoice',{invoiceId:i.id});
-   const final=await snapshot(c);outputs.push({slot,retry:retry.status,cancellation:cancellation.status,expiry:expiry.status,invoice:invoice.id,amount:invoice.amount,beforeReconcileReceipts:1,final});
+   const final=await snapshot(c);outputs.push({slot,retry:retry.status,cancellation:cancellation.status,expiry:expiry.status,invoice:invoice.id,amount:invoice.amount,beforeReconcileReceipts:pendingReceipts.length,pendingReceipts,final});
    // Refund after authoritative query restores the shared allocation.
    await refund(c,book.result.id);outputs.at(-1).afterRefund=await snapshot(c);
-  }artifacts.travelUnknown=outputs;return {depositRetry:outputs[0].retry,balanceRetry:outputs[1].retry,receipts:outputs.length}}),
+  }artifacts.travelUnknown=outputs;return {depositRetry:outputs[0].retry,balanceRetry:outputs[1].retry,receipts:outputs.reduce((n,r)=>n+r.beforeReconcileReceipts,0)}}),
  item(70,'조회·취소·원장·재고 대조',{queryThenRefund:true,pending:0,restored:2,cancelWhileUnknownDenied:true},async()=>{
   const runs=artifacts.travelUnknown;return {queryThenRefund:runs.length===2&&runs.every(r=>r.afterRefund.bookings.every(b=>b.status==='cancelled')),pending:runs.reduce((n,r)=>n+r.final.invoices.filter(i=>i.status==='unpaid').length,0),restored:inventory.snapshot().slots.filter(s=>['travel-deposit','travel-balance'].includes(s.slot)&&s.available===1).length,cancelWhileUnknownDenied:runs.every(r=>r.cancellation===409&&r.expiry===409)}})
  ];

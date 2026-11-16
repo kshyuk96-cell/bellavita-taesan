@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from manager_bridge.hope_shared_inventory import provision_exchange,validate_contract,check_exchange,independent_stock_check,independent_domain_check
 from manager_bridge.hope_registered_runtime import HopeArtifacts
-from manager_bridge.hope_batch04 import contract,evaluate,EXPECTED
+from manager_bridge.hope_batch04 import contract,evaluate,EXPECTED,PAYMENT_PLANS
 from manager_bridge.qa_jobs import QAJobs
 from manager_bridge.store import Store,Conflict
 from manager_bridge.tests import test_qa_admission
@@ -35,8 +35,13 @@ def evidence():
         else:value['ledger'][0]['entries'][0]['delta']+=1
         faults.append(dict(id=name,domain=value,targetDetected=False))
     pages=[dict(path=p,html='<body>'+''.join(v+'('+k+')' for k,v in GLOSSARY.items())+'</body>') for p in ['/review/','/review/features','/review/app','/review/policy']]
+    def flow(label):
+        value=deepcopy(d);plan=PAYMENT_PLANS[label];value['bookings'][0].update(total=sum(plan.values()),plan=deepcopy(plan))
+        value['refunds'][0]['quote'].update(refundTotal=sum(plan.values()),refund=deepcopy(plan));value['travelEvents']=[dict(type='refunded',refundId='r',amount=plan['card'])]
+        value['ledger'][0]['entries']=[dict(account=a,book=k,delta=amount*direction) for k,amount in plan.items() if k!='card' for a,direction in [('ct',1),('system',-1)]]
+        return value
     raw=dict(schema='hope-actual-service-batch04/v1',source_revision=SOURCE,inventory_digest=validate_contract(inventory,SOURCE),scope='actual_service_source_shared_test_inventory',role='main',realPG=False,operational_authorization=False,customer_acceptance_approved=False,
-        items=[dict(id=n,actual=deepcopy(EXPECTED[n])) for n in (61,62,63,64,65,67,68,69,70)],artifacts=dict(inventory=stock,cleanDomain=d,duplicate=deepcopy(d),partial=deepcopy(d),faultInjection=faults,terms_pages=pages))
+        items=[dict(id=n,actual=deepcopy(EXPECTED[n])) for n in (61,62,63,64,65,67,68,69,70)],artifacts=dict(inventory=stock,cleanDomain=d,duplicate=flow("duplicate"),partial=flow("partial"),faultInjection=faults,terms_pages=pages))
     return raw,inventory,{n:deepcopy(EXPECTED[n]) for n in (66,76,77,78)}
 
 
@@ -70,6 +75,14 @@ class Batch04Oracles(unittest.TestCase):
         value=deepcopy(clean);value['ledger'].append(deepcopy(value['ledger'][0]));self.assertIn('duplicate_journal_source',independent_domain_check(value))
         value=deepcopy(clean);value['refunds'][0]['quote']['refund']['DP']=101
         self.assertIn('excess_refund_source',independent_domain_check(value))
+
+    def test_balanced_underrefund_and_wrong_native_plan_are_rejected(self):
+        state=domain();state['bookings'][0].update(status='cancelled',pointsCommitted=True)
+        state['refunds'][0]['quote']['refund']['DP']=99;state['refunds'][0]['quote']['refundTotal']=99
+        state['ledger'][0]['entries'][0]['delta']=99;state['ledger'][0]['entries'][1]['delta']=-99
+        self.assertIn('full_refund_source_mismatch',independent_domain_check(state))
+        raw,inv,host=evidence();raw['artifacts']['duplicate']['bookings'][0]['plan']['DP']-=1
+        self.assertEqual(evaluate(raw,SOURCE,contract(SOURCE),host,raw['inventory_digest'],inv)['counts']['fail'],1)
 
     def test_card_refund_event_must_match_original_refund(self):
         state=domain();state['bookings'][0].update(total=110,plan=dict(DP=100,BP=0,SP=0,CP=0,card=10))

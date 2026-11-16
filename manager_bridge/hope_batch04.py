@@ -11,6 +11,7 @@ from taesan_core.universal_qa import Scenario,Risk,Adapter,run_scenarios,build_c
 from taesan_core.hope_tour_qa import REQUIREMENTS
 
 ADAPTER='hope-actual-batch04';VERSION='shared-fixture-persistent-manager-v1'
+PAYMENT_PLANS={'duplicate':dict(DP=600000,BP=100000,SP=100000,CP=0,card=200000),'partial':dict(DP=600000,BP=150000,SP=100000,CP=0,card=1150000),'travel-deposit':dict(DP=50000,BP=25000,SP=0,CP=0,card=925000),'travel-balance':dict(DP=600000,BP=100000,SP=100000,CP=0,card=200000)}
 EXPECTED={61:dict(pinned=True,supplier=False),62:dict(separate=True,operationalTables=0),63:dict(soldOutDenied=True,restored=1),
 64:dict(expired=1,uncertainBlocked=True,held=1),65:dict(successes=1,rejected=1,confirmed=1),
 66:dict(executors=2,barrierReady=2,confirmed=1,rejected=1),67:dict(bookings=1,cardApprovals=1,stale=409),
@@ -47,7 +48,12 @@ def evaluate(raw,source,trusted,host,inventory_pin,inventory_contract):
     stock=independent_stock_check(artifacts['inventory'],inventory_contract['slots']);domain=independent_domain_check(artifacts['cleanDomain'])
     for label,state in [('duplicate',artifacts.get('duplicate')),('partial',artifacts.get('partial'))]+[(r['slot']+'-'+stage,r.get(stage)) for r in artifacts.get('travelUnknown',[]) for stage in ('final','afterRefund')]:
         if state is None:domain.append('missing_domain_evidence:'+label)
-        else:domain.extend(label+':'+issue for issue in independent_domain_check(state))
+        else:
+            domain.extend(label+':'+issue for issue in independent_domain_check(state))
+            case=label if label in PAYMENT_PLANS else label.rsplit('-',1)[0]
+            plan=PAYMENT_PLANS[case]
+            for booking in state['bookings']:
+                if booking['total']!=sum(plan.values()) or booking['plan']!=plan:domain.append(label+':independent_payment_plan_mismatch')
     faults=artifacts.get('faultInjection',[]);expected_faults={'free-stock-corruption','duplicate-debit','excess-refund','unbalanced-journal'}
     detected=[]
     for fault in faults:
