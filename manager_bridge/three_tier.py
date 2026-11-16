@@ -469,6 +469,8 @@ class ThreeTier:
                 if row['state']!='review_passed' or evidence is None or evidence.get('candidate_digest')!=candidate_digest or evidence.get('reviewer_subject')!=reviewer['subject'] or evidence.get('isolation_verified') is not True or any(x['exit_code']!=0 for x in evidence['checks']):raise Conflict('actual independent passing checks required')
                 self._require_code_assessment(candidate,evidence,reviewer['subject'])
                 if task['state']!='reported':raise Conflict('upstream developer report changed')
+                from .qa_jobs import require_task_qa
+                require_task_qa(c, task, candidate['source']['head_sha'])
                 record={'report_digest':digest(json.loads(task['report'])),'scope':'three_tier_technical_only','actor':manager['subject'],'reviewer':reviewer['subject'],'candidate_digest':candidate_digest,'evidence_digest':digest(evidence),'deployment_approved':False}
                 c.execute("UPDATE bridge_tasks SET state='reviewed',review=?,updated=? WHERE id=?",(canonical_json(record),self.store._now(),task_id))
                 state='accepted'

@@ -37,17 +37,22 @@ def run(seed, output):
     report['report_digest'] = fingerprint(report)
     admission = admit_qa_report(report, expected_source_revision=revision, required_coverage=REQUIRED_COVERAGE,expected_contract=trusted_contract)
     mutations = []
+    mutation_reports = {}
     for mutant in ('allow_zero_quantity','skip_tenant','replay_unknown','truncate_won'):
         mutation_contract = build_contract(suite,adapters(mutant))
         altered = run_scenarios(suite, adapters(mutant), source_revision=revision, seed=seed, required_coverage=REQUIRED_COVERAGE)
         decision = admit_qa_report(altered, expected_source_revision=revision, required_coverage=REQUIRED_COVERAGE,
                                   expected_contract=mutation_contract)
+        mutation_reports[mutant] = altered
         failed = [row for row in altered['scenarios'] if row['status']=='fail']
         mutations.append({'mutant': mutant, 'counts': altered['counts'], 'admitted': decision['admitted'],
                           'samples': failed[:2]})
         if not failed or decision['admitted']:
             raise AssertionError('mutation was not caught: '+mutant)
     output.mkdir(parents=True, exist_ok=True)
+    for mutant, evidence_report in mutation_reports.items():
+        with gzip.GzipFile(filename=str(output/('mutation-'+mutant+'.json.gz')), mode='wb', mtime=0) as file:
+            file.write(json.dumps(evidence_report,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode())
     # Fixed mtime makes exports byte-reproducible. Full scenario evidence stays compressed.
     with gzip.GzipFile(filename=str(output/'scenarios.json.gz'), mode='wb', mtime=0) as file:
         file.write(json.dumps(report, ensure_ascii=False, sort_keys=True, separators=(',',':')).encode())
@@ -67,7 +72,8 @@ def run(seed, output):
     summary = {k:v for k,v in report.items() if k!='scenarios'}
     summary['admission'] = admission
     summary['mutations'] = mutations
-    summary['exports'] = {name:hashlib.sha256((output/name).read_bytes()).hexdigest() for name in ('scenarios.json.gz','formulas.csv.gz','scenario-contract.json.gz')}
+    summary['exports'] = {name:hashlib.sha256((output/name).read_bytes()).hexdigest() for name in ('scenarios.json.gz','formulas.csv.gz','scenario-contract.json.gz',
+        *('mutation-'+mutant+'.json.gz' for mutant in mutation_reports))}
     (output/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps({'counts':report['counts'],'admitted':admission['admitted'],
                       'mutations':[{k:m[k] for k in ('mutant','counts','admitted')} for m in mutations]},ensure_ascii=False))

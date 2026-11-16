@@ -577,6 +577,8 @@ class Store:
             if _hierarchy_enabled(c,row['project']):raise Conflict('managed tasks require independent three-tier technical acceptance')
             if type(version) is not int or version != row['version'] or manifest_digest != row['manifest_digest'] or row['state'] != 'reported':
                 raise Conflict('보고된 정확한 검토안에만 관리자 검토를 기록할 수 있어요.')
+            from .qa_jobs import require_task_qa
+            require_task_qa(c, row, json.loads(row['report']).get('head_sha'))
             review = {'actor': actor['subject'], 'version': version, 'manifest_digest': manifest_digest,
                       'report_digest': digest(json.loads(row['report'])), 'evidence_reference': evidence_reference,
                       'reviewed_at': self._now(), 'scope': 'manager_record_only'}

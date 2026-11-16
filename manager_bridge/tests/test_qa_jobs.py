@@ -104,3 +104,31 @@ class QAJobsTests(unittest.TestCase):
             server.shutdown()
             thread.join(timeout=3)
             server.server_close()
+
+    def test_existing_manager_review_requires_bound_qa_for_exact_candidate(self):
+        task = self.store.submit(self.owner, 'development', dict(project='shop',
+            repository='fixture/shop', base_sha='b'*40, description='offline fixture',
+            checks=['fixture'], kind='development'))
+        self.jobs.require_for_task(self.owner, task['id'], self.approval)
+        self.store.approve(self.owner, task['id'], task['version'], task['manifest_digest'])
+        claimed = self.store.claim(self.worker, 'shop')
+        self.store.report(self.worker, task['id'], claimed['lease_token'],
+            dict(head_sha='a'*40, summary='offline fixture', checks=[dict(name='fixture',passed=True)]))
+        def review():
+            return self.store.review(self.owner, task['id'], task['version'], task['manifest_digest'], 'fixture:independent-check')
+        with self.assertRaises(Conflict): review()
+        job = self.jobs.receive(self.owner, self.approval, 'bound-task', task['id'])
+        self.jobs.claim(self.worker, job['id'])
+        r = self.report()
+        r['job_binding']['task'] = task['id']
+        r['report_digest'] = digest({k:v for k,v in r.items() if k != 'report_digest'})
+        self.assertEqual('accepted', self.jobs.finish(self.worker, job['id'], r)['state'])
+        with self.store._transaction() as c:
+            import json
+            changed = dict(head_sha='b'*40, summary='changed candidate', checks=[])
+            c.execute('UPDATE bridge_tasks SET report=? WHERE id=?', (json.dumps(changed),task['id']))
+        with self.assertRaises(Conflict): review()
+        with self.store._transaction() as c:
+            changed['head_sha'] = 'a'*40
+            c.execute('UPDATE bridge_tasks SET report=? WHERE id=?', (json.dumps(changed),task['id']))
+        self.assertEqual('reviewed', review()['state'])

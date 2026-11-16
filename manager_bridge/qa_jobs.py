@@ -13,6 +13,8 @@ class QAJobs:
             c.executescript('''
             CREATE TABLE IF NOT EXISTS qa_approvals (
               id TEXT PRIMARY KEY, project TEXT, manifest TEXT);
+            CREATE TABLE IF NOT EXISTS qa_task_requirements (
+              task TEXT PRIMARY KEY, approval TEXT, manifest_digest TEXT);
             CREATE TABLE IF NOT EXISTS qa_jobs (
               id TEXT PRIMARY KEY, approval TEXT, request_key TEXT, task TEXT,
               state TEXT, worker TEXT, deadline REAL, report TEXT, decision TEXT,
@@ -51,6 +53,20 @@ class QAJobs:
             c.execute('INSERT OR IGNORE INTO qa_approvals VALUES (?,?,?)',
                       (key, project, canonical_json(manifest)))
         return key
+
+    def require_for_task(self, token, task_id, approval):
+        """Owner opts a pending development task into mandatory QA before approval."""
+        with self.store._transaction() as c:
+            actor, manifest = self._approval(c, token, approval, ('owner',))
+            task = self.store._get(c, actor, task_id)
+            if task['project'] != manifest['project'] or task['state'] != 'pending_approval':
+                raise Conflict('bind QA before approving exact project task')
+            old = c.execute('SELECT * FROM qa_task_requirements WHERE task=?', (task_id,)).fetchone()
+            if old and (old['approval'] != approval or old['manifest_digest'] != task['manifest_digest']):
+                raise Conflict('QA requirement is immutable')
+            c.execute('INSERT OR IGNORE INTO qa_task_requirements VALUES (?,?,?)',
+                      (task_id, approval, task['manifest_digest']))
+            return {'task':task_id, 'approval':approval}
 
     def _approval(self, c, token, key, roles):
         actor = self.store._authenticate(c, token)
@@ -142,3 +158,31 @@ class QAJobs:
             state = 'cancelled' if row['state'] == 'queued' else 'reconciliation_required'
             c.execute('UPDATE qa_jobs SET state=? WHERE id=?', (state, key))
             return self._public(c.execute('SELECT * FROM qa_jobs WHERE id=?', (key,)).fetchone())
+
+
+def require_task_qa(c, task, candidate_revision):
+    """Called inside existing manager/three-tier acceptance transactions."""
+    if not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='qa_task_requirements'").fetchone():
+        return  # Existing projects have no implicit QA approval or new policy.
+    requirement = c.execute('SELECT * FROM qa_task_requirements WHERE task=?', (task['id'],)).fetchone()
+    if requirement is None:
+        return
+    approval = c.execute('SELECT manifest FROM qa_approvals WHERE id=?', (requirement['approval'],)).fetchone()
+    if approval is None:
+        raise Conflict('required QA approval missing')
+    manifest = json.loads(approval['manifest'])
+    if (task['manifest_digest'] != requirement['manifest_digest'] or
+            candidate_revision != manifest['source_revision']):
+        raise Conflict('QA candidate or task changed')
+    runs = c.execute("SELECT report,decision FROM qa_jobs WHERE approval=? AND task=? AND state='accepted'",
+                     (requirement['approval'], task['id'])).fetchall()
+    for run in runs:
+        report = json.loads(run['report'])
+        decision = admit_qa_report(report, expected_source_revision=candidate_revision,
+            required_coverage=manifest['coverage'], expected_contract=manifest['contract'])
+        expected_binding = dict(project=manifest['project'], task=task['id'],
+            approval=requirement['approval'], adapter_release=manifest['adapter_release'],
+            source_revision=candidate_revision)
+        if decision['admitted'] and report.get('job_binding') == expected_binding:
+            return
+    raise Conflict('mandatory QA has no current passing evidence')
