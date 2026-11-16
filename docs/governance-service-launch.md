@@ -24,6 +24,8 @@ python scripts/run_governance_service.py --config /var/lib/taesan/governance.jso
 
 소스 및 QA 연결은 신뢰된 서버 코드가 `build_service(..., source_probes=..., qa_providers=..., governance=True)`로 등록합니다. JSON 실행기는 임의 연결을 불러오지 않으므로 별도 연결 등록이 없으면 소스는 `not_configured`이고 자동 실행이 차단됩니다. 필수 QA 정책이 있는 프로젝트는 등록된 QA 제공자가 없으면 승인되지 않습니다. 합성 QA 증거는 실제 프로젝트 증거로 승격되지 않습니다.
 
+거버넌스 모드는 소켓을 열기 전에 선택한 프로젝트를 관리 대상으로 영속 등록합니다. 등록 뒤 신규 개발 실행은 제안함의 배치 승인과 필수 QA 정책을 요구하며 일반 업무 등록 경로로 이를 우회할 수 없습니다. 이후 거버넌스 옵션이나 제공자를 생략해 재시작해도 등록이 해제되지 않습니다. 기존 기록은 보존하며 검증이 누락된 과거 결과를 새로운 기술 인수로 인정하지 않습니다.
+
 거버넌스 모드의 각 관리자 주기와 HTTP tick/reconcile은 선택한 프로젝트의 읽기 전용 소스 관찰을 먼저 갱신합니다. 기존 `poll_seconds`는 1~60초이며 제안의 소스 관찰 유효기간은 300초입니다. `baseline`, `unchanged`, `changed`만 다음 실행 판단으로 진행합니다. 누락·권한 거절·연결 실패·오래된 응답은 실행을 막고 최신 상태를 기록합니다. 마지막 성공 소스는 보존하지만 최신 실패가 있는 동안 제안 승인과 실행에 사용할 수 없습니다. 소스 변화는 자동 업무 승인이나 재실행을 뜻하지 않습니다. 제공자는 자체 제한 시간 안에 응답해야 합니다.
 
 API 접두사는 `/v1/representative/runtime/governance/`입니다. 인증된 `POST proposals/create`, `POST proposals/list`, `GET proposals/get?proposal_id=...`, `POST batches/create`, `GET batches/get?batch_id=...`, 소유자 전용 `POST batches/approve`를 사용합니다. 배치의 정확한 digest를 승인해도 기술 승인이나 네이티브 전달 권한이 생기지 않습니다.

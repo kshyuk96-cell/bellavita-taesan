@@ -5,7 +5,7 @@ import unittest
 from manager_bridge.tests import test_three_tier as hierarchy_fixtures
 from manager_bridge.tests import test_qa_admission as qa_fixtures
 from manager_bridge.governance_gate import QAObservation
-from manager_bridge.store import Conflict, PermissionDenied, digest
+from manager_bridge.store import Conflict, PermissionDenied, NotFound, digest
 
 
 class GovernanceGateTests(unittest.TestCase):
@@ -127,7 +127,7 @@ class GovernanceGateTests(unittest.TestCase):
         task, reviewed = self.fx.reviewed()
         candidate = self.fx.core._fresh_candidate(self.fx.manager,task['id'])
         candidate['task']['approval']['proposal_batch_id']='fixture-batch'
-        with self.assertRaisesRegex(Conflict,'proposal requires registered'):
+        with self.assertRaisesRegex(Conflict,'requires registered'):
             self.gate.require(self.fx.manager,candidate,'reviewer')
 
     def test_proposal_contract_pin_uses_registered_policy(self):
@@ -186,3 +186,33 @@ class GovernanceGateTests(unittest.TestCase):
         persisted=self.fx.store.get_task(self.fx.owner,task['id'])
         self.assertEqual('reported',persisted['state'])
         self.assertIsNone(persisted['review'])
+
+    def test_enrolled_legacy_acceptance_requires_qa_policy(self):
+        task,reviewed=self.fx.reviewed()
+        self.gate.enroll(self.fx.manager,['project'])
+        with self.assertRaisesRegex(Conflict,'enrolled development requires'):
+            self.fx.core.decide(self.fx.manager,task['id'],reviewed['candidate_digest'])
+        persisted=self.fx.store.get_task(self.fx.owner,task['id'])
+        self.assertEqual('reported',persisted['state'])
+        self.assertIsNone(persisted['review'])
+
+    def test_enrollment_survives_core_reconstruction_without_gate_configuration(self):
+        from manager_bridge.three_tier import ThreeTier
+        task,accepted=self.accept()
+        self.gate.enroll(self.fx.manager,['project'])
+        restarted=ThreeTier(self.fx.store,self.fx.registry,source_observers={'project':self.fx.observe})
+        historical=self.fx.store.get_task(self.fx.owner,task['id'])
+        self.assertEqual(accepted['candidate_digest'],historical['review']['candidate_digest'])
+        with self.assertRaisesRegex(Conflict,'enrolled development requires'):
+            restarted.get(self.fx.manager,task['id'])
+        with self.assertRaisesRegex(Conflict,'enrolled development requires'):
+            restarted.decide(self.fx.manager,task['id'],accepted['candidate_digest'])
+
+    def test_enrollment_is_scoped_and_atomic(self):
+        with self.assertRaises(PermissionDenied):
+            self.gate.enroll(self.fx.dev,['project'])
+        narrow=self.fx.store.add_token('narrow-manager','manager',['project'])
+        with self.assertRaises((PermissionDenied,NotFound)):
+            self.gate.enroll(narrow,['project','other'])
+        with self.fx.store._transaction() as c:
+            self.assertEqual(0,c.execute('SELECT COUNT(*) FROM governance_enrolled_projects').fetchone()[0])

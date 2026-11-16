@@ -84,7 +84,15 @@ def validate_execution(c, store, task):
     proposal=c.execute('SELECT * FROM manager_proposals WHERE id=?',(approval.get('proposal_id'),)).fetchone()
     if not proposal or proposal['fingerprint']!=approval.get('proposal_digest'):
         raise Conflict('proposal approval binding changed')
+    batch=c.execute('SELECT * FROM manager_proposal_batches WHERE id=?',(approval['proposal_batch_id'],)).fetchone()
+    if (proposal['task']!=task['id'] or not batch or batch['approved_by']!=approval.get('owner_hash')
+            or {'id':proposal['id'],'digest':proposal['fingerprint']} not in json.loads(batch['snapshot'])):
+        raise Conflict('exact approved proposal batch task link required')
     snapshot=json.loads(proposal['snapshot'])
+    manifest={k:snapshot['spec'][k] for k in ('project','repository','base_sha','description','checks','kind')}
+    if (json.loads(task['manifest'])!=manifest or task['manifest_digest']!=digest(manifest)
+            or approval.get('version')!=task['version'] or approval.get('manifest_digest')!=task['manifest_digest']):
+        raise Conflict('proposal execution manifest binding changed')
     _validate_parent(c,store,snapshot)
     config=c.execute('SELECT fingerprint FROM maintenance_projects WHERE project=?',(task['project'],)).fetchone()
     if not config or config['fingerprint']!=snapshot['config_fingerprint']:
@@ -267,8 +275,8 @@ class ProposalBoard:
                 self.store._event(c,task,actor['subject'],'approved','queued',approval)
             # Authenticate again at the commit boundary; failures roll back the entire batch.
             self._actor(c,token,('owner',))
+            c.execute('UPDATE manager_proposal_batches SET approved_by=? WHERE id=?',(actor['token_hash'],batch_id))
             for proposal in rows:
                 current=self._proposal(c,token,proposal['id'])
                 validate_execution(c,self.store,self.store._get(c,actor,current['task']))
-            c.execute('UPDATE manager_proposal_batches SET approved_by=? WHERE id=?',(actor['token_hash'],batch_id))
             return self._batch(c,token,c.execute('SELECT * FROM manager_proposal_batches WHERE id=?',(batch_id,)).fetchone())

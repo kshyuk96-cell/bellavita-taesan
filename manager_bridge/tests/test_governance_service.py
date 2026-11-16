@@ -41,6 +41,8 @@ class GovernanceServiceTests(unittest.TestCase):
         self.assertIs(service.server.continuous_manager,self.controller)
         self.assertIs(service.server.governance_gate,self.core.governance_gate)
         self.assertIs(service.server.proposal_board.store,self.store)
+        with self.store._transaction() as c:
+            self.assertIsNotNone(c.execute('SELECT project FROM governance_enrolled_projects WHERE project=?',('project',)).fetchone())
         result=service.run(max_ticks=1)
         self.assertEqual(result['state'],'bounded_run_complete');self.assertEqual(result['ticks'],1)
         self.assertFalse(result['always_on_verified'])

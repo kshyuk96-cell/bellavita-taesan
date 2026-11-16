@@ -111,6 +111,7 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
     controller.status(host.manager_token(),settings['projects'])
     watch=SourceWatch(host.store,host.registry,source_probes)
     gate=GovernanceGate(host.store,host.registry,providers=qa_providers) if governance else None
+    if gate is not None:gate.enroll(host.manager_token(),settings['projects'])
     server=make_server(host.store,listener[0],listener[1],public_origin=listener[2])
     try:
         server.three_tier=host.core;server.fleet=host.fleet;server.continuous_manager=controller

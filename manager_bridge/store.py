@@ -521,6 +521,12 @@ class Store:
 
     def _validate_execution(self,c,row,*,check_source_age=False):
         approval=json.loads(row['approval']) if row['approval'] else {}
+        if json.loads(row['manifest'])['kind']=='development':
+            if c is None:raise Conflict('development execution requires a transactional fence')
+            enrolled=(c.execute("SELECT 1 FROM sqlite_master WHERE name='governance_enrolled_projects'").fetchone()
+                      and c.execute('SELECT 1 FROM governance_enrolled_projects WHERE project=?',(row['project'],)).fetchone())
+            if enrolled and not approval.get('proposal_batch_id'):
+                raise Conflict('enrolled development requires owner-approved ProposalBoard origin')
         if approval.get('proposal_batch_id') is not None:
             from .proposal_board import validate_execution
             validate_execution(c,self,row)

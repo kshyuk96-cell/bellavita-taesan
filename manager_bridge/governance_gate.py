@@ -41,11 +41,26 @@ class GovernanceGate:
             if not callable(callback):
                 raise ValueError('registered QA provider callback required')
         with store._transaction() as c:
+            c.execute('CREATE TABLE IF NOT EXISTS governance_enrolled_projects (project TEXT PRIMARY KEY, enrolled_at REAL NOT NULL)')
             c.execute('CREATE TABLE IF NOT EXISTS governance_qa_policies (project TEXT PRIMARY KEY, policy TEXT NOT NULL, policy_digest TEXT NOT NULL)')
             c.execute('CREATE TABLE IF NOT EXISTS governance_qa_policy_history (project TEXT NOT NULL, contract_version TEXT NOT NULL, policy TEXT NOT NULL, policy_digest TEXT NOT NULL, PRIMARY KEY(project,contract_version))')
             for row in c.execute('SELECT * FROM governance_qa_policies').fetchall():
                 old=json.loads(row['policy'])
                 c.execute('INSERT OR IGNORE INTO governance_qa_policy_history VALUES (?,?,?,?)',(row['project'],old['contract_version'],row['policy'],row['policy_digest']))
+
+    def enroll(self, token, projects):
+        """Durably restrict selected project acceptance; never grants permissions."""
+        if type(projects) not in (list, tuple) or not projects or len(projects)>100 or len(set(projects)) != len(projects):
+            raise ValueError('explicit unique bounded governance projects required')
+        for project in projects:
+            name(project)
+        with self.store._transaction() as c:
+            for project in projects:
+                self.registry._get(c,token,project,('owner','manager'))
+            now=self.store._now()
+            for project in projects:
+                c.execute('INSERT OR IGNORE INTO governance_enrolled_projects VALUES (?,?)',(project,now))
+        return {'projects':list(projects),'governance_required':True,'operational_authorization':False}
 
     def register_policy(self, token, project, *, contract_version, expected_contract,
                         required_coverage, provider_identity, scope='synthetic_only',
@@ -106,8 +121,9 @@ class GovernanceGate:
             approval = json.loads(approval)
         proposal = 'proposal_batch_id' in approval
         if row is None:
-            if proposal:
-                raise Conflict('proposal requires registered mandatory QA policy')
+            enrolled=c.execute('SELECT 1 FROM governance_enrolled_projects WHERE project=?',(task['project'],)).fetchone()
+            if proposal or enrolled:
+                raise Conflict('governed project requires registered mandatory QA policy')
             return None
         policy = json.loads(row['policy'])
         if proposal:

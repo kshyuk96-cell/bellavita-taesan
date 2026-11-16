@@ -206,6 +206,44 @@ class ProposalTests(unittest.TestCase):
             row=self.store._get(c,self.store._authenticate(c,self.owner),task['id'])
             with self.assertRaisesRegex(Conflict,'QA policy changed'):self.store._validate_execution(c,row)
 
+
+    def test_durable_enrollment_blocks_legacy_development_execution_and_restart(self):
+        manifest={k:self.spec()[k] for k in ('project','repository','base_sha','description','checks','kind')}
+        legacy=self.store.submit(self.owner,'legacy-direct',manifest)
+        self.store.approve(self.owner,legacy['id'],legacy['version'],legacy['manifest_digest'])
+        with self.store._transaction() as c:
+            row=self.store._get(c,self.store._authenticate(c,self.owner),legacy['id'])
+            self.store._validate_execution(c,row)
+            c.execute('CREATE TABLE IF NOT EXISTS governance_enrolled_projects (project TEXT PRIMARY KEY,enrolled_at REAL NOT NULL)')
+            c.execute('INSERT OR IGNORE INTO governance_enrolled_projects VALUES (?,?)',('erp',1000))
+            with self.assertRaisesRegex(Conflict,'ProposalBoard'):self.store._validate_execution(c,row)
+        restarted=Store(self.store.path,clock=lambda:1000)
+        with restarted._transaction() as c:
+            row=restarted._get(c,restarted._authenticate(c,self.owner),legacy['id'])
+            with self.assertRaisesRegex(Conflict,'ProposalBoard'):restarted._validate_execution(c,row)
+        self.assertEqual(self.store.get_task(self.manager,legacy['id'])['state'],'queued')
+        self.assertIsNone(self.store.claim(self.worker,'erp',task_id=legacy['id']))
+        with self.store._transaction() as c:
+            import json
+            row=self.store._get(c,self.store._authenticate(c,self.owner),legacy['id'])
+            forged=json.loads(row['approval']);forged['proposal_batch_id']='forged';forged['proposal_id']='forged';forged['proposal_digest']='a'*64
+            c.execute('UPDATE bridge_tasks SET approval=? WHERE id=?',(json.dumps(forged),legacy['id']))
+            row=self.store._get(c,self.store._authenticate(c,self.owner),legacy['id'])
+            with self.assertRaisesRegex(Conflict,'proposal approval binding'):self.store._validate_execution(c,row)
+        self.assertNotEqual(self.store.get_task(self.manager,legacy['id'])['state'],'running')
+
+    def test_enrolled_project_board_origin_requires_exact_task_link(self):
+        with self.store._transaction() as c:
+            c.execute('CREATE TABLE IF NOT EXISTS governance_enrolled_projects (project TEXT PRIMARY KEY,enrolled_at REAL NOT NULL)')
+            c.execute('INSERT OR IGNORE INTO governance_enrolled_projects VALUES (?,?)',('erp',1000))
+        batch=self.batch();task=self.approve(batch)['tasks'][0]
+        with self.store._transaction() as c:
+            row=self.store._get(c,self.store._authenticate(c,self.owner),task['id'])
+            self.store._validate_execution(c,row)
+            c.execute('UPDATE manager_proposals SET task=NULL WHERE id=?',(batch['items'][0]['id'],))
+            with self.assertRaisesRegex(Conflict,'task link'):self.store._validate_execution(c,row)
+
+
 class DerivedProposalTests(unittest.TestCase):
     def setUp(self):
         from manager_bridge.tests.test_governance_gate import GovernanceGateTests
