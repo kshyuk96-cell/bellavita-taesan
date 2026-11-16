@@ -5,7 +5,7 @@ from .control_center import ControlCenter
 
 class OperationsControl:
     def __init__(self,control,preflight,reporting,budget,*,worker_links=None,recovery=None,readiness=None,transition=None,link_plan=None,backup_health=None,
-                 baselines=None,quality_report=None,quality_handoff=None):
+                 baselines=None,quality_report=None,quality_handoff=None,workflow_trace=None):
         from .project_connection_preflight import ProjectConnectionPreflight
         from .operations_reporting import OperationsReporting
         from .operating_budget import OperatingBudget
@@ -40,6 +40,10 @@ class OperationsControl:
         for value,expected in ((baselines,BusinessBaselines),(quality_report,QualityDeliveryReport),(quality_handoff,WorkerQualityHandoff)):
             if value is not None and (not isinstance(value,expected) or value.core is not control.core):raise ValueError('same registered quality service required')
         self.baselines,self.quality_report,self.quality_handoff=baselines,quality_report,quality_handoff
+        from .workflow_trace import WorkflowTrace
+        if workflow_trace is not None and (not isinstance(workflow_trace,WorkflowTrace) or workflow_trace.core is not control.core):
+            raise ValueError('same registered workflow trace required')
+        self.workflow_trace=workflow_trace
         self.transition,self.link_plan,self.backup_health=transition,link_plan,backup_health
         self.recovery,self.readiness=recovery,readiness
 
@@ -212,3 +216,13 @@ class OperationsControl:
         self.control._scope(token,[task['project']])
         if self.quality_handoff is None:raise NotFound('quality handoff not configured')
         return self.quality_handoff.generate(token,task_id,role,candidate_digest)
+
+    def workflow(self,token,task_id,*,limit=30):
+        # get_task() expires leases as a side effect. This endpoint is a
+        # recorded snapshot and must not trigger task transitions while reading.
+        with self.store._transaction() as c:
+            actor=self.store._authenticate(c,token);self.store._role(actor,('owner','manager'))
+            task=self.store._get(c,actor,task_id)
+        self.control._scope(token,[task['project']])
+        if self.workflow_trace is None:raise NotFound('workflow trace not configured')
+        return self.workflow_trace.report(token,task_id,limit=limit)

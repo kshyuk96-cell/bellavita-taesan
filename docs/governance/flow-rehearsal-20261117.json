@@ -1,0 +1,357 @@
+{
+  "schema_version": "governance-flow-rehearsal/v1",
+  "scope": "disposable_synthetic_command_workers",
+  "state": "passed",
+  "completed_full_flow": true,
+  "blocker": null,
+  "mechanical_probe": {
+    "available": true,
+    "state": "ready",
+    "isolation_verified": true
+  },
+  "parent_task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+  "parent_state": "accepted",
+  "parent_candidate_digest": "ab86dc5268cd92904976b4bc28d8ff31bc6e02e4140fc8ba61904bd4dff1bd37",
+  "parent_head": "184b15a57d7b2a02b7dc1788a9adca169d026d2c",
+  "parent_technical_accepted": true,
+  "manager_rework_observed": true,
+  "rework_count": 1,
+  "developer_commands": [
+    {
+      "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+      "command_digest": "eb9aa8db0d8f3a3acf64afeba78107ea82e7c11d0eb6aa9b67443087e37138e8",
+      "exit_code": 0,
+      "elapsed_seconds": 0.043125,
+      "stdout_digest": "8a5a6ef71284ef777257bb609a24574ad60391c0eb769e1228f5eea1bb36d3d4",
+      "written_value": 1
+    },
+    {
+      "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+      "command_digest": "eb9aa8db0d8f3a3acf64afeba78107ea82e7c11d0eb6aa9b67443087e37138e8",
+      "exit_code": 0,
+      "elapsed_seconds": 0.035438,
+      "stdout_digest": "876e8ff7bd8d2c9d16ffb4ba0cdb5ba7d14dfca8b290b9a22d7e608792f5e263",
+      "written_value": 2
+    },
+    {
+      "task_id": "b268da9926f35c461b9e0d7d58f4d3b3",
+      "command_digest": "eb9aa8db0d8f3a3acf64afeba78107ea82e7c11d0eb6aa9b67443087e37138e8",
+      "exit_code": 0,
+      "elapsed_seconds": 0.036792,
+      "stdout_digest": "fac5b7342c4730832ab174a01dce927f119dad11f5ed0a04bb9c2e3deead2e5d",
+      "written_value": 3
+    }
+  ],
+  "semantic_commands": [
+    {
+      "candidate_digest": "441d3071bb409b1a3926204a80049cc1891f6689a7c07eea7b77183391d2d6c4",
+      "head_sha": "7d0685adf9c3bd1e830d87a27b45c3e494cf4cbd",
+      "recommendation": "rework",
+      "observed_value": 1,
+      "command_digest": "216c9590db6ceaf3e23451658f5dc0b95052561da98717668be5cd8c77e2bac3",
+      "exit_code": 1,
+      "elapsed_seconds": 0.046652,
+      "stdout_digest": "05d6c38b87a73dab1426a8f7993150f2630adc67da39647e4cadc469f5fd3f15",
+      "worker_scope": "fixed_synthetic_semantic_command"
+    },
+    {
+      "candidate_digest": "ab86dc5268cd92904976b4bc28d8ff31bc6e02e4140fc8ba61904bd4dff1bd37",
+      "head_sha": "184b15a57d7b2a02b7dc1788a9adca169d026d2c",
+      "recommendation": "pass",
+      "observed_value": 2,
+      "command_digest": "3f0507acc8db98120178a5dffdcafd51142eb5443b710fdaa0352b341f299767",
+      "exit_code": 0,
+      "elapsed_seconds": 0.047736,
+      "stdout_digest": "a0c521cd35f4f33988b93f5ac3fc4f690ba37a3dda26f8a2515f67a16a718dc7",
+      "worker_scope": "fixed_synthetic_semantic_command"
+    }
+  ],
+  "mechanical_checks": [
+    {
+      "argv_digest": "f04ed28f826c435bab8897a50494090665e74d5c7744a4c9779b314b5c74c7e2",
+      "elapsed_seconds": 0.051938,
+      "exit_code": 0,
+      "name": "mechanical-structure"
+    }
+  ],
+  "child_task_id": "b268da9926f35c461b9e0d7d58f4d3b3",
+  "preapproved_dependent_dispatched": true,
+  "unapproved_start_denied": true,
+  "unapproved_next_denied": true,
+  "unapproved_next_guard_exercised": true,
+  "unapproved_tasks_remain_pending": true,
+  "synthetic_owner_approvals": 2,
+  "actions": [
+    {
+      "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+      "phase": "start",
+      "state": "confirmed",
+      "observed_core_state": "development_queued"
+    },
+    {
+      "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+      "phase": "dispatch_development",
+      "state": "confirmed",
+      "observed_core_state": "developing"
+    },
+    {
+      "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+      "phase": "collect_development",
+      "state": "confirmed",
+      "observed_core_state": "candidate_ready"
+    },
+    {
+      "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+      "phase": "review",
+      "state": "confirmed",
+      "observed_core_state": "review_failed"
+    },
+    {
+      "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+      "phase": "rework_decision",
+      "state": "confirmed",
+      "observed_core_state": "rework_queued"
+    },
+    {
+      "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+      "phase": "dispatch_rework",
+      "state": "confirmed",
+      "observed_core_state": "rework_developing"
+    },
+    {
+      "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+      "phase": "collect_development",
+      "state": "confirmed",
+      "observed_core_state": "candidate_ready"
+    },
+    {
+      "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+      "phase": "review",
+      "state": "confirmed",
+      "observed_core_state": "review_passed"
+    },
+    {
+      "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+      "phase": "technical_decision",
+      "state": "confirmed",
+      "observed_core_state": "accepted"
+    },
+    {
+      "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+      "phase": "approve_next",
+      "state": "confirmed",
+      "observed_core_state": "development_queued"
+    },
+    {
+      "task_id": "b268da9926f35c461b9e0d7d58f4d3b3",
+      "phase": "dispatch_development",
+      "state": "confirmed",
+      "observed_core_state": "developing"
+    }
+  ],
+  "trace": {
+    "schema_version": "workflow-trace/v1",
+    "scope": "recorded_database_snapshot",
+    "task_id": "153fad23645cbcf6f4e5e1ce88f4d688",
+    "project": "synthetic-governance-flow",
+    "version": 1,
+    "manifest_digest": "0335e63c48ca97bce42e42d80d82ded66ba0c7735b9857f48da34c2a8902734e",
+    "config_fingerprint": "183ba240cab803596e12041b472e21de8f0c62992619d3efde8bfe5c6fb172bd",
+    "observed_at": 1794873105.4703634,
+    "recorded_task_state": "reviewed",
+    "recorded_hierarchy_state": "accepted",
+    "binding_matches_task": true,
+    "rework_count": 1,
+    "events": [
+      {
+        "id": 1,
+        "kind": "assigned",
+        "recorded_state": "development_queued",
+        "recorded_at": 1794873103.6100502
+      },
+      {
+        "id": 2,
+        "kind": "development_claimed",
+        "recorded_state": "developing",
+        "recorded_at": 1794873103.654049
+      },
+      {
+        "id": 3,
+        "kind": "candidate_frozen",
+        "recorded_state": "candidate_ready",
+        "recorded_at": 1794873103.8570364
+      },
+      {
+        "id": 4,
+        "kind": "review_claimed",
+        "recorded_state": "reviewing",
+        "recorded_at": 1794873103.9175298
+      },
+      {
+        "id": 5,
+        "kind": "independent_review_completed",
+        "recorded_state": "review_failed",
+        "recorded_at": 1794873104.2534933
+      },
+      {
+        "id": 6,
+        "kind": "technical_rework",
+        "recorded_state": "rework_queued",
+        "recorded_at": 1794873104.3129873
+      },
+      {
+        "id": 7,
+        "kind": "rework_claimed",
+        "recorded_state": "rework_developing",
+        "recorded_at": 1794873104.357576
+      },
+      {
+        "id": 8,
+        "kind": "candidate_frozen",
+        "recorded_state": "candidate_ready",
+        "recorded_at": 1794873104.5562956
+      },
+      {
+        "id": 9,
+        "kind": "review_claimed",
+        "recorded_state": "reviewing",
+        "recorded_at": 1794873104.6183565
+      },
+      {
+        "id": 10,
+        "kind": "independent_review_completed",
+        "recorded_state": "review_passed",
+        "recorded_at": 1794873104.9548755
+      },
+      {
+        "id": 11,
+        "kind": "technical_accept",
+        "recorded_state": "accepted",
+        "recorded_at": 1794873105.0857272
+      }
+    ],
+    "event_count": 11,
+    "events_truncated": false,
+    "actions": [
+      {
+        "phase": "approve_next",
+        "recorded_state": "confirmed",
+        "attempts": 1,
+        "created_at": 1794873105.2628043,
+        "updated_at": 1794873105.314243,
+        "binding_matches_task": true
+      },
+      {
+        "phase": "technical_decision",
+        "recorded_state": "confirmed",
+        "attempts": 1,
+        "created_at": 1794873105.041408,
+        "updated_at": 1794873105.1281085,
+        "binding_matches_task": true
+      },
+      {
+        "phase": "review",
+        "recorded_state": "confirmed",
+        "attempts": 1,
+        "created_at": 1794873104.576426,
+        "updated_at": 1794873104.9956372,
+        "binding_matches_task": true
+      },
+      {
+        "phase": "collect_development",
+        "recorded_state": "confirmed",
+        "attempts": 1,
+        "created_at": 1794873104.422074,
+        "updated_at": 1794873104.5657718,
+        "binding_matches_task": true
+      },
+      {
+        "phase": "dispatch_rework",
+        "recorded_state": "confirmed",
+        "attempts": 1,
+        "created_at": 1794873104.327946,
+        "updated_at": 1794873104.414433,
+        "binding_matches_task": true
+      },
+      {
+        "phase": "rework_decision",
+        "recorded_state": "confirmed",
+        "attempts": 1,
+        "created_at": 1794873104.2676346,
+        "updated_at": 1794873104.318889,
+        "binding_matches_task": true
+      },
+      {
+        "phase": "review",
+        "recorded_state": "confirmed",
+        "attempts": 1,
+        "created_at": 1794873103.8727639,
+        "updated_at": 1794873104.259299,
+        "binding_matches_task": true
+      },
+      {
+        "phase": "collect_development",
+        "recorded_state": "confirmed",
+        "attempts": 1,
+        "created_at": 1794873103.7253482,
+        "updated_at": 1794873103.8623865,
+        "binding_matches_task": true
+      },
+      {
+        "phase": "dispatch_development",
+        "recorded_state": "confirmed",
+        "attempts": 1,
+        "created_at": 1794873103.62455,
+        "updated_at": 1794873103.717773,
+        "binding_matches_task": true
+      },
+      {
+        "phase": "start",
+        "recorded_state": "confirmed",
+        "attempts": 1,
+        "created_at": 1794873103.578734,
+        "updated_at": 1794873103.6159425,
+        "binding_matches_task": true
+      }
+    ],
+    "action_count": 10,
+    "actions_truncated": false,
+    "controller_history_available": true,
+    "action_history_scope": "selected_project_task_all_actors",
+    "host_history_scope": "current_assignment_only",
+    "host": {
+      "recorded_phase": "frozen",
+      "task_version_manifest_match": true,
+      "config_binding_verified": true,
+      "binding_matches_task": true
+    },
+    "next_assignments": [
+      {
+        "task_id": "b268da9926f35c461b9e0d7d58f4d3b3",
+        "current_child_recorded_state": "running",
+        "current_child_version": 1,
+        "current_child_manifest_digest": "4162cfb3865151093395c91168378e119989d424b90b2fd3527c85308530a16e",
+        "recorded_at": 1794873105.3067453,
+        "parent_candidate_digest": "ab86dc5268cd92904976b4bc28d8ff31bc6e02e4140fc8ba61904bd4dff1bd37",
+        "execution_verified": false
+      }
+    ],
+    "next_assignment_count": 1,
+    "next_assignments_truncated": false,
+    "fresh_observers_invoked": false,
+    "current_technical_acceptance_verified": false,
+    "snapshot_digest_is_signature": false,
+    "execution_authorized": false,
+    "operational_authorized": false,
+    "always_on_verified": false,
+    "snapshot_digest": "e9220177abf1b1043b9461ef01838a4bb32dda60eae1c33a244411554988956a"
+  },
+  "workspaces_destroyed_on_return": true,
+  "actual_codex_execution_verified": false,
+  "model_calls": 0,
+  "customer_repositories_used": false,
+  "operational_change": false,
+  "external_tester_engine_used": false,
+  "deployment_performed": false,
+  "always_on_verified": false
+}
