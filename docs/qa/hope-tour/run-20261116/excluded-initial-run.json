@@ -1,0 +1,17 @@
+{
+  "excluded": true,
+  "reason": "Expected v31 before coding; source check later found v32. No bracketing evidence: not adopted for source-bound admission.",
+  "expected_revision": "475b25947f9f22161ad8d7730b5b34dbf3a83b54",
+  "observed_version_after": 32,
+  "counts_are_provisional_diagnostics_not_accepted_evidence": {
+    "generated": 24,
+    "executed": 9,
+    "asserted": 9,
+    "unique_failures": 2,
+    "unique_states": 24,
+    "blocked": 0,
+    "fail": 2,
+    "pass": 7,
+    "unmeasured": 15
+  }
+}

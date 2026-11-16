@@ -1,0 +1,203 @@
+{
+  "engine_revision": "e3e06580eddc6d05a282d27ea8673a97a307dc1d",
+  "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+  "policy_version": "hope-customer-20261116-v2",
+  "reference_documents": [
+    "eda84f0a643fd4feaa5e287cc2065e98304c70478291af37267cff2e00c8a9d0",
+    "d3de4f429c4c080056d3eec2a14380827d3af0b18b16b9a0107572e33e0437a0"
+  ],
+  "source_file_hashes": {
+    "scripts/run_hope_tour_qa.py": "29cda90f30d607ef0872866347f1ef17a12859cef08d7c33383fb74745aeb4aa",
+    "taesan_core/universal_qa.py": "a626cdd8e04c2b557e31d607efaac3dc19463d6078377860a7a28663695f037a",
+    "taesan_core/hope_tour_qa.py": "24559bcbc12fa0ee68129ce071bac95d5cd6056bade8f75d3e08f721aaa0a0ae",
+    "manager_bridge/qa_admission.py": "f93928aa598bd0b80847350c5e5d9e4bf8023fad2a8417879d6397c897a79c5b",
+    "manager_bridge/hope_review_client.py": "55db6fa66f6d463aaa5c6515aedcf12965a2c972d4c9f4f2fa705a4d7afe54b7",
+    "manager_bridge/hope_tour_acceptance.py": "7f5d845f1e4f80fde71f45efec4cbd6cd177d4c1873441c7cb232bc025e1fa71",
+    "manager_bridge/hope_tour_reporting.py": "dc665de5b68339fcd497131beb1cec2210950a54ce18ec71b2135b9a1eea7e4b",
+    "manager_bridge/hope_tour_exports.py": "863ef2b0bf63b53db07c71f3c8ca9262f63540ac16586e8f86aa8c099a2814db",
+    "manager_bridge/store.py": "df1277f773ec55e90d4d47a9ab26f45c2bd1d023bd13acb0eaaf836e9e843dcc"
+  },
+  "target_manifest": {
+    "project_id": "appgprj_6af881381bdc8191843d4e4f742948dd",
+    "origin": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site",
+    "version_id": "appgprj_6af881381bdc8191843d4e4f742948dd~appgver_a921b1deee3881918bc8c0975c26193c",
+    "version_number": 32,
+    "source_revision": "028a019b2a701120648a69591f34765de4b54825",
+    "deployment_id": "appgdep_6afa57d3af588191ac190b6ad24c421a",
+    "deployment_status": "succeeded",
+    "observed_at": "2026-11-16T01:22:32.377771+00:00"
+  },
+  "after_target_manifest": {
+    "project_id": "appgprj_6af881381bdc8191843d4e4f742948dd",
+    "origin": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site",
+    "version_id": "appgprj_6af881381bdc8191843d4e4f742948dd~appgver_a921b1deee3881918bc8c0975c26193c",
+    "version_number": 32,
+    "source_revision": "028a019b2a701120648a69591f34765de4b54825",
+    "deployment_id": "appgdep_6afa57d3af588191ac190b6ad24c421a",
+    "deployment_status": "succeeded",
+    "observed_at": "2026-11-16T01:24:25.341238+00:00"
+  },
+  "source_window_verified": true,
+  "seed": 20261116,
+  "reference_selfcheck": {
+    "generated": 2060,
+    "executed": 2060,
+    "asserted": 2060,
+    "unique_failures": 0,
+    "unique_states": 2060,
+    "blocked": 0,
+    "fail": 0,
+    "pass": 2060,
+    "unmeasured": 0
+  },
+  "reference_scope": "test-system self-check; NOT 2060 executions of the customer service",
+  "mutations": [
+    {
+      "mutation": "bonus_first",
+      "counts": {
+        "generated": 2060,
+        "executed": 2060,
+        "asserted": 2060,
+        "unique_failures": 189,
+        "unique_states": 2060,
+        "blocked": 0,
+        "fail": 456,
+        "pass": 1604,
+        "unmeasured": 0
+      },
+      "admitted": false
+    },
+    {
+      "mutation": "ignore_bp_cap",
+      "counts": {
+        "generated": 2060,
+        "executed": 2060,
+        "asserted": 2060,
+        "unique_failures": 200,
+        "unique_states": 2060,
+        "blocked": 0,
+        "fail": 240,
+        "pass": 1820,
+        "unmeasured": 0
+      },
+      "admitted": false
+    },
+    {
+      "mutation": "refund_bonus",
+      "counts": {
+        "generated": 2060,
+        "executed": 2060,
+        "asserted": 2060,
+        "unique_failures": 476,
+        "unique_states": 2060,
+        "blocked": 0,
+        "fail": 701,
+        "pass": 1359,
+        "unmeasured": 0
+      },
+      "admitted": false
+    },
+    {
+      "mutation": "refund_signup_fee",
+      "counts": {
+        "generated": 2060,
+        "executed": 2060,
+        "asserted": 2060,
+        "unique_failures": 234,
+        "unique_states": 2060,
+        "blocked": 0,
+        "fail": 695,
+        "pass": 1365,
+        "unmeasured": 0
+      },
+      "admitted": false
+    }
+  ],
+  "service_counts": {
+    "generated": 24,
+    "executed": 9,
+    "asserted": 9,
+    "unique_failures": 2,
+    "unique_states": 24,
+    "blocked": 0,
+    "fail": 2,
+    "pass": 7,
+    "unmeasured": 15
+  },
+  "service_admission": {
+    "admitted": false,
+    "reasons": [
+      "critical_scenario_not_passed",
+      "required_coverage_missing"
+    ],
+    "warnings": [],
+    "scope": "synthetic_only",
+    "operational_authorization": false,
+    "verified_counts": {
+      "generated": 24,
+      "executed": 9,
+      "asserted": 9,
+      "unique_failures": 2
+    }
+  },
+  "customer_summary": {
+    "basis_at": "2026-11-16T10:24:45.545323+09:00",
+    "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+    "total": 38,
+    "counts": {
+      "PASS": 0,
+      "FAIL": 1,
+      "BLOCKED": 12,
+      "NOT RUN": 25
+    },
+    "executed": 11,
+    "execution_basis_pass_rate_percent": 0.0,
+    "unique_observed_checks": 9,
+    "execution_note": "38개 최종 시험의 부분 실행 포함; 실제 HTTP 관찰 수와 합산하지 않음",
+    "business_results": {
+      "UX·보안": {
+        "PASS": 0,
+        "FAIL": 0,
+        "BLOCKED": 1,
+        "NOT RUN": 5
+      },
+      "결제": {
+        "PASS": 0,
+        "FAIL": 0,
+        "BLOCKED": 3,
+        "NOT RUN": 7
+      },
+      "상품": {
+        "PASS": 0,
+        "FAIL": 0,
+        "BLOCKED": 2,
+        "NOT RUN": 6
+      },
+      "통합": {
+        "PASS": 0,
+        "FAIL": 0,
+        "BLOCKED": 2,
+        "NOT RUN": 2
+      },
+      "회원관리": {
+        "PASS": 0,
+        "FAIL": 1,
+        "BLOCKED": 4,
+        "NOT RUN": 5
+      }
+    },
+    "unresolved_S1_S2": 1,
+    "actual_pg": "미연동",
+    "recommendation": "재시험 필요",
+    "usability": {
+      "participants": 0,
+      "task_success_rate": null,
+      "duration": null,
+      "help_requests": null
+    },
+    "operational_authorization": false,
+    "customer_acceptance_approved": false
+  },
+  "collector_errors": [],
+  "operational_authorization": false
+}

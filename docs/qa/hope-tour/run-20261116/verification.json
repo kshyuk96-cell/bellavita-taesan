@@ -1,0 +1,22 @@
+{
+  "engine_revision": "e3e0658",
+  "full_repository": {
+    "run": 1687,
+    "passed": 1686,
+    "skipped": 1,
+    "failures": 0
+  },
+  "new_customer_tests": {
+    "run": 11,
+    "passed": 11
+  },
+  "sandboxed_chromium_probe": {
+    "available": false,
+    "error_type": "Error",
+    "browser_run_verified": false
+  },
+  "before_after_source_verified": true,
+  "site_version": 32,
+  "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+  "operational_authorization": false
+}
