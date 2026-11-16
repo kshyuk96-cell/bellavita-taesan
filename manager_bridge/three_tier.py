@@ -148,6 +148,8 @@ class ThreeTier:
         return config
 
     def _admission(self,c,token,task):
+        from .runtime_transition import assert_new_start
+        assert_new_start(c,task['project'])
         budget=self.admission_budget
         if budget is None:
             from .store import _admission_required

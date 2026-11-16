@@ -1,0 +1,29 @@
+# Draft only. Not installed, enabled, started, stopped, or deployed.
+# Suggested unit name: taesan-governance.service
+# Drain new admission and verify existing records before an operator update.
+[Unit]
+Description=Taesan registered governance manager
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/var/lib/taesan/private
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=taesan-manager
+Group=taesan-manager
+UMask=0077
+WorkingDirectory=/opt/taesan/application
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/taesan/venv/bin/python /opt/taesan/application/scripts/run_governance_service.py --config /var/lib/taesan/private/service.json
+Restart=on-failure
+RestartSec=15
+KillSignal=SIGTERM
+KillMode=control-group
+TimeoutStopSec=60
+NoNewPrivileges=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target

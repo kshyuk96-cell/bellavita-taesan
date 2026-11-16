@@ -215,6 +215,9 @@ class OperatingBudget:
         _,config=self._auth(c,token,project);now=_clock(self.store._now())
         policy=c.execute('SELECT * FROM operating_budget_policies WHERE project=?',(project,)).fetchone()
         if self._quarantined(c):return {'project':project,'allowed':False,'state':'paused','reason':'restore_quarantine','configured':policy is not None,'admission_only':True,'execution_authorized':False}
+        from .runtime_transition import assert_new_start
+        try:assert_new_start(c,project)
+        except Conflict:return {'project':project,'allowed':False,'state':'paused','reason':'runtime_transition_blocked','configured':policy is not None,'admission_only':True,'execution_authorized':False}
         host_required=bool(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='host_admission_requirements'").fetchone() and c.execute('SELECT 1 FROM host_admission_requirements WHERE project=?',(project,)).fetchone())
         if self.host_admission is not None or host_required:
             host=self.host_admission._check(c,token,project) if self.host_admission is not None else {'allowed':False,'reason':'host_gate_unconfigured'}

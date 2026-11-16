@@ -1,0 +1,103 @@
+{
+  "scope": "transition_preparation_and_local_synthetic_verification",
+  "whole_suite_passed": 2083,
+  "new_tests": 45,
+  "whole_suite_seconds": 239.847,
+  "independent_review": "partial_session_stopped_after_automatic_possible_cybersecurity_risk_classification",
+  "independent_findings_fixed": [
+    "legacy_unassigned_claim_during_drain",
+    "double_leading_slash_unit_path_alias"
+  ],
+  "independent_recovery": {
+    "scope": "private_local_synthetic_independent_recovery",
+    "passed": true,
+    "original_database_removed_before_restore": true,
+    "quarantine_and_budget_denial_checked": true,
+    "offsite_verified": false,
+    "remote_restore_tested": false,
+    "keys_persisted": false,
+    "network_calls": 0
+  },
+  "unit_static_validation": {
+    "scope": "static_systemd_unit_validation_only",
+    "draft": {
+      "state": "unit_draft_created",
+      "sha256": "0ade68a7ab5947388f81c7eb54e0d9145aa0d9d57eda299ce2f6cd9fbb54c018",
+      "bytes": 933,
+      "installed": false,
+      "enabled": false,
+      "started": false,
+      "system_service_changed": false
+    },
+    "systemd_analyze_exit_code": 1,
+    "stderr_bytes": 66,
+    "installed": false,
+    "started": false,
+    "reboot_verified": false,
+    "models_started": 0
+  },
+  "user_unit_validation": {
+    "passed": false,
+    "reason": "SO_PASSCRED_not_permitted"
+  },
+  "private_destination_creation": {
+    "repository": "kshyuk96-cell/taesan-governance-recovery",
+    "created": false,
+    "http_status": 403,
+    "reason": "resource_not_accessible_by_integration",
+    "remote_objects_written": 0,
+    "customer_repository_fallback_used": false
+  },
+  "candidate_quote": {
+    "provider": "DigitalOcean",
+    "source": "https://www.digitalocean.com/pricing/droplets",
+    "observed_date": "2026-11-16",
+    "selection": "Basic Regular",
+    "vcpu": 2,
+    "memory_gib": 4,
+    "ssd_gib": 80,
+    "transfer_gib": 4000,
+    "hourly_usd": 0.03571,
+    "monthly_usd": 24,
+    "actual_performance_qualified": false,
+    "resource_created": false,
+    "billing_enabled": false,
+    "os_candidate": {
+      "name": "Debian 13",
+      "slug": "debian-13-x64",
+      "source": "https://docs.digitalocean.com/products/droplets/details/images/",
+      "observed_date": "2026-11-16",
+      "remote_verified": false
+    }
+  },
+  "access_key": {
+    "algorithm": "Ed25519",
+    "public_fingerprint": "SHA256:A9nNQ0QXkefpfv/0gLbznYmh5u49IkB2FPNPmGClyQo",
+    "private_key_included": false,
+    "external_custody_verified": false
+  },
+  "paid_api_calls": 0,
+  "production_deployments": 0,
+  "main_merged": false,
+  "tester_engine_executed": false,
+  "always_on_verified": false,
+  "actual_offsite_restore_verified": false,
+  "overall_control_percentage": null,
+  "implementation_commit": "73d197a8159f4f672d5cf55bec783aa662667c42",
+  "current_host_preflight": {
+    "scope": "current_task_cloud_host_only",
+    "application_commit": "73d197a8159f4f672d5cf55bec783aa662667c42",
+    "measurement": {
+      "host_identity": "f470f4954f12ee9c06346927151263659cb0116b45f1040aa85c04911c8ca303",
+      "application_commit": "73d197a8159f4f672d5cf55bec783aa662667c42",
+      "namespace_isolation_verified": true,
+      "private_storage_verified": true,
+      "observed_at": 1794814292.4922552
+    },
+    "models_started": 0,
+    "paid_api_calls": 0,
+    "persistent_boot_verified": false,
+    "offsite_backup_verified": false,
+    "deployment_performed": false
+  }
+}

@@ -58,7 +58,9 @@ def _hierarchy_enabled(c, project):
              c.execute('SELECT 1 FROM hierarchy_members WHERE project=?',(project,)).fetchone())
     budgeted=(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='operating_budget_policies'").fetchone() and
               c.execute('SELECT 1 FROM operating_budget_policies WHERE project=?',(project,)).fetchone())
-    return bool(managed or budgeted or _admission_required(c,project))
+    transition=(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='runtime_transition_state'").fetchone() and
+        c.execute("SELECT 1 FROM runtime_transition_state s LEFT JOIN maintenance_projects p ON p.project=s.project WHERE s.project=? AND (s.mode!='accepting' OR p.fingerprint IS NULL OR p.fingerprint!=s.config_fingerprint)",(project,)).fetchone())
+    return bool(managed or budgeted or transition or _admission_required(c,project))
 
 
 def _hierarchy_claim_allowed(c, actor, task):

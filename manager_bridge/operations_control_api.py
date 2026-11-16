@@ -11,6 +11,15 @@ ROUTES={
     'host/install':('install_host',('project','requirement'),('expected_revision',)),
     'host/refresh':('refresh_host',('project',),()),
     'recovery':('recovery_report',('projects',),('limit',)),
+    'transition/status':('transition_status',('projects',),()),
+    'transition/drain':('drain',('projects','expected_revisions','request_key'),('reason',)),
+    'transition/resume':('resume',('projects','expected_revisions','request_key'),()),
+    'links/inventory':('link_inventory',('projects',),()),
+    'links/plan':('create_link_plan',('request_key','projects','expected_bindings','role_mappings','expected_host_map_digest','broker_refs'),()),
+    'links/get':('get_link_plan',('plan_id',),()),
+    'backup/report':('backup_report',(),('verify_latest',)),
+    'backup/policy':('install_backup_policy',('policy',),('expected_revision',)),
+    'backup/rehearse':('rehearse_backup',('backup_id','request_key'),()),
     'readiness':('readiness_report',('projects',),()),
     'exceptions':('exception_report',('projects','request_key'),('after','limit')),
     'projects/register':('register_projects',('request_key','registrations'),()),
@@ -38,7 +47,7 @@ def dispatch(handler,method,path,token,body=None):
     store=handler.server.store
     with store._transaction() as c:
         actor=store._authenticate(c,token)
-        store._role(actor,('owner',) if route in ('budget/install','host/install','projects/register') else ('owner','manager'))
+        store._role(actor,('owner',) if route in ('budget/install','host/install','projects/register','transition/drain','transition/resume','links/inventory','links/plan','links/get','backup/report','backup/policy','backup/rehearse') else ('owner','manager'))
     operations=getattr(handler.server,'operations_control',None)
     if operations is None:raise NotFound('operations control not configured')
     if not isinstance(operations,OperationsControl) or operations.store is not store:raise ValueError('registered operations control required')
