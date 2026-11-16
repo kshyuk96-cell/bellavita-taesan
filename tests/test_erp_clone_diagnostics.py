@@ -15,6 +15,7 @@ class DiagnosticsTest(unittest.TestCase):
     def __init__(self,*a):pass
     def detail(self,n):return {'goodName':title,'goodPrice':93500}
     def settings(self,row):return ()
+    def same_settings(self,a,b):return True
     def image_checksums(self,row):return []
    class Handler:
     headers={'Authorization':'Bearer fixture-token'}

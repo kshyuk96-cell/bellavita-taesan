@@ -134,7 +134,7 @@ class BlogPay:
             'brand', 'isDelivery', 'eDeliBPrice', 'eDeliFPrice', 'goodContent', 'tag', 'isEvent',
             'supplyUserId', 'isSmUse', 'isCpUse', 'goodSmValue', 'cpNum', 'subtitle', 'subtitleColor',
             'goodsft', 'addShip', 'bsFree', 'perLimitCount', 'buyDCinfo', 'is_show_detail', 'gBindNum',
-            'IsReserve', 'adminMemo', 'isDeliveryPrice', 'isTodayShipUse', 'todayShipTime') if item.get(key) is not None}
+            'IsReserve', 'adminMemo') if item.get(key) is not None}
         fields.update(mode='updateGoodsNew', goodNum=item['goodNum'], goodName=title, goodPrice=price,
                       categorySelect='useSelect' if item.get('cateNum') else 'useEmptyCate',
                       isDisplay=0, isRecommend=0, optionState=item.get('optionState',1),
@@ -165,6 +165,25 @@ class BlogPay:
                 'eDeliFPrice','is_show_detail','isSmUse','isCpUse','gBindNum','IsReserve','SDate','EDate',
                 'gTaxType','isDeliveryPrice','isTodayShipUse','todayShipTime')
         return tuple(row.get(k) for k in keys), normal, inputs
+
+    def same_settings(self, actual, source):
+        """Compare effective settings; retain strict legacy-policy checks.
+
+        Official goodsModify documents shipSubNum as the required new shipping
+        policy identifier. isDeliveryPrice is an old read-only flag, not a write
+        parameter. Ignore that flag only with an equal explicit new policy ID.
+        Disabled today-shipping flags have no cutoff; enabled flags stay strict.
+        Fingerprinting remains byte-for-byte unchanged in settings().
+        """
+        a,b=dict(actual),dict(source)
+        policy=str(source.get('shipSubNum') or '')
+        if policy.isdecimal() and int(policy)>0 and str(actual.get('shipSubNum'))==policy:
+            a['isDeliveryPrice']=b.get('isDeliveryPrice')
+        disabled=(None,'','N','0',0)
+        if a.get('isTodayShipUse') in disabled and b.get('isTodayShipUse') in disabled:
+            a['isTodayShipUse']=b['isTodayShipUse']=None
+            a['todayShipTime']=b['todayShipTime']=None
+        return self.settings(a)==self.settings(b)
 
     def image_checksums(self, item):
         base = item.get('goodImgUri', '').rsplit('/', 1)[0]
@@ -239,14 +258,10 @@ class BlogPay:
                     rows.append(candidates[0])
                 item = self.detail(number)
                 if (item.get('goodName') != title or int(item.get('goodPrice',0)) != price
-                        or self.settings(item) != self.settings(template)):
+                        or not self.same_settings(item,template)):
                     self.set_sale(item, False)
                     item = self.detail(number)
-                    # The vendor defaults these delivery fields on update when omitted.
-                    # Repair only those known defaults on our journalled copy; all
-                    # other settings must still match the unchanged source.
-                    item={**item,**{k:template.get(k) for k in ('isDeliveryPrice','isTodayShipUse','todayShipTime')}}
-                    if self.settings(item) != self.settings(template):
+                    if not self.same_settings(item,template):
                         raise ValueError('복제 상품의 상세 설명, 옵션 또는 배송 설정이 원본과 달라 판매를 중지했어요.')
                     try:
                         self.edit_copy(item, title, price)
@@ -255,7 +270,7 @@ class BlogPay:
                         pass
                 item = self.detail(number)
                 if (item.get('goodName') != title or int(item.get('goodPrice',0)) != price
-                        or self.settings(item) != self.settings(template)
+                        or not self.same_settings(item,template)
                         or self.image_checksums(item) != template_images):
                     self.set_sale(item, False)
                     raise ValueError('상품명, 가격 또는 옵션을 확인해야 해요. 확인 전에는 주문 링크를 보내지 않아요.')
@@ -268,7 +283,7 @@ class BlogPay:
                        {'isShow':'1','isSoldout':'0','isRecommend':'0'}.items()):
                     raise ValueError('판매 상태나 메인진열 설정을 확인해야 해요.')
                 if (active.get('goodName') != title or int(active.get('goodPrice', 0)) != price
-                        or self.settings(active) != self.settings(template)):
+                        or not self.same_settings(active,template)):
                     self.set_sale(active, False)
                     raise ValueError('공개된 상품의 가격과 설정을 확인해야 해요.')
                 order = active if active.get('shortGoodUrl') else next(
