@@ -274,8 +274,14 @@ def render(product, action, can_pay):
 
 
 def normalize_order(product, fields):
+    def text_field(key):
+        text = fields.get(key, '')
+        if not isinstance(text, str):
+            raise ValueError('입력하신 주문 정보를 다시 확인해 주세요.')
+        return text
+
     def value(key, limit):
-        text = fields.get(key, '').strip()
+        text = text_field(key).strip()
         if not text or len(text) > limit:
             raise ValueError('입력하신 주문 정보를 다시 확인해 주세요.')
         return text
@@ -307,9 +313,10 @@ def normalize_order(product, fields):
     if kind:
         if kind not in ('personal', 'business', 'self'):
             raise ValueError('현금영수증 발급 구분을 확인해 주세요.')
+        receipt_identifier = '' if kind == 'self' else text_field('cash_receipt_identifier')
         identifier = ('0100001234' if kind == 'self' else buyer_phone if kind == 'personal' and
-                      not fields.get('cash_receipt_identifier', '').strip() else
-                      re.sub(r'[\s-]', '', fields.get('cash_receipt_identifier', '')))
+                      not receipt_identifier.strip() else
+                      re.sub(r'[\s-]', '', receipt_identifier))
         pattern = r'01[016789][0-9]{8}' if kind == 'personal' else r'[0-9]{10}'
         if not re.fullmatch(pattern, identifier):
             raise ValueError('현금영수증 휴대폰 번호(11자리) 또는 사업자번호(10자리)를 확인해 주세요.')

@@ -55,6 +55,39 @@ class CustomerCheckoutValidationTests(unittest.TestCase):
             with self.subTest(fields=fields), self.assertRaises(ValueError):
                 self.normalize(**fields)
 
+    def test_non_string_customer_fields(self):
+        self.product['extra_fields'] = [{'label': 'Note'}]
+        self.fields['extra0'] = ' Valid note '
+        for bad in (None, 123, 1.5, True, [], {}, b'123', bytearray(b'123')):
+            for key in ('buyer_phone', 'sender', 'buyer', 'message', 'extra0'):
+                with self.subTest(key=key, value=bad), self.assertRaises(ValueError):
+                    self.normalize(**{'choice0': '2', 'message': 'Valid message', key: bad})
+            for kind in ('personal', 'business'):
+                with self.subTest(kind=kind, value=bad), self.assertRaises(ValueError):
+                    self.normalize(cash_receipt_type=kind, cash_receipt_identifier=bad)
+
+    def test_optional_fields_remain_ignored(self):
+        for ignored in (None, 123, [], {}, b'ignored'):
+            with self.subTest(value=ignored):
+                order = self.normalize(same_buyer='yes', buyer=ignored, message=ignored,
+                                       extra0=ignored, cash_receipt_identifier=ignored)
+                self.assertEqual(order['buyer'], 'Sender')
+                self.assertEqual(order['message'], '')
+                self.assertNotIn('cash_receipt', order)
+                self.assertEqual(self.normalize(cash_receipt_type='self',
+                    cash_receipt_identifier=ignored)['cash_receipt'],
+                    {'kind': 'self', 'identifier': '0100001234'})
+        self.product['extra_fields'] = [{'label': 'Note', 'max': 4}]
+        self.assertEqual(self.normalize(extra0=' Note ')['options'][-1], ['Note', 'Note'])
+        for extra in ('', '     ', '12345'):
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                self.normalize(extra0=extra)
+        self.product.pop('extra_fields')
+        self.product['force_message'] = True
+        with self.assertRaises(ValueError):
+            self.normalize(message=None)
+        self.assertEqual(self.normalize(message=' Forced ')['message'], 'Forced')
+
     def test_ascii_boundary(self):
         for digits in ('０１２３４５６７８９', '٠١٢٣٤٥٦٧٨٩', '۰۱۲۳۴۵۶۷۸۹', '०१२३४५६७८९'):
             translate = str.maketrans('0123456789', digits)
