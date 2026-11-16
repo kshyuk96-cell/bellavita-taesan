@@ -245,6 +245,7 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
             from .business_baselines import BusinessBaselines
             from .quality_delivery_report import QualityDeliveryReport
             from .worker_quality_handoff import WorkerQualityHandoff
+            from .workflow_trace import WorkflowTrace
             baselines=BusinessBaselines(host.core)
             quality_report=QualityDeliveryReport(host.core,baselines)
             quality_handoff=WorkerQualityHandoff(host.core)
@@ -252,7 +253,7 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
             server.operations_control=OperationsControl(server.control_center,preflight,reporting,budget,
                 worker_links=worker_links,recovery=service.recovery,readiness=readiness,
                 transition=service.runtime_transition,link_plan=links,backup_health=backup_health,
-                baselines=baselines,quality_report=quality_report,quality_handoff=quality_handoff)
+                baselines=baselines,quality_report=quality_report,quality_handoff=quality_handoff,workflow_trace=WorkflowTrace(host.core))
             controller.admission_budget=budget
             host.core.admission_budget=budget
         return service
