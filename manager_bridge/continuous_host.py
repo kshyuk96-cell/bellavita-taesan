@@ -474,7 +474,9 @@ def _transport_journal(store,project,role):
     return persist
 
 
-def load_host(config_file):
+def load_host(config_file,*,profile_guard_factory=None):
+    if profile_guard_factory is not None and not callable(profile_guard_factory):
+        raise ValueError('trusted subscription profile guard factory required')
     """Load only fixed private host paths; no dynamic imports or HTTP commands.
 
     Database, role memberships, capacity and future-worker templates must already
@@ -548,10 +550,18 @@ def load_host(config_file):
                 if row is None or row['phase']!='executing' or row['version']!=assignment['version'] or row['manifest_digest']!=assignment['manifest_digest'] or json.loads(row['assignment']).get('host_reservation_id')!=reservation_id:raise Conflict('durable native execution attempt unavailable')
             return fleet.authorize_reserved_execution(_token(manager_path),reservation_id,assignment)
         devsetting=transport_settings['developer']
+        developer_guard=(profile_guard_factory('developer',project,entry['developer_id'],devsetting['codex_home'],devfile)
+                         if profile_guard_factory is not None else None)
+        if profile_guard_factory is not None and not callable(developer_guard):
+            raise ValueError('developer profile guard must be registered')
         developer=CodexHost(devsetting['binary'],devsetting['codex_home'],{
             project:ProjectBinding(project,entry['repository'],source,require_origin=devsetting.get('require_origin',True))},
-            authorize=authorize,authorize_reservation=authorize_reservation if entry.get('worker_mode')=='deferred_native' else None,diagnostic_sink=_transport_journal(store,project,'developer'),clock=store.clock,execution_timeout=devsetting.get('execution_timeout',180))
-        def reviewer_factory(frozen,*,heartbeat,project=project,repository=entry['repository'],settings=transport_settings['reviewer'],reviewfile=reviewfile,candidates=candidates):
+            authorize=authorize,authorize_reservation=authorize_reservation if entry.get('worker_mode')=='deferred_native' else None,diagnostic_sink=_transport_journal(store,project,'developer'),clock=store.clock,execution_timeout=devsetting.get('execution_timeout',180),profile_guard=developer_guard)
+        reviewer_guard=(profile_guard_factory('reviewer',project,entry['reviewer_id'],transport_settings['reviewer']['codex_home'],reviewfile)
+                        if profile_guard_factory is not None else None)
+        if profile_guard_factory is not None and not callable(reviewer_guard):
+            raise ValueError('reviewer profile guard must be registered')
+        def reviewer_factory(frozen,*,heartbeat,project=project,repository=entry['repository'],settings=transport_settings['reviewer'],reviewfile=reviewfile,candidates=candidates,profile_guard=reviewer_guard):
             frozen=_physical(frozen)
             if frozen.parent!=candidates:raise Conflict('review checkout outside registered candidates')
             def authorize_review(candidate,reviewer):
@@ -563,7 +573,7 @@ def load_host(config_file):
                             actor['subject']==reviewer['subject'] and task['project']==project)
             transport=CodexHost(settings['binary'],settings['codex_home'],{
                 project:ProjectBinding(project,repository,frozen,require_origin=settings.get('require_origin',True))},
-                authorize_review=authorize_review,diagnostic_sink=_transport_journal(store,project,'reviewer'),clock=store.clock,execution_timeout=settings.get('execution_timeout',180))
+                authorize_review=authorize_review,diagnostic_sink=_transport_journal(store,project,'reviewer'),clock=store.clock,execution_timeout=settings.get('execution_timeout',180),profile_guard=profile_guard)
             transport.verify_confidentiality(project,forbidden,heartbeat=heartbeat)
             return transport
         projects[project]=ProjectHost(project,entry['repository'],source,candidates,runtime,

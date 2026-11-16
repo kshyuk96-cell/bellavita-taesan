@@ -1,0 +1,94 @@
+{
+  "scope": "isolated actual source with synthetic inputs; no live/UI/operational authorization",
+  "actual_cases": 27,
+  "passed": 27,
+  "blocked": 4,
+  "projects": [
+    {
+      "project": "bellavita-shop",
+      "source_revision": "d5047f3345b757edfcfbd81a73c609c0392007dd",
+      "harness_digest": "d8b716d15311d722c3fd2ad106284b263f0451473c881328f72d876018a0aea0",
+      "plan_digest": "2431f18ef697757c4ba33c5a27f49c702f89390d03f8d4ae10017e60be1dd80b",
+      "runtime_digest": "7c5ec98dea125b7006506da230d2220845e46859c663445a6033b11c32bb7a37",
+      "actual_cases": 11,
+      "passed": 11,
+      "blocked": 0,
+      "business_admitted": true,
+      "unavailable": {}
+    },
+    {
+      "project": "bellavita-erp",
+      "source_revision": "13f78626e415c67ce2d07424f5ba5c1351666581",
+      "harness_digest": "d8b716d15311d722c3fd2ad106284b263f0451473c881328f72d876018a0aea0",
+      "plan_digest": "152528664812334f9c46fcea7d97c236fbff223db2ea9d3b4810ce6be789291a",
+      "runtime_digest": "81fa698a946b06ab381ed794e44283fa82240aff3d68dae3a8f2e4d9729e13fe",
+      "actual_cases": 8,
+      "passed": 8,
+      "blocked": 0,
+      "business_admitted": true,
+      "unavailable": {}
+    },
+    {
+      "project": "hope-sunrise",
+      "source_revision": "985a918f55f3cd2fbf0445d6ef38c761332577d2",
+      "harness_digest": "d8b716d15311d722c3fd2ad106284b263f0451473c881328f72d876018a0aea0",
+      "plan_digest": "2d0742afe3bb65ff5675304f4c2bbc42a71b192162328edbfaf11110a511056f",
+      "runtime_digest": "b2cd32a2b8fa899a1017c87540c583d330116fa89b1b71c8719448284ee689ed",
+      "actual_cases": 7,
+      "passed": 7,
+      "blocked": 0,
+      "business_admitted": true,
+      "unavailable": {}
+    },
+    {
+      "project": "funeral-association",
+      "source_revision": "42cfeedee9e0fbc1ffc90603b86d4fb5ed0e9e84",
+      "harness_digest": "d8b716d15311d722c3fd2ad106284b263f0451473c881328f72d876018a0aea0",
+      "plan_digest": "6364d16b14e119d1824f4e00384e58d5c9267f7851cf3d68819f5a02bc93c118",
+      "runtime_digest": "685559c5c17d3e1e491271a7bbc08cd5db5c444d4c9b64b0ecb3db10b2bebe4c",
+      "actual_cases": 1,
+      "passed": 1,
+      "blocked": 4,
+      "business_admitted": false,
+      "unavailable": {
+        "duplicate-order": "isolated_postgres_next_playwright_stack_not_prepared",
+        "order-state": "isolated_postgres_next_playwright_stack_not_prepared",
+        "private-note": "isolated_postgres_next_playwright_stack_not_prepared",
+        "server-price-snapshot": "isolated_postgres_next_playwright_stack_not_prepared"
+      }
+    }
+  ],
+  "planned_scenarios": 31,
+  "passed_scenarios": 27,
+  "blocked_scenarios": 4,
+  "planned_formulas": 14,
+  "passed_formulas": 13,
+  "blocked_formulas": 1,
+  "native_auth": {
+    "manual_refresh_receipts": 1,
+    "scheduled_refresh_receipts": 1,
+    "distributed_profiles": 2,
+    "guarded_metadata_roles_passed": 2,
+    "model_turns": 0,
+    "paid_api_calls": 0
+  },
+  "canonical_supervision": {
+    "ticks": 3,
+    "native_refresh_receipts": 1,
+    "private_backup_snapshots": 1,
+    "customer_tasks": 0,
+    "always_on_deployed": false
+  },
+  "render": {
+    "workspace_id": "tea-dbqjaul6e07s73fcqmo0",
+    "existing_services": 6,
+    "modified_services": 0,
+    "remote_host_isolation_verified": false
+  },
+  "local_postgres_fixture": {
+    "select_one_passed": true,
+    "container_removed": true,
+    "public_ports": 0
+  },
+  "browser_full_stack_verified": false
+}

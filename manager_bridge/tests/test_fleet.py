@@ -121,7 +121,10 @@ class FleetTests(unittest.TestCase):
         self.assertFalse(self.fleet.inventory(self.manager,['project'])['projects'][0]['sessions'])
 
     def test_bearers_and_secret_shaped_metadata_are_rejected(self):
-        self.items=(self.observation(session_id=self.manager),)
+        # A valid public identifier ensures this reaches known-bearer rejection;
+        # random URL-safe tokens can begin with '-' and fail earlier parsing.
+        bearer=self.store.add_token('metadata-probe','worker',['project'],token='fixture-known-bearer-'+('x'*32))
+        self.items=(self.observation(session_id=bearer),)
         with self.assertRaises(ValueError):self.fleet.discover(self.manager,'project','host')
         for field,value in [('session_id','sk-proj-secret'),('external_ref','github_pat_secret'),('reference','/private/path')]:
             with self.subTest(field=field),self.assertRaises(ValueError):self.observation(**{field:value})
