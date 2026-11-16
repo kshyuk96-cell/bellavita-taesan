@@ -30,4 +30,8 @@ python scripts/run_governance_service.py --config /var/lib/taesan/governance.jso
 
 API 접두사는 `/v1/representative/runtime/governance/`입니다. 인증된 `POST proposals/create`, `POST proposals/list`, `GET proposals/get?proposal_id=...`, `POST batches/create`, `GET batches/get?batch_id=...`, 소유자 전용 `POST batches/approve`를 사용합니다. 배치의 정확한 digest를 승인해도 기술 승인이나 네이티브 전달 권한이 생기지 않습니다.
 
+`POST catalog/list`는 명시한 프로젝트의 카탈로그를 조회합니다. 소유자 전용 `POST catalog/register`는 `{projects, expected_revisions}`로 비활성 고객 등록정보를 원자적으로 등록하며 유지보수나 배포를 활성화하지 않습니다. `POST portfolio/report`, `POST portfolio/decision-packet`, `POST portfolio/dashboard`는 `{projects}`만 받습니다. 마지막 경로는 인증 응답에 읽기 전용 HTML을 포함합니다. 소스 경로·콜백·토큰·명령은 이 API로 설정할 수 없습니다.
+
+신뢰된 `connection_profiles`와 QA 제공자는 `build_service`의 Python 인수로 등록합니다. `project_qa.freeze_project_qa_contract`와 `PersistedReviewQAProvider`는 알려진 원격 기준 커밋과 검사 명령을 검토 실행 전에 고정합니다. 실제 고객 업무 오라클과 UI 검증은 별도 연결이 필요합니다. 관리 서비스는 유지보수 비활성 프로젝트의 진단을 유지하되 해당 프로젝트를 작업 실행 범위에서 제외합니다. 프로세스 건강 상태 관찰이 상시 호스트나 영속 저장 검증을 뜻하지 않습니다.
+
 SIGTERM/SIGINT는 새로운 관리자 실행을 차단하고 HTTP 수신을 종료합니다. 진행 중인 외부 작업이나 오래된 불명확 작업이 종료되었다고 판단하지 않으며 불확실한 작업은 자동 재전송하지 않습니다. 프로세스 감독 예제는 `ops/taesan-governance.service.example`이며 설치하거나 활성화하지 않았습니다.

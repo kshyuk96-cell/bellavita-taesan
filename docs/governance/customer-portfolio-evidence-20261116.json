@@ -1,0 +1,649 @@
+{
+  "scope": "private_local_control_plane_with_real_customer_catalog_and_readonly_source_metadata",
+  "customer_execution_activated": false,
+  "authenticated_http_verified": true,
+  "registered_projects": 4,
+  "maintenance_enabled_count": 0,
+  "canonical_service_run": {
+    "state": "bounded_run_complete",
+    "ticks": 3,
+    "source_blocked_ticks": 0,
+    "source_watch": [
+      {
+        "project": "bellavita-erp",
+        "state": "unchanged"
+      },
+      {
+        "project": "bellavita-shop",
+        "state": "unchanged"
+      },
+      {
+        "project": "funeral-association",
+        "state": "unchanged"
+      },
+      {
+        "project": "hope-sunrise",
+        "state": "unchanged"
+      }
+    ],
+    "inactive_projects": [
+      "bellavita-erp",
+      "bellavita-shop",
+      "funeral-association",
+      "hope-sunrise"
+    ],
+    "always_on_verified": false,
+    "operational_change": false
+  },
+  "execution_counts": {
+    "bridge_tasks": 0,
+    "hierarchy_tasks": 0,
+    "continuous_actions": 0
+  },
+  "original_source_unchanged": true,
+  "portfolio": {
+    "projects": [
+      {
+        "project": "bellavita-erp",
+        "registry_revision": 1,
+        "source": {
+          "state": "baseline",
+          "fresh": true
+        },
+        "connections": {
+          "state": "blocked",
+          "ready": 0,
+          "total": 5,
+          "capabilities": {
+            "source_snapshot": "not_configured",
+            "receiver": "not_configured",
+            "sandbox": "not_configured",
+            "host": "not_configured",
+            "model": "not_configured"
+          }
+        },
+        "qa": {
+          "policy": "missing",
+          "provider": "missing"
+        },
+        "role_counts": {
+          "taesan": 0,
+          "developer": 0,
+          "reviewer": 0
+        },
+        "capacity": {
+          "configured": false,
+          "max_active": null,
+          "max_review": null
+        },
+        "routing": {
+          "state": "blocked",
+          "eligible_role_counts": {
+            "taesan": 0,
+            "developer": 0,
+            "reviewer": 0
+          }
+        },
+        "tasks": [],
+        "total_tasks": 0,
+        "tasks_partial": false,
+        "progress": [
+          {
+            "item": "registration",
+            "state": "registered"
+          },
+          {
+            "item": "source",
+            "state": "verified"
+          },
+          {
+            "item": "connections",
+            "state": "blocked"
+          },
+          {
+            "item": "ownership",
+            "state": "blocked"
+          },
+          {
+            "item": "capacity",
+            "state": "blocked"
+          },
+          {
+            "item": "qa_policy",
+            "state": "blocked"
+          },
+          {
+            "item": "qa_provider",
+            "state": "blocked"
+          },
+          {
+            "item": "proposals",
+            "state": "registered"
+          },
+          {
+            "item": "routing",
+            "state": "blocked"
+          },
+          {
+            "item": "service",
+            "state": "verified"
+          }
+        ]
+      },
+      {
+        "project": "bellavita-shop",
+        "registry_revision": 1,
+        "source": {
+          "state": "baseline",
+          "fresh": true
+        },
+        "connections": {
+          "state": "blocked",
+          "ready": 0,
+          "total": 5,
+          "capabilities": {
+            "source_snapshot": "not_configured",
+            "receiver": "not_configured",
+            "sandbox": "not_configured",
+            "host": "not_configured",
+            "model": "not_configured"
+          }
+        },
+        "qa": {
+          "policy": "missing",
+          "provider": "missing"
+        },
+        "role_counts": {
+          "taesan": 0,
+          "developer": 0,
+          "reviewer": 0
+        },
+        "capacity": {
+          "configured": false,
+          "max_active": null,
+          "max_review": null
+        },
+        "routing": {
+          "state": "blocked",
+          "eligible_role_counts": {
+            "taesan": 0,
+            "developer": 0,
+            "reviewer": 0
+          }
+        },
+        "tasks": [],
+        "total_tasks": 0,
+        "tasks_partial": false,
+        "progress": [
+          {
+            "item": "registration",
+            "state": "registered"
+          },
+          {
+            "item": "source",
+            "state": "verified"
+          },
+          {
+            "item": "connections",
+            "state": "blocked"
+          },
+          {
+            "item": "ownership",
+            "state": "blocked"
+          },
+          {
+            "item": "capacity",
+            "state": "blocked"
+          },
+          {
+            "item": "qa_policy",
+            "state": "blocked"
+          },
+          {
+            "item": "qa_provider",
+            "state": "blocked"
+          },
+          {
+            "item": "proposals",
+            "state": "registered"
+          },
+          {
+            "item": "routing",
+            "state": "blocked"
+          },
+          {
+            "item": "service",
+            "state": "verified"
+          }
+        ]
+      },
+      {
+        "project": "funeral-association",
+        "registry_revision": 1,
+        "source": {
+          "state": "baseline",
+          "fresh": true
+        },
+        "connections": {
+          "state": "blocked",
+          "ready": 0,
+          "total": 5,
+          "capabilities": {
+            "source_snapshot": "not_configured",
+            "receiver": "not_configured",
+            "sandbox": "not_configured",
+            "host": "not_configured",
+            "model": "not_configured"
+          }
+        },
+        "qa": {
+          "policy": "missing",
+          "provider": "missing"
+        },
+        "role_counts": {
+          "taesan": 0,
+          "developer": 0,
+          "reviewer": 0
+        },
+        "capacity": {
+          "configured": false,
+          "max_active": null,
+          "max_review": null
+        },
+        "routing": {
+          "state": "blocked",
+          "eligible_role_counts": {
+            "taesan": 0,
+            "developer": 0,
+            "reviewer": 0
+          }
+        },
+        "tasks": [],
+        "total_tasks": 0,
+        "tasks_partial": false,
+        "progress": [
+          {
+            "item": "registration",
+            "state": "registered"
+          },
+          {
+            "item": "source",
+            "state": "verified"
+          },
+          {
+            "item": "connections",
+            "state": "blocked"
+          },
+          {
+            "item": "ownership",
+            "state": "blocked"
+          },
+          {
+            "item": "capacity",
+            "state": "blocked"
+          },
+          {
+            "item": "qa_policy",
+            "state": "blocked"
+          },
+          {
+            "item": "qa_provider",
+            "state": "blocked"
+          },
+          {
+            "item": "proposals",
+            "state": "registered"
+          },
+          {
+            "item": "routing",
+            "state": "blocked"
+          },
+          {
+            "item": "service",
+            "state": "verified"
+          }
+        ]
+      },
+      {
+        "project": "hope-sunrise",
+        "registry_revision": 1,
+        "source": {
+          "state": "baseline",
+          "fresh": true
+        },
+        "connections": {
+          "state": "blocked",
+          "ready": 0,
+          "total": 5,
+          "capabilities": {
+            "source_snapshot": "not_configured",
+            "receiver": "not_configured",
+            "sandbox": "not_configured",
+            "host": "not_configured",
+            "model": "not_configured"
+          }
+        },
+        "qa": {
+          "policy": "missing",
+          "provider": "missing"
+        },
+        "role_counts": {
+          "taesan": 0,
+          "developer": 0,
+          "reviewer": 0
+        },
+        "capacity": {
+          "configured": false,
+          "max_active": null,
+          "max_review": null
+        },
+        "routing": {
+          "state": "blocked",
+          "eligible_role_counts": {
+            "taesan": 0,
+            "developer": 0,
+            "reviewer": 0
+          }
+        },
+        "tasks": [],
+        "total_tasks": 0,
+        "tasks_partial": false,
+        "progress": [
+          {
+            "item": "registration",
+            "state": "registered"
+          },
+          {
+            "item": "source",
+            "state": "verified"
+          },
+          {
+            "item": "connections",
+            "state": "blocked"
+          },
+          {
+            "item": "ownership",
+            "state": "blocked"
+          },
+          {
+            "item": "capacity",
+            "state": "blocked"
+          },
+          {
+            "item": "qa_policy",
+            "state": "blocked"
+          },
+          {
+            "item": "qa_provider",
+            "state": "blocked"
+          },
+          {
+            "item": "proposals",
+            "state": "registered"
+          },
+          {
+            "item": "routing",
+            "state": "blocked"
+          },
+          {
+            "item": "service",
+            "state": "verified"
+          }
+        ]
+      }
+    ],
+    "batches": [],
+    "task_window": {
+      "limit": 20,
+      "freshness_checks": 0,
+      "partial": false,
+      "next_cursor": null
+    },
+    "service_health": {
+      "state": "running",
+      "http_state": "listening",
+      "manager_state": "running",
+      "fresh": true
+    },
+    "routing_state": "observed",
+    "operational_authorization": false,
+    "always_on_verified": false,
+    "account_wide_control_verified": false
+  },
+  "owner_decision_packet": {
+    "projects": [
+      "bellavita-erp",
+      "bellavita-shop",
+      "funeral-association",
+      "hope-sunrise"
+    ],
+    "owner_required": [
+      {
+        "kind": "qa_policy_setup",
+        "project": "bellavita-erp",
+        "action": "owner_register_qa_policy",
+        "execution_authorized": false
+      },
+      {
+        "kind": "qa_policy_setup",
+        "project": "bellavita-shop",
+        "action": "owner_register_qa_policy",
+        "execution_authorized": false
+      },
+      {
+        "kind": "qa_policy_setup",
+        "project": "funeral-association",
+        "action": "owner_register_qa_policy",
+        "execution_authorized": false
+      },
+      {
+        "kind": "qa_policy_setup",
+        "project": "hope-sunrise",
+        "action": "owner_register_qa_policy",
+        "execution_authorized": false
+      }
+    ],
+    "diagnostic_count": 24,
+    "operational_authorization": false,
+    "technical_acceptance": false
+  },
+  "source_handoffs": [
+    {
+      "project": "bellavita-erp",
+      "name": "벨라비타 ERP",
+      "state": "upstream_changed",
+      "baseline": {
+        "project": "bellavita-erp",
+        "source_kind": "sites",
+        "source_ref": "appgprj_6af874873e148191b9677cca35f00557",
+        "branch": "main",
+        "sha": "2c10b03db14c607fb4c61e09cbdf52ec7b406f40",
+        "revision": "sites-v20"
+      },
+      "local_sha": "2c10b03db14c607fb4c61e09cbdf52ec7b406f40",
+      "local_clean": true,
+      "upstream_sha": "13f78626e415c67ce2d07424f5ba5c1351666581",
+      "upstream_revision": "sites-v28",
+      "upstream_observed_at": 1794792632.441,
+      "source_ready_for_handoff": false,
+      "next_action": "import_new_source_into_separate_worktree",
+      "qa_contract": "not_verified",
+      "requirements_handoff": "not_verified",
+      "worker_connection": "not_verified",
+      "persistent_cloud_host": "not_verified",
+      "execution_ready": false,
+      "approval_granted": false,
+      "source_modified": false,
+      "tests_executed": 0,
+      "operational_change": false,
+      "checked_at": 1794792719.5575454,
+      "config_fingerprint": "824bc442e58f4f5f5de72ce63edc1ced02b4ca81ef1b7231b0f2d172cba33c41",
+      "migration_plan": {
+        "preserve_original": true,
+        "fetch_performed": false,
+        "reset_performed": false,
+        "strategy": "separate_worktree",
+        "steps": [
+          "record_original_source_and_pending_changes",
+          "import_new_source_into_separate_worktree",
+          "review_exact_source_version_and_requirements",
+          "verify_runtime_worker_and_qa_before_execution"
+        ]
+      }
+    },
+    {
+      "project": "bellavita-shop",
+      "name": "벨라비타 쇼핑몰",
+      "state": "source_aligned",
+      "baseline": {
+        "project": "bellavita-shop",
+        "source_kind": "github",
+        "source_ref": "kshyuk96-cell/bellavita-taesan",
+        "branch": "codex/shop-backend",
+        "sha": "d5047f3345b757edfcfbd81a73c609c0392007dd",
+        "revision": "github-d5047f3"
+      },
+      "local_sha": "d5047f3345b757edfcfbd81a73c609c0392007dd",
+      "local_clean": true,
+      "upstream_sha": "d5047f3345b757edfcfbd81a73c609c0392007dd",
+      "upstream_revision": "github-d5047f3",
+      "upstream_observed_at": 1794792637.638,
+      "source_ready_for_handoff": true,
+      "next_action": "verify_requirements_runtime_worker_and_qa_contract",
+      "qa_contract": "not_verified",
+      "requirements_handoff": "not_verified",
+      "worker_connection": "not_verified",
+      "persistent_cloud_host": "not_verified",
+      "execution_ready": false,
+      "approval_granted": false,
+      "source_modified": false,
+      "tests_executed": 0,
+      "operational_change": false,
+      "checked_at": 1794792719.5701892,
+      "config_fingerprint": "6a6f1bc664dd7733e4590446dc86c201ab51b72426edd3b8252fd28083d7595a",
+      "migration_plan": {
+        "preserve_original": true,
+        "fetch_performed": false,
+        "reset_performed": false,
+        "strategy": "preserve_and_reconcile",
+        "steps": [
+          "record_original_source_and_pending_changes",
+          "verify_requirements_runtime_worker_and_qa_contract",
+          "review_exact_source_version_and_requirements",
+          "verify_runtime_worker_and_qa_before_execution"
+        ]
+      }
+    },
+    {
+      "project": "funeral-association",
+      "name": "장례지도사협회",
+      "state": "upstream_changed",
+      "baseline": {
+        "project": "funeral-association",
+        "source_kind": "github",
+        "source_ref": "kshyuk96-cell/association-aftercare-platform",
+        "branch": "main",
+        "sha": "8f1e4fa331dbf460f0fcbea432c0fa360cc1b4ba",
+        "revision": "github-8f1e4fa"
+      },
+      "local_sha": "8f1e4fa331dbf460f0fcbea432c0fa360cc1b4ba",
+      "local_clean": true,
+      "upstream_sha": "42cfeedee9e0fbc1ffc90603b86d4fb5ed0e9e84",
+      "upstream_revision": "github-42cfeed",
+      "upstream_observed_at": 1794792637.605,
+      "source_ready_for_handoff": false,
+      "next_action": "import_new_source_into_separate_worktree",
+      "qa_contract": "not_verified",
+      "requirements_handoff": "not_verified",
+      "worker_connection": "not_verified",
+      "persistent_cloud_host": "not_verified",
+      "execution_ready": false,
+      "approval_granted": false,
+      "source_modified": false,
+      "tests_executed": 0,
+      "operational_change": false,
+      "checked_at": 1794792719.5821607,
+      "config_fingerprint": "b9bec456fe3235e118a3876ad7ebf85eec2b868e4f62c8c74fdffdf1dbc81996",
+      "migration_plan": {
+        "preserve_original": true,
+        "fetch_performed": false,
+        "reset_performed": false,
+        "strategy": "separate_worktree",
+        "steps": [
+          "record_original_source_and_pending_changes",
+          "import_new_source_into_separate_worktree",
+          "review_exact_source_version_and_requirements",
+          "verify_runtime_worker_and_qa_before_execution"
+        ]
+      }
+    },
+    {
+      "project": "hope-sunrise",
+      "name": "희망일출",
+      "state": "upstream_changed",
+      "baseline": {
+        "project": "hope-sunrise",
+        "source_kind": "sites",
+        "source_ref": "appgprj_6af86d66b7108191a8dd1052c4a7302f",
+        "branch": "main",
+        "sha": "d4da64b3791bb8dd7a96cf2f974c784385e79687",
+        "revision": "sites-v20"
+      },
+      "local_sha": "d4da64b3791bb8dd7a96cf2f974c784385e79687",
+      "local_clean": true,
+      "upstream_sha": "985a918f55f3cd2fbf0445d6ef38c761332577d2",
+      "upstream_revision": "sites-v37",
+      "upstream_observed_at": 1794792632.415,
+      "source_ready_for_handoff": false,
+      "next_action": "import_new_source_into_separate_worktree",
+      "qa_contract": "not_verified",
+      "requirements_handoff": "not_verified",
+      "worker_connection": "not_verified",
+      "persistent_cloud_host": "not_verified",
+      "execution_ready": false,
+      "approval_granted": false,
+      "source_modified": false,
+      "tests_executed": 0,
+      "operational_change": false,
+      "checked_at": 1794792719.6008618,
+      "config_fingerprint": "b291164ea5c79dc044b392eab351dada5644e89c3ee57fd6500f82680c766fe9",
+      "migration_plan": {
+        "preserve_original": true,
+        "fetch_performed": false,
+        "reset_performed": false,
+        "strategy": "separate_worktree",
+        "steps": [
+          "record_original_source_and_pending_changes",
+          "import_new_source_into_separate_worktree",
+          "review_exact_source_version_and_requirements",
+          "verify_runtime_worker_and_qa_before_execution"
+        ]
+      }
+    }
+  ],
+  "new_source_copies": [
+    {
+      "project": "bellavita-shop",
+      "sha": "d5047f3345b757edfcfbd81a73c609c0392007dd",
+      "tracked_and_visible_untracked_clean": true,
+      "ignored_dependencies_audited": false,
+      "remote_rechecked": false,
+      "security_sandbox_verified": false
+    },
+    {
+      "project": "funeral-association",
+      "sha": "42cfeedee9e0fbc1ffc90603b86d4fb5ed0e9e84",
+      "tracked_and_visible_untracked_clean": true,
+      "ignored_dependencies_audited": false,
+      "remote_rechecked": false,
+      "security_sandbox_verified": false
+    }
+  ],
+  "sites_source_import": "blocked_archive_authorization",
+  "paid_api_calls": 0,
+  "customer_writes": 0,
+  "always_on_deployed": false,
+  "schema_version": 1,
+  "snapshot_only": true,
+  "scope_note": "Private local verification manager DB with real customer catalog and connector-read source metadata; no customer worker activated, no persistent host deployed."
+}

@@ -25,6 +25,7 @@ class GovernanceService:
         self.host,self.controller,self.settings,self.server=host,controller,settings,server
         self.stop_event=threading.Event();server.governance_stop_event=self.stop_event
         self._thread=None;self.source_states={};server.governance_service=self
+        self._manager_running=False
 
     def stop(self):
         # Signal handler safe: controller fences observe this before dispatch.
@@ -34,6 +35,19 @@ class GovernanceService:
         result=self.controller.status(self.host.manager_token(),self.settings['projects'])
         result['source_watch']=[{'project':project,'state':state} for project,state in sorted(self.source_states.items())]
         return result
+
+    def health(self,token,projects):
+        """Current process observations only; never attests durable hosting or uptime."""
+        from .store import PermissionDenied
+        self.controller.status(token,projects)
+        if any(p not in self.settings['projects'] for p in projects):
+            raise PermissionDenied('health outside configured service scope')
+        alive=self._thread is not None and self._thread.is_alive()
+        stopped=self.stop_event.is_set()
+        return {'state':'stopping' if stopped else ('running' if alive else 'unavailable'),
+                'http_state':'listening' if alive and not stopped else ('stopped' if stopped else 'unknown'),
+                'manager_state':'running' if self._manager_running and not stopped else ('stopped' if stopped else 'idle'),
+                'observed_at':self.host.store._now()}
 
     def refresh_sources(self,token,projects):
         from .store import PermissionDenied
@@ -55,21 +69,33 @@ class GovernanceService:
         shutdown_thread=threading.Thread(target=self._shutdown_when_stopped,daemon=True)
         shutdown_thread.start()
         try:
-            ticks=0;blocked=0
+            self._manager_running=True
+            ticks=0;blocked=0;dispatch_scope=None;inactive=[]
             while not self.stop_event.is_set() and (max_ticks is None or ticks<max_ticks):
                 token=self.host.manager_token()
-                ready=self.refresh_sources(token,self.settings['projects']) if hasattr(self.server,'proposal_board') else True
+                active=tuple(p for p in self.settings['projects'] if self.host.registry.get(token,p)['config']['maintenance_enabled'])
+                inactive=[p for p in self.settings['projects'] if p not in active]
+                if dispatch_scope is not None and active!=dispatch_scope:
+                    self.controller.release(token,dispatch_scope,self.settings['instance_id'])
+                    dispatch_scope=None
+                if hasattr(self.server,'proposal_board'):
+                    self.refresh_sources(token,self.settings['projects'])
+                    ready=bool(active) and all(self.source_states.get(p) in ('baseline','unchanged','changed') for p in active)
+                else:ready=bool(active)
                 if ready:
-                    self.controller.tick(token,self.settings['projects'],self.settings['instance_id'],stop_event=self.stop_event)
-                else:blocked+=1
+                    dispatch_scope=active
+                    self.controller.tick(token,active,self.settings['instance_id'],stop_event=self.stop_event)
+                elif active:blocked+=1
                 ticks+=1
                 if max_ticks is None or ticks<max_ticks:self.stop_event.wait(self.settings['poll_seconds'])
             return {'state':'stopped' if self.stop_event.is_set() else 'bounded_run_complete','ticks':ticks,
                     'source_blocked_ticks':blocked,'source_watch':[{'project':p,'state':v} for p,v in sorted(self.source_states.items())],
+                    'inactive_projects':inactive,
                     'always_on_verified':False,'operational_change':False}
         finally:
+            self._manager_running=False
             self.stop()
-            try:self.controller.release(self.host.manager_token(),self.settings['projects'],self.settings['instance_id'])
+            try:self.controller.release(self.host.manager_token(),dispatch_scope or self.settings['projects'],self.settings['instance_id'])
             finally:shutdown_thread.join();self._thread.join();self.server.server_close()
 
     def _shutdown_when_stopped(self):
@@ -93,16 +119,20 @@ def load_service(config_file):
 
 
 def build_service(host,controller,settings,*,listen=None,governance=False,
-                  qa_providers=None,source_probes=None):
+                  qa_providers=None,source_probes=None,connection_profiles=None):
     """Compose already trusted host objects; provider arguments never come from HTTP/config."""
     from .continuous_manager import ContinuousManager
     from .three_tier import ThreeTier
     from .source_watch import SourceWatch
     from .governance_gate import GovernanceGate
     from .proposal_board import ProposalBoard
+    from .project_onboarding import Onboarding
+    from .connection_readiness import Connections
+    from .governance_routing import GovernanceRouting
+    from .governance_portfolio import Portfolio
     if not isinstance(host.core,ThreeTier) or host.core.store is not host.store or not isinstance(controller,ContinuousManager) or controller.core is not host.core:
         raise ValueError('same trusted host and controller required')
-    if type(governance) is not bool or (qa_providers is not None and not governance):
+    if type(governance) is not bool or (any(v is not None for v in (qa_providers,connection_profiles)) and not governance):
         raise ValueError('explicit governance registration required')
     poll=settings.get('poll_seconds')
     if type(poll) not in (int,float) or not 1<=poll<=60:raise ValueError('bounded source polling required')
@@ -119,6 +149,12 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
         if governance:
             host.core.governance_gate=gate
             server.proposal_board=ProposalBoard(host.store,host.registry);server.governance_gate=gate
-        return GovernanceService(host,controller,settings,server)
+            server.governance_onboarding=Onboarding(host.store,host.registry)
+            connections=Connections(host.store,host.registry,connection_profiles)
+            routing=GovernanceRouting(host.core,controller)
+            server.governance_portfolio=Portfolio(host.core,connections=connections,board=server.proposal_board,routing=routing)
+        service=GovernanceService(host,controller,settings,server)
+        if governance:server.governance_portfolio.health=service.health
+        return service
     except BaseException:
         server.server_close();raise
