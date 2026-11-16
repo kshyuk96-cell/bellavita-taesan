@@ -1,0 +1,192 @@
+{
+  "schema": "hope-batch02-formulas/v1",
+  "source_revision": "9433bf650183d9b8c7efe437b1f0f002bfcc0677",
+  "records": [
+    {
+      "id": "signup-hope",
+      "expression": "monthly+signup_fee",
+      "variables": {
+        "monthly": 50000,
+        "signup_fee": 25000
+      },
+      "units": "KRW / point (1:1 TEST assumption)",
+      "calculation_order": "monthly+signup_fee",
+      "rounding": "integer exact; no fractional case in this batch",
+      "condition": "initial simulator approval",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 75000,
+      "actual": 75000,
+      "status": "PASS"
+    },
+    {
+      "id": "principal-hope",
+      "expression": "monthly (signup fee excluded)",
+      "variables": {
+        "monthly": 50000,
+        "signup_fee": 25000
+      },
+      "units": "KRW / point (1:1 TEST assumption)",
+      "calculation_order": "monthly (signup fee excluded)",
+      "rounding": "integer exact; no fractional case in this batch",
+      "condition": "paid initial invoice",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 50000,
+      "actual": 50000,
+      "status": "PASS"
+    },
+    {
+      "id": "signup-happy",
+      "expression": "monthly+signup_fee",
+      "variables": {
+        "monthly": 100000,
+        "signup_fee": 50000
+      },
+      "units": "KRW / point (1:1 TEST assumption)",
+      "calculation_order": "monthly+signup_fee",
+      "rounding": "integer exact; no fractional case in this batch",
+      "condition": "initial simulator approval",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 150000,
+      "actual": 150000,
+      "status": "PASS"
+    },
+    {
+      "id": "principal-happy",
+      "expression": "monthly (signup fee excluded)",
+      "variables": {
+        "monthly": 100000,
+        "signup_fee": 50000
+      },
+      "units": "KRW / point (1:1 TEST assumption)",
+      "calculation_order": "monthly (signup fee excluded)",
+      "rounding": "integer exact; no fractional case in this batch",
+      "condition": "paid initial invoice",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 100000,
+      "actual": 100000,
+      "status": "PASS"
+    },
+    {
+      "id": "signup-premium",
+      "expression": "monthly+signup_fee",
+      "variables": {
+        "monthly": 200000,
+        "signup_fee": 100000
+      },
+      "units": "KRW / point (1:1 TEST assumption)",
+      "calculation_order": "monthly+signup_fee",
+      "rounding": "integer exact; no fractional case in this batch",
+      "condition": "initial simulator approval",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 300000,
+      "actual": 300000,
+      "status": "PASS"
+    },
+    {
+      "id": "principal-premium",
+      "expression": "monthly (signup fee excluded)",
+      "variables": {
+        "monthly": 200000,
+        "signup_fee": 100000
+      },
+      "units": "KRW / point (1:1 TEST assumption)",
+      "calculation_order": "monthly (signup fee excluded)",
+      "rounding": "integer exact; no fractional case in this batch",
+      "condition": "paid initial invoice",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 200000,
+      "actual": 200000,
+      "status": "PASS"
+    },
+    {
+      "id": "mixed-total",
+      "expression": "DP+BP+SP+card",
+      "variables": {
+        "DP": 600000,
+        "BP": 100000,
+        "SP": 100000,
+        "card": 200000
+      },
+      "units": "KRW / point (1:1 TEST assumption)",
+      "calculation_order": "DP+BP+SP+card",
+      "rounding": "integer exact; no fractional case in this batch",
+      "condition": "U04/P02 one booking, no cancellation fee",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 1000000,
+      "actual": 1000000,
+      "status": "PASS"
+    },
+    {
+      "id": "restored-DP",
+      "expression": "after_cancel-before_cancel",
+      "variables": {
+        "before": 0,
+        "after": 600000
+      },
+      "units": "KRW / point (1:1 TEST assumption)",
+      "calculation_order": "after_cancel-before_cancel",
+      "rounding": "integer exact; no fractional case in this batch",
+      "condition": "R01 full cancellation; zero fee TEST policy",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 600000,
+      "actual": 600000,
+      "status": "PASS"
+    },
+    {
+      "id": "restored-BP",
+      "expression": "after_cancel-before_cancel",
+      "variables": {
+        "before": 50000,
+        "after": 150000
+      },
+      "units": "KRW / point (1:1 TEST assumption)",
+      "calculation_order": "after_cancel-before_cancel",
+      "rounding": "integer exact; no fractional case in this batch",
+      "condition": "R01 full cancellation; zero fee TEST policy",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 100000,
+      "actual": 100000,
+      "status": "PASS"
+    },
+    {
+      "id": "restored-SP",
+      "expression": "after_cancel-before_cancel",
+      "variables": {
+        "before": 0,
+        "after": 100000
+      },
+      "units": "KRW / point (1:1 TEST assumption)",
+      "calculation_order": "after_cancel-before_cancel",
+      "rounding": "integer exact; no fractional case in this batch",
+      "condition": "R01 full cancellation; zero fee TEST policy",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 100000,
+      "actual": 100000,
+      "status": "PASS"
+    },
+    {
+      "id": "principal-cap",
+      "expression": "max(0,paid-used)",
+      "variables": {
+        "paid": 1200000,
+        "used": 450000,
+        "excluded_free_BP": 85000
+      },
+      "units": "KRW / point (1:1 TEST assumption)",
+      "calculation_order": "max(0,paid-used)",
+      "rounding": "integer exact; no fractional case in this batch",
+      "condition": "U09 proven paid principal only",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 750000,
+      "actual": 750000,
+      "status": "PASS"
+    }
+  ],
+  "missing_boundary_coverage": [
+    "fractional rounding",
+    "nonzero cancellation fees",
+    "CP policy",
+    "BP/SP relative order approval"
+  ],
+  "operational_authorization": false
+}

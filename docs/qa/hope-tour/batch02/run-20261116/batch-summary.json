@@ -1,0 +1,71 @@
+{
+  "source_revision": "9433bf650183d9b8c7efe437b1f0f002bfcc0677",
+  "engine_revision": "a76982d4f1f77356894c40e2aa5ede5964557ee9",
+  "counts": {
+    "pass": 18,
+    "fail": 1,
+    "blocked": 0,
+    "unmeasured": 1
+  },
+  "admission": {
+    "admitted": false,
+    "reasons": [
+      "critical_scenario_not_passed",
+      "required_coverage_missing"
+    ],
+    "warnings": [],
+    "scope": "synthetic_only",
+    "operational_authorization": false,
+    "verified_counts": {
+      "generated": 20,
+      "executed": 19,
+      "asserted": 19,
+      "unique_failures": 1
+    }
+  },
+  "glossary": {
+    "DP": false,
+    "BP": false,
+    "SP": false,
+    "CP": false,
+    "PG": false,
+    "API": false,
+    "CRM": false,
+    "QA": false,
+    "KPI": false
+  },
+  "report_exports": {
+    "canonical_customer_rows": 38,
+    "word_reopened": true,
+    "excel_reopened": true
+  },
+  "source_provenance": {
+    "source_files": {
+      "dist/club.mjs": "7c945db2d98e3115dc40993a87c9ea73be7b851fab74ecccee2d6778b27ea56d",
+      "dist/club-travel.mjs": "2a25f62a954cc98a9823e8e7cc736d2d6c5d14723722c1e330e1f27c35b4bd98",
+      "dist/club-launch.mjs": "22fc504398716ec1026f4c922cd78282a65b4aaa958cd7fa40604e8cdfe8b99c",
+      "dist/club-integration.mjs": "c508fcacfb05c24d5c934e1d7bab17eed839b5a874306b9b59bd1d1a7401b586",
+      "dist/club-integration-crypto.mjs": "a6e6030c6635c4ab1e5e64aa5e633f6143a3f7aa24e489f05baf6f1c35cf26c1",
+      "dist/club-admin.mjs": "91e0bf4a668e65109bb2b3f4d36f322d0f3db253ab43f59754e83ed9e70d6259",
+      "dist/club-operations.mjs": "7b71265bea022dff1ad7ba6bc7536b798f85de75edb26f004c92f1aaa77e6018",
+      "dist/orders.mjs": "6b8105aaf93178babc05c62b92f3c95fa31749526ece856f8c73d482b23f317c",
+      "dist/review-pages.mjs": "cd76fa6011ef43bdf58244b50352e1a14bbffae5ea4a433f19fa95a503c886be",
+      "dist/review-member-pages.mjs": "9b055edc1264f1b7ebdfccc82a8af959042d2d322131d70b4aec7a61b98e21b4",
+      "server-src/review-server.mjs": "4bf6a938335276056085df65cc3d107367575c7d67634185ad054a2e700c0714"
+    },
+    "linking": "same import/export removal as original build-worker; function bodies unchanged",
+    "input_source_revision": "9433bf650183d9b8c7efe437b1f0f002bfcc0677",
+    "bundle_digest": "4049eedabe7efed82f0a79419e966b28d73e471413b807db4ec7bc2b6ee0daaa"
+  },
+  "runtime_provenance": {
+    "image": "node@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54",
+    "network": "none",
+    "read_only": true,
+    "user": 65534,
+    "node_heap_mib": 384,
+    "cpu_rlimit_seconds": 35,
+    "cgroup_memory_enforced": false,
+    "arbitrary_host_execution": false,
+    "elapsed_seconds": 8.054
+  }
+}
