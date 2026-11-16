@@ -14,6 +14,7 @@ RUN apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=20 update \
  && useradd --uid 10003 --gid 10003 --create-home --shell /usr/sbin/nologin worker \
  && install -d -m 0700 -o 10003 -g 10003 /state /work /runtime /home/worker/profile
 COPY app /app
+RUN /usr/local/bin/python -m pip install --no-cache-dir --only-binary=:all: -r /app/manager_bridge/runtime-requirements.txt
 RUN test "$(git -c safe.directory=/app -C /app rev-parse HEAD)" = "${APPLICATION_COMMIT}" \
  && test -z "$(git -c safe.directory=/app -C /app status --porcelain)" \
  && chown -R 10003:10003 /app

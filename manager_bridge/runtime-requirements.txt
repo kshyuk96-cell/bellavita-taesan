@@ -1,0 +1,2 @@
+# Manager-only trusted binary dependency, separate from customer code.
+cryptography==50.0.0

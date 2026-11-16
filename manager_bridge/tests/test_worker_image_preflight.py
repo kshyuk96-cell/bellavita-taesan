@@ -33,7 +33,9 @@ class WorkerImageTests(unittest.TestCase):
             recipe=(self.source/'ops'/'worker-images'/(role+'.Dockerfile')).read_text()
             self.assertIn('FROM '+BASE_IMAGE,recipe)
             self.assertIn('USER '+str(uid)+':'+str(uid),recipe)
-            self.assertNotIn('COPY .',recipe);self.assertNotIn('pip install',recipe)
+            self.assertNotIn('COPY .',recipe)
+            self.assertIn('--only-binary=:all: -r /app/manager_bridge/runtime-requirements.txt',recipe)
+            self.assertNotIn('-r /app/requirements.txt',recipe)
         with self.assertRaises(ValueError):prepare_build_context(source=self.source,expected_commit='a'*40,role='control',destination=self.root/'wrong')
 
     def test_tracked_auth_and_missing_binary_fail_closed(self):
