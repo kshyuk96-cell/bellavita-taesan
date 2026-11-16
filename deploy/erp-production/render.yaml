@@ -19,4 +19,4 @@ services:
       - key: ERP_WORKER_KEY
         generateValue: true
       - key: ERP_RUNTIME_SHA256
-        value: fb92d565b1974aae51d59783aba8ffa30a5ee382b09c741bcbbd7b6669bb0b38
+        value: 08f0bffee32e55f76f34967f5fb59c2186b0cf290c892a2227656c8bffec2f2d
