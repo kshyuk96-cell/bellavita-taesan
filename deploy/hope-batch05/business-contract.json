@@ -1,0 +1,13 @@
+{
+  "schema": "hope-persistent-review/v1",
+  "environment": "isolated_nonproduction",
+  "project": "hope-tour",
+  "task": "hope-batch05-source-candidate",
+  "source_revision": "6e31be85187fec2e5b8592ec3e8e7cb2535352e3",
+  "database": "review.sqlite",
+  "adapter_release": "persistent-recovery-v1",
+  "schema_version": 1,
+  "operational_tables": false,
+  "real_pg": false,
+  "encryption_key_transport": "memory-to-stdin-only"
+}

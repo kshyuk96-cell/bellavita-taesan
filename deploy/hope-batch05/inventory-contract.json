@@ -1,0 +1,26 @@
+{
+  "schema": "hope-shared-fixture-inventory/v1",
+  "environment": "isolated_nonproduction",
+  "project": "hope-tour",
+  "source_revision": "6e31be85187fec2e5b8592ec3e8e7cb2535352e3",
+  "adapter_version": "shared-fixture-v1",
+  "owner": "qa-fixture-controller",
+  "supplier_connected": false,
+  "operational_tables": false,
+  "resource": {
+    "product_id": "P02",
+    "departure": "2027-03-16",
+    "room": "TEST 객실"
+  },
+  "slots": {
+    "before-hold": 1,
+    "after-hold": 1,
+    "before-store": 1,
+    "after-store": 1,
+    "before-response": 1,
+    "shared-worker": 1,
+    "restarted-unknown": 1,
+    "rounding": 2,
+    "audit": 1
+  }
+}
