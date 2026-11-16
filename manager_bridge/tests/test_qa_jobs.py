@@ -40,6 +40,7 @@ class QAJobsTests(unittest.TestCase):
 
     def test_duplicate_and_replay_and_worker_ownership(self):
         self.assertEqual(self.job, self.jobs.receive(self.owner, self.approval, 'request1', 'task1'))
+        self.assertEqual(self.job, self.jobs.receive(self.owner, self.approval, 'different-key', 'task1'))
         with self.assertRaises(Conflict):
             self.jobs.receive(self.owner, self.approval, 'request1', 'changed')
         self.jobs.claim(self.worker, self.job['id'])
@@ -51,9 +52,10 @@ class QAJobsTests(unittest.TestCase):
     def test_stale_source_and_cross_task_and_critical_fail_block(self):
         for mutation in ('source', 'binding', 'critical'):
             with self.subTest(mutation=mutation):
-                job = self.jobs.receive(self.owner, self.approval, mutation, 'task1')
+                job = self.jobs.receive(self.owner, self.approval, mutation, mutation)
                 self.jobs.claim(self.worker, job['id'])
                 r = self.report()
+                r['job_binding']['task'] = mutation
                 if mutation == 'source': r['source_revision'] = 'b'*40
                 if mutation == 'binding': r['job_binding']['task'] = 'different'
                 if mutation == 'critical': r['scenarios'][0]['status'] = 'unmeasured'
@@ -75,7 +77,7 @@ class QAJobsTests(unittest.TestCase):
     def test_cancel_and_cross_project(self):
         self.assertEqual('cancelled', self.jobs.cancel(self.owner, self.job['id'])['state'])
         with self.assertRaises(Conflict): self.jobs.claim(self.worker, self.job['id'])
-        job = self.jobs.receive(self.owner, self.approval, 'second', 'task1')
+        job = self.jobs.receive(self.owner, self.approval, 'second', 'task2')
         self.jobs.claim(self.worker, job['id'])
         self.assertEqual('reconciliation_required', self.jobs.cancel(self.owner, job['id'])['state'])
         self.store.register_project(self.owner, 'other', 'fixture/other')
@@ -93,10 +95,13 @@ class QAJobsTests(unittest.TestCase):
         base = 'http://127.0.0.1:'+str(server.server_address[1])
         try:
             result = request(base, self.owner, 'POST', '/v1/qa/jobs',
-                dict(approval=self.approval, request_key='http', task='task1'))
+                dict(approval=self.approval, request_key='http', task='task-http'))
             path = '/v1/qa/jobs/'+result['job']['id']
             self.assertTrue(request(base, self.worker, 'POST', path+'/claim', {})['ok'])
-            result = request(base, self.worker, 'POST', path+'/result', {'report':self.report()})
+            report = self.report()
+            report['job_binding']['task'] = 'task-http'
+            report['report_digest'] = digest({k:v for k,v in report.items() if k != 'report_digest'})
+            result = request(base, self.worker, 'POST', path+'/result', {'report':report})
             self.assertEqual('accepted', result['job']['state'])
             self.assertEqual(result['job'], request(base, self.owner, 'GET', path)['job'])
             self.assertEqual(409, request(base, self.worker, 'POST', path+'/claim', {})['status'])

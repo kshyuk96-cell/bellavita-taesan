@@ -18,7 +18,7 @@ class QAJobs:
             CREATE TABLE IF NOT EXISTS qa_jobs (
               id TEXT PRIMARY KEY, approval TEXT, request_key TEXT, task TEXT,
               state TEXT, worker TEXT, deadline REAL, report TEXT, decision TEXT,
-              UNIQUE(approval,request_key));
+              UNIQUE(approval,request_key), UNIQUE(approval,task));
             ''')
 
     def approve(self, token, *, project, source_revision, contract, coverage,
@@ -89,6 +89,9 @@ class QAJobs:
                 if old['task'] != task:
                     raise Conflict('idempotency conflict')
                 return self._public(old)
+            same_task = c.execute('SELECT * FROM qa_jobs WHERE approval=? AND task=?', (approval, task)).fetchone()
+            if same_task:
+                return self._public(same_task)
             if c.execute('SELECT count(*) FROM qa_jobs WHERE approval=?', (approval,)).fetchone()[0] >= 10000:
                 raise Conflict('approval job limit reached')
             key = secrets.token_hex(16)
