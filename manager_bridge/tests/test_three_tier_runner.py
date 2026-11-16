@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from manager_bridge.store import Conflict, PermissionDenied, digest
 from manager_bridge.three_tier_runner import (ReviewProfile,FixedReviewRunner,ReviewUnavailable,
-    BubblewrapReviewEngine,_archive,_extract,_tree_digest,_run_bounded)
+    BubblewrapReviewEngine,_archive,_extract,_tree_digest,_runtime_digest,_run_bounded,MAX_ARCHIVE,MAX_RUNTIME_BYTES)
 
 
 class FixtureSandboxEngine:
@@ -274,6 +274,65 @@ else:
         (self.runtime/'linked').symlink_to(self.source/'fixture.txt')
         with self.assertRaises(Conflict):self.runner.observe(self.task)
         self.assertFalse(self.engine.calls)
+
+    def test_fixed_runtime_budget_accepts_large_binary_without_expanding_source(self):
+        binary=self.runtime/'node'
+        with binary.open('wb') as stream:stream.truncate(127*1024*1024)
+        self.assertEqual(256*1024*1024,MAX_RUNTIME_BYTES)
+        self.assertEqual(64*1024*1024,MAX_ARCHIVE)
+        runtime_hash=_runtime_digest(self.runtime)
+        self.assertEqual(64,len(runtime_hash))
+        with self.assertRaisesRegex(Conflict,'too large'):_tree_digest(self.runtime)
+        self.assertEqual(runtime_hash,self.runner.observe(self.task).runtime_digest)
+        with binary.open('wb') as stream:stream.truncate(MAX_RUNTIME_BYTES+1)
+        with self.assertRaisesRegex(Conflict,'too large'):_runtime_digest(self.runtime)
+
+    def test_trusted_dependency_mount_readonly_and_fingerprinted(self):
+        modules=self.runtime/'node_modules';modules.mkdir();(modules/'fixture.js').write_text('module.exports=42')
+        engine=BubblewrapReviewEngine();seen=[]
+        def run(argv,**kwargs):
+            seen.append(argv)
+            self.assertTrue((self.root/'work'/'node_modules').is_dir())
+            return {'exit_code':0,'elapsed_seconds':0.01}
+        work=self.root/'work';work.mkdir()
+        with patch.object(engine,'probe',return_value={'available':True,'isolation_verified':True}),patch('manager_bridge.three_tier_runner._run_bounded',side_effect=run):
+            engine.execute_snapshot(self.profile,work,self.root,[('checks',self.profile.checks['checks'])],lambda:None)
+        argv=seen[0];position=argv.index(str(modules))
+        self.assertEqual('--ro-bind',argv[position-1]);self.assertEqual('/work/node_modules',argv[position+1])
+        candidate=self.candidate();(modules/'fixture.js').write_text('changed')
+        with self.assertRaises(Conflict):self.run_review(candidate,self.reviewer)
+
+    def test_dependencies_cannot_shadow_candidate_or_use_links(self):
+        modules=self.runtime/'node_modules';modules.mkdir()
+        (self.source/'node_modules').mkdir();(self.source/'node_modules'/'bad.js').write_text('tracked')
+        self.git('add','.');self.git('commit','-m','Forbidden tracked dependencies')
+        profile=replace(self.profile,head_sha=self.git('rev-parse','HEAD'))
+        runner=FixedReviewRunner(profile,engine=self.engine,clock=lambda:self.now)
+        with self.assertRaisesRegex(ReviewUnavailable,'candidate dependencies'):runner.observe(self.task)
+        self.assertFalse(self.engine.calls)
+        (modules/'outside').symlink_to(self.source/'fixture.txt')
+        with self.assertRaises(Conflict):_runtime_digest(self.runtime)
+
+    def test_nested_tracked_dependencies_rejected_in_archive_and_extract(self):
+        import io,tarfile
+        modules=self.source/'src'/'node_modules';modules.mkdir(parents=True)
+        (modules/'package.js').write_text('candidate dependency shadow')
+        self.git('add','.');self.git('commit','-m','Nested forbidden dependency')
+        profile=replace(self.profile,head_sha=self.git('rev-parse','HEAD'))
+        with self.assertRaisesRegex(ReviewUnavailable,'candidate dependencies'):_archive(profile)
+        for name in ('node_modules/x.js','src/node_modules/x.js','src/deep/node_modules/x.js'):
+            stream=io.BytesIO()
+            with tarfile.open(fileobj=stream,mode='w') as archive:
+                item=tarfile.TarInfo(name);item.size=1;archive.addfile(item,io.BytesIO(b'x'))
+            with self.assertRaises(ReviewUnavailable):_extract(stream.getvalue(),self.root/'unpacked')
+
+    def test_direct_engine_runtime_mutation_blocks_outcomes(self):
+        engine=BubblewrapReviewEngine()
+        def run(argv,**kwargs):
+            (self.runtime/'changed').write_text('untrusted drift')
+            return {'exit_code':0,'elapsed_seconds':0.01}
+        with patch.object(engine,'probe',return_value={'available':True,'isolation_verified':True}),patch('manager_bridge.three_tier_runner._run_bounded',side_effect=run):
+            with self.assertRaises(Conflict):engine.execute_snapshot(self.profile,self.source,self.root,[('checks',self.profile.checks['checks'])],lambda:None)
 
     def test_process_cap_is_applied_inside_namespace_before_registered_command(self):
         engine=BubblewrapReviewEngine();seen=[]

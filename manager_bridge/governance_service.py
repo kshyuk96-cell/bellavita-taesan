@@ -26,6 +26,7 @@ class GovernanceService:
         self.stop_event=threading.Event();server.governance_stop_event=self.stop_event
         self._thread=None;self.source_states={};server.governance_service=self
         self._manager_running=False
+        self.supervision=None
 
     def stop(self):
         # Signal handler safe: controller fences observe this before dispatch.
@@ -34,6 +35,7 @@ class GovernanceService:
     def status(self):
         result=self.controller.status(self.host.manager_token(),self.settings['projects'])
         result['source_watch']=[{'project':project,'state':state} for project,state in sorted(self.source_states.items())]
+        if self.supervision is not None:result['supervision']=self.supervision.report(self.host.manager_token(),self.settings['projects'])
         return result
 
     def health(self,token,projects):
@@ -73,6 +75,8 @@ class GovernanceService:
             ticks=0;blocked=0;dispatch_scope=None;inactive=[]
             while not self.stop_event.is_set() and (max_ticks is None or ticks<max_ticks):
                 token=self.host.manager_token()
+                if self.supervision is not None:self.supervision.poll(token,stop_event=self.stop_event)
+                if self.stop_event.is_set():break
                 active=tuple(p for p in self.settings['projects'] if self.host.registry.get(token,p)['config']['maintenance_enabled'])
                 inactive=[p for p in self.settings['projects'] if p not in active]
                 if dispatch_scope is not None and active!=dispatch_scope:
@@ -108,18 +112,24 @@ class GovernanceService:
 
 def load_service(config_file):
     config=_private_json(config_file)
-    if config.get('version')!=1 or type(config.get('version')) is not int or not {'version','host_config_file'}<=set(config) or set(config)-{'version','host_config_file','listen','governance'}:
+    if config.get('version')!=1 or type(config.get('version')) is not int or not {'version','host_config_file'}<=set(config) or set(config)-{'version','host_config_file','listen','governance','supervision'}:
         raise ValueError('exact governance service configuration required')
     listener=config.get('listen',{})
     if 'governance' in config and (type(config['governance']) is not dict or config['governance']):
         raise ValueError('exact governance settings required')
     host_config=_private_file(config['host_config_file'])
     host,controller,settings=load_host(host_config)
-    return build_service(host,controller,settings,listen=listener,governance='governance' in config)
+    supervision=None
+    if 'supervision' in config:
+        from .governance_supervision import SupervisionSettings
+        if type(config['supervision']) is not dict:raise ValueError('explicit supervision settings required')
+        supervision=SupervisionSettings(**config['supervision'])
+    return build_service(host,controller,settings,listen=listener,governance='governance' in config,supervision=supervision)
 
 
 def build_service(host,controller,settings,*,listen=None,governance=False,
-                  qa_providers=None,source_probes=None,connection_profiles=None):
+                  qa_providers=None,source_probes=None,connection_profiles=None,
+                  supervision=None,owner_token_loader=None,expiration_provider=None,subscription_broker=None):
     """Compose already trusted host objects; provider arguments never come from HTTP/config."""
     from .continuous_manager import ContinuousManager
     from .three_tier import ThreeTier
@@ -139,6 +149,10 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
     listener=_listener({} if listen is None else listen)
     # Validate actor scope before creating a socket or exposing any service.
     controller.status(host.manager_token(),settings['projects'])
+    if supervision is not None:
+        from .governance_supervision import GovernanceSupervision
+        GovernanceSupervision.validate_registration(host.core,settings['projects'],supervision,owner_token_loader,subscription_broker)
+    elif subscription_broker is not None:raise ValueError('explicit supervision settings required')
     watch=SourceWatch(host.store,host.registry,source_probes)
     gate=GovernanceGate(host.store,host.registry,providers=qa_providers) if governance else None
     if gate is not None:gate.enroll(host.manager_token(),settings['projects'])
@@ -155,6 +169,13 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
             server.governance_portfolio=Portfolio(host.core,connections=connections,board=server.proposal_board,routing=routing)
         service=GovernanceService(host,controller,settings,server)
         if governance:server.governance_portfolio.health=service.health
+        if supervision is not None:
+            from .governance_supervision import GovernanceSupervision
+            service.supervision=GovernanceSupervision(host,controller,settings['projects'],supervision,
+                health=service.health,owner_token_loader=owner_token_loader,expiration_provider=expiration_provider,subscription_broker=subscription_broker)
+            server.governance_supervision=service.supervision
+        elif owner_token_loader is not None or expiration_provider is not None:
+            raise ValueError('explicit supervision settings required')
         return service
     except BaseException:
         server.server_close();raise

@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "workspace_id": "tea-dbqjaul6e07s73fcqmo0",
+  "workspace_name": "Simba's workspace",
+  "workspace_explicitly_confirmed": true,
+  "request_scoped_workspace": true,
+  "services": [
+    {
+      "service_id": "srv-dbsmfgoae00c738fnhjg",
+      "name": "bellavita-obituary-erp-review-bmb7",
+      "kind": "web_service",
+      "region": "singapore",
+      "plan": "free",
+      "branch": "codex/bellavita-review-isolation",
+      "repository": "https://github.com/kshyuk96-cell/association-aftercare-platform",
+      "auto_deploy": false,
+      "suspended": false,
+      "disk_gb": 0,
+      "preview_generation": "off"
+    },
+    {
+      "service_id": "srv-dbsmcbgae00c738ff18g",
+      "name": "signitone-pilot-zp6o",
+      "kind": "web_service",
+      "region": "singapore",
+      "plan": "0.5c-512mb",
+      "branch": "main",
+      "repository": "https://github.com/kshyuk96-cell/signitone-studio",
+      "auto_deploy": false,
+      "suspended": false,
+      "disk_gb": 10,
+      "preview_generation": "off"
+    },
+    {
+      "service_id": "srv-dbskef0n74is73a5chk0",
+      "name": "bellavita-invitation-erp-review",
+      "kind": "web_service",
+      "region": "oregon",
+      "plan": "free",
+      "branch": "codex/erp-invitation-checkout-20261115",
+      "repository": "https://github.com/kshyuk96-cell/bellavita-taesan",
+      "auto_deploy": false,
+      "suspended": false,
+      "disk_gb": 0,
+      "preview_generation": "off"
+    },
+    {
+      "service_id": "srv-dbsfj4mi0phs73d0a8mg",
+      "name": "association-integration-review-gfja",
+      "kind": "web_service",
+      "region": "singapore",
+      "plan": "0.5c-512mb",
+      "branch": "main",
+      "repository": "https://github.com/kshyuk96-cell/association-aftercare-platform",
+      "auto_deploy": false,
+      "suspended": false,
+      "disk_gb": 1,
+      "preview_generation": "off"
+    },
+    {
+      "service_id": "srv-dbs3drbrjlhs73d278sg",
+      "name": "bellavita-shop-verification-v3b4",
+      "kind": "web_service",
+      "region": "oregon",
+      "plan": "0.5c-512mb",
+      "branch": "codex/shop-backend",
+      "repository": "https://github.com/kshyuk96-cell/bellavita-taesan",
+      "auto_deploy": false,
+      "suspended": false,
+      "disk_gb": 1,
+      "preview_generation": "off"
+    },
+    {
+      "service_id": "srv-dbqjqm5bedkc73drfkc0",
+      "name": "bellavita-taesan-test",
+      "kind": "web_service",
+      "region": "oregon",
+      "plan": "0.5c-512mb",
+      "branch": "main",
+      "repository": "https://github.com/kshyuk96-cell/bellavita-taesan",
+      "auto_deploy": true,
+      "suspended": false,
+      "disk_gb": 1,
+      "preview_generation": "off"
+    }
+  ],
+  "known_compute_monthly_usd": 28,
+  "known_disk_monthly_usd": 3.25,
+  "full_workspace_bill_verified": false,
+  "resource_changes": 0,
+  "remote_host_namespace_measured": false
+}

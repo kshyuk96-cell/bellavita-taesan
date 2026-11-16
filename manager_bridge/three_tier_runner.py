@@ -23,6 +23,8 @@ from .source_rehearsal import observe_checkout
 from .store import Conflict, PermissionDenied, _project, _sha, digest
 
 MAX_ARCHIVE = 64 * 1024 * 1024
+# Trusted host policy only; never a task/HTTP-selected archive allowance.
+MAX_RUNTIME_BYTES = 256 * 1024 * 1024
 MAX_FILES = 50000
 
 
@@ -69,7 +71,9 @@ def _archive(profile):
         if not raw:continue
         meta,path=raw.split(b'\t',1);mode,kind,oid=meta.split(b' ')
         if mode not in (b'100644',b'100755') or kind!=b'blob':raise ReviewUnavailable('tracked source links forbidden')
-        tracked[path.decode('utf-8')]=oid.decode('ascii')
+        decoded=path.decode('utf-8')
+        if 'node_modules' in Path(decoded).parts:raise ReviewUnavailable('tracked candidate dependencies forbidden')
+        tracked[decoded]=oid.decode('ascii')
     if len(tracked)>MAX_FILES:raise ReviewUnavailable('bounded tracked input count required')
     with tarfile.open(fileobj=io.BytesIO(content),mode='r:') as archive:
         files={m.name:m for m in archive.getmembers() if m.isfile()}
@@ -92,13 +96,13 @@ def _extract(content,destination):
         for item in members:
             path=Path(item.name)
             if (path.is_absolute() or '..' in path.parts or '\\' in item.name or
-                    not path.parts or path.parts[0] in {'.git','node_modules'} or
+                    not path.parts or path.parts[0]=='.git' or 'node_modules' in path.parts or
                     not (item.isdir() or item.isfile())):
                 raise ReviewUnavailable('review snapshot links or metadata forbidden')
         archive.extractall(root,members=members,filter='data')
 
 
-def _tree_digest(path):
+def _bounded_tree_digest(path, byte_limit):
     """Before/after fingerprint of the independent input copy, not build output."""
     root=Path(path);records=[];total=0
     if root.is_symlink() or not root.is_dir():raise Conflict('review input root changed')
@@ -107,11 +111,37 @@ def _tree_digest(path):
         relative=item.relative_to(root).as_posix()
         if item.is_file():
             total+=item.stat().st_size
-            if total>MAX_ARCHIVE:raise Conflict('review input too large')
-            records.append((relative,hashlib.sha256(item.read_bytes()).hexdigest(),item.stat().st_mode&0o777))
+            if total>byte_limit:raise Conflict('review input too large')
+            with item.open('rb') as stream:
+                file_digest=hashlib.file_digest(stream,'sha256').hexdigest()
+            records.append((relative,file_digest,item.stat().st_mode&0o777))
         elif not item.is_dir():raise Conflict('review input special file detected')
         if len(records)>MAX_FILES:raise Conflict('review input file count exceeded')
     return digest(records)
+
+
+def _tree_digest(path):
+    """Source snapshots retain the independent 64 MiB bound."""
+    return _bounded_tree_digest(path, MAX_ARCHIVE)
+
+
+def _runtime_digest(path):
+    """A fixed larger allowance for host-owned Node binaries and dependencies."""
+    return _bounded_tree_digest(path, MAX_RUNTIME_BYTES)
+
+
+def _dependency_mount(profile, work):
+    """Read-only trusted dependencies never originate in a tracked candidate."""
+    modules=profile.runtime/'node_modules'
+    if not modules.exists() and not modules.is_symlink():return []
+    if modules.is_symlink() or not modules.is_dir():raise Conflict('trusted dependencies must be a real directory')
+    target=Path(work)/'node_modules'
+    if target.is_symlink() or (target.exists() and (not target.is_dir() or any(target.iterdir()))):
+        raise Conflict('candidate dependencies must not shadow trusted runtime')
+    # _extract rejects every tracked node_modules entry, including empty dirs.
+    # Prepare an empty mountpoint before the source becomes read-only in bwrap.
+    target.mkdir(exist_ok=True)
+    return ['--ro-bind',str(modules),'/work/node_modules']
 
 
 @dataclass(frozen=True)
@@ -200,8 +230,11 @@ class BubblewrapReviewEngine(BubblewrapTests):
     def execute_snapshot(self,profile,work,outputs,checks,heartbeat):
         if self.probe().get('isolation_verified') is not True:
             raise ReviewUnavailable('independent review isolation unavailable')
+        # Direct engine callers receive the same fixed runtime/path validation.
+        runtime_before=_runtime_digest(profile.runtime)
+        dependencies=_dependency_mount(profile,work)
         prefix=self._base()+['--ro-bind',str(profile.runtime),'/runtime',
-            '--ro-bind',str(work),'/work','--bind',str(outputs),'/outputs','--chdir','/work',
+            '--ro-bind',str(work),'/work']+dependencies+['--bind',str(outputs),'/outputs','--chdir','/work',
             '--setenv','PYTHONDONTWRITEBYTECODE','1','--setenv','TAESAN_DATA','/tmp/taesan-fixture-data',
             '--setenv','TAESAN_WEBHOOK_SECRET','fixture-review-only',
             '--setenv','TAESAN_ADMIN_IDS','fixture-admin','--setenv','TAESAN_STAFF_IDS','fixture-employee',
@@ -211,6 +244,7 @@ class BubblewrapReviewEngine(BubblewrapTests):
             guarded=['/usr/bin/prlimit','--core=0','--nofile=256','--fsize=268435456',
                      '--nproc=128','--as=1610612736','--']+list(argv)
             outcome=_run_bounded(prefix+guarded,cwd=None,timeout=profile.timeout,heartbeat=heartbeat)
+            if _runtime_digest(profile.runtime)!=runtime_before:raise Conflict('trusted runtime changed during execution')
             results.append({'name':name,'argv_digest':digest(list(argv)),**outcome})
         return results
 
@@ -257,7 +291,7 @@ class FixedReviewRunner:
             artifact_digest=hashlib.sha256(content).hexdigest(),
             checks_digest=digest({name:digest(list(argv)) for name,argv in checks}),
             reference='independent-source/'+self.profile.project+'/'+self.profile.head_sha[:12],observed_at=self._now(),
-            changed_paths=self._changed_paths(),runtime_digest=_tree_digest(self.profile.runtime))
+            changed_paths=self._changed_paths(),runtime_digest=_runtime_digest(self.profile.runtime))
 
     def __call__(self,candidate,reviewer,*,heartbeat=None):
         from .three_tier import CheckOutcome,ReviewEvidence
@@ -283,6 +317,7 @@ class FixedReviewRunner:
         with tempfile.TemporaryDirectory(prefix='taesan-independent-review-') as directory:
             root=Path(directory);work=root/'source';outputs=root/'outputs'
             work.mkdir(mode=0o700);outputs.mkdir(mode=0o700);_extract(content,work)
+            _dependency_mount(self.profile,work)
             before=_tree_digest(work)
             def fence():
                 heartbeat()

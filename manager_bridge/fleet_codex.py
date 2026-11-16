@@ -9,6 +9,7 @@ technical acceptance. Run coding profiles on dedicated credential-free hosts:
 workspace-write is not a host-data confidentiality boundary.
 """
 from dataclasses import dataclass
+from contextlib import ExitStack, nullcontext
 from pathlib import Path
 import hashlib
 import json
@@ -129,9 +130,11 @@ def _stop(process):
 class _Rpc:
     def __init__(self,host,project):
         self.host=host;self.project=project;self.process=None;self.counter=0;self.pending=b'';self.total=0;self.selector=None
+        self.profile_stack=ExitStack()
     def __enter__(self):
         binding=self.host._binding(self.project)
         try:
+            self.profile_stack.enter_context(self.host._profile_scope(self.project))
             self.process=self.host.process_factory([str(self.host.binary),'app-server','--listen','stdio://'],
                 cwd=str(binding.cwd),env=_environment(self.host.home),stdin=subprocess.PIPE,stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,start_new_session=True)
@@ -143,15 +146,16 @@ class _Rpc:
             self.__exit__(None,None,None)
             raise TransportUnavailable('registered Codex metadata connection unavailable') from None
     def __exit__(self,*args):
-        if self.process:
-            # An acknowledgement can precede asynchronous metadata flush. EOF
-            # allows the official server to shut down normally before SIGTERM.
-            if self.process.stdin and not self.process.stdin.closed:self.process.stdin.close()
-            try:self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:_stop(self.process)
-            for stream in (self.process.stdin,self.process.stdout):
-                if stream:stream.close()
-        if self.selector:self.selector.close()
+        try:
+            if self.process:
+                # EOF permits asynchronous metadata flush before termination.
+                if self.process.stdin and not self.process.stdin.closed:self.process.stdin.close()
+                try:self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:_stop(self.process)
+                for stream in (self.process.stdin,self.process.stdout):
+                    if stream:stream.close()
+            if self.selector:self.selector.close()
+        finally:self.profile_stack.close()
     def _send(self,value):
         encoded=(json.dumps(value,separators=(',',':'))+'\n').encode()
         if len(encoded)>32768:raise ValueError('bounded registered request required')
@@ -186,7 +190,7 @@ class _Rpc:
 
 class CodexHost:
     def __init__(self,binary,codex_home,bindings,*,authorize=None,authorize_review=None,authorize_reservation=None,diagnostic_sink=None,
-                 clock=time.time,process_factory=subprocess.Popen,metadata_timeout=15,execution_timeout=180):
+                 clock=time.time,process_factory=subprocess.Popen,metadata_timeout=15,execution_timeout=180,profile_guard=None):
         binary=Path(binary).absolute()
         if not binary.is_file() or not os.access(binary,os.X_OK):raise ValueError('registered executable required')
         self.binary=binary;self.home=_directory(codex_home,True)
@@ -194,7 +198,7 @@ class CodexHost:
         self.bindings=dict(bindings)
         for key,value in self.bindings.items():
             if not isinstance(value,ProjectBinding) or key!=value.project:raise ValueError('exact project binding required')
-        for callback in (authorize,authorize_review,authorize_reservation,diagnostic_sink):
+        for callback in (authorize,authorize_review,authorize_reservation,diagnostic_sink,profile_guard):
             if callback is not None and not callable(callback):raise ValueError('registered authorizer required')
         if not callable(clock) or not callable(process_factory):raise ValueError('registered host callbacks required')
         if type(metadata_timeout) not in (int,float) or not 1<=metadata_timeout<=60 or type(execution_timeout) not in (int,float) or not 1<=execution_timeout<=600:raise ValueError('bounded host timeout required')
@@ -206,6 +210,11 @@ class CodexHost:
         self.metadata_timeout,self.execution_timeout=metadata_timeout,execution_timeout
         self._deliveries={}
         self._confidentiality={}
+        self.profile_guard=profile_guard
+
+    def _profile_scope(self,project):
+        self._binding(project)
+        return self.profile_guard(project) if self.profile_guard is not None else nullcontext()
     def _diagnostic(self,project,stage,category='none',**facts):
         stages={'spawned','input_ready','process_completed','events_observed','stopped','run_failed','source_checked','source_failed','receipt_completed','receipt_failed','assessment_failed','assessment_completed'}
         categories={'none','authorization','timeout','output_bound','process','json','event_bound','receipt_sequence','unsupported_event','command_outcome','native_identity','process_outcome','source','assessment_json','assessment_schema','unknown'}
@@ -480,6 +489,10 @@ print(json.dumps(result));sys.exit(0 if result['outside_denied'] and result['git
         self._binding(project)
         return FleetProvider(self.discover,None,True,self.delivery_observer,execution_provisioning=self.authorize_reservation is not None,reserved_execution_observer=self.reserved_execution_observer if self.authorize_reservation is not None else None)
     def _run(self,project,prompt,*,session_id,read_only,heartbeat,context=None):
+        with self._profile_scope(project):
+            return self._run_guarded(project,prompt,session_id=session_id,read_only=read_only,heartbeat=heartbeat,context=context)
+
+    def _run_guarded(self,project,prompt,*,session_id,read_only,heartbeat,context=None):
         binding=self._binding(project)
         if context is not None:
             if type(context) is not dict or set(context)-{'task_id','task_version','manifest_digest','reservation_id','candidate_digest'}:raise ValueError('fixed diagnostic context required')
