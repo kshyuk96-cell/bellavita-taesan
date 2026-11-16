@@ -423,9 +423,12 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
             configured=os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID','').strip()
             if configured:items=[worker.template_check(configured,client)]
             else:
-                rows=list(client.products(all_pages=True))
-                candidates=[r for r in rows if '쌀빛그림화환' in r.get('goodName','') and str(r.get('isShow'))=='0' and str(r.get('isRecommend'))=='0'][:12]
-                items=[worker.template_check(str(r['goodNum']),client) for r in candidates]
+                items=[]
+                for r in client.products(all_pages=True):
+                    if '쌀빛그림화환' not in r.get('goodName','') or str(r.get('isShow'))!='0' or str(r.get('isRecommend'))!='0':continue
+                    items.append({'productId':str(r['goodNum']),'name':r.get('goodName',''),'price':int(r.get('goodPrice') or 0),'hidden':True})
+                    if len(items)>=12:break
+                # Detailed image/settings fingerprints are fetched only for the selected source.
             handler.send_json({'items':items,'configured':configured or None});return True
         if method=='POST' and path=='/erp/invitations/template-check':
             size=int(handler.headers.get('Content-Length','0'))
