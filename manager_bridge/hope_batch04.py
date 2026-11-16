@@ -81,6 +81,13 @@ def customer_report(raw,result,*,engine_revision,prior):
     for defect in report['defects']:
         if defect['id']=='LIMIT-REVIEW-INVENTORY-001':defect.update(status='TEST_ADAPTER_RETEST_MATCH_SUPPLIER_PENDING',retest='PARTIAL_SHARED_FIXTURE_MATCH',retest_source_revision=raw['source_revision'])
         elif defect['id']=='BUG-TERM-001':defect.update(status='HTML_RETEST_MATCH_BROWSER_PENDING',retest='BROWSER_NOT_RUN')
+    duplicate_fault=next((f for f in raw['artifacts'].get('faultInjection',[]) if f['id']=='duplicate-debit'),None)
+    if duplicate_fault and duplicate_fault.get('targetDetected') is False:
+        report['defects'].append(dict(id='BUG-RECONCILE-DUPLICATE-001',scenario_ids=[],related_development_items=[79],severity='S1',priority='P0',
+            status='OPEN_TEST_DETECTION_GAP',kind='injected_state_detection_gap_not_observed_production_duplicate',
+            symptom='실제 실행 결과를 복제해 균형이 맞는 중복 차감 원장을 주입했을 때 대상 자체 대사기가 누락; 독립 대사기는 검출',
+            actual=dict(target_detected=False,independent_detected=bool(independent_domain_check(duplicate_fault['domain']))),expected=dict(target_detected=True),
+            owner=None,due_date=None,fixed_revision=None,retest_source_revision=raw['source_revision'],retest='INDEPENDENT_DETECTION_ONLY'))
     states=('PASS','FAIL','BLOCKED','NOT RUN');counts={s:sum(r['status']==s for r in report['scenarios']) for s in states}
     report['summary'].update(counts=counts,executed=sum(r['execution_steps'] is not None for r in report['scenarios']),deployed_revision=None,execution_scope=raw['scope'],
         unique_observed_checks=sum(result['counts'].get(s,0) for s in ('pass','fail')),unresolved_S1_S2=sum(d.get('severity') in ('S1','S2') and d['status']!='CLOSED' for d in report['defects']),recommendation='인수 차단: 실제 공급사/PG/브라우저/정책 승인 미검증')
