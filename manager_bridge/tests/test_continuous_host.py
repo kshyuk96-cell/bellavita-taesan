@@ -189,6 +189,20 @@ class HostTests(unittest.TestCase):
             forbidden=probe.call_args.args[1]
             self.assertIn(devprofile,forbidden);self.assertIn(reviewprofile,forbidden)
         self.assertEqual(config['projects'],('project',));self.assertEqual(self.transport.calls,0)
+        artifacts=self.root/'retained-references';artifacts.mkdir(mode=0o700)
+        preparation=self.root/'prepared-references';preparation.mkdir(mode=0o700)
+        payload['reference_materials']={'artifact_root':str(artifacts),'preparation_root':str(preparation)}
+        path.write_text(json.dumps(payload))
+        with patch('manager_bridge.continuous_host.observe_checkout',return_value={'sha':'a'*40,'tracked_and_visible_untracked_clean':True}), patch('manager_bridge.fleet_codex.CodexHost.verify_confidentiality',return_value={'verified':True,'fixture':True}) as probe:
+            configured,_,_=load_host(path)
+            self.assertIn(artifacts,probe.call_args.args[1]);self.assertIn(preparation,probe.call_args.args[1])
+            self.assertTrue(callable(configured.projects['project'].developer_transport.reference_provider))
+        payload['reference_materials']['preparation_root']=str(devprofile)
+        path.write_text(json.dumps(payload))
+        with patch('manager_bridge.continuous_host.observe_checkout',return_value={'sha':'a'*40,'tracked_and_visible_untracked_clean':True}), patch('manager_bridge.fleet_codex.CodexHost.verify_confidentiality') as probe:
+            with self.assertRaisesRegex(ValueError,'reference roots must be separate'):load_host(path)
+            probe.assert_not_called()
+        payload.pop('reference_materials')
         # A forbidden control parent cannot be reopened for model work roots.
         payload['data_root']=str(self.root);payload['database']=str(self.store.path)
         path.write_text(json.dumps(payload))
