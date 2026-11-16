@@ -23,15 +23,19 @@ python scripts/run_hope_tour_qa.py --sut-revision 475b25947f9f22161ad8d7730b5b34
 # 운영자가 대상 버전·배포를 먼저 조회해 고정한 manifest로 검수 API를 실행한다.
 # 토큰이 필요한 경우 기존 비공개 0600 token 파일만 전달한다. 토큰을 명령 인수 값으로 넣지 않는다.
 python scripts/run_hope_tour_qa.py --sut-revision 475b25947f9f22161ad8d7730b5b34dbf3a83b54 \
-  --target-manifest docs/qa/hope-tour/target-v31.json --live-review \
+  --target-manifest /private/source-before.json --live-review \
   --token-file /private/hope-review.token --output /tmp/hope-live-report
 
+# 실행 후 Sites에서 버전/배포를 다시 조회해 source-after.json을 만든다.
+# 전후 manifest에는 실제 조회한 UTC observed_at을 기록한다.
+# gzip -dc /tmp/hope-live-report/customer-observations.json.gz > /private/observations.json
 # 기존 관찰 재판독: 데이터는 인증된 검수 실행기가 수집한 자료여야 한다.
 python scripts/run_hope_tour_qa.py --sut-revision EXPECTED_REVIEWED_SOURCE_SHA \
-  --evidence-json /private/observations.json --output /tmp/hope-recheck
+  --evidence-json /private/observations.json --target-manifest /private/source-before.json \
+  --after-target-manifest /private/source-after.json --output /tmp/hope-recheck
 ```
 
-실행 코드가 먼저 커밋되어 있어야 한다. 새 버전은 새 manifest·계약·실행을 요구한다. 다른 SUT 버전의 관찰은 차단한다. 첨부 `target-v31.json`은 이번 관찰의 재현 기준이며 이후 배포를 자동 승인하지 않는다. 검수 전·후에 Sites 배포/버전을 다시 확인한다. manifest는 운영자 확인 자료로, 보고서 해시만으로 대상 배포의 진실성을 인증하지 않는다.
+실행 코드가 먼저 커밋되어 있어야 한다. 새 버전은 새 manifest·계약·실행을 요구한다. 다른 SUT 버전의 관찰은 차단한다. 첨부 `target-v31.json`은 이번 관찰의 재현 기준이며 이후 배포를 자동 승인하지 않는다. 검수 전·후에 Sites 배포/버전을 다시 확인한다. live 수집 단계는 사후 관찰이 없으므로 잠정 보고서만 만든다. 별도 재판독 단계에서 전후 프로젝트·origin·버전·배포·소스가 같고, 실제 조회 시각이 수집 구간의 앞뒤를 감싸야 인수용 버전 결합을 인정한다. 하나라도 누락/불일치면 수집된 기대값 비교를 인수 증거로 채택하지 않는다. live 실행의 사전 manifest는 5분 이내에 조회한 자료여야 한다. manifest는 운영자 확인 자료로, 보고서 해시만으로 대상 배포의 진실성을 인증하지 않는다.
 
 `HopeReviewClient`는 정확한 검수 origin과 `/review/` API만 사용한다. 매 POST 전에 `isolated_server_review`, simulator, 실제 결제/운영 쓰기/외부 알림 모두 false를 확인한다. 새 cookie jar마다 별도 합성 공간을 사용한다. 운영 엔드포인트, PAN/CVC, 다른 workspace 주입, 임의 상품/회사 데이터 입력은 허용하지 않는다. 로그인·가입·가상 카드·시계·예약·취소 동작은 공개 검수 계정과 전용 서버 공간에서만 수행한다.
 
@@ -59,3 +63,5 @@ Excel 외부 텍스트는 수식 실행이 되지 않도록 이스케이프한�
 공통 매니저 게이트 `admit_qa_report`를 사용하며 현재 보고서는 중요 미실시/실패로 인수를 차단한다. 기존 승인 저장소에 제출 보고서 자체에서 계약을 복원해 등록하면 안 된다. 운영자가 사전에 보관한 `build_contract(scenarios(), registered_adapter_versions)`와 기대 SUT 버전을 사용한다.
 
 이 프로젝트의 실제 HTTP 검수는 고정 review 서버의 격리 simulator를 이용한다. #74의 네트워크 차단 자식 실행기에서 운영 URL로 나가는 우회를 추가하지 않았다. 임의 대상 코드나 임의 네트워크 명령을 sandbox 밖에서 실행하는 기능은 제공하지 않는다.
+
+개발 중 검수 사이트가 31번에서 32번으로 변경된 사실을 발견했다. 31번을 기대하고 수집한 초기 관찰은 안정된 소스 결합 증거로 채택하지 않았다. 이 사례를 전후 배포/시각 불일치 회귀 검사에 반영했다.

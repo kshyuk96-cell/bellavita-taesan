@@ -9,12 +9,13 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from datetime import datetime, timezone
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from taesan_core.hope_tour_qa import formula_suite,fixture_adapters,REFERENCE_SHA256,FORMAT_SHA256,POLICY_VERSION
 from taesan_core.universal_qa import run_scenarios,build_contract
 from manager_bridge.qa_admission import admit_qa_report
 from manager_bridge.hope_review_client import HopeReviewClient,ORIGIN
-from manager_bridge.hope_tour_acceptance import collect,evaluate
+from manager_bridge.hope_tour_acceptance import collect,evaluate,verify_source_window
 from manager_bridge.hope_tour_reporting import final_report
 from manager_bridge.hope_tour_exports import document,spreadsheet
 
@@ -30,8 +31,10 @@ def main():
     parser.add_argument('--token-file',type=Path)
     parser.add_argument('--target-manifest',type=Path)
     parser.add_argument('--evidence-json',type=Path)
+    parser.add_argument('--after-target-manifest',type=Path)
     args=parser.parse_args()
     if not re.fullmatch('[a-f0-9]{40}',args.sut_revision):parser.error('exact target source SHA required')
+    if args.live_review and args.after_target_manifest:parser.error('observe target source AFTER execution, then finalize by evidence import')
     if args.live_review and args.evidence_json:parser.error('choose live review or observation import')
     engine=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     paths=['scripts/run_hope_tour_qa.py','taesan_core/universal_qa.py','taesan_core/hope_tour_qa.py',
@@ -44,6 +47,12 @@ def main():
     if args.live_review and (not target or target.get('source_revision')!=args.sut_revision or
                             target.get('origin')!=ORIGIN or target.get('deployment_status')!='succeeded'):
         parser.error('operator-reviewed source/version/deployment manifest required')
+    if args.live_review:
+        try:
+            stamp=datetime.fromisoformat(target['observed_at'])
+            age=(datetime.now(timezone.utc)-stamp).total_seconds()
+            if not 0<=age<=300:raise ValueError()
+        except (KeyError,TypeError,ValueError):parser.error('fresh timezone-aware platform source observation (within five minutes) required')
     output=args.output;output.mkdir(parents=True,exist_ok=True)
     def save(name,value):
         with gzip.GzipFile(filename=str(output/name),mode='wb',mtime=0) as f:
@@ -72,6 +81,9 @@ def main():
     if args.live_review:
         collected=collect(lambda:HopeReviewClient(token_file=args.token_file),sut_revision=args.sut_revision)
     elif args.evidence_json:collected=json.loads(args.evidence_json.read_text())
+    after=json.loads(args.after_target_manifest.read_text()) if args.after_target_manifest else None
+    source_verified=verify_source_window(collected,target,after,args.sut_revision)
+    for observation in collected['observations'].values():observation['source_window_verified']=source_verified
     evaluation=evaluate(collected['observations'],sut_revision=args.sut_revision,seed=args.seed)
     customer=final_report(evaluation,collected,engine_revision=engine,sut_revision=args.sut_revision)
     save('customer-observations.json.gz',collected)
@@ -80,7 +92,7 @@ def main():
     spreadsheet(customer,output/'customer-report.xlsx');document(customer,output/'customer-report.docx')
     summary=dict(engine_revision=engine,sut_revision=args.sut_revision,policy_version=POLICY_VERSION,
         reference_documents=[REFERENCE_SHA256,FORMAT_SHA256],source_file_hashes={p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in paths},
-        target_manifest=target,seed=args.seed,reference_selfcheck=reference['counts'],
+        target_manifest=target,after_target_manifest=after,source_window_verified=source_verified,seed=args.seed,reference_selfcheck=reference['counts'],
         reference_scope='test-system self-check; NOT 2060 executions of the customer service',
         mutations=mutations,service_counts=evaluation['report']['counts'],
         service_admission=evaluation['admission'],customer_summary=customer['summary'],

@@ -22,6 +22,13 @@ def text(value):
     return json.dumps(value,ensure_ascii=False,sort_keys=True) if type(value) in (dict,list) else ('' if value is None else str(value))
 
 
+SUMMARY_LABELS={'basis_at':'시험 기준일','deployed_revision':'배포 버전','total':'전체 시나리오 수','counts':'통과/실패/차단/미실시',
+ 'executed':'실행 수(부분 실행 포함)','execution_basis_pass_rate_percent':'실행기준 통과율(%)','unique_observed_checks':'고유 관찰 항목 수',
+ 'execution_note':'실행 집계 범위','business_results':'업무별 통과 현황','unresolved_S1_S2':'미해결 S1/S2',
+ 'actual_pg':'실제 PG 연동','recommendation':'최종 권고','usability':'사용성 실측',
+ 'operational_authorization':'운영 승인','customer_acceptance_approved':'발주사 최종 인수 승인'}
+
+
 def spreadsheet(report,path):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
@@ -39,7 +46,7 @@ def spreadsheet(report,path):
         for col in ws.columns:
             ws.column_dimensions[col[0].column_letter].width=min(70,max(16,len(str(col[0].value))+5))
             for cell in col:cell.alignment=Alignment(vertical='top',wrap_text=True)
-    sheet('종합결과',['항목','보고값'],report['summary'].items())
+    sheet('종합결과',['항목','보고값'],[(SUMMARY_LABELS.get(k,k),v) for k,v in report['summary'].items()])
     sheet('승인게이트',['단계','상태','사유'],[(g['stage'],g['status'],g['reason']) for g in report['approval_gates']])
     sheet('시나리오결과',['시험ID','업무','중요도','시험내용','일시','수행자','검토자','배포버전','환경','데이터','실제절차','기대값','실제값','판정','증빙','결함','재시험','비고'],
         [(r['test_id'],r['group'],r['priority'],r['title'],r['tested_at'],r['performer'],r['reviewer'],r['deployed_revision'],r['environment'],r['preconditions'],r['execution_steps'],r['expected'],r['actual'],r['status'],r['evidence'],r['defect_ids'],r['retest'],r['note']) for r in report['scenarios']])
@@ -70,7 +77,7 @@ def document(report,path):
     doc.add_heading('종합 결과보고서',level=1)
     table=doc.add_table(rows=0,cols=2);table.style='Table Grid'
     for key,value in report['summary'].items():
-        row=table.add_row().cells;row[0].text=key;row[1].text=text(value)
+        row=table.add_row().cells;row[0].text=SUMMARY_LABELS.get(key,key);row[1].text=text(value)
     doc.add_paragraph('실행기준 통과율 = PASS ÷ (PASS+FAIL) ×100; 분모 0이면 미산정. BLOCKED/NOT RUN은 별도 표시.')
     doc.add_heading('준비 및 승인 게이트',level=1)
     for gate in report['approval_gates']:doc.add_paragraph(gate['stage']+' / '+gate['status']+' / '+gate['reason'])

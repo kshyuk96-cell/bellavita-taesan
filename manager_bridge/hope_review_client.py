@@ -4,6 +4,7 @@ import json
 import re
 import time
 import uuid
+from datetime import datetime, timezone
 from urllib.request import Request, build_opener, ProxyHandler, HTTPCookieProcessor
 from urllib.error import HTTPError, URLError
 from .control import NoRedirect, secret
@@ -49,7 +50,9 @@ class HopeReviewClient:
         try:value=json.loads(raw)
         except (ValueError,UnicodeError):value=raw.decode(errors='replace')
         # No headers, cookies, login body, tokens or exception text in evidence.
-        self.events.append(dict(method=method,path=path,status=status,response_digest=digest(value),
+        self.events.append(dict(method=method,path=path,status=status,at=datetime.now(timezone.utc).isoformat(),
+                                request_id=body.get('requestId') if type(body) is dict and path.endswith('/command') else None,
+                                response_digest=digest(value),
                                 elapsed_ms=round((time.monotonic()-started)*1000)))
         return status,value
 

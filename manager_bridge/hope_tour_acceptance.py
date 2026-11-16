@@ -1,6 +1,7 @@
 """T01-T10 traceability and evidence admission, distinct from developer claims."""
 import re
 import uuid
+from datetime import datetime, timezone
 from lxml import html
 from taesan_core.hope_tour_qa import REQUIREMENTS, GLOSSARY, risk, REFERENCE_SHA256, POLICY_VERSION
 from taesan_core.universal_qa import Adapter, Scenario, EvidenceUnavailable, run_scenarios, build_contract
@@ -49,6 +50,8 @@ def evaluate(observations, *, sut_revision, seed=20261116):
         if observation is None:raise EvidenceUnavailable('not_executed_or_policy_not_approved')
         if type(observation) is not dict or observation.get('sut_revision')!=sut_revision:
             raise ValueError('stale observation rejected')
+        if observation.get('source_window_verified') is not True:
+            raise EvidenceUnavailable('target_source_window_not_verified')
         if observation.get('scope') not in ('isolated_server_review_http','server_html_declaration'):
             raise ValueError('unsupported evidence source')
         # These externally verified capabilities cannot be inferred from a simulator.
@@ -56,7 +59,7 @@ def evaluate(observations, *, sut_revision, seed=20261116):
                               'bp-limit-approved','bonus-order-approved','corporate-policy-approved','mobile-help'):
             raise EvidenceUnavailable('independent_evidence_or_policy_approval_required')
         return dict(actual=observation['actual'],evidence={'scope':observation['scope'],
-            'sut_revision':sut_revision,'steps':observation['steps']})
+            'sut_revision':sut_revision,'observed_at':observation.get('observed_at'),'steps':observation['steps']})
     adapters=[Adapter('hope-review','customer-observation-v1',execute)]
     suite=scenarios();contract=build_contract(suite,adapters)
     report=run_scenarios(suite,adapters,source_revision=sut_revision,seed=seed,required_coverage=list(CASES))
@@ -79,9 +82,11 @@ def evaluate(observations, *, sut_revision, seed=20261116):
 
 def collect(client_factory, *, sut_revision):
     """Fixed synthetic workspace actions only; never run downloaded package code."""
+    started_at=datetime.now(timezone.utc).isoformat()
     observations={};events=[];errors=[];caps={}
     def save(key,actual,steps,scope='isolated_server_review_http'):
-        observations[key]=dict(actual=actual,steps=steps,scope=scope,sut_revision=sut_revision)
+        observations[key]=dict(actual=actual,steps=steps,scope=scope,sut_revision=sut_revision,
+                               observed_at=datetime.now(timezone.utc).isoformat(),source_window_verified=False)
     def signup(client,scenario='success'):
         client.login('member');client.command('registerCard',{'scenario':scenario})
         fields=dict(grade='hope',consents={'terms':True,'privacy':True,'recurring':True,'marketing':False})
@@ -150,6 +155,24 @@ def collect(client_factory, *, sut_revision):
         except (ReviewUncertain,KeyError,ValueError,TypeError):errors.append(key+'_not_verified')
         finally:events.extend(client.events)
     # No cookies/tokens, passwords, raw card fields or entire member records exported.
-    return dict(observations=observations,transport_events=events,errors=errors,
+    return dict(started_at=started_at,finished_at=datetime.now(timezone.utc).isoformat(),
+        observations=observations,transport_events=events,errors=errors,
         developer_claims=caps.get('coverage',{}),capabilities={k:caps.get(k) for k in
             ('mode','realCharges','operationalWrites','actualPgCardTests','browserRunVerified','productionIdentityVerified')})
+
+
+def verify_source_window(collected,before,after,expected_revision):
+    """Trusted operator's platform observations; never inferred from report hashes."""
+    try:
+        keys=('project_id','origin','version_id','deployment_id','source_revision')
+        if (not before or not after or any(not before.get(k) or before[k]!=after.get(k) for k in keys) or
+                before['source_revision']!=expected_revision or
+                before['origin']!='https://hope-tour-feedback.shrewdmaxim1.chatgpt.site' or
+                before.get('deployment_status')!='succeeded' or after.get('deployment_status')!='succeeded'):
+            return False
+        stamp=lambda value:datetime.fromisoformat(value)
+        times=[stamp(before['observed_at']),stamp(collected['started_at']),
+               stamp(collected['finished_at']),stamp(after['observed_at'])]
+        return all(t.tzinfo is not None for t in times) and times==sorted(times)
+    except (KeyError,TypeError,ValueError):
+        return False

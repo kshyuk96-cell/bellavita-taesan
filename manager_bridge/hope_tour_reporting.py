@@ -61,7 +61,7 @@ def final_report(evaluation,collected,*,engine_revision,sut_revision,reviewer=No
         elif sid in ('MEM-08','PAY-08'):
             status='BLOCKED';note='정책결정 대기'
         results.append(dict(test_id=sid,requirement_id=sid,priority=priority,group=group,title=title,
-            tested_at=now if status in ('PASS','FAIL','BLOCKED') and observed and observed['executed'] else None,
+            tested_at=observed.get('evidence',{}).get('observed_at') if observed and observed['executed'] else None,
             performer='자동 검증기',reviewer=reviewer,deployed_revision=sut_revision,
             environment={'url':'https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/',
                 'browser':None,'device':None,'os':None,'pg_mode':'simulator'},
@@ -97,9 +97,12 @@ def final_report(evaluation,collected,*,engine_revision,sut_revision,reviewer=No
         ('⑥ 보고·인수','P0 전항목 통과·S1/S2 0건·실제 PG 증거·정책 승인 조건 미충족')]]
     return dict(schema='hope-customer-final-report/v1',reference_documents=[REFERENCE_SHA256,FORMAT_SHA256],
         policy_version=POLICY_VERSION,engine_revision=engine_revision,sut_revision=sut_revision,
-        summary={'basis_at':now,'total':len(results),'counts':counts,
+        summary={'basis_at':now,'deployed_revision':sut_revision,'total':len(results),'counts':counts,
             'executed':counts['PASS']+counts['FAIL']+sum(r['status']=='BLOCKED' and r['execution_steps'] is not None for r in results),
             'execution_basis_pass_rate_percent':round(100*counts['PASS']/denominator,2) if denominator else None,
+            'unique_observed_checks':evaluation['report']['counts']['executed'],
+            'execution_note':'38개 최종 시험의 부분 실행 포함; 실제 HTTP 관찰 수와 합산하지 않음',
+            'business_results':{g:{state:sum(r['group']==g and r['status']==state for r in results) for state in ('PASS','FAIL','BLOCKED','NOT RUN')} for g in sorted({r['group'] for r in results})},
             'unresolved_S1_S2':unresolved,'actual_pg':'미연동','recommendation':'재시험 필요',
             'usability':{'participants':0,'task_success_rate':None,'duration':None,'help_requests':None},
             'operational_authorization':False,'customer_acceptance_approved':False},

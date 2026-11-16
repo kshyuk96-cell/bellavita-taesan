@@ -41,7 +41,7 @@ class HopeTourQATests(unittest.TestCase):
         self.assertFalse(final['summary']['customer_acceptance_approved'])
 
     def test_simulator_cannot_attest_real_pg_or_mobile(self):
-        observations={key:dict(actual=expected,scope='isolated_server_review_http',sut_revision='a'*40,steps=['fixture'])
+        observations={key:dict(actual=expected,scope='isolated_server_review_http',sut_revision='a'*40,source_window_verified=True,steps=['fixture'])
                       for key,(_,expected) in CASES.items()}
         value=evaluate(observations,sut_revision='a'*40)
         self.assertFalse(value['admission']['admitted'])
@@ -51,7 +51,7 @@ class HopeTourQATests(unittest.TestCase):
         self.assertFalse(any(r['status']=='PASS' for r in final['scenarios']))
 
     def test_stale_evidence_blocks_and_declaration_conflict_is_scoped(self):
-        observation=dict(actual='SP',scope='server_html_declaration',sut_revision='a'*40,steps=['FB-13 label'])
+        observation=dict(actual='SP',scope='server_html_declaration',sut_revision='a'*40,source_window_verified=True,steps=['FB-13 label'])
         value=evaluate({'principal-first-declaration':observation},sut_revision='a'*40)
         row=next(r for r in value['report']['scenarios'] if r['id']=='principal-first-declaration')
         self.assertEqual('fail',row['status'])
@@ -100,3 +100,16 @@ class HopeTourQATests(unittest.TestCase):
             self.assertTrue(book['종합결과'].cell(book['종합결과'].max_row,2).value.startswith("'="))
             from docx import Document
             self.assertTrue(any('시나리오별 결과보고서' in p.text for p in Document(root/'report.docx').paragraphs))
+
+
+    def test_source_window_change_or_missing_post_observation_never_verifies(self):
+        from manager_bridge.hope_tour_acceptance import verify_source_window
+        before=dict(project_id='fixture',origin='https://hope-tour-feedback.shrewdmaxim1.chatgpt.site',
+            version_id='v31',deployment_id='deploy31',source_revision='a'*40,deployment_status='succeeded',
+            observed_at='2026-11-16T01:00:00+00:00')
+        after=dict(before,observed_at='2026-11-16T01:03:00+00:00')
+        observed=dict(started_at='2026-11-16T01:01:00+00:00',finished_at='2026-11-16T01:02:00+00:00')
+        self.assertTrue(verify_source_window(observed,before,after,'a'*40))
+        self.assertFalse(verify_source_window(observed,before,None,'a'*40))
+        self.assertFalse(verify_source_window(observed,before,dict(after,version_id='v32'),'a'*40))
+        self.assertFalse(verify_source_window(observed,before,dict(after,observed_at='2026-11-16T00:59:00+00:00'),'a'*40))
