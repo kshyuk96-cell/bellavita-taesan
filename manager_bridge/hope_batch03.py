@@ -1,7 +1,7 @@
 """Batch 41–60 manager oracles and local central-manager integration checks."""
 from copy import deepcopy
 from pathlib import Path
-import shutil
+from .hope_browser_contract import browser_plan
 from lxml import html
 from .hope_batch02 import glossary_observation
 from .hope_tour_reporting import final_report
@@ -58,9 +58,9 @@ def evaluate(raw,source,trusted,host,baseline):
         actual[43]['nativeDetails']=min(len(r.xpath('//details[@class="review-term"]/summary')) for r in roots)
         actual[43]['summary']=min(len(r.xpath('//details[@class="review-term"]/p')) for r in roots)
     actual[47]=dict(originalMissing=not all(original.values()),candidateAllPresent=all(terms.values()))
-    browser=shutil.which('cua_repl.js')
-    actual[44]=dict(unsupportedSkipped=browser is None,noFallback=True)
-    actual.update(host)
+    plan=browser_plan(source)
+    actual[44]=dict(unsupportedSkipped=plan['status']=='NOT RUN' and plan['preview_started'] is False,noFallback=plan['automatic_fallback'] is False)
+    actual.update({n:host.get(n) for n in range(48,55)})
     # Browser rows have no accepted observation transport in this profile.
     actual[45]=actual[46]=None
     matrix=artifacts.get('bpMatrix',[]);caps={'hope':{'domestic':1500,'overseas':1000,'culture':5000},'happy':{'domestic':2000,'overseas':1500,'culture':7000},'premium':{'domestic':2500,'overseas':1800,'culture':10000}}
@@ -80,7 +80,7 @@ def evaluate(raw,source,trusted,host,baseline):
     report=run_scenarios(suite(source),[Adapter(ADAPTER,VERSION,execute)],source_revision=source,seed=20261116,required_coverage=['batch03-'+str(n) for n in EXPECTED])
     admission=admit_qa_report(report,expected_source_revision=source,required_coverage=['batch03-'+str(n) for n in EXPECTED],expected_contract=trusted)
     return dict(common_report=report,trusted_contract=trusted,admission=admission,glossary=terms,baseline_glossary=original,
-        counts={s:sum(r['status']==s for r in report['scenarios']) for s in ('pass','fail','blocked','unmeasured')})
+        browser_plan=plan,counts={s:sum(r['status']==s for r in report['scenarios']) for s in ('pass','fail','blocked','unmeasured')})
 
 
 def customer_report(raw,result,engine_revision,prior):
@@ -101,15 +101,17 @@ def customer_report(raw,result,engine_revision,prior):
             execution_steps=['실제 후보 소스 Worker·격리 SQLite·독립 관리기 기대값 대조'],evidence=check['evidence'],
             note='후보 소스의 부분 검증; 고객 UI/정책/실제 PG 인수 조건 별도',defect_ids=[])
     for defect in report['defects']:
-        if defect['id']=='BUG-TERM-001':defect.update(status='HTML_RETEST_MATCH_BROWSER_PENDING',retest='PARTIAL_HTML_MATCH')
+        if defect['id']=='BUG-TERM-001':defect.update(status='HTML_RETEST_MATCH_BROWSER_PENDING',retest='PARTIAL_HTML_MATCH',retest_source_revision=raw['source_revision'])
     report['defects'].append(dict(id='LIMIT-REVIEW-INVENTORY-001',scenario_ids=['PRD-04'],severity='S1',priority='P0',
         status='OPEN',kind='isolated_review_scope_limit_not_production_oversell_proof',
         symptom='검수 공간별 재고 독립: 전역 마지막1석 공유 보호를 검증할 수 없음',actual=raw['artifacts'].get('inventory'),
         expected='승인된 공유 비운영 재고에서 전체 확정합계1 이하',owner=None,due_date=None,fixed_revision=None,retest='FAIL'))
     states=('PASS','FAIL','BLOCKED','NOT RUN')
-    report['summary'].update(counts={s:sum(r['status']==s for r in report['scenarios']) for s in states},
+    report['summary'].update(browser_plan=plan,counts={s:sum(r['status']==s for r in report['scenarios']) for s in states},
         executed=sum(r['execution_steps'] is not None for r in report['scenarios']),unique_observed_checks=sum(result['counts'][s] for s in ('pass','fail')),
         unresolved_S1_S2=sum(d.get('severity') in ('S1','S2') for d in report['defects']),recommendation='인수 차단: 전역재고·브라우저·실제PG·정책 미검증')
     report['summary']['business_results']={g:{s:sum(r['group']==g and r['status']==s for r in report['scenarios']) for s in states} for g in {r['group'] for r in report['scenarios']}}
+    report['summary']['execution_basis_pass_rate_percent']=0 if report['summary']['counts']['FAIL'] else None
+    report['retest_regression']=dict(status='PARTIAL_HTML_AND_API',candidate_source_revision=raw['source_revision'],browser_verified=False,actual_pg_verified=False,original_defect_ids=[d['id'] for d in report['defects']])
     report['actual_source_batch03']=dict(counts=result['counts'],admission=result['admission'],source_provenance=raw.get('source_provenance'),runtime_provenance=raw.get('runtime_provenance'))
     return report

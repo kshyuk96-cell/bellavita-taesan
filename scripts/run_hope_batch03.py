@@ -92,7 +92,7 @@ def main():
             job=jobs.receive(owner,approval,'approved-batch03','hope-batch03-source-candidate')
             manifest=jobs.inspect(owner,job['id'])['manifest'];last={}
             def evaluator(raw):
-                result=evaluate(raw,service.revision,trusted,host,baseline);last.update(result);return result['common_report']
+                result=evaluate(raw,service.revision,trusted,host,baseline);last.update(result);raw['browser_plan']=result['browser_plan'];return result['common_report']
             engine=HopeEngine(registry,manifest,evaluator);outcome=QAWorker(QAClient(base,worker),registry,engine=engine).run_once(job['id'])
             if not engine.raw or not last or outcome['state'] not in ('accepted','blocked'):raise ValueError('manager execution uncertain; do not retry automatically')
             raw=engine.raw;raw.update(engine_revision=revision,engine_files=engine_files,baseline_revision=config['baseline_revision'],manager_probe=probe)
