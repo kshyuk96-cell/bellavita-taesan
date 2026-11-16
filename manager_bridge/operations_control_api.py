@@ -6,6 +6,7 @@ from .store import NotFound
 PREFIX='/v1/representative/runtime/governance/control/operations/'
 ROUTES={
     'preflight':('inspect',('projects',),()),
+    'workers':('workers',('projects',),()),
     'owner-packet':('owner_packet',('request_key','projects'),('expected_fingerprints',)),
     'report':('report',('request_key','projects'),('after','limit')),
     'batches':('batches',('projects',),('cursor','limit')),

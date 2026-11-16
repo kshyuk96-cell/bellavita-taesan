@@ -1,0 +1,25 @@
+# Local worker image preparation
+
+The three recipes under `ops/worker-images` use the same exact Python base digest and an explicit committed application revision. Control, developer, and reviewer run as different nonroot UIDs (10001, 10002, 10003). Each image gets its own runtime profile directory; no auth, owner token, application database, customer source, or environment secret is included. Developer and reviewer include only a separately supplied bounded Codex executable, checked against its SHA-256 during the build. No model is run while building or probing.
+
+`prepare_build_context(source=..., expected_commit=..., role=..., destination=..., codex_binary=...)` creates a new private context from a shallow local clone of the specified commit, removes the origin, refuses tracked credential/state filenames and links, and supplies the role recipe and restrictive context ignore file. It never uses `COPY .` on a working directory. Dirty working-tree changes do not enter the committed application snapshot. Context manifests separately fingerprint the recipe and artifact bytes. Recipes must come from the trusted reviewed checkout; this helper is host-only configuration, not an HTTP build service.
+
+Build locally with the manifest's `APPLICATION_COMMIT` and (for workers) `CODEX_SHA256` build arguments. Do not pass credentials through build arguments. The application revision label identifies committed application code; the new recipe and module changes require a new application commit and rebuild before release. Package installation uses the pinned base's official Debian sources and a fixed host-tool allowlist, not customer package scripts or root `requirements.txt`. The latter contains broad customer/AI dependencies and is deliberately not installed here. Debian package resolution can change: the immutable final local image config digest records the actual build; this is not a fully reproducible apt lockfile.
+
+`inspect_local_image` accepts an existing exact local image config digest and checks role, UID, and application revision labels. Metadata validation is distinct from `probe_local_image`, which runs fixed version checks and a namespace probe with network disabled, no capabilities, a read-only root, bounded resources, and no credential mounts. A local config digest is not a registry manifest digest or third-party signature. These helpers never push, deploy, contact a model, provision a service, or silently relax isolation.
+
+Default commands show governance CLI help or the Codex version. They do not start a connected worker or authorize jobs. Runtime worker links, short-lived scoped credentials, independent role profiles, reviewed source/runtime bundles, and exact lease fences remain required. Control does not contain Codex; dedicated worker transports must be wired before using these images as a separated service topology. Customer Python/Node dependencies are separate trusted runtime bundles. Presence of `bubblewrap` is not proof that a host permits its namespaces.
+
+| Execution option | Measured evidence | Still required |
+| --- | --- | --- |
+| Current managed Cloud workspace | Local namespace/fsync and separate-process state checks can be measured; session lifetime is bounded | A supported supervisor and infrastructure persistence/restart evidence; do not call this always-on |
+| Local rootless Docker | Exact local build/config digests, nonroot users, tool versions, and container namespace probe are separately observable | The required nested namespaces must actually pass; no plain-process fallback |
+| Render Docker worker/control service | Recipe guidance only; no image was pushed and no service was created or deployed | Actual selected-host identity, namespace support, private persistent state, auth injection, restart/stop observations, and owner-approved rollout |
+
+A failed namespace probe blocks secure worker execution even when an image builds and its version checks pass. Local image preparation alone cannot establish remote host capability, production readiness, deployment authorization, or infrastructure durability.
+
+## Local observation for the initial preparation
+
+Three images were actually built from application commit `d63ab1ded4cfa62803cc3b3ec584ec2d60f64013` on the local rootless Docker daemon. Fixed read-only/no-network probes observed Python 3.13.5, Git 2.39.5, Bubblewrap 0.8.0, UIDs 10001/10002/10003, and Codex CLI 0.167.0-alpha.4 in the developer/reviewer images. Control correctly has no Codex executable. Actual config digests, context manifests, and build logs are retained privately under `/workspace/taesan-worker-image-proof`; these are local artifacts, not registry attestations.
+
+The canonical namespace probe failed inside all three restricted local containers. Therefore these built images are **not verified execution hosts** under the current Docker confinement. No privileges, host mounts, plain-process fallback, authentication, model calls, image push, or deployment were added to get around that result. This says nothing about a selected Render host, which has not been measured.

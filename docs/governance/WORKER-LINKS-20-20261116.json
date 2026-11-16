@@ -1,0 +1,115 @@
+{
+  "implementation_commit": "0ad364dc7d3876b02e2741bcee539febfd89d61b",
+  "scope": "private-source inert JSON markers, not business QA",
+  "tasks": [
+    {
+      "project": "bellavita-shop",
+      "task_id": "aa9f96c49d49eace3825c862abac6515",
+      "historical_state": "accepted",
+      "developer_process_exit": 0,
+      "turn_completed": true,
+      "command_successes": 1,
+      "command_failures": 0,
+      "session_id": "01a1e2d1-3fbe-7f23-a102-6a7427356581",
+      "independent_recommendation": "pass",
+      "checks": [
+        {
+          "name": "delivery_marker",
+          "exit_code": 0
+        }
+      ],
+      "isolation_verified": true,
+      "completed_observed_at": 1794806757.2931976
+    },
+    {
+      "project": "bellavita-shop",
+      "task_id": "55bf734a4c856f3dcc1246d82009ded7",
+      "historical_state": "accepted",
+      "developer_process_exit": 0,
+      "turn_completed": true,
+      "command_successes": 1,
+      "command_failures": 0,
+      "session_id": "01a1e2d1-3fbe-7f23-a102-6a7427356581",
+      "independent_recommendation": "pass",
+      "checks": [
+        {
+          "name": "delivery_marker",
+          "exit_code": 0
+        }
+      ],
+      "isolation_verified": true,
+      "completed_observed_at": 1794806939.1564622
+    },
+    {
+      "project": "bellavita-erp",
+      "task_id": "de6f869096a85e47b3f8a004a0346460",
+      "historical_state": "accepted",
+      "developer_process_exit": 0,
+      "turn_completed": true,
+      "command_successes": 1,
+      "command_failures": 0,
+      "session_id": "01a1e2dc-216e-7103-b3e5-15154167770d",
+      "independent_recommendation": "pass",
+      "checks": [
+        {
+          "name": "delivery_marker",
+          "exit_code": 0
+        }
+      ],
+      "isolation_verified": true,
+      "completed_observed_at": 1794807466.7247996
+    },
+    {
+      "project": "hope-sunrise",
+      "task_id": "d4ff2599c32cd1e723cf69b721cba746",
+      "historical_state": "accepted",
+      "developer_process_exit": 0,
+      "turn_completed": true,
+      "command_successes": 1,
+      "command_failures": 0,
+      "session_id": "01a1e2dd-9e9f-73b0-b5b4-e30dd368d281",
+      "independent_recommendation": "pass",
+      "checks": [
+        {
+          "name": "delivery_marker",
+          "exit_code": 0
+        }
+      ],
+      "isolation_verified": true,
+      "completed_observed_at": 1794807571.9728155
+    },
+    {
+      "project": "funeral-association",
+      "task_id": "15ae955dbbf3b8d7639815f0b11e9c77",
+      "historical_state": "accepted",
+      "developer_process_exit": 0,
+      "turn_completed": true,
+      "command_successes": 1,
+      "command_failures": 0,
+      "session_id": "01a1e2de-febf-7781-b76d-cbad83397c68",
+      "independent_recommendation": "pass",
+      "checks": [
+        {
+          "name": "delivery_marker",
+          "exit_code": 0
+        }
+      ],
+      "isolation_verified": true,
+      "completed_observed_at": 1794807661.7657616
+    }
+  ],
+  "whole_suite_passed": 1995,
+  "worker_profile_count": 8,
+  "same_session_followup_verified": true,
+  "always_on_deployed": false,
+  "customer_source_pushes": 0,
+  "paid_api_calls": 0,
+  "tester_engine_executed": false,
+  "artifact_body_bytes": 426,
+  "artifact_exact_readback": true,
+  "local_database_restore_quarantined": true,
+  "offhost_backup_verified": false,
+  "container_namespace_probe_passed": false,
+  "maintenance_flags_active": false,
+  "existing_codex_ui_chat_control_verified": false
+}

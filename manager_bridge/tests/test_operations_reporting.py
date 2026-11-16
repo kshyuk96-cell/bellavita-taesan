@@ -20,6 +20,16 @@ class OperationsReportingTests(unittest.TestCase):
     def service(self,**kwargs):
         return OperationsReporting(self.core,ControlDigest(Portfolio(self.core)),**kwargs)
 
+    def test_known_credential_key_is_rejected_before_trusted_observer(self):
+        called=[]
+        service=self.service(artifact_sources={('project','candidate'):lambda *_:called.append(1)})
+        from manager_bridge.store import PermissionDenied
+        # URL-safe bearer starts may be invalid names; use a registered safe
+        # fixture credential so the early known-token fence is exercised.
+        bearer=self.store.add_token('artifact-probe','worker',['project'],token='fixture-artifact-key-'+('z'*32))
+        with self.assertRaises(ValueError):service.register_artifact(self.manager,'project','candidate',bearer)
+        self.assertFalse(called)
+
     def test_artifact_actual_bytes_hash_and_size_only_are_retained(self):
         raw=b'PRIVATE_LOG_PAYLOAD';calls=[]
         def observer(project,key):calls.append((project,key));return ArtifactObservation(project,'qa_report',key,raw,self.now)
