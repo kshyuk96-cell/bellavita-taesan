@@ -77,6 +77,9 @@ class GovernanceService:
                 token=self.host.manager_token()
                 if self.supervision is not None:self.supervision.poll(token,stop_event=self.stop_event)
                 if self.stop_event.is_set():break
+                if self.controller.admission_budget is not None:
+                    self.controller.admission_budget.poll_auth(token,self.settings['projects'])
+                if self.stop_event.is_set():break
                 active=tuple(p for p in self.settings['projects'] if self.host.registry.get(token,p)['config']['maintenance_enabled'])
                 inactive=[p for p in self.settings['projects'] if p not in active]
                 if dispatch_scope is not None and active!=dispatch_scope:
@@ -129,7 +132,8 @@ def load_service(config_file):
 
 def build_service(host,controller,settings,*,listen=None,governance=False,
                   qa_providers=None,source_probes=None,connection_profiles=None,
-                  supervision=None,owner_token_loader=None,expiration_provider=None,subscription_broker=None):
+                  supervision=None,owner_token_loader=None,expiration_provider=None,subscription_broker=None,
+                  operating_budget=None,operations_metadata=(),artifact_sources=None):
     """Compose already trusted host objects; provider arguments never come from HTTP/config."""
     from .continuous_manager import ContinuousManager
     from .three_tier import ThreeTier
@@ -144,6 +148,18 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
         raise ValueError('same trusted host and controller required')
     if type(governance) is not bool or (any(v is not None for v in (qa_providers,connection_profiles)) and not governance):
         raise ValueError('explicit governance registration required')
+    if not governance and (operating_budget is not None or operations_metadata or artifact_sources is not None):
+        raise ValueError('explicit governance operations registration required')
+    if governance:
+        from .operating_budget import OperatingBudget
+        if controller.admission_budget is not None and host.core.admission_budget is not None and controller.admission_budget is not host.core.admission_budget:
+            raise ValueError('core and controller admission bindings differ')
+        existing_budget=controller.admission_budget or host.core.admission_budget
+        if operating_budget is not None and (not isinstance(operating_budget,OperatingBudget) or operating_budget.core is not host.core):
+            raise ValueError('same registered operating budget required')
+        if existing_budget is not None and operating_budget is not None and existing_budget is not operating_budget:
+            raise ValueError('controller already has a different admission budget')
+        budget=operating_budget or existing_budget or OperatingBudget(host.core)
     poll=settings.get('poll_seconds')
     if type(poll) not in (int,float) or not 1<=poll<=60:raise ValueError('bounded source polling required')
     listener=_listener({} if listen is None else listen)
@@ -185,6 +201,14 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
             server.control_center=ControlCenter(host.core,controller,server.proposal_board,server.governance_portfolio,
                 settings['projects'],settings['instance_id'],onboarding=onboarding,summary=summary,
                 stop_event=service.stop_event,source_preflight=service.refresh_sources)
+            from .project_connection_preflight import ProjectConnectionPreflight
+            from .operations_reporting import OperationsReporting
+            from .operations_control import OperationsControl
+            preflight=ProjectConnectionPreflight(host.store,host.registry,onboarding,metadata=operations_metadata)
+            reporting=OperationsReporting(host.core,summary,controller=controller,artifact_sources=artifact_sources,budget=budget)
+            server.operations_control=OperationsControl(server.control_center,preflight,reporting,budget)
+            controller.admission_budget=budget
+            host.core.admission_budget=budget
         return service
     except BaseException:
         server.server_close();raise

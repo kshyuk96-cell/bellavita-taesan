@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "artifact_type": "conditional_transition_proposal_not_runtime_configuration",
+  "workspace_id": "tea-dbqjaul6e07s73fcqmo0",
+  "region_proposal": "oregon",
+  "existing_services_repurposed": false,
+  "resource_creation_authorized": false,
+  "deployment_authorized": false,
+  "proposed_resources": [
+    {
+      "role": "control",
+      "compute_plan": "0.5c-512mb",
+      "disk_gb": 1,
+      "compute_monthly_usd": 7
+    },
+    {
+      "role": "developer",
+      "compute_plan": "1c-2g",
+      "disk_gb": 5,
+      "compute_monthly_usd": 25
+    },
+    {
+      "role": "independent_reviewer",
+      "compute_plan": "1c-2g",
+      "disk_gb": 5,
+      "compute_monthly_usd": 25
+    }
+  ],
+  "cost_formula": {
+    "compute_usd": 57,
+    "disk_gb": 11,
+    "disk_usd_per_gb_month": 0.25,
+    "disk_usd": 2.75,
+    "illustrative_additional_monthly_usd": 59.75,
+    "full_invoice_verified": false,
+    "excludes": [
+      "workspace_plan",
+      "tax",
+      "traffic",
+      "external_backup",
+      "subscription_or_API_fees",
+      "overage"
+    ]
+  },
+  "prerequisites": [
+    "verify_target_host_namespace_support_before_customer_workers",
+    "measure_real_memory_and_disk_demand",
+    "verify_persistent_state_after_actual_service_restart",
+    "verify_off_host_backup_restore",
+    "pin_and_authorize_project_sources_and_native_worker_credentials",
+    "review_final_resource_and_cost_scope"
+  ],
+  "failure_policy": {
+    "stop_new_admissions": true,
+    "retain_uncertain_journal": true,
+    "do_not_replay_unknown_work": true,
+    "restore_quarantined_store_only": true,
+    "re_enable_requires_current_authority_and_proof": true
+  },
+  "not_authorized": [
+    "create_resources",
+    "install_always_on_service",
+    "merge_main",
+    "write_customer_data",
+    "send_external_messages",
+    "make_paid_API_calls"
+  ]
+}

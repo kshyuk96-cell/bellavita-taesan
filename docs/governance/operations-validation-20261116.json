@@ -1,0 +1,157 @@
+{
+  "scope": "private inactive catalog with actual read-only provider metadata; no customer workers registered",
+  "metadata_max_age_seconds": 3600,
+  "observations_source": "operations-provider-observations-20261116.json",
+  "project_count": 4,
+  "projects": [
+    {
+      "project": "bellavita-erp",
+      "classification": "blocked",
+      "blocks": [
+        "cached_connection_evidence_not_validated_for_latest_source",
+        "source_observation_missing",
+        "role_taesan_missing",
+        "role_developer_missing",
+        "role_reviewer_missing",
+        "connection_receiver_missing",
+        "connection_sandbox_missing",
+        "connection_host_missing",
+        "task_specific_owner_policy_qa_and_live_execution_fences_required"
+      ],
+      "source_alignment": {
+        "observed_metadata_source_pin": {
+          "project": "bellavita-erp",
+          "source_kind": "sites",
+          "source_ref": "appgprj_6af874873e148191b9677cca35f00557",
+          "branch": "main",
+          "sha": "05dcf31d82e05d186c20a71a4d5f51f630342879",
+          "revision": "v32"
+        },
+        "cached_connection_source_pin": null,
+        "cached_source_matches_metadata": null,
+        "cached_connections_match_metadata": null,
+        "metadata_is_execution_authority": false,
+        "latest_source_qa_verified": false
+      },
+      "execution_blocked": true,
+      "live_connection_verified": false
+    },
+    {
+      "project": "bellavita-shop",
+      "classification": "blocked",
+      "blocks": [
+        "cached_connection_evidence_not_validated_for_latest_source",
+        "source_observation_missing",
+        "role_taesan_missing",
+        "role_developer_missing",
+        "role_reviewer_missing",
+        "connection_receiver_missing",
+        "connection_sandbox_missing",
+        "connection_host_missing",
+        "task_specific_owner_policy_qa_and_live_execution_fences_required"
+      ],
+      "source_alignment": {
+        "observed_metadata_source_pin": {
+          "project": "bellavita-shop",
+          "source_kind": "github",
+          "source_ref": "kshyuk96-cell/bellavita-taesan",
+          "branch": "codex/shop-backend",
+          "sha": "d5047f3345b757edfcfbd81a73c609c0392007dd",
+          "revision": "git-d5047f3345b757edfcfbd81a73c609c0392007dd"
+        },
+        "cached_connection_source_pin": null,
+        "cached_source_matches_metadata": null,
+        "cached_connections_match_metadata": null,
+        "metadata_is_execution_authority": false,
+        "latest_source_qa_verified": false
+      },
+      "execution_blocked": true,
+      "live_connection_verified": false
+    },
+    {
+      "project": "funeral-association",
+      "classification": "blocked",
+      "blocks": [
+        "cached_connection_evidence_not_validated_for_latest_source",
+        "source_observation_missing",
+        "role_taesan_missing",
+        "role_developer_missing",
+        "role_reviewer_missing",
+        "connection_receiver_missing",
+        "connection_sandbox_missing",
+        "connection_host_missing",
+        "task_specific_owner_policy_qa_and_live_execution_fences_required"
+      ],
+      "source_alignment": {
+        "observed_metadata_source_pin": {
+          "project": "funeral-association",
+          "source_kind": "github",
+          "source_ref": "kshyuk96-cell/association-aftercare-platform",
+          "branch": "main",
+          "sha": "fc40c181d25bb605cefebbddec7b9fc19b192909",
+          "revision": "git-fc40c181d25bb605cefebbddec7b9fc19b192909"
+        },
+        "cached_connection_source_pin": null,
+        "cached_source_matches_metadata": null,
+        "cached_connections_match_metadata": null,
+        "metadata_is_execution_authority": false,
+        "latest_source_qa_verified": false
+      },
+      "execution_blocked": true,
+      "live_connection_verified": false
+    },
+    {
+      "project": "hope-sunrise",
+      "classification": "blocked",
+      "blocks": [
+        "cached_connection_evidence_not_validated_for_latest_source",
+        "source_observation_missing",
+        "role_taesan_missing",
+        "role_developer_missing",
+        "role_reviewer_missing",
+        "connection_receiver_missing",
+        "connection_sandbox_missing",
+        "connection_host_missing",
+        "task_specific_owner_policy_qa_and_live_execution_fences_required"
+      ],
+      "source_alignment": {
+        "observed_metadata_source_pin": {
+          "project": "hope-sunrise",
+          "source_kind": "sites",
+          "source_ref": "appgprj_6af86d66b7108191a8dd1052c4a7302f",
+          "branch": "main",
+          "sha": "10a901e7640781c414a18c0b3e1c672cdccd46cd",
+          "revision": "v39"
+        },
+        "cached_connection_source_pin": null,
+        "cached_source_matches_metadata": null,
+        "cached_connections_match_metadata": null,
+        "metadata_is_execution_authority": false,
+        "latest_source_qa_verified": false
+      },
+      "execution_blocked": true,
+      "live_connection_verified": false
+    }
+  ],
+  "customer_tasks": 0,
+  "models_started": 0,
+  "operational_writes": 0,
+  "approval_granted": false,
+  "host_proof": {
+    "namespace_verified_on_current_cloud": true,
+    "private_fsync_verified": true,
+    "two_process_file_persistence_verified": true,
+    "infrastructure_reboot_verified": false,
+    "render_host_verified": false
+  },
+  "controller_restart": {
+    "processes": 2,
+    "lease_clock_simulated": true,
+    "duplicate_assignments": 0,
+    "model_execution_verified": false,
+    "source": "manager_bridge/tests/test_operations_restart.py"
+  },
+  "subscription_usage_measured": false,
+  "monetary_spend_measured": false,
+  "always_on_deployed": false
+}

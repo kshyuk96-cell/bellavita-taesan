@@ -125,6 +125,11 @@ class ProposalBoard:
             CREATE TABLE IF NOT EXISTS manager_proposal_batches (
               id TEXT PRIMARY KEY,actor TEXT,request_key TEXT,snapshot TEXT,fingerprint TEXT,
               approved_by TEXT,UNIQUE(actor,request_key));
+            CREATE TABLE IF NOT EXISTS manager_batch_cursors (
+              id TEXT PRIMARY KEY,actor TEXT,bindings TEXT,projects TEXT,
+              last_row INTEGER,upper_row INTEGER,expires REAL);
+            CREATE INDEX IF NOT EXISTS manager_batch_cursor_lookup
+              ON manager_batch_cursors(actor,projects,last_row,upper_row);
             ''')
 
     def _actor(self,c,token,roles=('owner','manager')):
@@ -276,6 +281,68 @@ class ProposalBoard:
             self._actor(c,token);row=c.execute('SELECT * FROM manager_proposal_batches WHERE id=?',(batch_id,)).fetchone()
             if not row:raise NotFound('batch unavailable')
             return self._batch(c,token,row)
+
+    def page_batches(self,token,projects,*,cursor=None,limit=20):
+        """Bounded keyset walk, including old pending decisions without disclosure.
+
+        Cursors bind the actor, exact project set, registry revisions and an upper
+        row watermark. Mixed batches outside the caller scope are skipped and
+        reported as a visibility gap, never returned as partly approved scope.
+        """
+        if type(projects) not in (list,tuple) or not 1<=len(projects)<=20 or any(type(p) is not str for p in projects):
+            raise ValueError('one to twenty exact projects required')
+        for project in projects:name(project)
+        if len(set(projects))!=len(projects) or type(limit) is not int or not 1<=limit<=50:raise ValueError('bounded unique batch page required')
+        selected=sorted(projects)
+        if cursor is not None:name(cursor)
+        with self.store._transaction() as c:
+            actor=self._actor(c,token)
+            bindings={p:self.registry._get(c,token,p)['fingerprint'] for p in selected}
+            from .agent_directory import _reject_known_tokens
+            _reject_known_tokens(c,{'projects':selected,'cursor':cursor})
+            now=self.store._now();last=0
+            upper=c.execute('SELECT COALESCE(MAX(rowid),0) FROM manager_proposal_batches').fetchone()[0]
+            if cursor is not None:
+                saved=c.execute('SELECT * FROM manager_batch_cursors WHERE id=?',(cursor,)).fetchone()
+                if not saved or saved['actor']!=actor['token_hash'] or saved['projects']!=canonical_json(selected):raise NotFound('batch cursor unavailable')
+                if saved['expires']<=now or saved['bindings']!=canonical_json(bindings):raise Conflict('batch cursor expired or configuration changed')
+                last,upper=saved['last_row'],saved['upper_row']
+            marks=','.join('?' for _ in selected)
+            rows=c.execute('''SELECT b.rowid AS scan_row,b.* FROM manager_proposal_batches b
+                WHERE b.rowid>? AND b.rowid<=? AND EXISTS
+                (SELECT 1 FROM json_each(b.snapshot) item JOIN manager_proposals p
+                 ON p.id=json_extract(item.value,'$.id') WHERE p.project IN ('''+marks+'''))
+                ORDER BY b.rowid LIMIT 201''',(last,upper,*selected)).fetchall()
+            items=[];scanned=0;visibility_gap=False
+            for row in rows[:200]:
+                last=row['scan_row'];scanned+=1
+                try:
+                    for item in json.loads(row['snapshot']):
+                        if self._proposal(c,token,item['id'])['project'] not in selected:
+                            raise NotFound('mixed batch outside selected projects')
+                    items.append(self._batch(c,token,row))
+                except NotFound:visibility_gap=True
+                if len(items)>=limit:break
+            more=len(rows)>scanned
+            next_cursor=None
+            if more:
+                reusable=c.execute('''SELECT id FROM manager_batch_cursors WHERE actor=? AND projects=?
+                    AND bindings=? AND last_row=? AND upper_row=? AND expires>? LIMIT 1''',
+                    (actor['token_hash'],canonical_json(selected),canonical_json(bindings),last,upper,now)).fetchone()
+                if reusable:next_cursor=reusable['id']
+                else:
+                    next_cursor=secrets.token_hex(16)
+                    c.execute('INSERT INTO manager_batch_cursors VALUES (?,?,?,?,?,?,?)',
+                        (next_cursor,actor['token_hash'],canonical_json(bindings),canonical_json(selected),last,upper,now+900))
+            c.execute('DELETE FROM manager_batch_cursors WHERE rowid IN (SELECT rowid FROM manager_batch_cursors WHERE expires<=? LIMIT 100)',(now,))
+            result={'items':items,'next_cursor':next_cursor,'has_more':more,'visibility_partial':visibility_gap,
+                    'scan_limit':200,'scanned':scanned,'limit':limit,'snapshot_scope':'initial_upper_row_watermark',
+                    'new_batches_require_new_walk':True,'business_approval':False,'execution_started':False}
+            self._actor(c,token)
+            for p,fingerprint in bindings.items():
+                if self.registry._get(c,token,p)['fingerprint']!=fingerprint:raise Conflict('batch scope changed')
+            _reject_known_tokens(c,result)
+            return result
 
     def approve_batch(self,token,batch_id,batch_digest):
         with self.store._transaction() as c:

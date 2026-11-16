@@ -1,0 +1,39 @@
+"""Strict POST operations routes within the existing authenticated control API."""
+from urllib.parse import urlsplit
+from .operations_control import OperationsControl
+from .store import NotFound
+
+PREFIX='/v1/representative/runtime/governance/control/operations/'
+ROUTES={
+    'preflight':('inspect',('projects',),()),
+    'owner-packet':('owner_packet',('request_key','projects'),('expected_fingerprints',)),
+    'report':('report',('request_key','projects'),('after','limit')),
+    'batches':('batches',('projects',),('cursor','limit')),
+    'budget/report':('budget_report',('projects',),()),
+    'budget/install':('install_budget',('project','policy'),('expected_revision',)),
+    'budget/auth':('refresh_auth',('project',),()),
+    'budget/reconcile':('reconcile_budget',('project','reservation_id'),()),
+    'artifacts/register':('register_artifact',('project','kind','artifact_key'),('retention_seconds',)),
+    'artifacts/get':('artifact',('reference',),()),
+}
+
+
+def dispatch(handler,method,path,token,body=None):
+    from .representative_api import _fields
+    url=urlsplit(path)
+    if url.scheme or url.netloc or url.fragment:raise ValueError('relative operations route required')
+    if not url.path.startswith(PREFIX):return False
+    route=url.path[len(PREFIX):]
+    if method!='POST' or route not in ROUTES:return False
+    if url.query:raise ValueError('POST query rejected')
+    action,required,optional=ROUTES[route];args=_fields(body,required,optional)
+    store=handler.server.store
+    with store._transaction() as c:
+        actor=store._authenticate(c,token)
+        store._role(actor,('owner',) if route=='budget/install' else ('owner','manager'))
+    operations=getattr(handler.server,'operations_control',None)
+    if operations is None:raise NotFound('operations control not configured')
+    if not isinstance(operations,OperationsControl) or operations.store is not store:raise ValueError('registered operations control required')
+    result=getattr(operations,action)(token,**args)
+    handler.respond(200,{'ok':True,'result':result})
+    return True

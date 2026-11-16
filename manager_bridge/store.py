@@ -47,8 +47,11 @@ _STATES = frozenset({'pending_approval', 'queued', 'running', 'reported', 'revie
 
 
 def _hierarchy_enabled(c, project):
-    return bool(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='hierarchy_members'").fetchone() and
-                c.execute('SELECT 1 FROM hierarchy_members WHERE project=?',(project,)).fetchone())
+    managed=(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='hierarchy_members'").fetchone() and
+             c.execute('SELECT 1 FROM hierarchy_members WHERE project=?',(project,)).fetchone())
+    budgeted=(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='operating_budget_policies'").fetchone() and
+              c.execute('SELECT 1 FROM operating_budget_policies WHERE project=?',(project,)).fetchone())
+    return bool(managed or budgeted)
 
 
 def _hierarchy_claim_allowed(c, actor, task):
