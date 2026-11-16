@@ -1,0 +1,458 @@
+{
+  "schema_version": "universal-qa/v1",
+  "environment": "synthetic",
+  "scope": "pure synthetic fixtures; no real users, UI, production or AI ability measurement",
+  "source_revision": "a6277d4ec5ec90ff6146edc110d7a1fbc6da5e15",
+  "seed": 20261116,
+  "adapter_versions": {
+    "order": "v1",
+    "scope": "v1",
+    "control": "v1",
+    "formula": "v1"
+  },
+  "coverage": {
+    "required": [
+      "control.roles-sequences",
+      "control.uncertain-retry",
+      "formula.rounding",
+      "order.boundary-rejection",
+      "order.valid",
+      "scope.cross-tenant",
+      "scope.same-tenant"
+    ],
+    "observed": [
+      "control.roles-sequences",
+      "control.uncertain-retry",
+      "formula.rounding",
+      "order.boundary-rejection",
+      "order.valid",
+      "scope.cross-tenant",
+      "scope.same-tenant"
+    ]
+  },
+  "counts": {
+    "generated": 3006,
+    "executed": 3006,
+    "asserted": 3006,
+    "unique_failures": 0,
+    "unique_states": 3006,
+    "blocked": 0,
+    "fail": 0,
+    "pass": 3006,
+    "unmeasured": 0
+  },
+  "source_files": {
+    "taesan_core/universal_qa.py": "b45a6076f3687008fc4eeb500d398c10aab07fe4b7da507a702264419a9b287d",
+    "taesan_core/qa_fixtures.py": "a7ebcadceb973eca102cb3e1386dbdd7ee46f9a1b286c1eedc4be88488d45950",
+    "manager_bridge/qa_admission.py": "f827187647035fbb1bd4e36adce65c5aca4365d46bc3ed9736f1a09c16328345",
+    "taesan_core/commerce.py": "9ad8198963e69a60ac0b522e00d4bd144cd1ca861043fcf498f6814dd87b6946",
+    "taesan_core/core.py": "f617792eb55c9886f1d88ef2cf18fc70661760c201a1e79a6c2adbc40c382591",
+    "scripts/run_universal_qa.py": "febdcd0d196401493673545558d23d6e530eaab36668cd1e1f435207474ddec9"
+  },
+  "report_digest": "3ec8de707d6442dc45f5014b8983ab08df067162b174ecf7be28e97e71942bfb",
+  "admission": {
+    "admitted": true,
+    "reasons": [],
+    "warnings": [],
+    "scope": "synthetic_only",
+    "operational_authorization": false,
+    "verified_counts": {
+      "generated": 3006,
+      "executed": 3006,
+      "asserted": 3006,
+      "unique_failures": 0
+    }
+  },
+  "mutations": [
+    {
+      "mutant": "allow_zero_quantity",
+      "counts": {
+        "generated": 3006,
+        "executed": 3006,
+        "asserted": 3006,
+        "unique_failures": 1,
+        "unique_states": 3006,
+        "blocked": 0,
+        "fail": 44,
+        "pass": 2962,
+        "unmeasured": 0
+      },
+      "admitted": false,
+      "samples": [
+        {
+          "id": "order-00075",
+          "adapter": "order",
+          "group": "order",
+          "coverage_key": "order.boundary-rejection",
+          "priority": "P1",
+          "risk": {
+            "priority": "P1",
+            "impact": "잘못된 주문/중복 실행/금액 발생",
+            "likelihood": "경계값과 재시도에서 발생 가능",
+            "recovery": "수동 확인과 상태 복원 필요"
+          },
+          "inputs": {
+            "fields": {
+              "quantity": 0,
+              "amount": 1,
+              "address": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가"
+            }
+          },
+          "expected": "rejected",
+          "oracle": "integer type/range and text length specification",
+          "state_rationale": "quantity/amount type and boundary × independent field/text length; identical states omitted",
+          "actual": "accepted",
+          "evidence": {
+            "contract": "commerce.check_fields",
+            "fixture": true
+          },
+          "executed": true,
+          "asserted": true,
+          "status": "fail",
+          "state_key": "793a6f724f3f5443a1a0512512c690cecbf93093875a9b71ebaa09e002219e46",
+          "failure_key": "d92239cf5d1f21edf07046ba5f06facd4c252da212ce8785b43dbfa3238473a8"
+        },
+        {
+          "id": "order-00100",
+          "adapter": "order",
+          "group": "order",
+          "coverage_key": "order.boundary-rejection",
+          "priority": "P1",
+          "risk": {
+            "priority": "P1",
+            "impact": "잘못된 주문/중복 실행/금액 발생",
+            "likelihood": "경계값과 재시도에서 발생 가능",
+            "recovery": "수동 확인과 상태 복원 필요"
+          },
+          "inputs": {
+            "fields": {
+              "quantity": 0,
+              "amount": 0,
+              "buyer_name": "가가"
+            }
+          },
+          "expected": "rejected",
+          "oracle": "integer type/range and text length specification",
+          "state_rationale": "quantity/amount type and boundary × independent field/text length; identical states omitted",
+          "actual": "accepted",
+          "evidence": {
+            "contract": "commerce.check_fields",
+            "fixture": true
+          },
+          "executed": true,
+          "asserted": true,
+          "status": "fail",
+          "state_key": "c6e3ee776a6741e4e78cf3b61d84d7bba2c00a473b1392305eb68f2b2048e7b2",
+          "failure_key": "d92239cf5d1f21edf07046ba5f06facd4c252da212ce8785b43dbfa3238473a8"
+        }
+      ]
+    },
+    {
+      "mutant": "skip_tenant",
+      "counts": {
+        "generated": 3006,
+        "executed": 3006,
+        "asserted": 3006,
+        "unique_failures": 1,
+        "unique_states": 3006,
+        "blocked": 0,
+        "fail": 3,
+        "pass": 3003,
+        "unmeasured": 0
+      },
+      "admitted": false,
+      "samples": [
+        {
+          "id": "scope-00001",
+          "adapter": "scope",
+          "group": "scope",
+          "coverage_key": "scope.cross-tenant",
+          "priority": "P0",
+          "risk": {
+            "priority": "P0",
+            "impact": "다른 회사 정보 노출 가능",
+            "likelihood": "권한 경계마다 반복 입력 가능",
+            "recovery": "노출 후 회수 불가; 즉시 차단"
+          },
+          "inputs": {
+            "principal_tenant": "company-a",
+            "order_tenant": "company-b",
+            "role": "writer",
+            "amount": 0
+          },
+          "expected": "denied",
+          "oracle": "tenant equality specification",
+          "state_rationale": "six role × tenant boundary equivalence classes; inert amount variation omitted",
+          "actual": "authorized",
+          "evidence": {
+            "contract": "Order.authorize",
+            "fixture": true
+          },
+          "executed": true,
+          "asserted": true,
+          "status": "fail",
+          "state_key": "375fb5e84c50986258862d8a0f2a3e1fe9e8680dbb654de728eca6db29fd2d67",
+          "failure_key": "26e71e381b48defc48d548e2facc7ac03899dc11d2d30ca21d8fa12e26ac9664"
+        },
+        {
+          "id": "scope-00003",
+          "adapter": "scope",
+          "group": "scope",
+          "coverage_key": "scope.cross-tenant",
+          "priority": "P0",
+          "risk": {
+            "priority": "P0",
+            "impact": "다른 회사 정보 노출 가능",
+            "likelihood": "권한 경계마다 반복 입력 가능",
+            "recovery": "노출 후 회수 불가; 즉시 차단"
+          },
+          "inputs": {
+            "principal_tenant": "company-a",
+            "order_tenant": "company-b",
+            "role": "reader",
+            "amount": 0
+          },
+          "expected": "denied",
+          "oracle": "tenant equality specification",
+          "state_rationale": "six role × tenant boundary equivalence classes; inert amount variation omitted",
+          "actual": "authorized",
+          "evidence": {
+            "contract": "Order.authorize",
+            "fixture": true
+          },
+          "executed": true,
+          "asserted": true,
+          "status": "fail",
+          "state_key": "584f7205f33345ff1eb947f768902394e870b7a0043ffb25b24c62fc1a5b950b",
+          "failure_key": "26e71e381b48defc48d548e2facc7ac03899dc11d2d30ca21d8fa12e26ac9664"
+        }
+      ]
+    },
+    {
+      "mutant": "replay_unknown",
+      "counts": {
+        "generated": 3006,
+        "executed": 3006,
+        "asserted": 3006,
+        "unique_failures": 9,
+        "unique_states": 3006,
+        "blocked": 0,
+        "fail": 122,
+        "pass": 2884,
+        "unmeasured": 0
+      },
+      "admitted": false,
+      "samples": [
+        {
+          "id": "control-00008",
+          "adapter": "control",
+          "group": "control",
+          "coverage_key": "control.uncertain-retry",
+          "priority": "P1",
+          "risk": {
+            "priority": "P1",
+            "impact": "잘못된 주문/중복 실행/금액 발생",
+            "likelihood": "경계값과 재시도에서 발생 가능",
+            "recovery": "수동 확인과 상태 복원 필요"
+          },
+          "inputs": {
+            "role": "admin",
+            "initial": "approved",
+            "actions": [
+              "approve",
+              "execute",
+              "timeout",
+              "retry",
+              "execute"
+            ]
+          },
+          "expected": {
+            "state": "unknown",
+            "effects": 1
+          },
+          "oracle": "independent declarative finite transition table/v1",
+          "state_rationale": "role × initial state × ordered actions; retry after uncertainty cannot repeat effects",
+          "actual": {
+            "state": "running",
+            "effects": 2
+          },
+          "evidence": {
+            "contract": "synthetic-control-policy/v1",
+            "fixture": true,
+            "steps_observed": 5
+          },
+          "executed": true,
+          "asserted": true,
+          "status": "fail",
+          "state_key": "7cb9c12f7071ba6b585da643ca7f77522ac2ce5caec0ff061a63ba1b282f6353",
+          "failure_key": "f5dab3124960aef38d3d58f69f0a992c07160d366f5ded1ae27d2214f191db3d"
+        },
+        {
+          "id": "control-00097",
+          "adapter": "control",
+          "group": "control",
+          "coverage_key": "control.uncertain-retry",
+          "priority": "P1",
+          "risk": {
+            "priority": "P1",
+            "impact": "잘못된 주문/중복 실행/금액 발생",
+            "likelihood": "경계값과 재시도에서 발생 가능",
+            "recovery": "수동 확인과 상태 복원 필요"
+          },
+          "inputs": {
+            "role": "admin",
+            "initial": "proposed",
+            "actions": [
+              "approve",
+              "execute",
+              "timeout",
+              "retry",
+              "execute"
+            ]
+          },
+          "expected": {
+            "state": "unknown",
+            "effects": 1
+          },
+          "oracle": "independent declarative finite transition table/v1",
+          "state_rationale": "role × initial state × ordered actions; retry after uncertainty cannot repeat effects",
+          "actual": {
+            "state": "running",
+            "effects": 2
+          },
+          "evidence": {
+            "contract": "synthetic-control-policy/v1",
+            "fixture": true,
+            "steps_observed": 5
+          },
+          "executed": true,
+          "asserted": true,
+          "status": "fail",
+          "state_key": "e87ce85d769548fe037993eee6261a862c20b5151c0cb76ba577c9ca2ca90efd",
+          "failure_key": "f5dab3124960aef38d3d58f69f0a992c07160d366f5ded1ae27d2214f191db3d"
+        }
+      ]
+    },
+    {
+      "mutant": "truncate_won",
+      "counts": {
+        "generated": 3006,
+        "executed": 3006,
+        "asserted": 3006,
+        "unique_failures": 270,
+        "unique_states": 3006,
+        "blocked": 0,
+        "fail": 270,
+        "pass": 2736,
+        "unmeasured": 0
+      },
+      "admitted": false,
+      "samples": [
+        {
+          "id": "formula-00001",
+          "adapter": "formula",
+          "group": "formula",
+          "coverage_key": "formula.rounding",
+          "priority": "P1",
+          "risk": {
+            "priority": "P1",
+            "impact": "잘못된 주문/중복 실행/금액 발생",
+            "likelihood": "경계값과 재시도에서 발생 가능",
+            "recovery": "수동 확인과 상태 복원 필요"
+          },
+          "inputs": {
+            "unit_won": 1,
+            "quantity": 1,
+            "discount_bps": 5000
+          },
+          "expected": 1,
+          "oracle": "exact integer numerator with +5000 then floor divide 10000",
+          "state_rationale": "zero/max discount, tie, large amount and quantity; integer won output",
+          "actual": 0,
+          "evidence": {
+            "contract": "synthetic-quote/v1",
+            "fixture": true
+          },
+          "executed": true,
+          "asserted": true,
+          "status": "fail",
+          "state_key": "0272cdfae8e0f32ed1d57a1443d48b94932a1c28cf7aa83c1a9270a36cba0943",
+          "failure_key": "87ac6d95e94b53c9f6dc0c2e8509be7c6eacb5372ef96e9cc10c293b1454e91f",
+          "formula": {
+            "id": "synthetic-quote-v1",
+            "expression": "round_half_up(unit_won * quantity * (10000-discount_bps)/10000)",
+            "variables": {
+              "unit_won": 1,
+              "quantity": 1,
+              "discount_bps": 5000
+            },
+            "units": {
+              "unit_won": "KRW/item",
+              "quantity": "item",
+              "discount_bps": "basis-point",
+              "result": "KRW"
+            },
+            "rounding": "nonnegative; nearest integer won; ties upward; once at final total",
+            "expected": 1,
+            "actual": 0,
+            "status": "fail"
+          }
+        },
+        {
+          "id": "formula-00002",
+          "adapter": "formula",
+          "group": "formula",
+          "coverage_key": "formula.rounding",
+          "priority": "P1",
+          "risk": {
+            "priority": "P1",
+            "impact": "잘못된 주문/중복 실행/금액 발생",
+            "likelihood": "경계값과 재시도에서 발생 가능",
+            "recovery": "수동 확인과 상태 복원 필요"
+          },
+          "inputs": {
+            "unit_won": 3,
+            "quantity": 1,
+            "discount_bps": 5000
+          },
+          "expected": 2,
+          "oracle": "exact integer numerator with +5000 then floor divide 10000",
+          "state_rationale": "zero/max discount, tie, large amount and quantity; integer won output",
+          "actual": 1,
+          "evidence": {
+            "contract": "synthetic-quote/v1",
+            "fixture": true
+          },
+          "executed": true,
+          "asserted": true,
+          "status": "fail",
+          "state_key": "1b0087c5f5ed171fb6e25be0f8a794f82d29ce38d6fc84cc7542a6778178205e",
+          "failure_key": "25599dbb7ce401941ce53e1e81e1be08954d198a2bd7977132d25a314bceab17",
+          "formula": {
+            "id": "synthetic-quote-v1",
+            "expression": "round_half_up(unit_won * quantity * (10000-discount_bps)/10000)",
+            "variables": {
+              "unit_won": 3,
+              "quantity": 1,
+              "discount_bps": 5000
+            },
+            "units": {
+              "unit_won": "KRW/item",
+              "quantity": "item",
+              "discount_bps": "basis-point",
+              "result": "KRW"
+            },
+            "rounding": "nonnegative; nearest integer won; ties upward; once at final total",
+            "expected": 2,
+            "actual": 1,
+            "status": "fail"
+          }
+        }
+      ]
+    }
+  ],
+  "exports": {
+    "scenarios.json.gz": "b54532d29e91320f8e9dfe140b38938a8f98661a6e5e107568ebef8d4308b34c",
+    "formulas.csv.gz": "332abc2959d6d659de5842146f627080ba8858f006f46fd0c220c828c9dbfaaf"
+  }
+}
