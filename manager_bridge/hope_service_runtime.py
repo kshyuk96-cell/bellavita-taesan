@@ -1,0 +1,107 @@
+"""Pinned actual-service build and API execution in an explicit Docker profile.
+
+No fallback to an unsandboxed host process. Never pushes or deploys the Site.
+"""
+from dataclasses import dataclass
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import tempfile
+import time
+import uuid
+from .project_runtime import _archive_source,_directory
+from .source_rehearsal import observe_checkout
+from .store import Conflict,digest
+
+CORE=['club','club-travel','club-launch','club-integration','club-integration-crypto','club-admin','club-operations','orders']
+EXPORTS=['handleReview','rvNewDocument','rvApply','rvView','rvAccounts','rvHash','rvSeedPrincipalScenario',
+ 'rvPrepareProduct','rvSelectedCatalog','rvRead','rvSession','rvCapabilities','clubBalances','clubPrincipalState',
+ 'clubPrincipalQuote','clubPrincipalRecords','ciLots','clubPlan','clubReconcile','coApply','ciSeal','ciQuote','quoteOrder']
+
+
+@dataclass(frozen=True)
+class ActualServiceProfile:
+    source: Path
+    revision: str
+    image: str
+
+    def __post_init__(self):
+        object.__setattr__(self,'source',_directory(self.source))
+        if not re.fullmatch('[a-f0-9]{40}',self.revision) or not re.fullmatch(r'node@sha256:[a-f0-9]{64}',self.image):
+            raise ValueError('pinned service source and runtime image required')
+
+    @property
+    def base_sha(self):return self.revision
+
+    def source_check(self):
+        status=observe_checkout(self.source)
+        if status['sha']!=self.revision or not status['tracked_and_visible_untracked_clean']:
+            raise Conflict('actual service checkout changed')
+        return status
+
+
+def _docker_env():
+    return {'PATH':os.environ.get('PATH','/usr/bin:/bin'),'HOME':'/nonexistent','DOCKER_CONFIG':'/nonexistent',
+            'DOCKER_HOST':'unix:///run/codex-docker/docker.sock'}
+
+
+def prepare(profile,root,adapter_root):
+    profile.source_check();source=root/'sut';source.mkdir()
+    _archive_source(profile,source)
+    manifest=json.loads((source/'.openai/hosting.json').read_text())
+    if manifest.get('project_id')!='appgprj_6af881381bdc8191843d4e4f742948dd':raise Conflict('wrong Site source')
+    parts=[];hashes={}
+    paths=['dist/'+name+'.mjs' for name in CORE]+['dist/review-pages.mjs','dist/review-member-pages.mjs','server-src/review-server.mjs']
+    for name in paths:
+        raw=(source/name).read_bytes();hashes[name]=hashlib.sha256(raw).hexdigest()
+        # Exact linking transform used by the service's own build-worker.mjs.
+        parts.append(re.sub(r'^import .*;\n','',raw.decode(),flags=re.M).replace('export ',''))
+    (root/'sut.bundle.mjs').write_text('\n'.join(parts)+'\nexport {'+','.join(EXPORTS)+'};\n')
+    (root/'config.json').write_text(json.dumps(dict(source_revision=profile.revision,virtual_clock='2026-11-16T01:00:00.000Z')))
+    for path in adapter_root.glob('*.mjs'):(root/path.name).write_bytes(path.read_bytes())
+    for path in root.rglob('*'):path.chmod(0o755 if path.is_dir() else 0o644)
+    root.chmod(0o755)
+    return dict(source_files=hashes,linking='same import/export removal as original build-worker; function bodies unchanged',
+        input_source_revision=profile.revision,bundle_digest=hashlib.sha256((root/'sut.bundle.mjs').read_bytes()).hexdigest())
+
+
+def execute_actual_service(profile,adapter_root,*,timeout=90):
+    if type(timeout) is not int or not 1<=timeout<=120:raise ValueError('bounded execution required')
+    profile.source_check()
+    # Only an already-prepared pinned image; execution never pulls another image.
+    image=subprocess.run(['docker','image','inspect',profile.image],env=_docker_env(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
+    if image.returncode:raise Conflict('approved Node image unavailable')
+    with tempfile.TemporaryDirectory(prefix='hope-real-source-') as folder:
+        root=Path(folder);pin=prepare(profile,root,Path(adapter_root))
+        name='hope-qa-'+uuid.uuid4().hex
+        args=['docker','run','--rm','--name',name,'--pull','never','--network','none','--read-only',
+          '--cap-drop','ALL','--security-opt','no-new-privileges','--user','65534:65534',
+          '--tmpfs','/tmp:rw,nosuid,nodev,size=134217728,mode=1777',
+          '--ulimit','cpu=35:35','--ulimit','nofile=256:256','--ulimit','nproc=128:128',
+          '--ulimit','fsize=67108864:67108864','--mount','type=bind,source='+str(root)+',target=/input,readonly',
+          profile.image,'node','--max-old-space-size=384','--permission',
+          '--allow-fs-read=/input','--allow-fs-read=/tmp','--allow-fs-write=/tmp','/input/run.mjs']
+        started=time.monotonic()
+        try:
+            with tempfile.TemporaryFile() as output:
+                process=subprocess.Popen(args,env=_docker_env(),stdin=subprocess.DEVNULL,stdout=output,stderr=subprocess.DEVNULL)
+                while process.poll() is None:
+                    if time.monotonic()-started>timeout or os.fstat(output.fileno()).st_size>8*1024*1024:
+                        subprocess.run(['docker','rm','-f',name],env=_docker_env(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
+                        process.wait(timeout=10);raise Conflict('actual service execution uncertain or limited')
+                    time.sleep(0.1)
+                if process.returncode:raise Conflict('isolated service harness failed; no successful evidence adopted')
+                output.seek(0);raw=output.read(8*1024*1024+1)
+                if len(raw)>8*1024*1024:raise Conflict('service evidence limit')
+                report=json.loads(raw)
+            profile.source_check()
+            report['source_provenance']=pin
+            report['runtime_provenance']=dict(image=profile.image,network='none',read_only=True,user=65534,
+                node_heap_mib=384,cpu_rlimit_seconds=35,cgroup_memory_enforced=False,
+                arbitrary_host_execution=False,elapsed_seconds=round(time.monotonic()-started,3))
+            return report
+        finally:
+            subprocess.run(['docker','rm','-f',name],env=_docker_env(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
