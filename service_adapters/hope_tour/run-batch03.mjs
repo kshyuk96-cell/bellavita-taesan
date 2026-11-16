@@ -89,12 +89,12 @@ const jobs=[
     beforeBalances:view.balances,afterBalances:after.balances,paidCard:doc.state.invoices.filter(i=>i.bookingId===booking.id&&i.kind==='travel'&&i.status==='paid').reduce((n,i)=>n+i.amount,0),confirmed:doc.state.bookings.find(b=>b.id===booking.id).status==='confirmed'});
   }artifacts.bpMatrix=rows;return {count:rows.length,matched:rows.every(r=>r.BP===Math.min(r.total-r.DP,Math.floor(r.total*({hope:{domestic:1500,overseas:1000,culture:5000},happy:{domestic:2000,overseas:1500,culture:7000},premium:{domestic:2500,overseas:1800,culture:10000}}[r.grade][r.category])/10000)))}}),
  item(57,'카드거절·동일 요청 중복',{declinedNoLoss:true,duplicatesSingleBooking:true,duplicateConflict:409},async()=>{
-  const c=await fresh();await c.command('registerCard',{scenario:'decline'});const before=await c.state(),book=await c.command('book',{expectedTotal:before.quote.total});
-  const inv=(await c.state()).state.invoices.find(i=>i.bookingId===book.result.id&&i.kind==='travel'&&i.subtype==='deposit');await c.command('payInvoice',{invoiceId:inv.id});
+  const c=await fresh('U05');await c.command('registerCard',{scenario:'decline'});const before=await c.state(),book=await c.command('book',{expectedTotal:before.quote.total});
+  const inv=(await c.state()).state.invoices.find(i=>i.bookingId===book.result.id&&i.kind==='travel'&&i.subtype==='deposit');assert(inv.amount>0,'positive card refusal required');await c.command('payInvoice',{invoiceId:inv.id});
   const after=await c.state();const d=await fresh(),v=await d.state(),requestId=crypto.randomUUID();
   const [a,b]=await Promise.all([d.command('book',{expectedTotal:v.quote.total},requestId),d.command('book',{expectedTotal:v.quote.total},requestId)]);
   const clash=await d.call('/review/api/command',{action:'book',expectedTotal:v.quote.total+1,requestId});
-  artifacts.declined={before:before.balances,after:after.balances,bookingStatus:after.state.bookings.find(x=>x.id===book.result.id).status};
+  artifacts.declined={declinedCardAmount:inv.amount,before:before.balances,after:after.balances,bookingStatus:after.state.bookings.find(x=>x.id===book.result.id).status};
   return {declinedNoLoss:normalized(before.balances)===normalized(after.balances),duplicatesSingleBooking:a.result.id===b.result.id&&(await d.state()).state.bookings.length===1,duplicateConflict:clash.status}}),
  item(58,'응답불명 재청구 차단·대조',{secondStatus:409,pendingBefore:1,pendingAfter:0},async()=>{
   const c=await fresh('U01');await c.command('registerCard',{scenario:'unknown'});await c.command('signup',{grade:'hope',consents:{terms:true,privacy:true,recurring:true,marketing:false}});
