@@ -1,0 +1,27 @@
+{
+  "schema": "hope-shared-fixture-inventory/v1",
+  "environment": "isolated_nonproduction",
+  "project": "hope-tour",
+  "source_revision": "6f0d7fc1a7a0b328edaa36568a8522edc86e196f",
+  "adapter_version": "shared-fixture-v1",
+  "owner": "qa-fixture-controller",
+  "supplier_connected": false,
+  "operational_tables": false,
+  "resource": {
+    "product_id": "P02",
+    "departure": "2027-03-16",
+    "room": "TEST 객실"
+  },
+  "slots": {
+    "atomic": 1,
+    "expiry": 1,
+    "different-members": 1,
+    "race": 1,
+    "duplicate": 1,
+    "partial": 2,
+    "travel-deposit": 1,
+    "travel-balance": 1,
+    "cancel": 1,
+    "generation": 1
+  }
+}

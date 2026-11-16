@@ -21,21 +21,31 @@ class HopeProfile:
     service: ActualServiceProfile
     adapter_root: Path
     timeout: int = 90
+    entrypoint: str = "run-batch03.mjs"
+    exchange: Path | None = None
+    inventory_contract: dict | None = None
 
     def __post_init__(self):
         if not isinstance(self.service,ActualServiceProfile) or type(self.timeout) is not int or not 1<=self.timeout<=120:
             raise ValueError('bounded actual-service profile required')
         if not re.fullmatch('[a-zA-Z0-9_.-]{1,100}',self.project) or not re.fullmatch('[a-zA-Z0-9_.-]{1,100}',self.release):raise ValueError('registered identifiers required')
         object.__setattr__(self,'adapter_root',_directory(self.adapter_root))
+        if self.entrypoint not in ('run-batch03.mjs','run-batch04.mjs'):raise ValueError('registered entrypoint required')
+        if self.entrypoint=='run-batch04.mjs':
+            from .hope_shared_inventory import validate_contract,check_exchange
+            pin=validate_contract(self.inventory_contract,self.revision)
+            object.__setattr__(self,'exchange',check_exchange(self.exchange,pin))
+        elif self.exchange is not None or self.inventory_contract is not None:raise ValueError('unexpected shared fixture')
     @property
     def revision(self):return self.service.revision
     def source_check(self):return self.service.source_check()
     def manifest(self):
         files={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(self.adapter_root.glob('*.mjs')) if not p.is_symlink()}
         if not {'run-batch03.mjs','d1-local.mjs','fixture-bridge.mjs'}<=files.keys() or any(p.is_symlink() for p in self.adapter_root.glob('*.mjs')):raise Conflict('missing or symlinked adapter')
+        if self.entrypoint not in files:raise Conflict('missing registered entrypoint')
         return dict(schema='hope-registered-profile/v1',project=self.project,release=self.release,source_revision=self.revision,
             source=str(self.service.source),adapter_root=str(self.adapter_root),adapter_files=files,image=self.service.image,
-            timeout=self.timeout,entrypoint='run-batch03.mjs',network='none',cgroup_memory_enforced=False)
+            timeout=self.timeout,entrypoint=self.entrypoint,exchange=str(self.exchange) if self.exchange else None,inventory_contract_digest=digest(self.inventory_contract) if self.inventory_contract else None,network='none',cgroup_memory_enforced=False)
     @property
     def fingerprint(self):return digest(self.manifest())
 
@@ -85,7 +95,7 @@ class HopeEngine:
         def fenced():
             heartbeat()
             if self.registry.resolve(self.manifest).fingerprint!=before:raise QAInterrupted('profile_changed')
-        self.raw=execute_actual_service(profile.service,profile.adapter_root,timeout=profile.timeout,entrypoint='run-batch03.mjs',heartbeat=fenced)
+        self.raw=execute_actual_service(profile.service,profile.adapter_root,timeout=profile.timeout,entrypoint=profile.entrypoint,heartbeat=fenced,exchange=profile.exchange,inventory_contract=profile.inventory_contract)
         report=self.evaluator(self.raw)
         return report,dict(schema='qa-execution-receipt/v1',profile_digest=before,source_revision=profile.revision,
             isolation_verified=self.raw.get('artifacts',{}).get('confinement',{}).get('verified') is True,
@@ -97,7 +107,9 @@ class HopeArtifacts:
     ALLOWED={'actual-source-evidence.json.gz','common-report.json.gz','trusted-contract.json.gz','customer-report.json','customer-report.docx','customer-report.xlsx','formula-report.json','batch-summary.json','source-candidate.patch','defect-retest.json'}
     def __init__(self,store):
         self.store=store;self.jobs=QAJobs(store)
-        with store._transaction() as c:c.execute('CREATE TABLE IF NOT EXISTS hope_job_artifacts(job TEXT,name TEXT,sha TEXT,size INTEGER,data BLOB,PRIMARY KEY(job,name))')
+        with store._transaction() as c:
+            c.execute('CREATE TABLE IF NOT EXISTS hope_job_artifacts(job TEXT,name TEXT,sha TEXT,size INTEGER,data BLOB,PRIMARY KEY(job,name))')
+            c.execute('CREATE TABLE IF NOT EXISTS hope_artifact_bundles(job TEXT PRIMARY KEY,manifest TEXT NOT NULL)')
     def collect(self,token,job,root):
         status=self.jobs.inspect(token,job)
         with self.store._transaction() as c:
@@ -112,16 +124,37 @@ class HopeArtifacts:
             data=path.read_bytes();payload.append((job,path.name,hashlib.sha256(data).hexdigest(),len(data),data))
         if not payload:raise ValueError('empty result bundle')
         with self.store._transaction() as c:
+            sealed=c.execute('SELECT manifest FROM hope_artifact_bundles WHERE job=?',(job,)).fetchone()
+            incoming=[dict(name=r[1],sha=r[2],size=r[3]) for r in payload]
+            if sealed and json.loads(sealed['manifest'])!=incoming:raise Conflict('sealed artifact bundle changed')
             for row in payload:
                 prior=c.execute('SELECT sha FROM hope_job_artifacts WHERE job=? AND name=?',row[:2]).fetchone()
                 if prior and prior['sha']!=row[2]:raise Conflict('immutable artifact conflict')
                 c.execute('INSERT OR IGNORE INTO hope_job_artifacts VALUES(?,?,?,?,?)',row)
         return self.list(token,job)
+    def seal(self,token,job,expected_names):
+        self.jobs.inspect(token,job)
+        with self.store._transaction() as c:
+            actor=self.store._authenticate(c,token);self.store._role(actor,('owner',))
+        items=self.list(token,job)
+        if set(expected_names)!={r['name'] for r in items} or len(expected_names)!=len(items):raise Conflict('required artifact missing')
+        manifest=canonical_json(items)
+        with self.store._transaction() as c:
+            old=c.execute('SELECT manifest FROM hope_artifact_bundles WHERE job=?',(job,)).fetchone()
+            if old and old['manifest']!=manifest:raise Conflict('sealed artifact bundle changed')
+            c.execute('INSERT OR IGNORE INTO hope_artifact_bundles VALUES(?,?)',(job,manifest))
+        return dict(artifacts=items,manifest_digest=digest(items),sealed=True)
     def list(self,token,job):
         self.jobs.inspect(token,job)
-        with self.store._transaction() as c:return [dict(r) for r in c.execute('SELECT name,sha,size FROM hope_job_artifacts WHERE job=? ORDER BY name',(job,))]
+        with self.store._transaction() as c:
+            rows=c.execute('SELECT name,sha,size,data FROM hope_job_artifacts WHERE job=? ORDER BY name',(job,)).fetchall()
+            items=[{k:r[k] for k in ('name','sha','size')} for r in rows]
+            sealed=c.execute('SELECT manifest FROM hope_artifact_bundles WHERE job=?',(job,)).fetchone()
+        if any(len(r['data'])!=r['size'] or hashlib.sha256(r['data']).hexdigest()!=r['sha'] for r in rows):raise Conflict('artifact bytes changed')
+        if sealed and json.loads(sealed['manifest'])!=items:raise Conflict('sealed artifact missing or changed')
+        return items
     def get(self,token,job,name):
-        self.jobs.inspect(token,job)
+        self.list(token,job)
         if name not in self.ALLOWED:raise NotFound('artifact missing')
         with self.store._transaction() as c:row=c.execute('SELECT * FROM hope_job_artifacts WHERE job=? AND name=?',(job,name)).fetchone()
         if not row:raise NotFound('artifact missing')
