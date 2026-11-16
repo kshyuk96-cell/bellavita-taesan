@@ -489,7 +489,7 @@ def load_host(config_file,*,profile_guard_factory=None):
     from .continuous_manager import ContinuousManager
     config=_private_json(config_file)
     required={'version','application_root','expected_source_commit','data_root','database','manager_token_file','instance_id','projects'}
-    if not required<=set(config) or set(config)-required-{'poll_seconds'} or config['version']!=1:
+    if not required<=set(config) or set(config)-required-{'poll_seconds','reference_materials'} or config['version']!=1:
         raise ValueError('exact host configuration schema required')
     application=_physical(config['application_root']);expected=config['expected_source_commit'];_sha(expected)
     observation=_observe(application)
@@ -513,6 +513,21 @@ def load_host(config_file,*,profile_guard_factory=None):
         packet=handoff.generate(_token(manager_path),task_id,role,candidate_digest)
         if packet['task']['project']!=project:raise Conflict('quality handoff outside registered project')
         return packet
+    reference_provider=None;reference_roots=()
+    if 'reference_materials' in config:
+        setting=config['reference_materials']
+        if type(setting) is not dict or set(setting)!={'artifact_root','preparation_root'}:
+            raise ValueError('exact private reference material configuration required')
+        from .artifact_content import ArtifactContent
+        from .reference_bundle import ReferenceBundles
+        from .reference_delivery import ReferenceDelivery
+        artifact_root=_physical(setting['artifact_root'],private=True)
+        preparation_root=_physical(setting['preparation_root'],private=True)
+        reference_roots=(artifact_root,preparation_root)
+        # The preparation service is registered locally; HTTP/worker input never
+        # chooses a host root or receives the entire retained artifact directory.
+        references=ReferenceDelivery(ReferenceBundles(core,ArtifactContent(core,artifact_root),preparation_root,handoff=handoff),lambda:_token(manager_path))
+        reference_provider=references.prepare
     projects={};providers={};fleet_box={}
     forbidden=tuple([manager_path,database,data,application,Path(config_file).absolute()]+[Path(value).absolute() for entry in entries if type(entry) is dict for value in (entry.get('developer_token_file','/nonexistent'),entry.get('reviewer_token_file','/nonexistent'))])
     for entry in entries:
@@ -563,7 +578,7 @@ def load_host(config_file,*,profile_guard_factory=None):
             raise ValueError('developer profile guard must be registered')
         developer=CodexHost(devsetting['binary'],devsetting['codex_home'],{
             project:ProjectBinding(project,entry['repository'],source,require_origin=devsetting.get('require_origin',True))},
-            authorize=authorize,authorize_reservation=authorize_reservation if entry.get('worker_mode')=='deferred_native' else None,diagnostic_sink=_transport_journal(store,project,'developer'),clock=store.clock,execution_timeout=devsetting.get('execution_timeout',180),profile_guard=developer_guard,quality_provider=quality_provider)
+            authorize=authorize,authorize_reservation=authorize_reservation if entry.get('worker_mode')=='deferred_native' else None,diagnostic_sink=_transport_journal(store,project,'developer'),clock=store.clock,execution_timeout=devsetting.get('execution_timeout',180),profile_guard=developer_guard,quality_provider=quality_provider,reference_provider=reference_provider)
         reviewer_guard=(profile_guard_factory('reviewer',project,entry['reviewer_id'],transport_settings['reviewer']['codex_home'],reviewfile)
                         if profile_guard_factory is not None else None)
         if profile_guard_factory is not None and not callable(reviewer_guard):
@@ -580,7 +595,7 @@ def load_host(config_file,*,profile_guard_factory=None):
                             actor['subject']==reviewer['subject'] and task['project']==project)
             transport=CodexHost(settings['binary'],settings['codex_home'],{
                 project:ProjectBinding(project,repository,frozen,require_origin=settings.get('require_origin',True))},
-                authorize_review=authorize_review,diagnostic_sink=_transport_journal(store,project,'reviewer'),clock=store.clock,execution_timeout=settings.get('execution_timeout',180),profile_guard=profile_guard,quality_provider=quality_provider)
+                authorize_review=authorize_review,diagnostic_sink=_transport_journal(store,project,'reviewer'),clock=store.clock,execution_timeout=settings.get('execution_timeout',180),profile_guard=profile_guard,quality_provider=quality_provider,reference_provider=reference_provider)
             transport.verify_confidentiality(project,forbidden,heartbeat=heartbeat)
             return transport
         projects[project]=ProjectHost(project,entry['repository'],source,candidates,runtime,
@@ -593,11 +608,17 @@ def load_host(config_file,*,profile_guard_factory=None):
     # frozen artifacts or CLI credentials as developer-writable source.
     _validate_resources(projects,manager_path,database)
     all_profiles=[settings['codex_home'] for entry in entries for settings in (entry['developer'],entry['reviewer'])]
+    if reference_roots:
+        protected=[data,application,manager_path,database,Path(config_file).absolute(),*(Path(p).absolute() for p in all_profiles)]
+        protected.extend(path for host in projects.values() for path in (host.source,host.candidates,host.runtime,host.developer_token_file,host.reviewer_token_file))
+        for root in reference_roots:
+            if any(root==path or root in path.parents or path in root.parents for path in protected):
+                raise ValueError('reference roots must be separate from source, runtime and control resources')
     for host in projects.values():
         if any(Path(p).absolute()==host.source or host.source in Path(p).absolute().parents or Path(p).absolute() in host.source.parents for p in all_profiles):raise ValueError('coding profile inside project source')
     # Every coding profile is host-private, including other projects' profiles.
     # The shared closure is finalized before any developer/reviewer probe runs.
-    forbidden=tuple(dict.fromkeys((*forbidden,*(Path(p).absolute() for p in all_profiles))))
+    forbidden=tuple(dict.fromkeys((*forbidden,*reference_roots,*(Path(p).absolute() for p in all_profiles))))
     # Success is an actual non-model OS sandbox probe, never a config flag.
     for host in projects.values():host.developer_transport.verify_confidentiality(host.project,forbidden)
     fleet=Fleet(store,registry,providers=providers) if providers else None

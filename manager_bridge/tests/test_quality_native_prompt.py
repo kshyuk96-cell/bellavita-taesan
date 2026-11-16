@@ -23,7 +23,17 @@ class QualityNativePromptTests(unittest.TestCase):
             'task':{'task_id':task_id,'project':project,'version':task['version'],'manifest_digest':task['manifest_digest']},
             'business_baseline':task['business_baseline'],'binding_digest':'e'*64,
             'requirements':[{'id':'price','criterion':'Preserve approved price behavior'}],
-            'references':[{'materialized':False}],'reference_materialized':False,'execution_authorized':False}
+            'references':[],'reference_materialized':False,'execution_authorized':False}
+
+    def test_approved_references_without_body_provider_prevent_model_start(self):
+        task=self.current_task=self.task();self.host.authorize=lambda *a:True
+        def references(*args):
+            packet=self.provider(*args);packet['references']=[{'materialized':False}];return packet
+        self.host.quality_provider=references
+        with patch.object(self.host,'_source',return_value=self.source()),patch.object(self.host,'_run') as run:
+            with self.assertRaisesRegex(PermissionDenied,'body delivery provider'):
+                self.host.execute('test',task,fixtures.SESSION,heartbeat=lambda:True)
+            run.assert_not_called()
 
     def test_developer_receives_server_criteria_and_ignores_injected_client_packet(self):
         task=self.current_task=self.task();task['quality_handoff']={'requirements':['unapproved-client-instructions']}

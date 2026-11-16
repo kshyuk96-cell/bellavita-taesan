@@ -1,0 +1,79 @@
+{
+  "scope": "actual_nonmodel_typed_reference_context_sandbox",
+  "models_started": 0,
+  "network_enabled": false,
+  "auth_profile": "fresh_empty",
+  "viewed": false,
+  "developer_and_reviewer": {
+    "developer": {
+      "verified": true,
+      "project": "project",
+      "roles": [
+        {
+          "read_only": false,
+          "git_write_denied": true,
+          "inside_read": true,
+          "inside_write": true,
+          "private_tmp_write": true,
+          "network_blocked": true,
+          "private_resources_hidden": true,
+          "reference_readonly": true,
+          "sanitized_ancestor_scaffold": true,
+          "real_parent_contents_hidden": true
+        },
+        {
+          "read_only": true,
+          "git_write_denied": true,
+          "inside_read": true,
+          "inside_write": false,
+          "private_tmp_write": true,
+          "network_blocked": true,
+          "private_resources_hidden": true,
+          "reference_readonly": true,
+          "sanitized_ancestor_scaffold": true,
+          "real_parent_contents_hidden": true
+        }
+      ],
+      "forbidden_path_count": 3,
+      "policy_digest": "ad548327342716f8cdbb6391cb7390a38ee52a7d5d4bdf5499e92811c834544d",
+      "observed_at": 1794835728.2237492,
+      "model_turns_started": 0,
+      "reference_binding_digest": "fe42c1a233f37878349236c0e35b522cd7b89b81df5fc8e9fe87d6a83b690ac6"
+    },
+    "reviewer": {
+      "verified": true,
+      "project": "project",
+      "roles": [
+        {
+          "read_only": false,
+          "git_write_denied": true,
+          "inside_read": true,
+          "inside_write": true,
+          "private_tmp_write": true,
+          "network_blocked": true,
+          "private_resources_hidden": true,
+          "reference_readonly": true,
+          "sanitized_ancestor_scaffold": true,
+          "real_parent_contents_hidden": true
+        },
+        {
+          "read_only": true,
+          "git_write_denied": true,
+          "inside_read": true,
+          "inside_write": false,
+          "private_tmp_write": true,
+          "network_blocked": true,
+          "private_resources_hidden": true,
+          "reference_readonly": true,
+          "sanitized_ancestor_scaffold": true,
+          "real_parent_contents_hidden": true
+        }
+      ],
+      "forbidden_path_count": 3,
+      "policy_digest": "ad548327342716f8cdbb6391cb7390a38ee52a7d5d4bdf5499e92811c834544d",
+      "observed_at": 1794835728.8317883,
+      "model_turns_started": 0,
+      "reference_binding_digest": "01ae86e61a42adfdeda5b04ba8e8fa0f5b9fb6df7d4010b57a5817bc395d8eda"
+    }
+  }
+}
