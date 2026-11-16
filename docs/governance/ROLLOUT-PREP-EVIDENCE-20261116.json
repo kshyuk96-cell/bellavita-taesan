@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "implementation_commit": "e270588225369283e4bb98a1dfc611852a4cc595",
+  "native_host_commit": "0ee7ebbc5b4e7675f95bb7e80977e8dee8a942fe",
+  "scope": "actual customer source preparation and private offline development; no production activation",
+  "sources": [
+    {
+      "project": "bellavita-shop",
+      "sha": "d5047f3345b757edfcfbd81a73c609c0392007dd",
+      "tracked_and_visible_untracked_clean": true,
+      "ignored_dependencies_audited": false,
+      "remote_rechecked": false,
+      "security_sandbox_verified": false
+    },
+    {
+      "project": "bellavita-erp",
+      "sha": "13f78626e415c67ce2d07424f5ba5c1351666581",
+      "tracked_and_visible_untracked_clean": true,
+      "ignored_dependencies_audited": false,
+      "remote_rechecked": false,
+      "security_sandbox_verified": false
+    },
+    {
+      "project": "hope-sunrise",
+      "sha": "985a918f55f3cd2fbf0445d6ef38c761332577d2",
+      "tracked_and_visible_untracked_clean": true,
+      "ignored_dependencies_audited": false,
+      "remote_rechecked": false,
+      "security_sandbox_verified": false
+    },
+    {
+      "project": "funeral-association",
+      "sha": "42cfeedee9e0fbc1ffc90603b86d4fb5ed0e9e84",
+      "tracked_and_visible_untracked_clean": true,
+      "ignored_dependencies_audited": false,
+      "remote_rechecked": false,
+      "security_sandbox_verified": false
+    }
+  ],
+  "sites_recovery": {
+    "native_owner_access_verified": true,
+    "source_helper_mode": "open",
+    "source_pushes": 0,
+    "deployments": 0,
+    "credentials_exposed": false
+  },
+  "manager_validation": {
+    "projects_registered": 4,
+    "role_bindings": 12,
+    "mechanical_command_plans": 4,
+    "local_auth_notices": 8,
+    "backup_digest": "a2f5396f83681a83e9529004e3447d55404b2282bc228529a7ab7ff57be02243",
+    "restore_quarantine": true,
+    "maintenance_activated": 0
+  },
+  "actual_development": {
+    "tasks": [
+      {
+        "task_digest": "1e08625fe5863daf12af1eb75d39a91dcfdff14b6a14065f2d286392b49761a5",
+        "candidate_head": "753be731a9ff15962d41ad034bfa59f250114d0c",
+        "acceptance_recorded": true,
+        "native_session_digest": "1764fbbec8a5943a7f020361c92e5d6fbbca746df9e234e86366abef04f0f040",
+        "native_process_exit": 0,
+        "developer_command_attempts": 5,
+        "developer_command_failures": 1,
+        "independent_check_exits": [
+          0,
+          0,
+          0
+        ],
+        "semantic_recommendation": "pass",
+        "qa_admitted": true,
+        "qa_scope": "synthetic_only",
+        "qa_report_digest": "0acca15b5e56097f032304628e91b093d2be7922296f5336570e27dd96a6cc70"
+      },
+      {
+        "task_digest": "f0ed4a0d11ca9998f12ade7d62a353ea81cdece09d0c5a059d9982623f5eff69",
+        "candidate_head": "f00624d193e2a6c11809ac6dbd68ab93550ad671",
+        "acceptance_recorded": true,
+        "native_session_digest": "1764fbbec8a5943a7f020361c92e5d6fbbca746df9e234e86366abef04f0f040",
+        "native_process_exit": 0,
+        "developer_command_attempts": 4,
+        "developer_command_failures": 1,
+        "independent_check_exits": [
+          0,
+          0,
+          0
+        ],
+        "semantic_recommendation": "pass",
+        "qa_admitted": true,
+        "qa_scope": "synthetic_only",
+        "qa_report_digest": "f546abcf09b9f07792886373e02d94ca4dbc0b21ab820f80c205891fdf052348"
+      }
+    ],
+    "counts": {
+      "continuous_host_assignments": 2,
+      "manager_proposal_batches": 2,
+      "hierarchy_next_assignments": 1,
+      "continuous_host_sessions": 1
+    },
+    "current_accepted_head": "f00624d193e2a6c11809ac6dbd68ab93550ad671",
+    "parent_acceptance_historical_after_followup": true,
+    "customer_patch_pr": "https://github.com/kshyuk96-cell/bellavita-taesan/pull/78",
+    "note": "Developer command failures are retained; only final independent checks and native semantic review establish acceptance."
+  },
+  "prior_attempt": {
+    "state": "uncertain_before_model_execution",
+    "native_model_turns": 0,
+    "replayed_or_reset": false,
+    "reason": "stale subscription profile metadata; a separate new proof used current already-authorized profiles"
+  },
+  "standalone_business_tests": {
+    "projects": [
+      {
+        "project": "bellavita-erp",
+        "source_sha": "13f78626e415c67ce2d07424f5ba5c1351666581",
+        "scope": "standalone namespace-isolated existing business tests; not Gate admission or FixedReviewRunner runtime fingerprint validation",
+        "commands": [
+          {
+            "name": "business_tests",
+            "argv_digest": "74791c932db5b7e67c8776c7658c0ef14cee5cae07deceb1f5e0b1a643ad81ba",
+            "exit_code": 1,
+            "elapsed_seconds": 0.26144
+          }
+        ],
+        "test_files": [
+          "tests/business.test.js",
+          "tests/settlement.test.js",
+          "tests/finance.test.js"
+        ],
+        "customer_source_unchanged": true,
+        "live_customer_data": false,
+        "business_scenario_contracts_executed": false
+      },
+      {
+        "project": "hope-sunrise",
+        "source_sha": "985a918f55f3cd2fbf0445d6ef38c761332577d2",
+        "scope": "standalone namespace-isolated existing business tests; not Gate admission or FixedReviewRunner runtime fingerprint validation",
+        "commands": [
+          {
+            "name": "business_tests",
+            "argv_digest": "5dc87dabdd8f4d72b1bf60fd7c0d802530bd9f3cd46766c26a21976b0608bbd7",
+            "exit_code": 0,
+            "elapsed_seconds": 0.567819
+          }
+        ],
+        "test_files": [
+          "tests/orders.test.mjs",
+          "tests/club.test.mjs",
+          "tests/club-reward-settlement.test.mjs"
+        ],
+        "customer_source_unchanged": true,
+        "live_customer_data": false,
+        "business_scenario_contracts_executed": false
+      }
+    ],
+    "paid_api_calls": 0,
+    "operational_writes": 0
+  },
+  "customer_business_plan": {
+    "scenario_definitions": 31,
+    "formula_definitions": 14,
+    "plan_scenarios_executed": false,
+    "business_admission": false,
+    "runtime_prerequisites_unverified": true
+  },
+  "validation": {
+    "repository_tests_passed": 1784,
+    "namespace_and_loopback_actual": true
+  },
+  "limits": {
+    "always_on_host_deployed": false,
+    "render_workspace_selected": false,
+    "model_profile_auto_refresh_broker_verified": false,
+    "operational_sheet_writes": 0,
+    "payments_or_notifications": 0,
+    "paid_api_calls": 0,
+    "new_paid_resources": 0,
+    "existing_codex_chat_ui_control_verified": false
+  }
+}
