@@ -1,5 +1,7 @@
 # 범용 합성 QA 계약과 사용법
 
+후속 서버 접수·결과 회수·필수 인수 연결과 실제 주문 코드의 오프라인 검사는 [FOLLOWUP-20261116.md](FOLLOWUP-20261116.md)를 참고한다. 아래 서버 미연결 설명은 PR #72 인계 시점의 범위다.
+
 이 시스템은 프로젝트별 신뢰된 Python 어댑터를 공통 시나리오 계약으로 실행하고, 매니저가 결과를 다시 검증하는 도구다. 기존 `taesan_core`의 `CoreError`, `Principal`, `Order`, `check_fields`와 `manager_bridge.store.digest`를 재사용한다. 기존 업무 평가 점수와 합치지 않는다. 보고서 건수는 AI 능력 점수가 아니다.
 
 ## 실행과 결과
