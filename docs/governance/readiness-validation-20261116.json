@@ -1,0 +1,113 @@
+{
+  "scope": "actual_current_cloud_host_measurement_only",
+  "application_commit": "e4ec15fac92d7d0b6534cf9ad3e2cc1dc015de11",
+  "observation": {
+    "host_identity": "f470f4954f12ee9c06346927151263659cb0116b45f1040aa85c04911c8ca303",
+    "application_commit": "e4ec15fac92d7d0b6534cf9ad3e2cc1dc015de11",
+    "namespace_isolation_verified": true,
+    "private_storage_verified": true,
+    "observed_at": 1794809725.4717898
+  },
+  "models_started": 0,
+  "paid_api_calls": 0,
+  "resources_created": 0,
+  "remote_attestation_verified": false,
+  "always_on_verified": false,
+  "infrastructure_persistence_verified": false,
+  "container_qualified": false,
+  "local_container_diagnostics": {
+    "image_application_commit": "0ad364dc7d3876b02e2741bcee539febfd89d61b",
+    "docker_rootless_observed": true,
+    "container_uid": 10002,
+    "effective_capabilities": "0000000000000000",
+    "no_new_privileges": true,
+    "seccomp_mode": 2,
+    "nested_namespace_probe_passed": false,
+    "single_causal_restriction_identified": false,
+    "security_relaxation_performed": false
+  },
+  "encrypted_roundtrip": {
+    "scope": "private_local_synthetic_roundtrip",
+    "application_commit": "e4ec15fac92d7d0b6534cf9ad3e2cc1dc015de11",
+    "tests_run": 1,
+    "passed": true,
+    "external_storage_tested": false,
+    "remote_restore_tested": false,
+    "keys_persisted": false,
+    "paid_calls": 0
+  },
+  "independent_review": {
+    "state": "passed",
+    "focused_tests_passed": 38,
+    "stale_positive_original_reproducer_blocked": true,
+    "tester_engine_executed": false
+  },
+  "validation": {
+    "whole_suite_final_passed": 2038,
+    "whole_suite_seconds": 224.677,
+    "whole_suite_commit": "e4ec15fac92d7d0b6534cf9ad3e2cc1dc015de11",
+    "new_tests_added": 43,
+    "new_host_and_control_focused_passed": 14,
+    "independent_focused_passed": 38,
+    "whitespace_check": "passed",
+    "tester_engine_executed": false
+  },
+  "control_image_runtime_validation": {
+    "scope": "local_control_image_build_and_crypto_only",
+    "application_commit": "a66d3d2430085518f4128a704141b9003ddfe3ae",
+    "image": {
+      "scope": "observed_local_image_metadata",
+      "image_config_digest": "sha256:68dabb5353438b8791ffb0406c10400dddc45019bcd2b83bd7fb5910bd47e4df",
+      "registry_manifest_digest": null,
+      "expected_bindings_match": true,
+      "role": "control",
+      "application_commit": "a66d3d2430085518f4128a704141b9003ddfe3ae",
+      "nonroot_user": "10001:10001",
+      "runtime_probe_performed": true,
+      "isolation_verified": false,
+      "credentials_mounted": false,
+      "images_pushed": false,
+      "deployment_performed": false,
+      "runtime_probe_state": "observed",
+      "runtime": {
+        "uid": 10001,
+        "python": "3.13.5",
+        "git": {
+          "available": true,
+          "exit_code": 0,
+          "version": "git version 2.39.5"
+        },
+        "bwrap": {
+          "available": true,
+          "exit_code": 0,
+          "version": "bubblewrap 0.8.0"
+        },
+        "codex": {
+          "available": false
+        },
+        "namespace_isolation_verified": false,
+        "namespace_probe_exit_code": 1,
+        "namespace_probe_failure_category": "unavailable"
+      }
+    },
+    "crypto": {
+      "crypto_version": "50.0.0",
+      "aead_roundtrip_passed": true
+    },
+    "host_trusted_public_ca_ephemeral_mount": true,
+    "tls_verification_disabled": false,
+    "images_pushed": false,
+    "deployment_performed": false,
+    "models_started": 0
+  },
+  "packaging_validation": {
+    "pinned_crypto": "50.0.0",
+    "focused_image_and_backup_tests_passed": 11,
+    "subsequent_recipe_tests_passed": 3,
+    "first_ci_run": 43816124244,
+    "first_ci_state": "failed_missing_dependency",
+    "dependency_fixed_ci_run": 43816591338,
+    "dependency_fixed_ci_state": "success",
+    "recipe_and_evidence_head_ci": "pending"
+  }
+}

@@ -1,0 +1,13 @@
+# Local host qualification in new-work admission
+
+`HostAdmission` binds an owner-installed `HostRequirement` to the exact registry configuration, host/boot fingerprint and clean application commit. The trusted `LocalHostObserver` measures namespace isolation and private write/fsync outside SQLite transactions and checks the application commit/cleanliness both before and after the probe. A typed observation expires after at most 60 seconds (default 30). Freshness is not persistence or remote attestation.
+
+`OperatingBudget(host_admission=gate)` checks this requirement in actual reservation and core-start fences. Durable host requirements also block a legacy/recreated core with no admission coordinator and a budget instance with no host adapter. Missing, failed, future, stale or mismatched measurements fail closed. A request sequence rejects late responses; a persisted observation watermark prevents cached old success from replacing newer failure. Equal-time success cannot overwrite failure. Transport failure records the current clock as its negative watermark. Existing collection, diagnostics and reconciliation remain available.
+
+A private service configuration can add `"local_host_admission": {}` alongside `"governance": {}`. It registers a fixed local observer from the already validated private host configuration's application/state roots. Initially new work remains blocked until an owner installs the exact host requirement. No host path, executable, probe callback or success flag is accepted through HTTP.
+
+Under `/v1/representative/runtime/governance/control/operations/`, strict authenticated POST routes are `host/install` (owner, exact typed requirement and prior revision), `host/refresh` (owner/manager, project only) and `host/report` (owner/manager, projects only). Routine service ticks reuse fresh observations and refresh due configured projects. These operations do not start a model, deploy a service, refresh OAuth or create paid resources.
+
+Passing local prerequisites does not prove daemon uptime, durable volume behavior, off-host backup or remote host identity. Task-specific source/approval/QA/role/capacity/quota/action fences remain mandatory. Never infer 90% always-on control from this gate.
+
+Manager images install the pinned manager-only crypto requirement. In a managed build proxy environment, supply the already trusted public CA bundle with BuildKit `--secret id=taesan_build_ca,src=/etc/ssl/certs/ca-certificates.crt`. The optional mount is used only by package installation and is not retained in the image. Default public-CA environments need no mount. TLS verification is never disabled; no API/auth secret is supplied during image build.

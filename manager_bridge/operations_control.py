@@ -4,7 +4,7 @@ from .control_center import ControlCenter
 
 
 class OperationsControl:
-    def __init__(self,control,preflight,reporting,budget,*,worker_links=None):
+    def __init__(self,control,preflight,reporting,budget,*,worker_links=None,recovery=None,readiness=None):
         from .project_connection_preflight import ProjectConnectionPreflight
         from .operations_reporting import OperationsReporting
         from .operating_budget import OperatingBudget
@@ -22,6 +22,12 @@ class OperationsControl:
             if not isinstance(worker_links,NativeWorkerLinks) or worker_links.core is not control.core:
                 raise ValueError('same registered native worker links required')
         self.worker_links=worker_links
+        from .recovery_readiness import RecoveryReadiness
+        from .portfolio_readiness import PortfolioReadiness
+        for value,kind,expected in ((recovery,'recovery',RecoveryReadiness),(readiness,'readiness',PortfolioReadiness)):
+            if value is not None and (not isinstance(value,expected) or value.core is not control.core):
+                raise ValueError('same registered '+kind+' required')
+        self.recovery,self.readiness=recovery,readiness
 
     def inspect(self,token,projects):
         self.control._scope(token,projects)
@@ -76,3 +82,44 @@ class OperationsControl:
         value=self.reporting.get_artifact(token,reference)
         self.control._scope(token,[value['project']])
         return value
+
+    def host_report(self,token,projects):
+        self.control._scope(token,projects)
+        gate=self.budget.host_admission
+        if gate is None:raise NotFound('local host admission not configured')
+        return {'projects':[gate.check(token,p) for p in projects],'always_on_verified':False}
+
+    def install_host(self,token,project,requirement,*,expected_revision=0):
+        from .host_admission import HostRequirement
+        self.control._scope(token,[project],roles=('owner',))
+        gate=self.budget.host_admission
+        if gate is None:raise NotFound('local host admission not configured')
+        if type(requirement) is not dict:raise ValueError('exact host requirement required')
+        try:value=HostRequirement(**requirement)
+        except TypeError:raise ValueError('exact host requirement fields required') from None
+        return gate.install(token,project,value,expected_revision=expected_revision)
+
+    def refresh_host(self,token,project):
+        self.control._scope(token,[project])
+        gate=self.budget.host_admission
+        if gate is None:raise NotFound('local host admission not configured')
+        return gate.refresh(token,project)
+
+    def recovery_report(self,token,projects,*,limit=20):
+        self.control._scope(token,projects)
+        if self.recovery is None:raise NotFound('recovery inspection not configured')
+        return self.recovery.inspect(token,projects,limit=limit)
+
+    def readiness_report(self,token,projects):
+        self.control._scope(token,projects)
+        if self.readiness is None:raise NotFound('portfolio readiness not configured')
+        return self.readiness.assess(token,projects)
+
+    def exception_report(self,token,projects,request_key,*,after=None,limit=20):
+        self.control._scope(token,projects)
+        if self.readiness is None:raise NotFound('portfolio readiness not configured')
+        return self.readiness.exceptions(token,projects,request_key,after=after,limit=limit)
+
+    def register_projects(self,token,request_key,registrations):
+        if self.readiness is None:raise NotFound('portfolio readiness not configured')
+        return self.readiness.register_batch(token,request_key,registrations)

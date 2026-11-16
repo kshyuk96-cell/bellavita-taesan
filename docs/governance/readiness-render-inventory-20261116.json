@@ -1,0 +1,88 @@
+{
+  "scope": "read_only_render_service_metadata",
+  "workspace_id": "tea-dbqjaul6e07s73fcqmo0",
+  "services": [
+    {
+      "id": "srv-dbt8cve7bikc73dbqof0",
+      "name": "bellavita-erp-production-3q1v",
+      "type": "background_worker",
+      "branch": "codex/erp-production-bootstrap-20261116",
+      "auto_deploy": "no",
+      "plan": "0.5c-512mb",
+      "region": "singapore",
+      "has_persistent_disk": false,
+      "worker_host_isolation_verified": false
+    },
+    {
+      "id": "srv-dbsmfgoae00c738fnhjg",
+      "name": "bellavita-obituary-erp-review-bmb7",
+      "type": "web_service",
+      "branch": "codex/bellavita-review-isolation",
+      "auto_deploy": "no",
+      "plan": "free",
+      "region": "singapore",
+      "has_persistent_disk": false,
+      "worker_host_isolation_verified": false
+    },
+    {
+      "id": "srv-dbsmcbgae00c738ff18g",
+      "name": "signitone-pilot-zp6o",
+      "type": "web_service",
+      "branch": "main",
+      "auto_deploy": "no",
+      "plan": "0.5c-512mb",
+      "region": "singapore",
+      "has_persistent_disk": true,
+      "worker_host_isolation_verified": false
+    },
+    {
+      "id": "srv-dbskef0n74is73a5chk0",
+      "name": "bellavita-invitation-erp-review",
+      "type": "web_service",
+      "branch": "codex/erp-invitation-checkout-20261115",
+      "auto_deploy": "no",
+      "plan": "free",
+      "region": "oregon",
+      "has_persistent_disk": false,
+      "worker_host_isolation_verified": false
+    },
+    {
+      "id": "srv-dbsfj4mi0phs73d0a8mg",
+      "name": "association-integration-review-gfja",
+      "type": "web_service",
+      "branch": "main",
+      "auto_deploy": "no",
+      "plan": "0.5c-512mb",
+      "region": "singapore",
+      "has_persistent_disk": true,
+      "worker_host_isolation_verified": false
+    },
+    {
+      "id": "srv-dbs3drbrjlhs73d278sg",
+      "name": "bellavita-shop-verification-v3b4",
+      "type": "web_service",
+      "branch": "codex/shop-backend",
+      "auto_deploy": "no",
+      "plan": "0.5c-512mb",
+      "region": "oregon",
+      "has_persistent_disk": true,
+      "worker_host_isolation_verified": false
+    },
+    {
+      "id": "srv-dbqjqm5bedkc73drfkc0",
+      "name": "bellavita-taesan-test",
+      "type": "web_service",
+      "branch": "main",
+      "auto_deploy": "yes",
+      "plan": "0.5c-512mb",
+      "region": "oregon",
+      "has_persistent_disk": true,
+      "worker_host_isolation_verified": false
+    }
+  ],
+  "service_count": 7,
+  "resources_created": 0,
+  "resources_modified": 0,
+  "deployments_started": 0,
+  "host_qualified": false
+}

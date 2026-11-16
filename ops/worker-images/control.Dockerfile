@@ -14,6 +14,10 @@ RUN apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=20 update \
  && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin worker \
  && install -d -m 0700 -o 10001 -g 10001 /state /work /runtime /home/worker/profile
 COPY app /app
+# Optional host-trusted public CA bundle for managed build proxies; never persisted.
+RUN --mount=type=secret,id=taesan_build_ca,target=/run/secrets/taesan-build-ca,required=false \
+    if [ -f /run/secrets/taesan-build-ca ]; then export PIP_CERT=/run/secrets/taesan-build-ca; fi; \
+    /usr/local/bin/python -m pip install --no-cache-dir --only-binary=:all: -r /app/manager_bridge/runtime-requirements.txt
 RUN test "$(git -c safe.directory=/app -C /app rev-parse HEAD)" = "${APPLICATION_COMMIT}" \
  && test -z "$(git -c safe.directory=/app -C /app status --porcelain)" \
  && chown -R 10001:10001 /app

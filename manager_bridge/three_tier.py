@@ -150,8 +150,8 @@ class ThreeTier:
     def _admission(self,c,token,task):
         budget=self.admission_budget
         if budget is None:
-            installed=(c.execute("SELECT 1 FROM sqlite_master WHERE name='operating_budget_policies'").fetchone() and
-                       c.execute('SELECT 1 FROM operating_budget_policies WHERE project=?',(task['project'],)).fetchone())
+            from .store import _admission_required
+            installed=_admission_required(c,task['project'])
             if installed:raise PermissionDenied('registered admission coordinator required')
             return
         from .operating_budget import OperatingBudget
