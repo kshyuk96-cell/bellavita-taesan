@@ -1,0 +1,168 @@
+{
+  "source_revision": "1b1d958db1567bc62b5771976226c7d26716015e",
+  "contract_digest": "91c65ade6812573ac082332099fa988b6b3c8c991e3ceefc9e5cfa21f7214edc",
+  "adapter_versions": {
+    "bellavita-order-ledger": "offline-v1"
+  },
+  "scope": "local_http_offline_real_component",
+  "scenario_counts": {
+    "generated": 288,
+    "executed": 288,
+    "asserted": 288,
+    "unique_failures": 0,
+    "unique_states": 288,
+    "blocked": 0,
+    "fail": 0,
+    "pass": 288,
+    "unmeasured": 0
+  },
+  "operational_authorization": false,
+  "unverified": [
+    "deployed staging",
+    "live manager",
+    "UI",
+    "sheet writes",
+    "isolated executor lifecycle"
+  ],
+  "checks": [
+    {
+      "check": "mandatory_qa_before_review",
+      "status": 409,
+      "passed": true
+    },
+    {
+      "check": "pass",
+      "state": "accepted",
+      "reasons": [],
+      "submitted_counts": {
+        "generated": 288,
+        "executed": 288,
+        "asserted": 288,
+        "unique_failures": 0,
+        "unique_states": 288,
+        "blocked": 0,
+        "fail": 0,
+        "pass": 288,
+        "unmeasured": 0
+      },
+      "report_digest": "26ca9964351d9832c0b69ad3141337f53945810b74a7019524cfa64666946160",
+      "recovered_identically": true,
+      "passed": true
+    },
+    {
+      "check": "duplicate_execution_rejected",
+      "status": 409,
+      "passed": true
+    },
+    {
+      "check": "critical_unmeasured",
+      "state": "blocked",
+      "reasons": [
+        "critical_scenario_not_passed"
+      ],
+      "submitted_counts": {
+        "generated": 288,
+        "executed": 287,
+        "asserted": 287,
+        "unique_failures": 0,
+        "unique_states": 288,
+        "blocked": 0,
+        "fail": 0,
+        "pass": 287,
+        "unmeasured": 1
+      },
+      "report_digest": "88fcf7b6276b464e866515c791f6dd6d98ae554af6a053628e2745f35b21122c",
+      "recovered_identically": true,
+      "passed": true
+    },
+    {
+      "check": "coverage_missing",
+      "state": "blocked",
+      "reasons": [
+        "required_coverage_missing"
+      ],
+      "submitted_counts": {
+        "generated": 288,
+        "executed": 288,
+        "asserted": 288,
+        "unique_failures": 0,
+        "unique_states": 288,
+        "blocked": 0,
+        "fail": 0,
+        "pass": 288,
+        "unmeasured": 0
+      },
+      "report_digest": "887a92e0fb27b4212843eefeffe5ecab22a47464ef8b33480f8deb663d17282e",
+      "recovered_identically": true,
+      "passed": true
+    },
+    {
+      "check": "source_mismatch",
+      "state": "blocked",
+      "reasons": [
+        "source_revision_mismatch"
+      ],
+      "submitted_counts": {
+        "generated": 288,
+        "executed": 288,
+        "asserted": 288,
+        "unique_failures": 0,
+        "unique_states": 288,
+        "blocked": 0,
+        "fail": 0,
+        "pass": 288,
+        "unmeasured": 0
+      },
+      "report_digest": "5e76e71abe696ed4d5b80b3b13cf2f58eb8322a6ed426113e84d5ce0d3c2588e",
+      "recovered_identically": true,
+      "passed": true
+    },
+    {
+      "check": "task_mismatch",
+      "state": "blocked",
+      "reasons": [
+        "job_binding_mismatch"
+      ],
+      "submitted_counts": {
+        "generated": 288,
+        "executed": 288,
+        "asserted": 288,
+        "unique_failures": 0,
+        "unique_states": 288,
+        "blocked": 0,
+        "fail": 0,
+        "pass": 288,
+        "unmeasured": 0
+      },
+      "report_digest": "f8130a6c2dfb3d5b6a7a61c70e83837cd9c88d1d065b7620e8bba23cdf0b8d60",
+      "recovered_identically": true,
+      "passed": true
+    },
+    {
+      "check": "priority_downgrade",
+      "state": "blocked",
+      "reasons": [
+        "trusted_scenario_contract_mismatch"
+      ],
+      "submitted_counts": {
+        "generated": 288,
+        "executed": 288,
+        "asserted": 288,
+        "unique_failures": 0,
+        "unique_states": 288,
+        "blocked": 0,
+        "fail": 0,
+        "pass": 288,
+        "unmeasured": 0
+      },
+      "report_digest": "70699c5b651976d50b46efb306c246c9cb7e968d1aae991a901ff57fc86f4727",
+      "recovered_identically": true,
+      "passed": true
+    },
+    {
+      "check": "mandatory_review_after_current_passing_qa",
+      "state": "reviewed",
+      "passed": true
+    }
+  ]
+}

@@ -82,11 +82,11 @@ class Handler(BaseHTTPRequestHandler):
             return Sessions(self.server.store).cookie_token(raw)
         raise PermissionError('authentication required')
 
-    def body(self):
+    def body(self, max_bytes=131072):
         if self.headers.get_content_type() != 'application/json':
             raise ValueError('json required')
         length = int(self.headers.get('Content-Length', '0'))
-        if not 0 < length <= 131072:
+        if not 0 < length <= max_bytes:
             raise ValueError('invalid body length')
         result = json.loads(self.rfile.read(length), object_pairs_hook=_pairs,
                             parse_constant=lambda _: (_ for _ in ()).throw(ValueError('invalid number')))
@@ -140,6 +140,25 @@ class Handler(BaseHTTPRequestHandler):
                         pass
                 return self.respond(200,{'ok':True,'logged_out':True},cookie=self._session_cookie('',0))
             token = self.token()
+            if parsed.path.startswith('/v1/qa/'):
+                from .qa_jobs import QAJobs
+                jobs = QAJobs(store)
+                if method == 'POST' and parsed.path == '/v1/qa/jobs':
+                    data = self.body()
+                    return self.respond(200, {'ok': True, 'job': jobs.receive(
+                        token, data['approval'], data['request_key'], data['task'])})
+                match = re.fullmatch(r'/v1/qa/jobs/([a-f0-9]{32})(?:/(claim|cancel|result))?', parsed.path)
+                if match:
+                    key, action = match.groups()
+                    if method == 'GET' and action is None:
+                        return self.respond(200, {'ok': True, 'job': jobs.get(token, key)})
+                    if method == 'POST' and action == 'result':
+                        data = self.body(max_bytes=32*1024*1024)
+                        return self.respond(200, {'ok': True, 'job': jobs.finish(token, key, data['report'])})
+                    if method == 'POST' and action in ('claim', 'cancel'):
+                        self.body()
+                        return self.respond(200, {'ok': True, 'job': getattr(jobs, action)(token, key)})
+                return self.respond(404, {'ok': False, 'error': 'not_found'})
             if parsed.path.startswith('/v1/representative/'):
                 from .representative_api import dispatch
                 data=self.body() if method=='POST' else None

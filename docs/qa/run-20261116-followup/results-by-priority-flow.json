@@ -1,0 +1,71 @@
+{
+  "synthetic_suite": {
+    "source_revision": "e3f515e0d88e7ba49c67a35404352bb58939df49",
+    "counts": {
+      "asserted": 3006,
+      "blocked": 0,
+      "executed": 3006,
+      "fail": 0,
+      "generated": 3006,
+      "pass": 3006,
+      "unique_failures": 0,
+      "unique_states": 3006,
+      "unmeasured": 0
+    },
+    "priority_results": {
+      "P0": {
+        "pass": 3
+      },
+      "P1": {
+        "pass": 2715
+      },
+      "P2": {
+        "pass": 129
+      },
+      "P3": {
+        "pass": 159
+      }
+    },
+    "workflow_results": {
+      "control": {
+        "pass": 1000
+      },
+      "formula": {
+        "pass": 1000
+      },
+      "order": {
+        "pass": 1000
+      },
+      "scope": {
+        "pass": 6
+      }
+    }
+  },
+  "offline_real_order_component": {
+    "source_revision": "e3f515e0d88e7ba49c67a35404352bb58939df49",
+    "counts": {
+      "generated": 288,
+      "executed": 288,
+      "asserted": 288,
+      "unique_failures": 0,
+      "unique_states": 288,
+      "blocked": 0,
+      "fail": 0,
+      "pass": 288,
+      "unmeasured": 0
+    },
+    "priority_results": {
+      "P0": {},
+      "P1": {
+        "pass": 288
+      },
+      "P2": {},
+      "P3": {}
+    },
+    "workflow_results": {
+      "order-sheet-normalization": {
+        "pass": 288
+      }
+    }
+  }
+}

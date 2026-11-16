@@ -1,0 +1,58 @@
+{
+  "candidate_source_revision": "e3f515e0d88e7ba49c67a35404352bb58939df49",
+  "baseline": {
+    "revision": "1b61986cb88624db6ec8cadfbc9cf4bd92115796",
+    "default_discovery": {
+      "run": 1593,
+      "skipped": 1,
+      "failures": 0
+    },
+    "scenarios": 3006
+  },
+  "checks": {
+    "manager_regression": {
+      "run": 1356,
+      "skipped": 1,
+      "failures": 0
+    },
+    "portable_core": {
+      "run": 245,
+      "skipped": 0,
+      "failures": 0
+    },
+    "focused_acceptance_http_store": {
+      "run": 79,
+      "failures": 0
+    },
+    "full_repository": {
+      "run": 1660,
+      "passed": 1659,
+      "skipped": 1,
+      "failures": 0,
+      "command": "python -m unittest discover -s tests -q"
+    }
+  },
+  "reproduction": {
+    "runs": 2,
+    "identical_files": [
+      "formulas.csv.gz",
+      "mutation-allow_zero_quantity.json.gz",
+      "mutation-replay_unknown.json.gz",
+      "mutation-skip_tenant.json.gz",
+      "mutation-truncate_won.json.gz",
+      "scenario-contract.json.gz",
+      "scenarios.json.gz",
+      "summary.json"
+    ],
+    "byte_identical": true
+  },
+  "not_verified": [
+    "deployed staging service",
+    "live manager integration",
+    "UI",
+    "sheet transport or writes",
+    "approved real billing policy",
+    "OS-isolated executor lifecycle"
+  ],
+  "operational_authorization": false
+}
