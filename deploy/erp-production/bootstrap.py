@@ -11,7 +11,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 import zipfile
-ALLOWED = {'client.py','render_child.py','company_renderer.py','asset_bundle.py','company/__init__.py','company/render.py','company/sender.py','manifest.json'}
+ALLOWED = {'client.py','render_child.py','company_renderer.py','asset_bundle.py','company/__init__.py','company/render.py','company/sender.py','company/event_scroll.py','manifest.json'}
 
 
 def download_runtime(origin, token, expected_digest):
