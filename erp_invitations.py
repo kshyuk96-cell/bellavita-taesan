@@ -450,6 +450,14 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
                         copy_key=hashlib.sha256(f'{title}\0{price}'.encode()).hexdigest()
                         record=db.execute('SELECT number,before FROM copies WHERE key=?',(copy_key,)).fetchone()
                         copies.append({'price':price,'recorded':bool(record),'productId':record[0] if record else None,'baselineProductCount':len(json.loads(record[1])) if record else None})
+            if any(x['productId'] for x in copies):
+                client=BlogPay(os.getenv('BLOGPAY_SHOP_ID',''),os.getenv('BLOGPAY_API_TOKEN',''))
+                template=client.detail(os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID'))
+                for entry in copies:
+                    if not entry['productId']:continue
+                    item=client.detail(entry['productId'])
+                    entry['matches']={'name':item.get('goodName')==title,'price':int(item.get('goodPrice',0))==entry['price'],'settings':client.settings(item)==client.settings(template),'images':client.image_checksums(item)==client.image_checksums(template)}
+                    entry['differentSettingKeys']=[k for k in template if k in item and item[k]!=template[k] and k not in ('goodNum','goodName','goodPrice','goodImgUri','goodImg','subImg1','subImg2','subImg3','subImg4','shortGoodUrl')]
             handler.send_json({'requestId':diagnostic[1],'state':row['state'],'copies':copies,'templateConfigured':bool(os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID'))});return True
         if method=='POST' and path=='/erp/invitations/template-check':
             size=int(handler.headers.get('Content-Length','0'))
