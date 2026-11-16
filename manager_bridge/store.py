@@ -46,12 +46,19 @@ _STATES = frozenset({'pending_approval', 'queued', 'running', 'reported', 'revie
                      'cancelled', 'needs_verification'})
 
 
+def _admission_required(c, project):
+    # Durable owner requirements survive missing/recreated in-memory adapters.
+    return any(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone()
+               and c.execute('SELECT 1 FROM '+table+' WHERE project=?',(project,)).fetchone()
+               for table in ('operating_budget_policies','host_admission_requirements'))
+
+
 def _hierarchy_enabled(c, project):
     managed=(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='hierarchy_members'").fetchone() and
              c.execute('SELECT 1 FROM hierarchy_members WHERE project=?',(project,)).fetchone())
     budgeted=(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='operating_budget_policies'").fetchone() and
               c.execute('SELECT 1 FROM operating_budget_policies WHERE project=?',(project,)).fetchone())
-    return bool(managed or budgeted)
+    return bool(managed or budgeted or _admission_required(c,project))
 
 
 def _hierarchy_claim_allowed(c, actor, task):

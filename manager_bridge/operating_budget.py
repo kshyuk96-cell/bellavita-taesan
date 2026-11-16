@@ -56,11 +56,16 @@ class BudgetAuthObservation:
 
 
 class OperatingBudget:
-    def __init__(self,core,*,auth_observer=None,require_policy=False):
+    def __init__(self,core,*,auth_observer=None,require_policy=False,host_admission=None):
         if not isinstance(core,ThreeTier):raise ValueError('registered hierarchy core required')
         if auth_observer is not None and not callable(auth_observer):raise ValueError('trusted auth observer required')
         if type(require_policy) is not bool:raise ValueError('explicit admission default required')
         self.core,self.store,self.registry=core,core.store,core.registry
+        if host_admission is not None:
+            from .host_admission import HostAdmission
+            if not isinstance(host_admission,HostAdmission) or host_admission.core is not core:
+                raise ValueError('same registered host admission required')
+        self.host_admission=host_admission
         self.auth_observer,self.require_policy=auth_observer,require_policy
         self._execution_scope=ContextVar('operating-budget-'+str(id(self)),default=None)
         with self.store._transaction() as c:
@@ -210,6 +215,11 @@ class OperatingBudget:
         _,config=self._auth(c,token,project);now=_clock(self.store._now())
         policy=c.execute('SELECT * FROM operating_budget_policies WHERE project=?',(project,)).fetchone()
         if self._quarantined(c):return {'project':project,'allowed':False,'state':'paused','reason':'restore_quarantine','configured':policy is not None,'admission_only':True,'execution_authorized':False}
+        host_required=bool(c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='host_admission_requirements'").fetchone() and c.execute('SELECT 1 FROM host_admission_requirements WHERE project=?',(project,)).fetchone())
+        if self.host_admission is not None or host_required:
+            host=self.host_admission._check(c,token,project) if self.host_admission is not None else {'allowed':False,'reason':'host_gate_unconfigured'}
+            if not host['allowed']:
+                return {'project':project,'allowed':False,'state':'paused','reason':host['reason'],'configured':policy is not None,'admission_only':True,'execution_authorized':False}
         if policy is None:
             return {'project':project,'allowed':not self.require_policy,'state':'not_configured','reason':'policy_missing','configured':False,'admission_only':True,'execution_authorized':False}
         body=json.loads(policy['policy']);validated=BudgetPolicy(**body)

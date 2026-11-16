@@ -27,6 +27,7 @@ class GovernanceService:
         self._thread=None;self.source_states={};server.governance_service=self
         self._manager_running=False
         self.supervision=None
+        self.recovery=None
 
     def stop(self):
         # Signal handler safe: controller fences observe this before dispatch.
@@ -64,6 +65,11 @@ class GovernanceService:
         return bool(states) and all(state in ('baseline','unchanged','changed') for state in states.values())
 
     def run(self,*,max_ticks=None):
+        if self.recovery is None: return self._run(max_ticks=max_ticks)
+        with self.recovery.instance_guard(self.host.manager_token(),self.settings['projects'],self.settings['instance_id']):
+            return self._run(max_ticks=max_ticks)
+
+    def _run(self,*,max_ticks=None):
         if max_ticks is not None and (type(max_ticks) is not int or not 1<=max_ticks<=100000):
             raise ValueError('bounded rehearsal tick count required')
         self._thread=threading.Thread(target=self.server.serve_forever,kwargs={'poll_interval':0.1},daemon=True)
@@ -79,6 +85,8 @@ class GovernanceService:
                 if self.stop_event.is_set():break
                 if self.controller.admission_budget is not None:
                     self.controller.admission_budget.poll_auth(token,self.settings['projects'])
+                    host_gate=self.controller.admission_budget.host_admission
+                    if host_gate is not None:host_gate.poll(token,self.settings['projects'])
                 if self.stop_event.is_set():break
                 active=tuple(p for p in self.settings['projects'] if self.host.registry.get(token,p)['config']['maintenance_enabled'])
                 inactive=[p for p in self.settings['projects'] if p not in active]
@@ -115,11 +123,13 @@ class GovernanceService:
 
 def load_service(config_file):
     config=_private_json(config_file)
-    if config.get('version')!=1 or type(config.get('version')) is not int or not {'version','host_config_file'}<=set(config) or set(config)-{'version','host_config_file','listen','governance','supervision'}:
+    if config.get('version')!=1 or type(config.get('version')) is not int or not {'version','host_config_file'}<=set(config) or set(config)-{'version','host_config_file','listen','governance','supervision','local_host_admission'}:
         raise ValueError('exact governance service configuration required')
     listener=config.get('listen',{})
     if 'governance' in config and (type(config['governance']) is not dict or config['governance']):
         raise ValueError('exact governance settings required')
+    if 'local_host_admission' in config and ('governance' not in config or type(config['local_host_admission']) is not dict or config['local_host_admission']):
+        raise ValueError('local host admission requires exact governance registration')
     host_config=_private_file(config['host_config_file'])
     host,controller,settings=load_host(host_config)
     supervision=None
@@ -127,13 +137,20 @@ def load_service(config_file):
         from .governance_supervision import SupervisionSettings
         if type(config['supervision']) is not dict:raise ValueError('explicit supervision settings required')
         supervision=SupervisionSettings(**config['supervision'])
-    return build_service(host,controller,settings,listen=listener,governance='governance' in config,supervision=supervision)
+    host_admission=None
+    if 'local_host_admission' in config:
+        from .host_admission import HostAdmission,LocalHostObserver
+        host_settings=_private_json(host_config)
+        host_admission=HostAdmission(host.core,observer=LocalHostObserver(
+            application_root=host_settings['application_root'],state_root=host_settings['data_root']))
+    return build_service(host,controller,settings,listen=listener,governance='governance' in config,
+        supervision=supervision,host_admission=host_admission)
 
 
 def build_service(host,controller,settings,*,listen=None,governance=False,
                   qa_providers=None,source_probes=None,connection_profiles=None,
                   supervision=None,owner_token_loader=None,expiration_provider=None,subscription_broker=None,
-                  operating_budget=None,operations_metadata=(),artifact_sources=None,worker_links=None):
+                  operating_budget=None,operations_metadata=(),artifact_sources=None,worker_links=None,host_admission=None):
     """Compose already trusted host objects; provider arguments never come from HTTP/config."""
     from .continuous_manager import ContinuousManager
     from .three_tier import ThreeTier
@@ -148,7 +165,7 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
         raise ValueError('same trusted host and controller required')
     if type(governance) is not bool or (any(v is not None for v in (qa_providers,connection_profiles)) and not governance):
         raise ValueError('explicit governance registration required')
-    if not governance and (operating_budget is not None or operations_metadata or artifact_sources is not None or worker_links is not None):
+    if not governance and (operating_budget is not None or operations_metadata or artifact_sources is not None or worker_links is not None or host_admission is not None):
         raise ValueError('explicit governance operations registration required')
     if governance:
         from .operating_budget import OperatingBudget
@@ -159,7 +176,9 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
             raise ValueError('same registered operating budget required')
         if existing_budget is not None and operating_budget is not None and existing_budget is not operating_budget:
             raise ValueError('controller already has a different admission budget')
-        budget=operating_budget or existing_budget or OperatingBudget(host.core)
+        budget=operating_budget or existing_budget or OperatingBudget(host.core,host_admission=host_admission)
+        if host_admission is not None and budget.host_admission is not host_admission:
+            raise ValueError('budget and local host admission bindings differ')
     poll=settings.get('poll_seconds')
     if type(poll) not in (int,float) or not 1<=poll<=60:raise ValueError('bounded source polling required')
     listener=_listener({} if listen is None else listen)
@@ -206,7 +225,12 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
             from .operations_control import OperationsControl
             preflight=ProjectConnectionPreflight(host.store,host.registry,onboarding,metadata=operations_metadata)
             reporting=OperationsReporting(host.core,summary,controller=controller,artifact_sources=artifact_sources,budget=budget)
-            server.operations_control=OperationsControl(server.control_center,preflight,reporting,budget,worker_links=worker_links)
+            from .recovery_readiness import RecoveryReadiness
+            from .portfolio_readiness import PortfolioReadiness
+            service.recovery=RecoveryReadiness(host.core,controller=controller,supervision=service.supervision)
+            readiness=PortfolioReadiness(host.core,connections=connections,budget=budget,operations_reporting=reporting)
+            server.operations_control=OperationsControl(server.control_center,preflight,reporting,budget,
+                worker_links=worker_links,recovery=service.recovery,readiness=readiness)
             controller.admission_budget=budget
             host.core.admission_budget=budget
         return service
