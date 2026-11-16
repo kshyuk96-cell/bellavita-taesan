@@ -18,6 +18,12 @@ def dispatch(handler,method,path,token,body=None):
     if url.scheme or url.netloc or url.fragment:raise ValueError('relative governance route required')
     if not url.path.startswith(PREFIX):return False
     route=url.path[len(PREFIX):]
+    if route.startswith('portfolio/'):
+        from .governance_portfolio_api import dispatch as portfolio_dispatch
+        return portfolio_dispatch(handler,method,path,token,body)
+    if route.startswith('catalog/'):
+        from .governance_catalog_api import dispatch as catalog_dispatch
+        return catalog_dispatch(handler,method,path,token,body)
     if method=='POST' and route in POSTS:
         if url.query:raise ValueError('POST query rejected')
         args=_fields(body,*POSTS[route])
