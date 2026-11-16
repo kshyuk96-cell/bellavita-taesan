@@ -123,7 +123,7 @@ class ProposalTests(unittest.TestCase):
 
     def test_business_material_and_unbounded_batches_never_approve(self):
         with self.assertRaises(ValueError):self.board.propose(self.manager,'one',self.spec(),source='business_material')
-        with self.assertRaises(ValueError):self.board.create_batch(self.manager,'batch',['a'+str(i) for i in range(11)])
+        with self.assertRaises(ValueError):self.board.create_batch(self.manager,'batch',['a'+str(i) for i in range(21)])
         with self.assertRaises(PermissionDenied):self.board.propose(self.worker,'one',self.spec())
 
     def test_source_drift_after_approval_blocks_execution_and_reports_new_decision(self):

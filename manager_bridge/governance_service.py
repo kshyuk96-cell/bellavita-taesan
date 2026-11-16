@@ -176,6 +176,15 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
             server.governance_supervision=service.supervision
         elif owner_token_loader is not None or expiration_provider is not None:
             raise ValueError('explicit supervision settings required')
+        if governance:
+            from .control_onboarding import ControlOnboarding
+            from .control_digest import ControlDigest
+            from .control_center import ControlCenter
+            onboarding=ControlOnboarding(host.store,host.registry,connections=connections,onboarding=server.governance_onboarding)
+            summary=ControlDigest(server.governance_portfolio,routing=routing,supervision=service.supervision)
+            server.control_center=ControlCenter(host.core,controller,server.proposal_board,server.governance_portfolio,
+                settings['projects'],settings['instance_id'],onboarding=onboarding,summary=summary,
+                stop_event=service.stop_event,source_preflight=service.refresh_sources)
         return service
     except BaseException:
         server.server_close();raise

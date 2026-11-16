@@ -144,7 +144,7 @@ class ProposalBoard:
         _validate_parent(c,self.store,snapshot)
         return snapshot
 
-    def propose(self,token,request_key,spec,*,source='manager_proposal'):
+    def _prepare_spec(self,token,request_key,spec,source='manager_proposal'):
         name(request_key)
         if source!='manager_proposal':raise ValueError('structured manager proposal required')
         extra={'allowed_paths','dependencies','qa_contract_ref','qa_contract_digest','priority','risk_rationale'}
@@ -158,40 +158,76 @@ class ProposalBoard:
         if type(spec['qa_contract_digest']) is not str or not re.fullmatch('[a-f0-9]{64}',spec['qa_contract_digest']):raise ValueError('QA contract digest required')
         if spec['priority'] not in ('P0','P1','P2','P3') or type(spec['risk_rationale']) is not str or not spec['risk_rationale'].strip() or len(spec['risk_rationale'])>2000:raise ValueError('priority and bounded risk rationale required')
         spec={**spec,'allowed_paths':allowed};_reject_credentials(spec,token)
+        return manifest,spec
+
+    def _insert_proposal(self,c,token,request_key,manifest,spec):
+        actor=self._actor(c,token);config=self.registry._get(c,token,manifest['project'])
+        if self.store._project_access(c,actor,manifest['project'])!=manifest['repository']:raise Conflict('repository mismatch')
+        old=c.execute('SELECT * FROM manager_proposals WHERE actor=? AND request_key=?',(actor['token_hash'],request_key)).fetchone()
+        if old:
+            if json.loads(old['snapshot'])['spec']!=spec:raise Conflict('proposal key scope is immutable')
+            self._current(c,token,old);return self._public(old)
+        observed=_source(c,manifest['project'],config,self.store._now())
+        parent_authority=_parent_authority(c,self.store,spec) if observed['sha']!=manifest['base_sha'] else None
+        snapshot={'spec':spec,'config_fingerprint':config['fingerprint'],'source':observed}
+        if parent_authority is not None:snapshot['parent_authority']=parent_authority
+        key=secrets.token_hex(16)
+        c.execute('INSERT INTO manager_proposals VALUES (?,?,?,?,?,?,NULL)',(key,actor['token_hash'],request_key,manifest['project'],canonical_json(snapshot),digest(snapshot)))
+        return self._public(self._proposal(c,token,key))
+
+
+    def propose(self,token,request_key,spec,*,source='manager_proposal'):
+        manifest,spec=self._prepare_spec(token,request_key,spec,source)
         with self.store._transaction() as c:
-            actor=self._actor(c,token);config=self.registry._get(c,token,manifest['project'])
-            if self.store._project_access(c,actor,manifest['project'])!=manifest['repository']:raise Conflict('repository mismatch')
-            old=c.execute('SELECT * FROM manager_proposals WHERE actor=? AND request_key=?',(actor['token_hash'],request_key)).fetchone()
-            if old:
-                if json.loads(old['snapshot'])['spec']!=spec:raise Conflict('proposal key scope is immutable')
-                self._current(c,token,old);return self._public(old)
-            observed=_source(c,manifest['project'],config,self.store._now())
-            parent_authority=_parent_authority(c,self.store,spec) if observed['sha']!=manifest['base_sha'] else None
-            snapshot={'spec':spec,'config_fingerprint':config['fingerprint'],'source':observed}
-            if parent_authority is not None:snapshot['parent_authority']=parent_authority
-            key=secrets.token_hex(16)
-            c.execute('INSERT INTO manager_proposals VALUES (?,?,?,?,?,?,NULL)',(key,actor['token_hash'],request_key,manifest['project'],canonical_json(snapshot),digest(snapshot)))
-            return self._public(self._proposal(c,token,key))
+            return self._insert_proposal(c,token,request_key,manifest,spec)
 
     @staticmethod
     def _public(row):
         return {'id':row['id'],'project':row['project'],'digest':row['fingerprint'],'snapshot':json.loads(row['snapshot']),'task_id':row['task']}
 
-    def create_batch(self,token,request_key,proposal_ids):
+    def _create_batch(self,c,token,request_key,proposal_ids):
         name(request_key)
-        if type(proposal_ids) is not list or not 1<=len(proposal_ids)<=10 or len(set(proposal_ids))!=len(proposal_ids):raise ValueError('one to ten unique proposals required')
+        if type(proposal_ids) is not list or not 1<=len(proposal_ids)<=20 or len(set(proposal_ids))!=len(proposal_ids):raise ValueError('one to twenty unique proposals required')
+        actor=self._actor(c,token)
+        rows=[self._proposal(c,token,key) for key in proposal_ids]
+        for row in rows:self._current(c,token,row)
+        items=[{'id':r['id'],'digest':r['fingerprint']} for r in rows]
+        old=c.execute('SELECT * FROM manager_proposal_batches WHERE actor=? AND request_key=?',(actor['token_hash'],request_key)).fetchone()
+        if old:
+            if json.loads(old['snapshot'])!=items:raise Conflict('batch key scope is immutable')
+            return self._batch(c,token,old)
+        key=secrets.token_hex(16)
+        c.execute('INSERT INTO manager_proposal_batches VALUES (?,?,?,?,?,NULL)',(key,actor['token_hash'],request_key,canonical_json(items),digest(items)))
+        return self._batch(c,token,c.execute('SELECT * FROM manager_proposal_batches WHERE id=?',(key,)).fetchone())
+
+
+    def create_batch(self,token,request_key,proposal_ids):
+        with self.store._transaction() as c:
+            return self._create_batch(c,token,request_key,proposal_ids)
+
+    def propose_bundle(self,token,request_key,specs):
+        """Atomically prepare 1–20 structured proposals and one owner decision.
+
+        Decomposition is supplied by the manager, never inferred approval from
+        prose. Any invalid scope rolls back all proposals and the batch.
+        """
+        name(request_key)
+        if type(specs) is not list or not 1<=len(specs)<=20:
+            raise ValueError('one to twenty structured proposals required')
+        prepared=[self._prepare_spec(token,'bundle-'+digest({'key':request_key,'index':i}),spec)
+                  for i,spec in enumerate(specs)]
+        if len({digest(spec) for _,spec in prepared})!=len(prepared):
+            raise ValueError('duplicate bundle proposal scope rejected')
         with self.store._transaction() as c:
             actor=self._actor(c,token)
-            rows=[self._proposal(c,token,key) for key in proposal_ids]
-            for row in rows:self._current(c,token,row)
-            items=[{'id':r['id'],'digest':r['fingerprint']} for r in rows]
-            old=c.execute('SELECT * FROM manager_proposal_batches WHERE actor=? AND request_key=?',(actor['token_hash'],request_key)).fetchone()
-            if old:
-                if json.loads(old['snapshot'])!=items:raise Conflict('batch key scope is immutable')
-                return self._batch(c,token,old)
-            key=secrets.token_hex(16)
-            c.execute('INSERT INTO manager_proposal_batches VALUES (?,?,?,?,?,NULL)',(key,actor['token_hash'],request_key,canonical_json(items),digest(items)))
-            return self._batch(c,token,c.execute('SELECT * FROM manager_proposal_batches WHERE id=?',(key,)).fetchone())
+            from .agent_directory import _reject_known_tokens
+            _reject_known_tokens(c,{'request_key':request_key,'specs':specs})
+            proposals=[self._insert_proposal(c,token,'bundle-'+digest({'key':request_key,'index':i}),manifest,spec)
+                       for i,(manifest,spec) in enumerate(prepared)]
+            result=self._create_batch(c,token,'bundle-'+digest(request_key),[p['id'] for p in proposals])
+            current=self._actor(c,token)
+            if current['token_hash']!=actor['token_hash']:raise Conflict('bundle authority changed')
+            return result
 
     def _batch(self,c,token,row):
         items=json.loads(row['snapshot']);proposals=[self._proposal(c,token,x['id']) for x in items]

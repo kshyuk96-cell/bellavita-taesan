@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "artifact_type": "operator_preflight_example",
+  "runtime_configuration": false,
+  "observed_state": "not_verified",
+  "projects": ["bellavita-shop", "bellavita-erp", "hope-sunrise", "funeral-association"],
+  "excluded_work": ["tester_engine_development", "tester_engine_execution"],
+  "scope": "cloud_only_registered_development",
+  "service": {
+    "entrypoint": "scripts/run_governance_service.py",
+    "private_config_file": "/var/lib/taesan/governance.json",
+    "listener": "127.0.0.1:8791",
+    "persistent_database": "/var/lib/taesan/manager.sqlite3",
+    "automatic_install": false,
+    "deployment_performed": false
+  },
+  "required_evidence": [
+    {"item": "pinned_clean_application_commit", "state": "not_verified"},
+    {"item": "owned_private_persistent_store", "state": "not_verified"},
+    {"item": "registered_scoped_manager_developer_reviewer", "state": "not_verified"},
+    {"item": "current_source_pin_and_readiness_facts", "state": "not_verified"},
+    {"item": "global_and_project_capacity_fences", "state": "not_verified"},
+    {"item": "guarded_worker_metadata_and_execution_paths", "state": "not_verified"},
+    {"item": "owner_batch_and_independent_qa_policy", "state": "not_verified"},
+    {"item": "authenticated_loopback_http_and_csrf", "state": "not_verified"},
+    {"item": "bounded_three_tick_smoke", "state": "not_verified"},
+    {"item": "recovery_quarantine_and_private_backup_policy", "state": "not_verified"}
+  ],
+  "supervision": {
+    "auth_watch": "scoped_read_only",
+    "subscription_refresh": "disabled_without_explicit_registered_broker_and_owner_policy",
+    "backups": "disabled_without_registered_global_owner_loader",
+    "retention": "pause_at_cap_no_automatic_deletion",
+    "uncertain_jobs": "explicit_reconciliation_required_no_replay"
+  },
+  "completion_percentage": null,
+  "always_on_verified": false,
+  "additional_spend_authorized": false
+}

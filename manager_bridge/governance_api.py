@@ -18,6 +18,9 @@ def dispatch(handler,method,path,token,body=None):
     if url.scheme or url.netloc or url.fragment:raise ValueError('relative governance route required')
     if not url.path.startswith(PREFIX):return False
     route=url.path[len(PREFIX):]
+    if route.startswith('control/'):
+        from .control_center_api import dispatch as control_dispatch
+        return control_dispatch(handler,method,path,token,body)
     if route.startswith('portfolio/'):
         from .governance_portfolio_api import dispatch as portfolio_dispatch
         return portfolio_dispatch(handler,method,path,token,body)

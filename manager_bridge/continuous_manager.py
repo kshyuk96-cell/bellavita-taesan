@@ -161,6 +161,21 @@ class ContinuousManager:
             'state':state,'candidate_digest':candidate,'next_task_id':next_task,'rework_count':rework,'prior_action_key':prior,'next_version':next_version,'next_manifest_digest':next_manifest_digest}
         return ActionRequest(digest(identity),task['id'],task['project'],phase,task['version'],task['manifest_digest'],config['fingerprint'],state,candidate,next_task,prior,next_version,next_manifest_digest)
 
+    def _approved_priority(self,c,task):
+        """Ordering hint only from the exact approved Board manifest, never prose."""
+        fallback=2
+        approval=json.loads(task['approval'] or '{}')
+        proposal_id=approval.get('proposal_id')
+        if proposal_id is None:return fallback
+        if not c.execute("SELECT 1 FROM sqlite_master WHERE name='manager_proposals'").fetchone():return fallback
+        row=c.execute('SELECT * FROM manager_proposals WHERE id=?',(proposal_id,)).fetchone()
+        if row is None or row['task']!=task['id'] or row['project']!=task['project'] or row['fingerprint']!=approval.get('proposal_digest'):return fallback
+        snapshot=json.loads(row['snapshot']);spec=snapshot.get('spec',{})
+        if digest(snapshot)!=row['fingerprint']:return fallback
+        manifest={key:spec.get(key) for key in ('project','repository','base_sha','description','checks','kind')}
+        if (approval.get('version')!=task['version'] or approval.get('manifest_digest')!=task['manifest_digest'] or digest(manifest)!=task['manifest_digest']):return fallback
+        return {'P0':0,'P1':1,'P2':2,'P3':3}.get(spec.get('priority'),fallback)
+
     def _plans(self,c,actor,configs,scan_limit):
         placeholders=','.join('?' for _ in configs)
         scan_scope=digest({'actor':actor['token_hash'],'projects':sorted(configs)})
@@ -172,8 +187,9 @@ class ContinuousManager:
             "AND (t.created>? OR (t.created=? AND t.id>?)) ORDER BY t.created,t.id LIMIT ?",(*configs,after_created,after_created,after_id,scan_limit)).fetchall()
         last=(rows[-1]['created'],rows[-1]['id']) if len(rows)==scan_limit else (0,'')
         c.execute('INSERT OR REPLACE INTO continuous_scan_cursor VALUES (?,?,?)',(scan_scope,*last))
-        plans=[]
+        plans=[];priorities={}
         for task in rows:
+            priorities[task['id']]=self._approved_priority(c,task)
             config=configs[task['project']]
             prior=c.execute("SELECT action_key FROM continuous_actions WHERE task_id=? AND phase!='reconcile' AND state IN ('running','uncertain') ORDER BY created LIMIT 1",(task['id'],)).fetchone()
             candidate=json.loads(task['hierarchy_candidate'])['digest'] if task['hierarchy_candidate'] else None
@@ -200,7 +216,13 @@ class ContinuousManager:
                 plans.append(self._request(task,config,state,'start'));continue
             phase=PHASE_FOR.get(state)
             if phase:plans.append(self._request(task,config,state,phase,candidate=candidate,rework=task['rework_count']))
-        return plans
+        # The cursor still advances in creation order across the bounded scan.
+        # Stable sorting affects this window only; it cannot starve later pages.
+        phase_rank={'reconcile':0,'collect_development':1,'collect_review':1,'review':1,
+                    'technical_decision':1,'rework_decision':1,'dispatch_development':2,
+                    'dispatch_rework':2,'start':3,'approve_next':3}
+        return sorted(plans,key=lambda request:(phase_rank[request.phase],
+                      priorities.get(request.next_task_id or request.task_id,2)))
 
     def _progress(self,token,request):
         if request.phase=='reconcile' and request.prior_action_key:
