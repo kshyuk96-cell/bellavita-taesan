@@ -60,6 +60,7 @@ def final_review(report,verified,*,trusted_plan):
         if not verified.source_window_verified:notes.append('후보 버전 전후 일치 미확인')
         if not metadata_ok:notes.append('실제 단계·시간대·실행환경 증거 부족')
         row.update(status='FAIL' if fail else 'BLOCKED' if missing or not verified.source_window_verified or not expectation_ok or not metadata_ok else 'PASS',tested_at=observation.get('tested_at'),performer='독립 검증기',deployed_revision=verified.source_revision,execution_steps=observation.get('steps'),actual=observation.get('actual'),evidence=checks,note='; '.join(notes),environment=environment)
+        if observation.get('approved_residual_plan'):row['note']+='; 승인된 잔여 영향·보완 계획: '+str(observation['approved_residual_plan'])
     defects=[dict(d) for d in verified.defects]
     if any(d.get('severity') not in ('S1','S2','S3','S4') or not d.get('status') for d in defects):raise Conflict('defect severity/state required')
     critical=[r for r in outcome['scenarios'] if r['priority'] in ('P0','P1')]
