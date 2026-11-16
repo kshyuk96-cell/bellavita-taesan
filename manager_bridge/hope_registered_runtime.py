@@ -5,6 +5,7 @@ import base64
 import hashlib
 import json
 import re
+import uuid
 from .hope_service_runtime import ActualServiceProfile,execute_actual_service,_docker_env
 from .project_runtime import _directory
 from .qa_jobs import QAJobs
@@ -69,12 +70,15 @@ class HopeEngine:
     def __init__(self,registry,manifest,evaluator):
         self.registry,self.manifest,self.evaluator=registry,manifest,evaluator;self.raw=None
     def probe(self):
+        name='hope-probe-'+uuid.uuid4().hex
         try:
             profile=self.registry.resolve(self.manifest)
             code="const r={uid:process.getuid(),network:false,fs:false,spawn:false};try{await fetch('https://example.com',{signal:AbortSignal.timeout(500)})}catch{r.network=true}try{(await import('node:fs')).readFileSync('/etc/passwd')}catch{r.fs=true}try{(await import('node:child_process')).execFileSync('/bin/true')}catch{r.spawn=true}console.log(JSON.stringify(r));"
-            result=subprocess.run(['docker','run','--rm','--pull','never','--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--user','65534:65534',profile.service.image,'node','--permission','--input-type=module','-e',code],env=_docker_env(),stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=10)
+            result=subprocess.run(['docker','run','--rm','--name',name,'--pull','never','--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--user','65534:65534',profile.service.image,'node','--permission','--input-type=module','-e',code],env=_docker_env(),stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=10)
             verified=result.returncode==0 and json.loads(result.stdout)==dict(uid=65534,network=True,fs=True,spawn=True)
         except Exception:verified=False
+        finally:
+            subprocess.run(['docker','rm','-f',name],env=_docker_env(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
         return dict(available=verified,isolation_verified=verified,kind='actual-fixed-confinement-probe',cgroup_memory_enforced=False)
     def execute(self,profile,heartbeat):
         before=profile.fingerprint
