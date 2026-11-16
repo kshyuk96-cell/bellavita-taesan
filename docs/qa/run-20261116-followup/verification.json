@@ -23,6 +23,13 @@
     "focused_acceptance_http_store": {
       "run": 79,
       "failures": 0
+    },
+    "full_repository": {
+      "run": 1660,
+      "passed": 1659,
+      "skipped": 1,
+      "failures": 0,
+      "command": "python -m unittest discover -s tests -q"
     }
   },
   "reproduction": {
