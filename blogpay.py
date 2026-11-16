@@ -134,7 +134,7 @@ class BlogPay:
             'brand', 'isDelivery', 'eDeliBPrice', 'eDeliFPrice', 'goodContent', 'tag', 'isEvent',
             'supplyUserId', 'isSmUse', 'isCpUse', 'goodSmValue', 'cpNum', 'subtitle', 'subtitleColor',
             'goodsft', 'addShip', 'bsFree', 'perLimitCount', 'buyDCinfo', 'is_show_detail', 'gBindNum',
-            'IsReserve', 'adminMemo') if item.get(key) is not None}
+            'IsReserve', 'adminMemo', 'isDeliveryPrice', 'isTodayShipUse', 'todayShipTime') if item.get(key) is not None}
         fields.update(mode='updateGoodsNew', goodNum=item['goodNum'], goodName=title, goodPrice=price,
                       categorySelect='useSelect' if item.get('cateNum') else 'useEmptyCate',
                       isDisplay=0, isRecommend=0, optionState=item.get('optionState',1),
@@ -238,9 +238,14 @@ class BlogPay:
                     db.commit()
                     rows.append(candidates[0])
                 item = self.detail(number)
-                if item.get('goodName') != title or int(item.get('goodPrice',0)) != price:
+                if (item.get('goodName') != title or int(item.get('goodPrice',0)) != price
+                        or self.settings(item) != self.settings(template)):
                     self.set_sale(item, False)
                     item = self.detail(number)
+                    # The vendor defaults these delivery fields on update when omitted.
+                    # Repair only those known defaults on our journalled copy; all
+                    # other settings must still match the unchanged source.
+                    item={**item,**{k:template.get(k) for k in ('isDeliveryPrice','isTodayShipUse','todayShipTime')}}
                     if self.settings(item) != self.settings(template):
                         raise ValueError('복제 상품의 상세 설명, 옵션 또는 배송 설정이 원본과 달라 판매를 중지했어요.')
                     try:
