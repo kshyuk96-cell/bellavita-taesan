@@ -56,7 +56,7 @@ def export_package(intake,report,output):
         for label,key in [('시험일시','tested_at'),('중요도','priority'),('환경','environment'),('사전조건','preconditions'),('실제 수행 단계','execution_steps'),('기대값','expected'),('실제값','actual'),('판정','status'),('증거','evidence'),('결함','defect_ids'),('재시험','retest'),('비고','note')]:
             cells=table.add_row().cells;cells[0].text=label;value=row[key]
             if key=='expected':value=value.get('description',value) if isinstance(value,dict) else value
-            elif key=='actual' and isinstance(value,dict):value='화면: '+txt(value.get('ui') or '미확인')+' / 서버·원장: '+txt(value.get('server') or '미확인')+' / PG: '+txt(value.get('pg') or '미확인')
+            elif key=='actual' and isinstance(value,dict):value='화면: '+txt('미확인' if value.get('ui') is None else value['ui'])+' / 서버·원장: '+txt('미확인' if value.get('server') is None else value['server'])+' / PG: '+txt('미확인' if value.get('pg') is None else value['pg'])
             elif value is None:value='미실시' if key in ('tested_at','execution_steps') else '미확인'
             cells[1].text=txt(value)
     for title,body in [('독립 계산식',report['formula_report']),('결함·UX 개선',dict(defects=report['defects'],ux=report['ux_observations'])),('추가 QA 검사',report['qa_added_checks']),('정책결정 대기',report['policy_decisions_pending']),('부족한 증거',report['missing_evidence'])]:doc.add_heading(title,1);doc.add_paragraph(txt(body))

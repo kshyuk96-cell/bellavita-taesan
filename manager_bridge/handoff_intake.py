@@ -150,3 +150,15 @@ def draft_report(intake,*,probe=None,browser=None):
     policies=list(POLICY_PENDING) if intake['plan']['template']=='hope-tour' else ['업무 규칙의 근거·승인 확인'] if any('policy' in r['required'] for r in intake['plan']['scenarios']) else []
     summary=dict(total=len(rows),counts={'PASS':0,'FAIL':0,'BLOCKED':0,'NOT RUN':len(rows)},executed=0,customer_ready=False,recommendation='검증 준비·미실시; 완료 확인서로 고객 인계 불가',source_revision=None,actual_pg='미검증',usability=dict(participants=0,task_success_rate=None),operational_authorization=False,customer_acceptance_approved=False)
     return dict(schema='customer-handoff-report/v1',document_status='DRAFT_NOT_VERIFIED',project=intake['project'],target=intake['target'],summary=summary,required_evidence={r['id']:r['required'] for r in intake['plan']['scenarios']},scenarios=rows,qa_added_checks=intake['plan']['extensions'],developer_claims=intake['developer_claims'],accounts=intake['accounts'],plan_digest=intake['plan_digest'],missing_evidence=missing,policy_decisions_pending=policies,read_only_probe=probe,browser_readiness=browser,defects=[],formula_report=[],ux_observations=[],approval_gates=[dict(stage=s,status='BLOCKED',reason=reason) for s,reason in [('준비','초기값·역할·환경 확인 전'),('실행','화면과 서버의 실제 실행 증거 없음'),('재시험','결함 수정 버전·연관 회귀 확인 전'),('고객 인계','필수 P0/P1과 미해결 주요 결함 판단 전')]])
+
+
+def approve_expectations(intake,expected_by_id,*,approved_by,basis):
+    """Trusted QA-manager preparation step, not a developer checklist flag or HTTP route."""
+    if digest(intake['plan'])!=intake['plan_digest'] or set(expected_by_id)!={r['id'] for r in intake['plan']['scenarios']} or not approved_by or not basis:raise Conflict('complete independently reviewed expectations required')
+    result=deepcopy(intake)
+    for row in result['plan']['scenarios']:
+        expected=expected_by_id[row['id']]
+        if type(expected) is not dict or not expected.get('description') or expected.get('values') is None:raise Conflict('concrete expected values required')
+        digest(expected)
+        row['expected']=dict(expected,approval='approved',approved_by=approved_by,basis=basis)
+    result['plan_digest']=digest(result['plan']);return result

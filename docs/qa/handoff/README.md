@@ -37,7 +37,7 @@ python scripts/prepare_handoff_review.py \
 
 ## 마지막 인계 판정
 
-`handoff_gate.final_review`는 개발자 파일/JSON이 아닌 등록된 host verifier의 `VerifiedEvidence`만 받는다. manager 사전 계획 digest·후보 source·실행 전후 버전 일치·어댑터·필수 scope·독립 기대값·증거 reference를 대조한다. 중요 시나리오 누락·중요도 하향·필수 검사 삭제·다른 source는 거절한다. 미실시 row의 PASS 위조도 초기화한다.
+`handoff_gate.final_review`는 개발자 파일/JSON이 아닌 등록된 host verifier의 `VerifiedEvidence`만 받는다. manager 사전 계획과 독립적으로 확정한 구체 기대값·승인 근거·계획 digest·후보 source·실행 전후 버전 일치·어댑터·필수 scope·독립 기대값·증거 reference를 대조한다. 중요 시나리오 누락·중요도 하향·필수 검사 삭제·다른 source는 거절한다. 미실시 row의 PASS 위조도 초기화한다.
 
 P0/P1 전부 통과, 추가 QA 검사 완료, source 일치, 미해결 S1/S2 없음, CLOSED 주요 결함의 해당 후보 수정·재시험 증거가 있어야 고객 검토용 인계를 권고한다. P2/P3 미해결은 영향·보완·담당·승인 계획이 필요하다. 인계 권고가 발주사의 최종 인수 승인이나 운영 배포 승인은 아니다.
 
@@ -50,3 +50,5 @@ Sites 대상의 브라우저는 [Sites SKILL.md](skill://plugin_connector_1p_689
 Cloud desktop 스킬과 `cloud_environment.environment_status`로 확인한 환경은 `ccarenv_b64_Y2NhcmVudl8xZWM2OTQwYzYwMDQ4MTkxOWRhODRhMTFkYmQ2NjQ1Mw`다. 환경은 running/connected, remote_desktop enabled=true/state=unknown으로 반환됐다. 다만 이 세션의 활성 도구 목록에 desktop JS/cua_repl.js 및 viewer 도구가 없으므로 실제 창/탭 조작은 시작하지 않았다. 데스크톱 자체가 없다고 주장하지 않으며 **조작 도구가 노출되지 않은 상태**로 기록한다.
 
 [Cloud desktop SKILL.md](skill://plugin_connector_1p_c5b7d5df5d7081918f2c4be5a633ed5d/cloud-desktop/SKILL.md)의 “If the task needs the original tab, native window, or a handoff, report which interaction is blocked, the environment ID, and the missing tool or error.”에 따른 진단이다. 이 제한을 임의 browser 설치나 비공식 제어 경로로 우회하지 않는다.
+
+`approve_expectations`는 독립 QA 관리자가 자료/화면/승인된 업무 기준으로 기대값을 구체화하는 내부 준비 단계다. 개발자의 기대값 또는 PASS 표시를 이 승인으로 자동 변환하지 않는다. 이 단계가 없으면 실행기가 PASS를 내도 최종 확인서에서는 BLOCKED다. 사용자에게 시나리오를 다시 작성시키는 절차가 아니라 QA 담당자의 책임이다.
