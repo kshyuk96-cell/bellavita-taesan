@@ -520,6 +520,9 @@ class Store:
             return None
 
     def _validate_execution(self,c,row,*,check_source_age=False):
+        if c is not None and c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='governance_restore_marker'").fetchone():
+            if c.execute('SELECT 1 FROM governance_restore_marker WHERE reconciliation_required=1 LIMIT 1').fetchone():
+                raise Conflict('restored state requires explicit verification before execution')
         approval=json.loads(row['approval']) if row['approval'] else {}
         if json.loads(row['manifest'])['kind']=='development':
             if c is None:raise Conflict('development execution requires a transactional fence')
