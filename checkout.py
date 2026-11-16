@@ -294,7 +294,7 @@ def normalize_order(product, fields):
     for i,spec in enumerate(product.get('extra_fields',[])):
         selected.append([spec['label'],value('extra'+str(i),spec.get('max',200))])
     buyer_phone = re.sub(r'[\s-]', '', value('buyer_phone', 20))
-    if not re.fullmatch(r'01[016789]\d{7,8}', buyer_phone):
+    if not re.fullmatch(r'01[016789][0-9]{7,8}', buyer_phone):
         raise ValueError('주문자 휴대폰 번호를 확인해 주세요.')
     sender = value('sender', 140)
     buyer = sender if fields.get('same_buyer') == 'yes' else value('buyer', 60)
@@ -310,7 +310,7 @@ def normalize_order(product, fields):
         identifier = ('0100001234' if kind == 'self' else buyer_phone if kind == 'personal' and
                       not fields.get('cash_receipt_identifier', '').strip() else
                       re.sub(r'[\s-]', '', fields.get('cash_receipt_identifier', '')))
-        pattern = r'01[016789]\d{8}' if kind == 'personal' else r'\d{10}'
+        pattern = r'01[016789][0-9]{8}' if kind == 'personal' else r'[0-9]{10}'
         if not re.fullmatch(pattern, identifier):
             raise ValueError('현금영수증 휴대폰 번호(11자리) 또는 사업자번호(10자리)를 확인해 주세요.')
         order['cash_receipt'] = {'kind': kind, 'identifier': identifier}
