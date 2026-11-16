@@ -15,6 +15,10 @@ def fingerprint(value):
                                      separators=(',', ':'), allow_nan=False).encode()).hexdigest()
 
 
+class EvidenceUnavailable(CoreError):
+    """A trusted adapter has no execution observation; never a passing verdict."""
+
+
 @dataclass(frozen=True)
 class Risk:
     priority: str
@@ -144,6 +148,9 @@ def run_scenarios(scenarios, adapters, *, source_revision, seed, required_covera
                 if row['status'] == 'fail':
                     row['failure_key'] = fingerprint([s.adapter, s.coverage_key, s.expected, result['actual']])
                     failures.add(row['failure_key'])
+            except EvidenceUnavailable:
+                executed -= 1
+                row.update(status='unmeasured', executed=False, evidence={'reason':'execution_evidence_unavailable'})
             except Exception as exc:
                 row.update(status='blocked', evidence={'error_type': type(exc).__name__})
         if s.formula is not None:

@@ -1,0 +1,11 @@
+{
+  "project_id": "appgprj_6af881381bdc8191843d4e4f742948dd",
+  "origin": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site",
+  "version_number": 31,
+  "version_id": "appgprj_6af881381bdc8191843d4e4f742948dd~appgver_2bfae7cc1d908191bdfd4056e4c64f0f",
+  "source_revision": "475b25947f9f22161ad8d7730b5b34dbf3a83b54",
+  "deployment_id": "appgdep_6afa4ddbc5f48191a2b7530f07843cfd",
+  "deployment_status": "succeeded",
+  "provenance": "Sites list_site_versions and get_deployment_status read by the operator; not inferred from report hashes",
+  "authorization_scope": "isolated /review/ fixtures only; no operational APIs, PG payments, notification sends or deployment"
+}
