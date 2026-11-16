@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "implementation_commit": "c2a324d60e0b923a0a636d531fd7dbcaced48708",
+  "implementation_commit": "457d071555918cc9026972596a1dceba4d28e6ed",
   "scope": "private synthetic local governance HTTP service with real subscribed Codex CLI and isolated review",
   "workflow": {
     "business_proposals": 2,
@@ -105,9 +105,10 @@
     "always_on_verified": false
   },
   "validation": {
-    "full_repository_tests": 1702,
+    "full_repository_tests": 1707,
     "full_repository_tests_passed": true,
-    "actual_namespace_and_loopback_tests": true
+    "actual_namespace_and_loopback_tests": true,
+    "durable_enrollment_bypass_review_passed": true
   },
   "limits": {
     "customer_project_execution_enabled": false,
@@ -119,5 +120,6 @@
     "paid_api_calls": 0,
     "new_paid_resources": 0,
     "old_unknown_attempts_replayed": false
-  }
+  },
+  "native_workflow_execution_commit": "c2a324d60e0b923a0a636d531fd7dbcaced48708"
 }
