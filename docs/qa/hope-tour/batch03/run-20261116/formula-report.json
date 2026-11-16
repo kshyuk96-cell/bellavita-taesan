@@ -1,0 +1,141 @@
+{
+  "records": [
+    {
+      "id": "hope-domestic",
+      "expression": "min(total-DP,floor(total*capBps/10000))",
+      "variables": {
+        "total": 300000,
+        "DP": 50000,
+        "capBps": 1500
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "integer floor",
+      "expected": 45000,
+      "actual": 45000,
+      "status": "PASS",
+      "policy_approval": "customer example; operational approval pending"
+    },
+    {
+      "id": "hope-overseas",
+      "expression": "min(total-DP,floor(total*capBps/10000))",
+      "variables": {
+        "total": 1000000,
+        "DP": 50000,
+        "capBps": 1000
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "integer floor",
+      "expected": 100000,
+      "actual": 100000,
+      "status": "PASS",
+      "policy_approval": "customer example; operational approval pending"
+    },
+    {
+      "id": "hope-culture",
+      "expression": "min(total-DP,floor(total*capBps/10000))",
+      "variables": {
+        "total": 100000,
+        "DP": 50000,
+        "capBps": 5000
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "integer floor",
+      "expected": 50000,
+      "actual": 50000,
+      "status": "PASS",
+      "policy_approval": "customer example; operational approval pending"
+    },
+    {
+      "id": "happy-domestic",
+      "expression": "min(total-DP,floor(total*capBps/10000))",
+      "variables": {
+        "total": 300000,
+        "DP": 100000,
+        "capBps": 2000
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "integer floor",
+      "expected": 60000,
+      "actual": 60000,
+      "status": "PASS",
+      "policy_approval": "customer example; operational approval pending"
+    },
+    {
+      "id": "happy-overseas",
+      "expression": "min(total-DP,floor(total*capBps/10000))",
+      "variables": {
+        "total": 1000000,
+        "DP": 100000,
+        "capBps": 1500
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "integer floor",
+      "expected": 150000,
+      "actual": 150000,
+      "status": "PASS",
+      "policy_approval": "customer example; operational approval pending"
+    },
+    {
+      "id": "happy-culture",
+      "expression": "min(total-DP,floor(total*capBps/10000))",
+      "variables": {
+        "total": 100000,
+        "DP": 100000,
+        "capBps": 7000
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "integer floor",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS",
+      "policy_approval": "customer example; operational approval pending"
+    },
+    {
+      "id": "premium-domestic",
+      "expression": "min(total-DP,floor(total*capBps/10000))",
+      "variables": {
+        "total": 300000,
+        "DP": 200000,
+        "capBps": 2500
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "integer floor",
+      "expected": 75000,
+      "actual": 75000,
+      "status": "PASS",
+      "policy_approval": "customer example; operational approval pending"
+    },
+    {
+      "id": "premium-overseas",
+      "expression": "min(total-DP,floor(total*capBps/10000))",
+      "variables": {
+        "total": 1000000,
+        "DP": 200000,
+        "capBps": 1800
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "integer floor",
+      "expected": 180000,
+      "actual": 180000,
+      "status": "PASS",
+      "policy_approval": "customer example; operational approval pending"
+    },
+    {
+      "id": "premium-culture",
+      "expression": "min(total-DP,floor(total*capBps/10000))",
+      "variables": {
+        "total": 100000,
+        "DP": 100000,
+        "capBps": 10000
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "integer floor",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS",
+      "policy_approval": "customer example; operational approval pending"
+    }
+  ],
+  "source_revision": "eaacbf0b9a999171e8d288f2e72b3bc3536ca973",
+  "operational_authorization": false
+}
