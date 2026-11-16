@@ -1,0 +1,342 @@
+{
+  "schema": "hope-customer-evidence-contract/v1",
+  "binding": {
+    "project": "hope-tour",
+    "task": "hope-batch05-source-candidate",
+    "source_revision": "6e31be85187fec2e5b8592ec3e8e7cb2535352e3",
+    "test_contract_digest": "3df09a50d18040568a4247ef6db2d4a15f81c2c5ac478d00660a4fb8b6967c57",
+    "adapter_release": "persistent-recovery-v1",
+    "generation": 1
+  },
+  "rows": {
+    "MEM-01": {
+      "priority": "P0",
+      "required": {
+        "mem-01_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "MEM-02": {
+      "priority": "P0",
+      "required": {
+        "mem-02_api": "actual_source_api",
+        "ui": "supported_browser",
+        "policy": "approved_policy"
+      }
+    },
+    "MEM-03": {
+      "priority": "P0",
+      "required": {
+        "mem-03_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "MEM-04": {
+      "priority": "P0",
+      "required": {
+        "mem-04_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "MEM-05": {
+      "priority": "P1",
+      "required": {
+        "mem-05_api": "actual_source_api",
+        "ui": "supported_browser"
+      }
+    },
+    "MEM-06": {
+      "priority": "P1",
+      "required": {
+        "mem-06_api": "actual_source_api",
+        "ui": "supported_browser",
+        "policy": "approved_policy"
+      }
+    },
+    "MEM-07": {
+      "priority": "P0",
+      "required": {
+        "mem-07_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "MEM-08": {
+      "priority": "P0",
+      "required": {
+        "mem-08_api": "actual_source_api",
+        "ui": "supported_browser",
+        "policy": "approved_policy"
+      }
+    },
+    "MEM-09": {
+      "priority": "P1",
+      "required": {
+        "mem-09_api": "actual_source_api",
+        "ui": "supported_browser"
+      }
+    },
+    "MEM-10": {
+      "priority": "P1",
+      "required": {
+        "terms_html": "server_html",
+        "keyboard_touch": "supported_browser",
+        "mobile_help": "supported_browser"
+      }
+    },
+    "PRD-01": {
+      "priority": "P0",
+      "required": {
+        "prd-01_api": "actual_source_api",
+        "ui": "supported_browser",
+        "policy": "approved_policy"
+      }
+    },
+    "PRD-02": {
+      "priority": "P0",
+      "required": {
+        "prd-02_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "PRD-03": {
+      "priority": "P0",
+      "required": {
+        "prd-03_api": "actual_source_api",
+        "ui": "supported_browser",
+        "policy": "approved_policy"
+      }
+    },
+    "PRD-04": {
+      "priority": "P0",
+      "required": {
+        "prd-04_api": "actual_source_api",
+        "ui": "supported_browser",
+        "policy": "approved_policy",
+        "inventory": "shared_test_inventory",
+        "supplier_inventory": "actual_supplier_inventory"
+      }
+    },
+    "PRD-05": {
+      "priority": "P1",
+      "required": {
+        "prd-05_api": "actual_source_api",
+        "ui": "supported_browser"
+      }
+    },
+    "PRD-06": {
+      "priority": "P1",
+      "required": {
+        "prd-06_api": "actual_source_api",
+        "ui": "supported_browser"
+      }
+    },
+    "PRD-07": {
+      "priority": "P0",
+      "required": {
+        "prd-07_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "PRD-08": {
+      "priority": "P0",
+      "required": {
+        "prd-08_api": "actual_source_api",
+        "ui": "supported_browser",
+        "policy": "approved_policy"
+      }
+    },
+    "PAY-01": {
+      "priority": "P0",
+      "required": {
+        "pay-01_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "PAY-02": {
+      "priority": "P0",
+      "required": {
+        "pay-02_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "PAY-03": {
+      "priority": "P0",
+      "required": {
+        "pay-03_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "PAY-04": {
+      "priority": "P0",
+      "required": {
+        "pay-04_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "PAY-05": {
+      "priority": "P0",
+      "required": {
+        "pay-05_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "PAY-06": {
+      "priority": "P0",
+      "required": {
+        "duplicate_booking": "actual_source_api",
+        "duplicate_payment": "actual_source_api",
+        "ledger": "independent_ledger",
+        "ui": "supported_browser",
+        "pg": "actual_pg",
+        "policy": "approved_policy"
+      }
+    },
+    "PAY-07": {
+      "priority": "P0",
+      "required": {
+        "unknown_payment": "actual_source_api",
+        "ledger": "independent_ledger",
+        "ui": "supported_browser",
+        "pg": "actual_pg",
+        "policy": "approved_policy"
+      }
+    },
+    "PAY-08": {
+      "priority": "P0",
+      "required": {
+        "partial_refund": "actual_source_api",
+        "ledger": "independent_ledger",
+        "inventory": "shared_test_inventory",
+        "ui": "supported_browser",
+        "pg": "actual_pg",
+        "policy": "approved_policy"
+      }
+    },
+    "PAY-09": {
+      "priority": "P0",
+      "required": {
+        "pay-09_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "PAY-10": {
+      "priority": "P0",
+      "required": {
+        "pay-10_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy",
+        "pg": "actual_pg"
+      }
+    },
+    "UX-01": {
+      "priority": "P1",
+      "required": {
+        "task_metrics": "human_observation",
+        "ui": "supported_browser"
+      }
+    },
+    "UX-02": {
+      "priority": "P1",
+      "required": {
+        "mobile_layout": "supported_browser",
+        "actual_devices": "real_device"
+      }
+    },
+    "UX-03": {
+      "priority": "P1",
+      "required": {
+        "ux-03_api": "actual_source_api",
+        "ui": "supported_browser"
+      }
+    },
+    "SEC-01": {
+      "priority": "P0",
+      "required": {
+        "sec-01_api": "actual_source_api",
+        "ui": "supported_browser",
+        "policy": "approved_policy"
+      }
+    },
+    "SEC-02": {
+      "priority": "P0",
+      "required": {
+        "sec-02_api": "actual_source_api",
+        "ui": "supported_browser",
+        "policy": "approved_policy"
+      }
+    },
+    "OPS-01": {
+      "priority": "P1",
+      "required": {
+        "backup_restore": "independent_backup_restore",
+        "regression_api": "actual_source_api",
+        "ui": "supported_browser"
+      }
+    },
+    "E2E-01": {
+      "priority": "P0",
+      "required": {
+        "e2e-01_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "E2E-02": {
+      "priority": "P0",
+      "required": {
+        "refund_flow": "actual_source_api",
+        "ledger": "independent_ledger",
+        "inventory": "shared_test_inventory",
+        "ui": "supported_browser",
+        "pg": "actual_pg",
+        "policy": "approved_policy"
+      }
+    },
+    "E2E-03": {
+      "priority": "P0",
+      "required": {
+        "e2e-03_api": "actual_source_api",
+        "ui": "supported_browser",
+        "ledger": "independent_ledger",
+        "policy": "approved_policy"
+      }
+    },
+    "E2E-04": {
+      "priority": "P0",
+      "required": {
+        "recovery_api": "actual_source_api",
+        "last_seat_api": "actual_source_api",
+        "inventory": "shared_test_inventory",
+        "ui": "supported_browser",
+        "pg": "actual_pg",
+        "policy": "approved_policy"
+      }
+    }
+  }
+}

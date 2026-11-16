@@ -74,3 +74,5 @@ REVIEW_DATA_KEY는 QA job 수명 동안 부모 메모리에서 유지해 각 컨
 [Sites SKILL.md](skill://plugin_connector_1p_689987207de08191979cf68eca2941c6/sites/SKILL.md)의 “If `cua_repl.js` is unavailable, skip browser QA”를 적용한다. 도구 부재로 preview 실행/브라우저 설치/임의 대체 조작은 하지 않았다. 92–94와 실제 공급사/PG/정책·외부 중앙 서버는 미검증/미연결로 유지한다. 실제 공개 서비스의 수정을 게시하거나 운영 계정·결제를 변경하지 않는다.
 
 기존 pinned Docker network-none/read-only source/UID65534/Node permission/CPU·파일·시간·출력 제한을 유지하고 승인된 business/exchange만 쓰기 마운트한다. rootless Docker cgroup 하드 총메모리 제한 미지원은 그대로다. source Worker 종료가 부모 QA controller 전체 장애의 자동 복구까지 입증하지 않는다. 다음101–120은 그 범위와 key broker·tenant 권한·백업복원을 먼저 제안한다.
+
+현재 부재 판정은 정상적으로 보존된 TEST 업무 DB를 전제로 한다. DB를 과거 백업으로 되돌리거나 임의 삭제한 뒤 같은 revision만 보고 안전한 미실행으로 판정하는 운영 복원 절차는 지원하지 않는다. rollback/교체 witness와 두 DB의 일관된 백업복원은101–120의 우선 항목이며, 고객 OPS-01은 실행하지 않은 상태로 유지한다.

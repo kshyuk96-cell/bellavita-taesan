@@ -1,0 +1,571 @@
+{
+  "source_revision": "6e31be85187fec2e5b8592ec3e8e7cb2535352e3",
+  "slices_match": true,
+  "expected_slices": [
+    {
+      "id": 1,
+      "total": 500006,
+      "sources": {
+        "CP": 0,
+        "SP": 50000,
+        "BP": 50001,
+        "DP": 300000,
+        "card": 100005
+      }
+    },
+    {
+      "id": 2,
+      "total": 500005,
+      "sources": {
+        "CP": 0,
+        "SP": 50000,
+        "BP": 50000,
+        "DP": 300000,
+        "card": 100005
+      }
+    }
+  ],
+  "actual_slices": [
+    {
+      "id": 1,
+      "total": 500006,
+      "sources": {
+        "CP": 0,
+        "SP": 50000,
+        "BP": 50001,
+        "DP": 300000,
+        "card": 100005
+      }
+    },
+    {
+      "id": 2,
+      "total": 500005,
+      "sources": {
+        "CP": 0,
+        "SP": 50000,
+        "BP": 50000,
+        "DP": 300000,
+        "card": 100005
+      }
+    }
+  ],
+  "records": [
+    {
+      "id": "member-total",
+      "expression": "floor(2*515470*9700/10000)",
+      "variables": {
+        "adults": 2,
+        "normal_unit_KRW": 515470,
+        "discount_bps": 300
+      },
+      "units": "KRW",
+      "rounding": "floor",
+      "expected": 1000011,
+      "actual": 1000011,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "room-1-CP",
+      "expression": "floor(exact proportional quota), then largest fractional remainder; ties by ascending room index",
+      "variables": {
+        "plan": {
+          "CP": 0,
+          "SP": 100000,
+          "BP": 100001,
+          "DP": 600000,
+          "card": 200010
+        },
+        "room_totals": [
+          500006,
+          500005
+        ],
+        "allocation_order": [
+          "CP",
+          "SP",
+          "BP",
+          "DP",
+          "card"
+        ]
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "largest remainder; stable room index tie",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "room-1-SP",
+      "expression": "floor(exact proportional quota), then largest fractional remainder; ties by ascending room index",
+      "variables": {
+        "plan": {
+          "CP": 0,
+          "SP": 100000,
+          "BP": 100001,
+          "DP": 600000,
+          "card": 200010
+        },
+        "room_totals": [
+          500006,
+          500005
+        ],
+        "allocation_order": [
+          "CP",
+          "SP",
+          "BP",
+          "DP",
+          "card"
+        ]
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "largest remainder; stable room index tie",
+      "expected": 50000,
+      "actual": 50000,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "room-1-BP",
+      "expression": "floor(exact proportional quota), then largest fractional remainder; ties by ascending room index",
+      "variables": {
+        "plan": {
+          "CP": 0,
+          "SP": 100000,
+          "BP": 100001,
+          "DP": 600000,
+          "card": 200010
+        },
+        "room_totals": [
+          500006,
+          500005
+        ],
+        "allocation_order": [
+          "CP",
+          "SP",
+          "BP",
+          "DP",
+          "card"
+        ]
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "largest remainder; stable room index tie",
+      "expected": 50001,
+      "actual": 50001,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "room-1-DP",
+      "expression": "floor(exact proportional quota), then largest fractional remainder; ties by ascending room index",
+      "variables": {
+        "plan": {
+          "CP": 0,
+          "SP": 100000,
+          "BP": 100001,
+          "DP": 600000,
+          "card": 200010
+        },
+        "room_totals": [
+          500006,
+          500005
+        ],
+        "allocation_order": [
+          "CP",
+          "SP",
+          "BP",
+          "DP",
+          "card"
+        ]
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "largest remainder; stable room index tie",
+      "expected": 300000,
+      "actual": 300000,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "room-1-card",
+      "expression": "floor(exact proportional quota), then largest fractional remainder; ties by ascending room index",
+      "variables": {
+        "plan": {
+          "CP": 0,
+          "SP": 100000,
+          "BP": 100001,
+          "DP": 600000,
+          "card": 200010
+        },
+        "room_totals": [
+          500006,
+          500005
+        ],
+        "allocation_order": [
+          "CP",
+          "SP",
+          "BP",
+          "DP",
+          "card"
+        ]
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "largest remainder; stable room index tie",
+      "expected": 100005,
+      "actual": 100005,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "room-2-CP",
+      "expression": "floor(exact proportional quota), then largest fractional remainder; ties by ascending room index",
+      "variables": {
+        "plan": {
+          "CP": 0,
+          "SP": 100000,
+          "BP": 100001,
+          "DP": 600000,
+          "card": 200010
+        },
+        "room_totals": [
+          500006,
+          500005
+        ],
+        "allocation_order": [
+          "CP",
+          "SP",
+          "BP",
+          "DP",
+          "card"
+        ]
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "largest remainder; stable room index tie",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "room-2-SP",
+      "expression": "floor(exact proportional quota), then largest fractional remainder; ties by ascending room index",
+      "variables": {
+        "plan": {
+          "CP": 0,
+          "SP": 100000,
+          "BP": 100001,
+          "DP": 600000,
+          "card": 200010
+        },
+        "room_totals": [
+          500006,
+          500005
+        ],
+        "allocation_order": [
+          "CP",
+          "SP",
+          "BP",
+          "DP",
+          "card"
+        ]
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "largest remainder; stable room index tie",
+      "expected": 50000,
+      "actual": 50000,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "room-2-BP",
+      "expression": "floor(exact proportional quota), then largest fractional remainder; ties by ascending room index",
+      "variables": {
+        "plan": {
+          "CP": 0,
+          "SP": 100000,
+          "BP": 100001,
+          "DP": 600000,
+          "card": 200010
+        },
+        "room_totals": [
+          500006,
+          500005
+        ],
+        "allocation_order": [
+          "CP",
+          "SP",
+          "BP",
+          "DP",
+          "card"
+        ]
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "largest remainder; stable room index tie",
+      "expected": 50000,
+      "actual": 50000,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "room-2-DP",
+      "expression": "floor(exact proportional quota), then largest fractional remainder; ties by ascending room index",
+      "variables": {
+        "plan": {
+          "CP": 0,
+          "SP": 100000,
+          "BP": 100001,
+          "DP": 600000,
+          "card": 200010
+        },
+        "room_totals": [
+          500006,
+          500005
+        ],
+        "allocation_order": [
+          "CP",
+          "SP",
+          "BP",
+          "DP",
+          "card"
+        ]
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "largest remainder; stable room index tie",
+      "expected": 300000,
+      "actual": 300000,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "room-2-card",
+      "expression": "floor(exact proportional quota), then largest fractional remainder; ties by ascending room index",
+      "variables": {
+        "plan": {
+          "CP": 0,
+          "SP": 100000,
+          "BP": 100001,
+          "DP": 600000,
+          "card": 200010
+        },
+        "room_totals": [
+          500006,
+          500005
+        ],
+        "allocation_order": [
+          "CP",
+          "SP",
+          "BP",
+          "DP",
+          "card"
+        ]
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "largest remainder; stable room index tie",
+      "expected": 100005,
+      "actual": 100005,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "before-balance-CP",
+      "expression": "room original source; card only already paid; zero TEST fee",
+      "variables": {
+        "room_sources": {
+          "CP": 0,
+          "SP": 50000,
+          "BP": 50001,
+          "DP": 300000,
+          "card": 0
+        },
+        "fee_bps": 0
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact allocated integer",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "before-balance-SP",
+      "expression": "room original source; card only already paid; zero TEST fee",
+      "variables": {
+        "room_sources": {
+          "CP": 0,
+          "SP": 50000,
+          "BP": 50001,
+          "DP": 300000,
+          "card": 0
+        },
+        "fee_bps": 0
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact allocated integer",
+      "expected": 50000,
+      "actual": 50000,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "before-balance-BP",
+      "expression": "room original source; card only already paid; zero TEST fee",
+      "variables": {
+        "room_sources": {
+          "CP": 0,
+          "SP": 50000,
+          "BP": 50001,
+          "DP": 300000,
+          "card": 0
+        },
+        "fee_bps": 0
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact allocated integer",
+      "expected": 50001,
+      "actual": 50001,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "before-balance-DP",
+      "expression": "room original source; card only already paid; zero TEST fee",
+      "variables": {
+        "room_sources": {
+          "CP": 0,
+          "SP": 50000,
+          "BP": 50001,
+          "DP": 300000,
+          "card": 0
+        },
+        "fee_bps": 0
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact allocated integer",
+      "expected": 300000,
+      "actual": 300000,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "before-balance-card",
+      "expression": "room original source; card only already paid; zero TEST fee",
+      "variables": {
+        "room_sources": {
+          "CP": 0,
+          "SP": 50000,
+          "BP": 50001,
+          "DP": 300000,
+          "card": 0
+        },
+        "fee_bps": 0
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact allocated integer",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "after-balance-CP",
+      "expression": "room original source; card only already paid; zero TEST fee",
+      "variables": {
+        "room_sources": {
+          "CP": 0,
+          "SP": 50000,
+          "BP": 50000,
+          "DP": 300000,
+          "card": 100005
+        },
+        "fee_bps": 0
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact allocated integer",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "after-balance-SP",
+      "expression": "room original source; card only already paid; zero TEST fee",
+      "variables": {
+        "room_sources": {
+          "CP": 0,
+          "SP": 50000,
+          "BP": 50000,
+          "DP": 300000,
+          "card": 100005
+        },
+        "fee_bps": 0
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact allocated integer",
+      "expected": 50000,
+      "actual": 50000,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "after-balance-BP",
+      "expression": "room original source; card only already paid; zero TEST fee",
+      "variables": {
+        "room_sources": {
+          "CP": 0,
+          "SP": 50000,
+          "BP": 50000,
+          "DP": 300000,
+          "card": 100005
+        },
+        "fee_bps": 0
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact allocated integer",
+      "expected": 50000,
+      "actual": 50000,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "after-balance-DP",
+      "expression": "room original source; card only already paid; zero TEST fee",
+      "variables": {
+        "room_sources": {
+          "CP": 0,
+          "SP": 50000,
+          "BP": 50000,
+          "DP": 300000,
+          "card": 100005
+        },
+        "fee_bps": 0
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact allocated integer",
+      "expected": 300000,
+      "actual": 300000,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    },
+    {
+      "id": "after-balance-card",
+      "expression": "room original source; card only already paid; zero TEST fee",
+      "variables": {
+        "room_sources": {
+          "CP": 0,
+          "SP": 50000,
+          "BP": 50000,
+          "DP": 300000,
+          "card": 100005
+        },
+        "fee_bps": 0
+      },
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact allocated integer",
+      "expected": 100005,
+      "actual": 100005,
+      "status": "PASS",
+      "policy_approval": "TEST slice sequence CP/SP/BP/DP/card, BP/SP relative order and cancellation-fee assumptions pending operational approval"
+    }
+  ],
+  "issues": [],
+  "policy_approval": "TEST assumptions; operational approval pending"
+}
