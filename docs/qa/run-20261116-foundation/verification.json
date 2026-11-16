@@ -1,0 +1,53 @@
+{
+  "source_revision": "2513cd0a1aad2deadb089b5ebebf1fcaddc11090",
+  "foundation_tests": {
+    "run": 16,
+    "passed": 16,
+    "failures": 0
+  },
+  "focused_checks_before_final_four_cases": {
+    "run": 67,
+    "failures": 0,
+    "overlaps_foundation_tests": true
+  },
+  "actual_sandbox": {
+    "available": false,
+    "isolation_verified": false,
+    "worker_claimed": false,
+    "persisted_state": "queued"
+  },
+  "fixture_scope": "worker HTTP success and process termination exercised with explicit test fixtures; no real namespace-isolated success claimed",
+  "not_verified": [
+    "namespace-isolated successful execution on an approved host",
+    "deployed staging service",
+    "live production manager connection",
+    "real business calculation policy"
+  ],
+  "operational_authorization": false,
+  "full_repository": {
+    "command": "python -m unittest discover -s tests -q",
+    "run": 1676,
+    "passed": 1675,
+    "skipped": 1,
+    "failures": 0
+  },
+  "synthetic_scenarios": 3006,
+  "offline_real_component_scenarios": {
+    "generated": 288,
+    "executed": 288,
+    "asserted": 288,
+    "unique_failures": 0,
+    "unique_states": 288,
+    "blocked": 0,
+    "fail": 0,
+    "pass": 288,
+    "unmeasured": 0
+  },
+  "mutation_failures": {
+    "allow_zero_quantity": 44,
+    "skip_tenant": 3,
+    "replay_unknown": 122,
+    "truncate_won": 270
+  },
+  "all_mutations_blocked": true
+}

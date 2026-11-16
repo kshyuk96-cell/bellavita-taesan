@@ -1,0 +1,12 @@
+{
+  "source_revision": "2513cd0a1aad2deadb089b5ebebf1fcaddc11090",
+  "worker_result": {
+    "state": "sandbox_unavailable",
+    "execution_started": false,
+    "retry_performed": false
+  },
+  "persisted_job_state": "queued",
+  "expected": "unavailable sandbox must leave job unclaimed",
+  "expectation_met": true,
+  "operational_authorization": false
+}
