@@ -1,0 +1,26 @@
+# Reviewable example only: this file does not install or enable a service.
+# Replace paths/user only after validating the private pinned host configuration.
+[Unit]
+Description=Taesan authenticated governance and development supervisor
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=taesan-manager
+Group=taesan-manager
+UMask=0077
+WorkingDirectory=/opt/taesan/app
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/taesan/venv/bin/python /opt/taesan/app/scripts/run_governance_service.py --config /var/lib/taesan/governance.json
+Restart=on-failure
+RestartSec=15
+KillMode=control-group
+TimeoutStopSec=60
+NoNewPrivileges=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target

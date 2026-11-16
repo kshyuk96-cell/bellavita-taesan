@@ -521,6 +521,9 @@ class Store:
 
     def _validate_execution(self,c,row,*,check_source_age=False):
         approval=json.loads(row['approval']) if row['approval'] else {}
+        if approval.get('proposal_batch_id') is not None:
+            from .proposal_board import validate_execution
+            validate_execution(c,self,row)
         if approval.get('delegation_id') is not None:
             if c is None:raise Conflict('delegated execution requires a transactional fence')
             from .delegation import validate_execution

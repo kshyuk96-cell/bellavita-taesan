@@ -312,13 +312,13 @@ class ContinuousManager:
         return {'state':'stopped' if stop_event is not None and stop_event.is_set() else 'tick_complete','actions':results,
             'always_on_verified':False,'operational_change':False,'existing_ui_chat_control_verified':False}
 
-    def reconcile(self,token,projects,instance_id,action_key,*,lease_seconds=30):
+    def reconcile(self,token,projects,instance_id,action_key,*,lease_seconds=30,stop_event=None):
         _hex(action_key)
         with self.store._transaction() as c:
             actor,_=self._auth(c,token,projects)
             row=c.execute('SELECT * FROM continuous_actions WHERE action_key=?',(action_key,)).fetchone()
             if row is None or row['actor_hash']!=actor['token_hash'] or row['project'] not in projects or row['state']!='uncertain':raise Conflict('exact uncertain owned action required')
-        return self.tick(token,projects,instance_id,limit=1,lease_seconds=lease_seconds,_reconcile_key=action_key)
+        return self.tick(token,projects,instance_id,limit=1,lease_seconds=lease_seconds,stop_event=stop_event,_reconcile_key=action_key)
 
     def run(self,token,projects,instance_id,*,stop_event=None,poll_seconds=2,max_ticks=None):
         if type(poll_seconds) not in (int,float) or not 1<=poll_seconds<=60:raise ValueError('bounded polling interval required')

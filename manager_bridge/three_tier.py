@@ -114,6 +114,8 @@ class ThreeTier:
     def __init__(self,store,registry,*,source_observers=None,review_hosts=None,stop_observers=None):
         if registry.store is not store:raise ValueError('shared registered store required')
         self.store,self.registry=store,registry
+        from .governance_gate import GovernanceGate
+        self.governance_gate=GovernanceGate(store,registry)
         self.source_observers=dict(source_observers or {});self.review_hosts=dict(review_hosts or {})
         self.stop_observers=dict(stop_observers or {})
         for collection in (self.source_observers,self.review_hosts,self.stop_observers):
@@ -457,7 +459,8 @@ class ThreeTier:
     def decide(self,token,task_id,candidate_digest,decision='accept'):
         _hash(candidate_digest)
         if decision not in ('accept','rework'):raise ValueError('technical accept or rework required')
-        self._fresh_candidate(token,task_id,'taesan')
+        fresh=self._fresh_candidate(token,task_id,'taesan')
+        qa=self._qa_observe(token,task_id,fresh) if decision=='accept' else None
         with self.store._transaction() as c:
             task,config,row,developer=self._bound(c,token,task_id,'taesan');manager=self._actor(c,token,task['project'],'taesan',config)
             candidate=json.loads(row['candidate']);evidence=json.loads(row['evidence']) if row['evidence'] else None
@@ -466,10 +469,11 @@ class ThreeTier:
             reviewer=self._member(c,task['project'],row['reviewer_id'],'reviewer',config)
             if len({developer['subject'],reviewer['subject'],manager['subject']})!=3:raise PermissionDenied('three distinct technical identities required')
             if decision=='accept':
+                self.governance_gate.verify_snapshot(c,candidate,qa['policy_digest'] if qa else None,qa)
                 if row['state']!='review_passed' or evidence is None or evidence.get('candidate_digest')!=candidate_digest or evidence.get('reviewer_subject')!=reviewer['subject'] or evidence.get('isolation_verified') is not True or any(x['exit_code']!=0 for x in evidence['checks']):raise Conflict('actual independent passing checks required')
                 self._require_code_assessment(candidate,evidence,reviewer['subject'])
                 if task['state']!='reported':raise Conflict('upstream developer report changed')
-                record={'report_digest':digest(json.loads(task['report'])),'scope':'three_tier_technical_only','actor':manager['subject'],'reviewer':reviewer['subject'],'candidate_digest':candidate_digest,'evidence_digest':digest(evidence),'deployment_approved':False}
+                record={'report_digest':digest(json.loads(task['report'])),'scope':'three_tier_technical_only','actor':manager['subject'],'reviewer':reviewer['subject'],'candidate_digest':candidate_digest,'evidence_digest':digest(evidence),'deployment_approved':False,'qa_admission':qa}
                 c.execute("UPDATE bridge_tasks SET state='reviewed',review=?,updated=? WHERE id=?",(canonical_json(record),self.store._now(),task_id))
                 state='accepted'
             else:
@@ -520,9 +524,13 @@ class ThreeTier:
         _task_id(current_task_id);_task_id(next_task_id);_hash(expected_parent_digest);name(request_key)
         if current_task_id==next_task_id:raise Conflict('next task must differ from accepted parent')
         candidate=self._fresh_candidate(token,current_task_id,'taesan')
+        qa=self._qa_observe(token,current_task_id,candidate)
         with self.store._transaction() as c:
             parent,config,current,developer=self._bound(c,token,current_task_id,'taesan')
             manager=self._actor(c,token,parent['project'],'taesan',config)
+            self.governance_gate.verify_snapshot(c,candidate,qa['policy_digest'] if qa else None,qa)
+            if not current['candidate'] or json.loads(current['candidate'])['digest']!=candidate['digest']:
+                raise Conflict('accepted parent changed during QA observation')
             if current['state']!='accepted' or candidate['digest']!=expected_parent_digest:raise Conflict('current accepted parent proof required')
             evidence=json.loads(current['evidence']) if current['evidence'] else None
             if evidence is None or evidence['candidate_digest']!=expected_parent_digest or evidence['isolation_verified'] is not True or any(x['exit_code']!=0 for x in evidence['checks']):raise Conflict('independent parent proof required')
@@ -572,17 +580,37 @@ class ThreeTier:
         if type(assessment) is not dict or assessment.get('candidate_digest')!=candidate['digest'] or assessment.get('reviewer_subject')!=reviewer_subject or assessment.get('recommendation')!='pass':raise Conflict('independent code review pass required')
 
     def _public(self,c,task,row):
+        saved_review=c.execute('SELECT review FROM bridge_tasks WHERE id=?',(task['id'],)).fetchone()
+        acceptance=json.loads(saved_review['review']) if saved_review and saved_review['review'] else {}
+        qa=acceptance.get('qa_admission')
         candidate=json.loads(row['candidate']) if row['candidate'] else None;evidence=json.loads(row['evidence']) if row['evidence'] else None
         return {'task_id':task['id'],'project':task['project'],'state':row['state'],'version':row['version'],'manifest_digest':row['manifest_digest'],
                 'developer_id':row['developer_id'],'reviewer_id':row['reviewer_id'],'rework_count':row['rework_count'],
                 'candidate_digest':candidate['digest'] if candidate else None,'source':candidate['source'] if candidate else None,
                 'checks':evidence['checks'] if evidence else [],'code_assessment':evidence.get('code_assessment') if evidence else None,'review_state':'passed' if row['state'] in ('review_passed','accepted') else 'failed' if row['state']=='review_failed' else 'not_measured',
                 'technical_accepted':row['state']=='accepted','operational_approved':False,'connection_verified':False,
+                'qa_admission':qa,'actual_project_qa_verified':False,
                 'requires_owner_decision':False,'blocked_reason':row['reason'],'operational_change':False,'existing_chat_control_verified':False}
+
+    def _qa_observe(self,token,task_id,candidate):
+        with self.store._transaction() as c:
+            task,config,row,developer=self._bound(c,token,task_id)
+            reviewer=self._member(c,task['project'],row['reviewer_id'],'reviewer',config) if row['reviewer_id'] else None
+        qa=self.governance_gate.require(token,candidate,reviewer['subject'] if reviewer else '')
+        # QA can take time. Reobserve source, artifact, runtime and exact task
+        # identity after it returns, outside the final write transaction.
+        if qa is not None:
+            current=self._fresh_candidate(token,task_id)
+            if current['digest']!=candidate['digest']:
+                raise Conflict('candidate changed during mandatory QA observation')
+            with self.store._transaction() as c:
+                self.governance_gate.verify_snapshot(c,candidate,qa['policy_digest'],qa)
+        return qa
 
     def _read_freshness(self,token,task_id):
         try:
-            self._fresh_candidate(token,task_id)
+            candidate=self._fresh_candidate(token,task_id)
+            self._qa_observe(token,task_id,candidate)
             return None
         except PermissionDenied:return 'authority_changed'
         except (Conflict,NotFound):return 'source_unavailable'

@@ -63,10 +63,20 @@ def dispatch(handler,method,path,token,body=None):
         return True
     expected=Fleet if family=='fleet' else ContinuousManager
     if not isinstance(service,expected) or service.store is not store:raise ValueError('exact registered management service required')
+    stop_event=getattr(handler.server,'governance_stop_event',None)
+    if family=='continuous' and action in ('tick','reconcile') and stop_event is not None and stop_event.is_set():
+        handler.respond(200,{'ok':True,'result':{'state':'stopped','actions':[],'execution_started':False,'automatic_replay':False,'operational_change':False}})
+        return True
+    governance=getattr(handler.server,'governance_service',None)
+    if family=='continuous' and action in ('tick','reconcile') and governance is not None and hasattr(handler.server,'proposal_board'):
+        if not governance.refresh_sources(token,args['projects']):
+            handler.respond(200,{'ok':True,'result':{'state':'source_unavailable','actions':[],'execution_started':False,'automatic_replay':False,'operational_change':False}})
+            return True
     if family=='fleet':
         names={'hosts/register':'register_host','templates/register':'register_template','discover':'discover',
             'enroll':'enroll','create':'create_for_task','reserve':'reserve_for_task','reserved/begin':'begin_reserved_execution','reserved/bind':'bind_reserved_execution','creation':'get_creation','inventory':'inventory','delivery/verify':'verify_delivery'}
         result=getattr(service,names[action])(token,**args)
+    elif action in ('tick','reconcile') and stop_event is not None:result=getattr(service,action)(token,stop_event=stop_event,**args)
     else:result=getattr(service,action)(token,**args)
     handler.respond(200,{'ok':True,'result':result})
     return True
