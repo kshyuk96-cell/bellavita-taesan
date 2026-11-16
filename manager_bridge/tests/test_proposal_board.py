@@ -205,3 +205,56 @@ class ProposalTests(unittest.TestCase):
         with self.store._transaction() as c:
             row=self.store._get(c,self.store._authenticate(c,self.owner),task['id'])
             with self.assertRaisesRegex(Conflict,'QA policy changed'):self.store._validate_execution(c,row)
+
+class DerivedProposalTests(unittest.TestCase):
+    def setUp(self):
+        from manager_bridge.tests.test_governance_gate import GovernanceGateTests
+        self.fx=GovernanceGateTests();self.fx.setUp();self.addCleanup(self.fx.doCleanups)
+        self.fx.register()
+        self.parent,self.accepted=self.fx.accept()
+        self.host=self.fx.fx
+        self.store=self.host.store;self.owner=self.host.owner;self.manager=self.host.manager
+        self.board=ProposalBoard(self.store,self.host.registry)
+        SourceWatch(self.store,self.host.registry)
+        config=self.host.registry.get(self.owner,'project')
+        with self.store._transaction() as c:
+            c.execute('INSERT INTO manager_source_heads VALUES (?,?,?,?,?,?,?)',('project',config['fingerprint'],'a'*40,'remote-v1','fixture/remote',self.host.now,1))
+        self.spec={'project':'project','repository':'fixture/project','base_sha':'b'*40,'description':'Synthetic accepted-parent continuation','checks':['fixture-check'],'kind':'development','allowed_paths':['src/'],'dependencies':[self.parent['id']],'qa_contract_ref':'1','qa_contract_digest':digest(self.fx.contract),'priority':'P2','risk_rationale':'Synthetic bounded continuation'}
+
+    def propose(self):return self.board.propose(self.manager,'derived',self.spec)
+
+    def test_exact_accepted_parent_allows_derived_base_and_preserves_remote_fence(self):
+        proposal=self.propose();snapshot=proposal['snapshot']
+        self.assertEqual(snapshot['source']['sha'],'a'*40)
+        self.assertEqual(snapshot['parent_authority']['head_sha'],'b'*40)
+        batch=self.board.create_batch(self.manager,'child',[proposal['id']])
+        result=self.board.approve_batch(self.owner,batch['id'],batch['digest'])
+        child=result['tasks'][0]
+        self.assertEqual(child['manifest']['base_sha'],'b'*40)
+        assigned=self.host.core.approve_next(self.manager,self.parent['id'],child['id'],self.accepted['candidate_digest'],'derived-next')
+        self.assertEqual(assigned['task_id'],child['id'])
+
+    def test_wrong_head_unaccepted_parent_and_nonunique_dependencies_rejected(self):
+        self.spec['base_sha']='d'*40
+        with self.assertRaises(Conflict):self.propose()
+        self.spec['base_sha']='b'*40;self.spec['dependencies']=[]
+        with self.assertRaises(Conflict):self.propose()
+        self.spec['dependencies']=[self.parent['id']]
+        with self.store._transaction() as c:c.execute("UPDATE hierarchy_tasks SET state='review_passed' WHERE task_id=?",(self.parent['id'],))
+        with self.assertRaises(Conflict):self.propose()
+
+    def test_revoked_parent_member_and_changed_parent_evidence_block_approval(self):
+        proposal=self.propose();batch=self.board.create_batch(self.manager,'child',[proposal['id']])
+        self.store.revoke_token(self.owner,token_hash(self.host.reviewer))
+        with self.assertRaises(Conflict):self.board.approve_batch(self.owner,batch['id'],batch['digest'])
+
+    def test_parent_evidence_changed_after_child_approval_blocks_execution(self):
+        proposal=self.propose();batch=self.board.create_batch(self.manager,'child',[proposal['id']])
+        task=self.board.approve_batch(self.owner,batch['id'],batch['digest'])['tasks'][0]
+        with self.store._transaction() as c:
+            import json
+            row=c.execute('SELECT evidence FROM hierarchy_tasks WHERE task_id=?',(self.parent['id'],)).fetchone()
+            evidence=json.loads(row['evidence']);evidence['reference']='fixture/changed'
+            c.execute('UPDATE hierarchy_tasks SET evidence=? WHERE task_id=?',(json.dumps(evidence),self.parent['id']))
+            row=self.store._get(c,self.store._authenticate(c,self.owner),task['id'])
+            with self.assertRaises(Conflict):self.store._validate_execution(c,row)

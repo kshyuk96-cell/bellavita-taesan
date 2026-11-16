@@ -9,7 +9,7 @@ import re
 import secrets
 from .coordination import validate_paths
 from .maintenance_registry import name, receipt
-from .store import Conflict, NotFound, _manifest, _reject_credentials, canonical_json, digest
+from .store import Conflict, NotFound, _manifest, _reject_credentials, canonical_json, digest, _hierarchy_acceptance
 
 
 SOURCE_MAX_AGE = 300
@@ -38,6 +38,45 @@ def _source(c, project, config, now):
     return {'sha':row['sha'],'revision':row['revision'],'sequence':row['sequence']}
 
 
+def _parent_authority(c,store,spec):
+    if len(spec['dependencies'])!=1:
+        raise Conflict('derived base requires exactly one accepted hierarchy parent')
+    parent=c.execute('SELECT * FROM bridge_tasks WHERE id=?',(spec['dependencies'][0],)).fetchone()
+    if (not parent or parent['project']!=spec['project'] or not parent['approval']
+            or parent['state']!='reviewed'
+            or not c.execute("SELECT 1 FROM sqlite_master WHERE name='hierarchy_tasks'").fetchone()):
+        raise Conflict('approved accepted same-project parent required')
+    hierarchy=c.execute('SELECT * FROM hierarchy_tasks WHERE task_id=?',(parent['id'],)).fetchone()
+    if not hierarchy or not _hierarchy_acceptance(c,parent):
+        raise Conflict('exact hierarchy technical acceptance required')
+    candidate=json.loads(hierarchy['candidate'])
+    if candidate['source']['head_sha']!=spec['base_sha']:
+        raise Conflict('derived base must equal accepted parent HEAD')
+    # Membership credentials remain authority, including after technical acceptance.
+    credentials={}
+    for field,role in (('developer_id','developer'),('reviewer_id','reviewer')):
+        member=c.execute('SELECT * FROM hierarchy_members WHERE project=? AND member_id=?',(spec['project'],hierarchy[field])).fetchone()
+        token=c.execute('SELECT * FROM bridge_tokens WHERE token_hash=?',(member['credential_hash'],)).fetchone() if member else None
+        if (not member or member['role']!=role or member['config_fingerprint']!=hierarchy['config_fingerprint']
+                or not token or token['role']!='worker' or token['subject']!=member['subject'] or token['revoked'] is not None
+                or (token['expires'] is not None and token['expires']<=store._now())
+                or spec['project'] not in json.loads(token['projects'])):
+            raise Conflict('accepted parent member authority revoked or changed')
+        credentials[field]=member['credential_hash']
+    store._validate_execution(c,parent)
+    return {'id':parent['id'],'version':parent['version'],'manifest_digest':parent['manifest_digest'],
+            'candidate_digest':candidate['digest'],'evidence_digest':digest(json.loads(hierarchy['evidence'])),
+            'review_digest':digest(json.loads(parent['review'])),'head_sha':candidate['source']['head_sha'],
+            'developer_id':hierarchy['developer_id'],'reviewer_id':hierarchy['reviewer_id'],
+            'member_credentials':credentials}
+
+
+def _validate_parent(c,store,snapshot):
+    if snapshot.get('parent_authority') is not None:
+        if _parent_authority(c,store,snapshot['spec'])!=snapshot['parent_authority']:
+            raise Conflict('accepted parent authority changed')
+
+
 def validate_execution(c, store, task):
     approval=json.loads(task['approval'] or '{}')
     if 'proposal_batch_id' not in approval:return
@@ -46,6 +85,7 @@ def validate_execution(c, store, task):
     if not proposal or proposal['fingerprint']!=approval.get('proposal_digest'):
         raise Conflict('proposal approval binding changed')
     snapshot=json.loads(proposal['snapshot'])
+    _validate_parent(c,store,snapshot)
     config=c.execute('SELECT fingerprint FROM maintenance_projects WHERE project=?',(task['project'],)).fetchone()
     if not config or config['fingerprint']!=snapshot['config_fingerprint']:
         raise Conflict('approved proposal configuration changed')
@@ -93,6 +133,7 @@ class ProposalBoard:
         snapshot=json.loads(row['snapshot']);config=self.registry._get(c,token,row['project'])
         if config['fingerprint']!=snapshot['config_fingerprint'] or _source(c,row['project'],config,self.store._now())!=snapshot['source']:
             raise Conflict('proposal source or configuration changed; create a new proposal')
+        _validate_parent(c,self.store,snapshot)
         return snapshot
 
     def propose(self,token,request_key,spec,*,source='manager_proposal'):
@@ -117,8 +158,9 @@ class ProposalBoard:
                 if json.loads(old['snapshot'])['spec']!=spec:raise Conflict('proposal key scope is immutable')
                 self._current(c,token,old);return self._public(old)
             observed=_source(c,manifest['project'],config,self.store._now())
-            if observed['sha']!=manifest['base_sha']:raise Conflict('proposal base differs from observed source')
+            parent_authority=_parent_authority(c,self.store,spec) if observed['sha']!=manifest['base_sha'] else None
             snapshot={'spec':spec,'config_fingerprint':config['fingerprint'],'source':observed}
+            if parent_authority is not None:snapshot['parent_authority']=parent_authority
             key=secrets.token_hex(16)
             c.execute('INSERT INTO manager_proposals VALUES (?,?,?,?,?,?,NULL)',(key,actor['token_hash'],request_key,manifest['project'],canonical_json(snapshot),digest(snapshot)))
             return self._public(self._proposal(c,token,key))
