@@ -1,0 +1,18 @@
+{
+  "project_id": "appgprj_6af881381bdc8191843d4e4f742948dd",
+  "site_version": null,
+  "docker_image": "node@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54",
+  "runtime": "node24-real-sqlite-d1-adapter",
+  "virtual_clock": "2026-11-16T01:00:00.000Z",
+  "network": "none",
+  "read_only": true,
+  "node_heap_mib": 384,
+  "cpu_seconds": 35,
+  "timeout_seconds": 90,
+  "cgroup_memory_enforced": false,
+  "deployment_authorized": false,
+  "baseline_revision": "9433bf650183d9b8c7efe437b1f0f002bfcc0677",
+  "source_revision": "6e31be85187fec2e5b8592ec3e8e7cb2535352e3",
+  "candidate_only": true,
+  "previous_candidate_revision": "6f0d7fc1a7a0b328edaa36568a8522edc86e196f"
+}

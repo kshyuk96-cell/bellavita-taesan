@@ -1,0 +1,163 @@
+{
+  "original_source_revision": "6f0d7fc1a7a0b328edaa36568a8522edc86e196f",
+  "original_duplicate_detected": false,
+  "candidate_source_revision": "6e31be85187fec2e5b8592ec3e8e7cb2535352e3",
+  "candidate_fault_results": [
+    {
+      "id": "duplicate-source",
+      "target_detected": true,
+      "independent_issues": [
+        "duplicate_journal_source"
+      ]
+    },
+    {
+      "id": "positive-duplicate-debit",
+      "target_detected": true,
+      "independent_issues": [
+        "duplicate_journal_source"
+      ]
+    },
+    {
+      "id": "duplicate-event",
+      "target_detected": true,
+      "independent_issues": [
+        "duplicate_event_key"
+      ]
+    },
+    {
+      "id": "excess-refund",
+      "target_detected": true,
+      "independent_issues": [
+        "excess_refund_source",
+        "excess_refund_total",
+        "full_refund_source_mismatch",
+        "refund_journal_mismatch"
+      ]
+    },
+    {
+      "id": "missing-journal",
+      "target_detected": true,
+      "independent_issues": [
+        "refund_journal_mismatch"
+      ]
+    }
+  ],
+  "defects": [
+    {
+      "id": "BUG-POLICY-001",
+      "scenario_ids": [
+        "PAY-01",
+        "E2E-01"
+      ],
+      "severity": "S1",
+      "priority": "P0",
+      "kind": "developer_declaration_conflict_not_runtime_proof",
+      "symptom": "FB-13의 SP→BP→DP→카드 표기가 고객 원금 우선 기준과 충돌",
+      "reproduce": [
+        "검수 상태 JSON 조회",
+        "FB-13 label과 고객 §7/최종 §4 대조"
+      ],
+      "actual": "SP",
+      "expected": "DP",
+      "owner": null,
+      "status": "API_RETEST_MATCH_UI_POLICY_PENDING",
+      "due_date": null,
+      "fixed_revision": null,
+      "retest": "PARTIAL_API_MATCH",
+      "retest_source_revision": "9433bf650183d9b8c7efe437b1f0f002bfcc0677"
+    },
+    {
+      "id": "BUG-TERM-001",
+      "scenario_ids": [
+        "MEM-10"
+      ],
+      "severity": "S3",
+      "priority": "P1",
+      "kind": "server_html_text",
+      "symptom": "고객이 지정한 전체 명칭(약어) 표기를 공개 검수 화면에서 모두 확인할 수 없음",
+      "reproduce": [
+        "검수·개발현황·앱 HTML의 본문 추출",
+        "전체 명칭(약어) 목록과 대조"
+      ],
+      "actual": {
+        "API": false,
+        "BP": false,
+        "CP": false,
+        "CRM": false,
+        "DP": false,
+        "KPI": false,
+        "PG": false,
+        "QA": false,
+        "SP": false
+      },
+      "expected": {
+        "API": true,
+        "BP": true,
+        "CP": true,
+        "CRM": true,
+        "DP": true,
+        "KPI": true,
+        "PG": true,
+        "QA": true,
+        "SP": true
+      },
+      "owner": null,
+      "status": "HTML_RETEST_MATCH_BROWSER_PENDING",
+      "due_date": null,
+      "fixed_revision": null,
+      "retest": "BROWSER_NOT_RUN",
+      "retest_source_revision": "eaacbf0b9a999171e8d288f2e72b3bc3536ca973"
+    },
+    {
+      "id": "LIMIT-REVIEW-INVENTORY-001",
+      "scenario_ids": [
+        "PRD-04"
+      ],
+      "severity": "S1",
+      "priority": "P0",
+      "status": "TEST_ADAPTER_RETEST_MATCH_SUPPLIER_PENDING",
+      "kind": "isolated_review_scope_limit_not_production_oversell_proof",
+      "symptom": "검수 공간별 재고 독립: 전역 마지막1석 공유 보호를 검증할 수 없음",
+      "actual": {
+        "sameWorkspaceSuccessStatuses": [
+          200,
+          409
+        ],
+        "sameWorkspaceBookings": 1,
+        "separateWorkspaceConfirmed": 2,
+        "model": "real Worker CAS; inventories are private per review workspace; no shared supplier inventory"
+      },
+      "expected": "승인된 공유 비운영 재고에서 전체 확정합계1 이하",
+      "owner": null,
+      "due_date": null,
+      "fixed_revision": null,
+      "retest": "PARTIAL_SHARED_FIXTURE_MATCH",
+      "retest_source_revision": "6f0d7fc1a7a0b328edaa36568a8522edc86e196f"
+    },
+    {
+      "id": "BUG-RECONCILE-DUPLICATE-001",
+      "scenario_ids": [],
+      "related_development_items": [
+        79
+      ],
+      "severity": "S1",
+      "priority": "P0",
+      "status": "FIXED_IN_LOCAL_CANDIDATE",
+      "kind": "injected_state_detection_gap_not_observed_production_duplicate",
+      "symptom": "실제 실행 결과를 복제해 균형이 맞는 중복 차감 원장을 주입했을 때 대상 자체 대사기가 누락; 독립 대사기는 검출",
+      "actual": {
+        "target_detected": false,
+        "independent_detected": true
+      },
+      "expected": {
+        "target_detected": true
+      },
+      "owner": null,
+      "due_date": null,
+      "fixed_revision": "6e31be85187fec2e5b8592ec3e8e7cb2535352e3",
+      "retest_source_revision": "6e31be85187fec2e5b8592ec3e8e7cb2535352e3",
+      "retest": "PASS_SOURCE_RECONCILER_AND_INDEPENDENT_ORACLE"
+    }
+  ],
+  "published": false
+}

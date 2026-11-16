@@ -19,7 +19,7 @@ from .store import Conflict,digest
 CORE=['club','club-travel','club-launch','club-integration','club-integration-crypto','club-admin','club-operations','orders']
 EXPORTS=['handleReview','rvNewDocument','rvApply','rvView','rvAccounts','rvHash','rvSeedPrincipalScenario',
  'rvPrepareProduct','rvSelectedCatalog','rvRead','rvSession','rvCapabilities','clubBalances','clubPrincipalState',
- 'clubPrincipalQuote','clubPrincipalRecords','ciLots','clubPlan','clubReconcile','coApply','ciSeal','ciQuote','quoteOrder']
+ 'clubPrincipalQuote','clubPrincipalRecords','ciLots','clubPlan','clubReconcile','coApply','ciSeal','ciOpen','ciQuote','quoteOrder']
 
 
 @dataclass(frozen=True)
@@ -68,25 +68,32 @@ def prepare(profile,root,adapter_root):
         input_source_revision=profile.revision,bundle_digest=hashlib.sha256((root/'sut.bundle.mjs').read_bytes()).hexdigest())
 
 
-def execute_actual_service(profile,adapter_root,*,timeout=90,entrypoint="run.mjs",heartbeat=None,exchange=None,inventory_contract=None,role="main"):
-    if entrypoint not in ("run.mjs","run-batch03.mjs","run-batch04.mjs"):raise ValueError("registered entrypoint required")
+def execute_actual_service(profile,adapter_root,*,timeout=90,entrypoint="run.mjs",heartbeat=None,exchange=None,inventory_contract=None,role="main",business=None,business_contract=None,runtime_secrets=None):
+    if entrypoint not in ("run.mjs","run-batch03.mjs","run-batch04.mjs","run-batch05.mjs"):raise ValueError("registered entrypoint required")
     if type(timeout) is not int or not 1<=timeout<=120:raise ValueError('bounded execution required')
-    if entrypoint=='run-batch04.mjs':
+    if entrypoint in ('run-batch04.mjs','run-batch05.mjs'):
         from .hope_shared_inventory import validate_contract,check_exchange
-        if role not in ('main','race-a','race-b'):raise ValueError('registered execution role required')
+        allowed=('main','race-a','race-b') if entrypoint=='run-batch04.mjs' else ('setup','crash-before-hold','crash-after-hold','crash-before-store','crash-after-store','crash-before-response','recover','complete-unknown','race-a','race-b','main')
+        if role not in allowed:raise ValueError('registered execution role required')
         inventory_pin=validate_contract(inventory_contract,profile.revision)
         exchange=check_exchange(exchange,inventory_pin)
     elif exchange is not None or inventory_contract is not None or role!='main':raise ValueError('shared data only for registered batch04 entrypoint')
+    if entrypoint=='run-batch05.mjs':
+        from .hope_persistent_review import check_business,business_pin
+        business=check_business(business,business_contract,profile.revision);business_digest=business_pin(business_contract,profile.revision)
+        if not isinstance(runtime_secrets,dict) or set(runtime_secrets)!={'REVIEW_DATA_KEY'} or not re.fullmatch('[A-Za-z0-9+/]{43}=',runtime_secrets['REVIEW_DATA_KEY']):raise ValueError('memory-only review key required')
+    elif business is not None or business_contract is not None or runtime_secrets is not None:raise ValueError('business binding only for registered persistent entrypoint')
     profile.source_check()
     # Only an already-prepared pinned image; execution never pulls another image.
     image=subprocess.run(['docker','image','inspect',profile.image],env=_docker_env(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
     if image.returncode:raise Conflict('approved Node image unavailable')
     with tempfile.TemporaryDirectory(prefix='hope-real-source-') as folder:
         root=Path(folder);pin=prepare(profile,root,Path(adapter_root))
-        if exchange is not None:
-            cfg=json.loads((root/'config.json').read_text());cfg.update(inventory_contract=inventory_contract,inventory_digest=inventory_pin,role=role)
-            (root/'config.json').write_text(json.dumps(cfg));(root/'config.json').chmod(0o644)
         name='hope-qa-'+uuid.uuid4().hex
+        if exchange is not None:
+            cfg=json.loads((root/'config.json').read_text());cfg.update(inventory_contract=inventory_contract,inventory_digest=inventory_pin,role=role,execution_id=name)
+            if business is not None:cfg.update(business_contract=business_contract,business_digest=business_digest)
+            (root/'config.json').write_text(json.dumps(cfg));(root/'config.json').chmod(0o644)
         args=['docker','run','--rm','--name',name,'--pull','never','--network','none','--read-only',
           '--cap-drop','ALL','--security-opt','no-new-privileges','--user','65534:65534',
           '--tmpfs','/tmp:rw,nosuid,nodev,size=134217728,mode=1777',
@@ -98,27 +105,35 @@ def execute_actual_service(profile,adapter_root,*,timeout=90,entrypoint="run.mjs
             position=args.index(profile.image)
             args[position:position]=['--mount','type=bind,source='+str(exchange)+',target=/exchange']
             args[-1:-1]=['--allow-fs-read=/exchange','--allow-fs-write=/exchange']
+        if business is not None:
+            position=args.index(profile.image);args[position:position]=['--interactive','--mount','type=bind,source='+str(business)+',target=/business']
+            args[-1:-1]=['--allow-fs-read=/business','--allow-fs-write=/business']
         started=time.monotonic()
         if heartbeat:heartbeat()
         try:
             with tempfile.TemporaryFile() as output:
-                process=subprocess.Popen(args,env=_docker_env(),stdin=subprocess.DEVNULL,stdout=output,stderr=subprocess.DEVNULL)
+                process=subprocess.Popen(args,env=_docker_env(),stdin=subprocess.PIPE if business is not None else subprocess.DEVNULL,stdout=output,stderr=subprocess.DEVNULL)
+                if business is not None:
+                    process.stdin.write(json.dumps(runtime_secrets).encode());process.stdin.close()
                 while process.poll() is None:
                     if heartbeat:heartbeat()
                     if time.monotonic()-started>timeout or os.fstat(output.fileno()).st_size>8*1024*1024:
                         subprocess.run(['docker','rm','-f',name],env=_docker_env(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
                         process.wait(timeout=10);raise Conflict('actual service execution uncertain or limited')
                     time.sleep(0.1)
-                if process.returncode:raise Conflict('isolated service harness failed; no successful evidence adopted')
-                output.seek(0);raw=output.read(8*1024*1024+1)
-                if len(raw)>8*1024*1024:raise Conflict('service evidence limit')
-                report=json.loads(raw)
+                if entrypoint=='run-batch05.mjs' and role.startswith('crash-') and process.returncode==86:
+                    report=dict(schema='hope-persistent-interruption/v1',source_revision=profile.revision,role=role,interrupted=True,exit_code=86,operational_authorization=False)
+                else:
+                    if process.returncode:raise Conflict('isolated service harness failed; no successful evidence adopted')
+                    output.seek(0);raw=output.read(8*1024*1024+1)
+                    if len(raw)>8*1024*1024:raise Conflict('service evidence limit')
+                    report=json.loads(raw)
             profile.source_check()
             if heartbeat:heartbeat()
             report['source_provenance']=pin
             report['runtime_provenance']=dict(image=profile.image,network='none',read_only=True,user=65534,
                 node_heap_mib=384,cpu_rlimit_seconds=35,cgroup_memory_enforced=False,
-                arbitrary_host_execution=False,container_name=name,execution_role=role,shared_fixture_mount=exchange is not None,elapsed_seconds=round(time.monotonic()-started,3))
+                arbitrary_host_execution=False,container_name=name,execution_role=role,shared_fixture_mount=exchange is not None,persistent_business_mount=business is not None,process_exited=True,elapsed_seconds=round(time.monotonic()-started,3))
             return report
         finally:
             subprocess.run(['docker','rm','-f',name],env=_docker_env(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)

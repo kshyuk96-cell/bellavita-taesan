@@ -72,7 +72,12 @@ def independent_stock_check(snapshot,capacities=None):
 
 
 def independent_domain_check(state):
-    issues=[];keys=set()
+    issues=[];keys=set();event_ids=set();event_keys=set()
+    for event in state['travelEvents']:
+        if event.get('id') and event['id'] in event_ids:issues.append('duplicate_event_id')
+        if event.get('eventKey') and event['eventKey'] in event_keys:issues.append('duplicate_event_key')
+        if event.get('id'):event_ids.add(event['id'])
+        if event.get('eventKey'):event_keys.add(event['eventKey'])
     for journal in state['ledger']:
         if journal['sourceKey'] in keys:issues.append('duplicate_journal_source')
         keys.add(journal['sourceKey'])
@@ -83,10 +88,10 @@ def independent_domain_check(state):
         if sum(r['quote']['refundTotal']+r['quote']['fee']-r['quote'].get('additionalDue',0) for r in refunds)>booking['total']:issues.append('excess_refund_total')
         for book in ('DP','BP','SP','CP','card'):
             if sum(r['quote']['refund'][book] for r in refunds)>booking['plan'][book]:issues.append('excess_refund_source')
-            if booking.get('status')=='cancelled' and booking.get('pointsCommitted') is True and refunds and all(r['quote']['fee']==0 for r in refunds) and sum(r['quote']['refund'][book] for r in refunds)!=booking['plan'][book]:issues.append('full_refund_source_mismatch')
+            if booking.get('status')=='cancelled' and booking.get('pointsCommitted') is True and refunds and all(r['quote']['fee']==0 for r in refunds) and sum(r['quote']['refund'][book] for r in refunds)!=booking['plan'][book]-(sum(r['quote'].get('unpaidReleased',0) for r in refunds) if book=='card' else 0):issues.append('full_refund_source_mismatch')
         if booking.get('status') in ('confirmed','cancelled','departed','completed'):
             paid=sum(i['amount'] for i in state['invoices'] if i.get('bookingId')==booking['id'] and i['kind']=='travel' and i['status']=='paid')
-            if paid!=booking['plan']['card']:issues.append('paid_invoice_card_mismatch')
+            if paid!=booking['plan']['card']-sum(r['quote'].get('unpaidReleased',0) for r in refunds):issues.append('paid_invoice_card_mismatch')
         for refund in refunds:
             if refund['quote']['refund']['card']>0:
                 events=[e for e in state['travelEvents'] if e.get('refundId')==refund['id'] and e.get('type')=='refunded']

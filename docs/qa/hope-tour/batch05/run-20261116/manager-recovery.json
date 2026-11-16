@@ -1,0 +1,80 @@
+{
+  "job_id": "a74ad729efe2d49c8ddf8b79327dd49c",
+  "sealed": {
+    "artifacts": [
+      {
+        "name": "actual-source-evidence.json.gz",
+        "sha": "d1dbf60afd8b54577fc207e5b632712a04e6e94dc94c7e469dbafcc39795ed21",
+        "size": 56762
+      },
+      {
+        "name": "batch-summary.json",
+        "sha": "d41522454e54e70c68c742a1fccc11fdc2ae02eae267e35930b8bca974728dc9",
+        "size": 4515
+      },
+      {
+        "name": "common-report.json.gz",
+        "sha": "339ee3a0f36b320806c98d1b6ca7dddfb1f5556f2f89e957bf9b79283350ecfa",
+        "size": 3574
+      },
+      {
+        "name": "customer-evidence-contract.json",
+        "sha": "637b9d235d53b61ce8a55680bc731cfa31cad8ffc1e7e35fbd3df36657e58d3d",
+        "size": 8640
+      },
+      {
+        "name": "customer-report.docx",
+        "sha": "49e099ab7601f98b580c35314a1a8a8148b9f5a5998968a1232cf793e693a5e9",
+        "size": 47430
+      },
+      {
+        "name": "customer-report.json",
+        "sha": "4155ad077217dbbcb3fceb9e588cefa1d33f2a4a054a4103f2f14816b78839aa",
+        "size": 91007
+      },
+      {
+        "name": "customer-report.xlsx",
+        "sha": "fcf549b0275ab31fd236cceb5b09cee16327be0583dbcbb9e18c0ad875b5fc58",
+        "size": 33510
+      },
+      {
+        "name": "defect-retest.json",
+        "sha": "1a2ddc853b1f0c8c3dcae9810c6354113cde6bfa73661c8d65f106322959fdac",
+        "size": 4830
+      },
+      {
+        "name": "formula-report.json",
+        "sha": "4291f14ae1fc67c271dd17b574f09fbd885a88f22d5de2336a9cbaa0a3fbb8dd",
+        "size": 16218
+      },
+      {
+        "name": "source-candidate.patch",
+        "sha": "6e66ae619121764e0b371be0f9c1866afc57f7b9bdca83c94ed976b770aa823c",
+        "size": 39294
+      },
+      {
+        "name": "trusted-contract.json.gz",
+        "sha": "c17180dbe0a475ebbfa591ddec924e58e78b26ec2ceec2c7a6f4202c0108c8c4",
+        "size": 2564
+      }
+    ],
+    "manifest_digest": "ecc3664eb563dc123bda6d7f4caea10a0c886e676c9141a5ea36261e35ff09b2",
+    "sealed": true
+  },
+  "after_process_restart_verified": [
+    "actual-source-evidence.json.gz",
+    "batch-summary.json",
+    "common-report.json.gz",
+    "customer-evidence-contract.json",
+    "customer-report.docx",
+    "customer-report.json",
+    "customer-report.xlsx",
+    "defect-retest.json",
+    "formula-report.json",
+    "source-candidate.patch",
+    "trusted-contract.json.gz"
+  ],
+  "raw_tokens_persisted": false,
+  "raw_encryption_key_persisted": false,
+  "remote_server_connected": false
+}

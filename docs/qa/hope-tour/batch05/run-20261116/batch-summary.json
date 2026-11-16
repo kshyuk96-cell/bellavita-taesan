@@ -1,0 +1,126 @@
+{
+  "source_revision": "6e31be85187fec2e5b8592ec3e8e7cb2535352e3",
+  "engine_revision": "536b1357571f10092ff9c235347762b9b0eda740",
+  "counts": {
+    "pass": 17,
+    "fail": 0,
+    "blocked": 0,
+    "unmeasured": 3
+  },
+  "admission": {
+    "admitted": false,
+    "operational_authorization": false,
+    "reasons": [
+      "critical_scenario_not_passed",
+      "required_coverage_missing"
+    ],
+    "scope": "synthetic_only",
+    "verified_counts": {
+      "asserted": 17,
+      "executed": 17,
+      "generated": 20,
+      "unique_failures": 0
+    },
+    "warnings": []
+  },
+  "manager": {
+    "job_id": "a74ad729efe2d49c8ddf8b79327dd49c",
+    "state": "blocked",
+    "decision": {
+      "admitted": false,
+      "operational_authorization": false,
+      "reasons": [
+        "critical_scenario_not_passed",
+        "required_coverage_missing"
+      ],
+      "scope": "synthetic_only",
+      "verified_counts": {
+        "asserted": 17,
+        "executed": 17,
+        "generated": 20,
+        "unique_failures": 0
+      },
+      "warnings": []
+    },
+    "remote_server_connected": false,
+    "transport": "separate persistent local manager HTTP; source Workers Docker",
+    "profile_digest": "7a759b860211020253b55514d18e2219a4d2214f85e2b77bdae9074bc009587b"
+  },
+  "browser_plan": {
+    "schema": "hope-supported-browser-plan/v1",
+    "source_revision": "6e31be85187fec2e5b8592ec3e8e7cb2535352e3",
+    "environment": "managed-linux",
+    "supported_tool_present": false,
+    "status": "NOT RUN",
+    "instruction": "skill://plugin_connector_1p_689987207de08191979cf68eca2941c6/sites/SKILL.md",
+    "reason": "cua_repl_unavailable_skip_browser_qa",
+    "automatic_fallback": false,
+    "preview_started": false,
+    "browser_installed": false,
+    "actual_browser_verified": false,
+    "widths": [
+      1280,
+      390,
+      360
+    ],
+    "routes": [
+      "/review/",
+      "/review/features",
+      "/review/app",
+      "/review/policy"
+    ],
+    "required_preconditions": [
+      "approved supported preview reference",
+      "candidate SHA before/after match",
+      "authenticated isolated seeded workspace",
+      "API/journal initial state match"
+    ],
+    "required_actions": [
+      "keyboard focus summary",
+      "Enter/Space open and close",
+      "touch open and close",
+      "screen/API/journal balances compare",
+      "horizontal overflow measurement",
+      "source-bound screenshots"
+    ],
+    "excluded_claims": [
+      "actual device verified by viewport",
+      "actual PG",
+      "production deployment"
+    ]
+  },
+  "source_provenance": {
+    "source_files": {
+      "dist/club.mjs": "7c945db2d98e3115dc40993a87c9ea73be7b851fab74ecccee2d6778b27ea56d",
+      "dist/club-travel.mjs": "9c56e5fce196fbb85f27a6ce9f5966a74d21effd3a633567423c957b7c06ea3e",
+      "dist/club-launch.mjs": "22fc504398716ec1026f4c922cd78282a65b4aaa958cd7fa40604e8cdfe8b99c",
+      "dist/club-integration.mjs": "c508fcacfb05c24d5c934e1d7bab17eed839b5a874306b9b59bd1d1a7401b586",
+      "dist/club-integration-crypto.mjs": "a6e6030c6635c4ab1e5e64aa5e633f6143a3f7aa24e489f05baf6f1c35cf26c1",
+      "dist/club-admin.mjs": "91e0bf4a668e65109bb2b3f4d36f322d0f3db253ab43f59754e83ed9e70d6259",
+      "dist/club-operations.mjs": "7b71265bea022dff1ad7ba6bc7536b798f85de75edb26f004c92f1aaa77e6018",
+      "dist/orders.mjs": "6b8105aaf93178babc05c62b92f3c95fa31749526ece856f8c73d482b23f317c",
+      "dist/review-pages.mjs": "367a5e10174e45bdec5d1a5f326e9bb5763f8f00b283940ec6d22a9a6b27941a",
+      "dist/review-member-pages.mjs": "9b055edc1264f1b7ebdfccc82a8af959042d2d322131d70b4aec7a61b98e21b4",
+      "server-src/review-server.mjs": "fe59108cc1168b7ca6ff0cbe58229552c0d640ebb57c2d5e85723873b2e1347a"
+    },
+    "linking": "same import/export removal as original build-worker; function bodies unchanged",
+    "input_source_revision": "6e31be85187fec2e5b8592ec3e8e7cb2535352e3",
+    "bundle_digest": "538d06259666ece46fcee25c2f570deafa0387c3223769cf40a36b899e51d9fd"
+  },
+  "runtime_provenance": {
+    "image": "node@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54",
+    "network": "none",
+    "read_only": true,
+    "user": 65534,
+    "node_heap_mib": 384,
+    "cpu_rlimit_seconds": 35,
+    "cgroup_memory_enforced": false,
+    "arbitrary_host_execution": false,
+    "container_name": "hope-qa-5fbb0ea19cdd4f07852f452b1bbd012c",
+    "execution_role": "main",
+    "shared_fixture_mount": true,
+    "persistent_business_mount": true,
+    "process_exited": true,
+    "elapsed_seconds": 6.789
+  }
+}

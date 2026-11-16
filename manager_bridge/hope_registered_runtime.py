@@ -24,18 +24,24 @@ class HopeProfile:
     entrypoint: str = "run-batch03.mjs"
     exchange: Path | None = None
     inventory_contract: dict | None = None
+    business: Path | None = None
+    business_contract: dict | None = None
 
     def __post_init__(self):
         if not isinstance(self.service,ActualServiceProfile) or type(self.timeout) is not int or not 1<=self.timeout<=120:
             raise ValueError('bounded actual-service profile required')
         if not re.fullmatch('[a-zA-Z0-9_.-]{1,100}',self.project) or not re.fullmatch('[a-zA-Z0-9_.-]{1,100}',self.release):raise ValueError('registered identifiers required')
         object.__setattr__(self,'adapter_root',_directory(self.adapter_root))
-        if self.entrypoint not in ('run-batch03.mjs','run-batch04.mjs'):raise ValueError('registered entrypoint required')
-        if self.entrypoint=='run-batch04.mjs':
+        if self.entrypoint not in ('run-batch03.mjs','run-batch04.mjs','run-batch05.mjs'):raise ValueError('registered entrypoint required')
+        if self.entrypoint in ('run-batch04.mjs','run-batch05.mjs'):
             from .hope_shared_inventory import validate_contract,check_exchange
             pin=validate_contract(self.inventory_contract,self.revision)
             object.__setattr__(self,'exchange',check_exchange(self.exchange,pin))
         elif self.exchange is not None or self.inventory_contract is not None:raise ValueError('unexpected shared fixture')
+        if self.entrypoint=='run-batch05.mjs':
+            from .hope_persistent_review import check_business
+            object.__setattr__(self,'business',check_business(self.business,self.business_contract,self.revision))
+        elif self.business is not None or self.business_contract is not None:raise ValueError('unexpected business binding')
     @property
     def revision(self):return self.service.revision
     def source_check(self):return self.service.source_check()
@@ -45,7 +51,7 @@ class HopeProfile:
         if self.entrypoint not in files:raise Conflict('missing registered entrypoint')
         return dict(schema='hope-registered-profile/v1',project=self.project,release=self.release,source_revision=self.revision,
             source=str(self.service.source),adapter_root=str(self.adapter_root),adapter_files=files,image=self.service.image,
-            timeout=self.timeout,entrypoint=self.entrypoint,exchange=str(self.exchange) if self.exchange else None,inventory_contract_digest=digest(self.inventory_contract) if self.inventory_contract else None,network='none',cgroup_memory_enforced=False)
+            timeout=self.timeout,entrypoint=self.entrypoint,exchange=str(self.exchange) if self.exchange else None,inventory_contract_digest=digest(self.inventory_contract) if self.inventory_contract else None,business=str(self.business) if self.business else None,business_contract_digest=digest(self.business_contract) if self.business_contract else None,network='none',cgroup_memory_enforced=False)
     @property
     def fingerprint(self):return digest(self.manifest())
 
@@ -104,7 +110,7 @@ class HopeEngine:
 
 class HopeArtifacts:
     """Host imports reviewed report outputs; project ACL is checked on every read."""
-    ALLOWED={'actual-source-evidence.json.gz','common-report.json.gz','trusted-contract.json.gz','customer-report.json','customer-report.docx','customer-report.xlsx','formula-report.json','batch-summary.json','source-candidate.patch','defect-retest.json'}
+    ALLOWED={'actual-source-evidence.json.gz','common-report.json.gz','trusted-contract.json.gz','customer-report.json','customer-report.docx','customer-report.xlsx','formula-report.json','batch-summary.json','source-candidate.patch','defect-retest.json','customer-evidence-contract.json'}
     def __init__(self,store):
         self.store=store;self.jobs=QAJobs(store)
         with store._transaction() as c:
