@@ -58,6 +58,10 @@ def components(renderer,v,kind,photos,composite):
 def page(renderer,v,price,order_url,parts,hero,og,url):
     template=(Path(__file__).parent/'erp_invitation_assets/wedding-reference.html').read_text(encoding='utf-8')
     title,greeting,signature,ogtitle=renderer.words(v,'wedding');_,date,clock=renderer.date_words(v)
+    if not v.get('greeting'):
+        side='bride' if v.get('hostSide')=='bride' else 'groom';name=v[side+'Name'];short=name[1:] if len(name)==3 else name
+        final=bool((ord(short[-1])-0xac00)%28) if short and 0xac00<=ord(short[-1])<=0xd7a3 else False
+        greeting=f"사랑하는 저희 {v[side+'Relation']} {short}{'이가' if final else '가'} 사랑과 믿음으로 한 가정을 이루는 소중한 첫걸음을 내딛습니다.\n두 사람의 뜻 깊은 출발을 따뜻한 마음으로 축복해 주시면 더없는 기쁨이 되겠습니다."
     families=''.join('<p>'+html.escape(v[s+'Parents'])+'의 '+html.escape(v[s+'Relation'])+' <strong>'+html.escape(v[s+'Name'])+'</strong></p>' for s in ('groom','bride'))
     greeting=''.join('<p>'+html.escape(line)+'</p>' for line in greeting.splitlines() if line.strip())
     values={'TITLE':v['groomName']+'·'+v['brideName']+' 결혼식 안내','OG_TITLE':ogtitle,'OG_DESCRIPTION':date+' '+clock,'URL':url,'OG_IMAGE':og,'SIGNATURE':signature,'HERO':hero,'DATE':date,'CLOCK':clock,'VENUE':v['venue'],'ADDRESS':v['address'],'SOURCE_URL':v['sourceUrl'],'ORDER_URL':order_url,**parts}
