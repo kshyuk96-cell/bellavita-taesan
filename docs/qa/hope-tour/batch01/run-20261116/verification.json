@@ -1,0 +1,34 @@
+{
+  "source_revision": "d12bf6937d056c73ea53e777afd04f6a3afa01e3",
+  "artifact_recorded_at": "2026-11-16T11:22:43.735491+09:00",
+  "full_repository": {
+    "command": "python -m unittest discover -s tests -q",
+    "run": 1725,
+    "passed": 1724,
+    "skipped": 1,
+    "failures": 0
+  },
+  "focused": {
+    "run": 49,
+    "passed": 49,
+    "includes_previous_customer_tests": 11
+  },
+  "new_tests": 38,
+  "local_reference_items": {
+    "PASS": 20,
+    "FAIL": 0,
+    "BLOCKED": 0
+  },
+  "remote_site": {
+    "setup_connected": false,
+    "reason": "test_data_protocol_not_advertised",
+    "request_methods": [
+      "GET"
+    ],
+    "source_binding": "not_verified_readiness_only"
+  },
+  "customer_service_tests_executed_by_this_batch": 0,
+  "historical_customer_defects": "OPEN_NOT_RETESTED",
+  "customer_site_verified": false,
+  "operational_authorization": false
+}
