@@ -459,6 +459,11 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
                     item=client.detail(entry['productId'])
                     entry['matches']={'name':item.get('goodName')==title,'price':int(item.get('goodPrice',0))==entry['price'],'settings':client.settings(item)==client.settings(template),'images':client.image_checksums(item)==client.image_checksums(template)}
                     entry['differentSettingKeys']=[k for k in template if k in item and item[k]!=template[k] and k not in ('goodNum','goodName','goodPrice','goodImgUri','goodImg','subImg1','subImg2','subImg3','subImg4','shortGoodUrl')]
+                    keys=('isDeliveryPrice','isTodayShipUse','todayShipTime','isEvent','goodsCode','subtitleColor')
+                    entry['settingChanges']={k:{'source':template.get(k),'copy':item.get(k)} for k in keys if template.get(k)!=item.get(k)}
+                    def flags(row):
+                        return {'normal':[[x.get('noRequire'),[[v.get(k) for k in ('noPrice','noInven','noSourcePrice','optionView')] for v in x.get('list',[])]] for x in row.get('normalOption') or []],'input':[[x.get('ioPrice'),x.get('ioRequire')] for x in row.get('inputOption') or []]}
+                    entry['optionFlags']={'source':flags(template),'copy':flags(item)}
             handler.send_json({'requestId':diagnostic[1],'state':row['state'],'copies':copies,'templateConfigured':bool(os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID'))});return True
         if method=='POST' and path=='/erp/invitations/template-check':
             size=int(handler.headers.get('Content-Length','0'))
