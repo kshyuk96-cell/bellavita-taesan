@@ -1,0 +1,398 @@
+{
+  "schema_version": "customer-worker-profile-prep/v1",
+  "project_count": 4,
+  "customer_code_executed": false,
+  "role_credentials_created": false,
+  "packets": [
+    {
+      "project": "bellavita-shop",
+      "requirements_manifest": {
+        "project": "bellavita-shop",
+        "base_sha": "d5047f3345b757edfcfbd81a73c609c0392007dd",
+        "repository": "kshyuk96-cell/bellavita-taesan",
+        "config_fingerprint": "6a6f1bc664dd7733e4590446dc86c201ab51b72426edd3b8252fd28083d7595a",
+        "commandset_digest": "04a94f3a5e6137609db5030e8f7abecb64b0c305c7ab5c6dbd742f2cce439e8b",
+        "inspected_files": [
+          {
+            "path": "README.md",
+            "sha256": "ce587ea53d4e95c29928d7840dcef42951bd313f8bcb2106a74e92b542789762",
+            "bytes": 16568
+          },
+          {
+            "path": "requirements.txt",
+            "sha256": "b22ae586dcd30aa2cef40b906ee00a926633043b0c6b7a660b0b7265476a3bab",
+            "bytes": 180
+          },
+          {
+            "path": "tests/test_shop.py",
+            "sha256": "ad1b10ce6a7962d338635a61479d92a94b83c301debfdc0b12189ed85ee4a566",
+            "bytes": 18895
+          },
+          {
+            "path": "tests/test_order_operations.py",
+            "sha256": "c48100eeadb54c761b1386431387430d3eee64ccf657ddbddf462113ef6bbfd6",
+            "bytes": 17875
+          },
+          {
+            "path": "tests/test_shop_delivery_suite.py",
+            "sha256": "53a105369a58f6c5c12803aba4165e1566664c8b1c6381908e7b142e924cc446",
+            "bytes": 16403
+          }
+        ],
+        "requirements_scope": "selected_files_only",
+        "all_requirements_known": false,
+        "tests_executed": 0
+      },
+      "requirements_digest": "f6bb636f98c80bcbcec1d526f580396e720844e27e2d74123656d7db1da1601f",
+      "continuous_host_project": {
+        "project": "bellavita-shop",
+        "repository": "kshyuk96-cell/bellavita-taesan",
+        "source": "/workspace/taesan-governance-portfolio-proof/sources/bellavita-shop",
+        "candidates": "/workspace/taesan-worker-runtime-prep/bellavita-shop/candidates",
+        "runtime": "/workspace/taesan-worker-runtime-prep/bellavita-shop/runtime",
+        "developer_token_file": "/workspace/taesan-worker-runtime-prep/bellavita-shop/control/developer.token",
+        "reviewer_token_file": "/workspace/taesan-worker-runtime-prep/bellavita-shop/control/reviewer.token",
+        "developer_id": "bellavita-shop-developer",
+        "reviewer_id": "bellavita-shop-reviewer",
+        "checks": {
+          "orders": [
+            "/usr/bin/python3",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests",
+            "-p",
+            "test_shop.py"
+          ],
+          "operations": [
+            "/usr/bin/python3",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests",
+            "-p",
+            "test_order_operations.py"
+          ],
+          "settlement": [
+            "/usr/bin/python3",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests",
+            "-p",
+            "test_shop_delivery_suite.py"
+          ]
+        },
+        "developer": {
+          "binary": "/usr/bin/codex",
+          "codex_home": "/workspace/taesan-worker-runtime-prep/bellavita-shop/developer-profile",
+          "require_origin": true
+        },
+        "reviewer": {
+          "binary": "/usr/bin/codex",
+          "codex_home": "/workspace/taesan-worker-runtime-prep/bellavita-shop/reviewer-profile",
+          "require_origin": true
+        }
+      },
+      "loader": "manager_bridge.continuous_host.load_host",
+      "pending_prerequisites": [
+        "role_memberships",
+        "private_role_tokens",
+        "codex_profile_authentication",
+        "independent_runtime",
+        "capacity_limits",
+        "qa_contract",
+        "source_connector",
+        "private_load_host_validation",
+        "registered_session_or_approved_fleet_template"
+      ],
+      "authentication_verified": false,
+      "execution_ready": false,
+      "maintenance_enabled": false,
+      "operational_authorized": false,
+      "packet_state": "prepared_references_only_not_installed"
+    },
+    {
+      "project": "funeral-association",
+      "requirements_manifest": {
+        "project": "funeral-association",
+        "base_sha": "42cfeedee9e0fbc1ffc90603b86d4fb5ed0e9e84",
+        "repository": "kshyuk96-cell/association-aftercare-platform",
+        "config_fingerprint": "b9bec456fe3235e118a3876ad7ebf85eec2b868e4f62c8c74fdffdf1dbc81996",
+        "commandset_digest": "9e791f7307cebfc30c016fe2a744459801b62b56550ec51b0333f110aec40523",
+        "inspected_files": [
+          {
+            "path": "README.md",
+            "sha256": "5b5a4f079e9441ddeac2ef09cec4098b977147fb529c99da6fbc2df51d0f3b35",
+            "bytes": 27111
+          },
+          {
+            "path": "package.json",
+            "sha256": "0f9a2a0051e6141e8702d5c1229652cac352c7c970d0d3c550e39b31ae53a093",
+            "bytes": 3715
+          },
+          {
+            "path": "tests/validation.test.ts",
+            "sha256": "82f653a7476566279135b5b4e18eff5def84321d5ade13d7f83d0e628821a093",
+            "bytes": 8411
+          },
+          {
+            "path": "tests/scenario-matrix.test.ts",
+            "sha256": "be6989eea4dd1300f00100a9b46cb413cda9194cd818661da3e2a3f48fd63ebc",
+            "bytes": 3887
+          },
+          {
+            "path": "tests/browser/orders.spec.ts",
+            "sha256": "387c50b70faa12fb73da7d3cb208f0a374e43fb137dcb76a0a1b396f6c24cc29",
+            "bytes": 15647
+          }
+        ],
+        "requirements_scope": "selected_files_only",
+        "all_requirements_known": false,
+        "tests_executed": 0
+      },
+      "requirements_digest": "2415cfa98e04c019c44c38153498b40c4812d4d85b36347a3be3282fa22a16fa",
+      "continuous_host_project": {
+        "project": "funeral-association",
+        "repository": "kshyuk96-cell/association-aftercare-platform",
+        "source": "/workspace/taesan-governance-portfolio-proof/sources/funeral-association",
+        "candidates": "/workspace/taesan-worker-runtime-prep/funeral-association/candidates",
+        "runtime": "/workspace/taesan-worker-runtime-prep/funeral-association/runtime",
+        "developer_token_file": "/workspace/taesan-worker-runtime-prep/funeral-association/control/developer.token",
+        "reviewer_token_file": "/workspace/taesan-worker-runtime-prep/funeral-association/control/reviewer.token",
+        "developer_id": "funeral-association-developer",
+        "reviewer_id": "funeral-association-reviewer",
+        "checks": {
+          "unit": [
+            "/usr/bin/node",
+            "--import",
+            "tsx",
+            "--test",
+            "tests/validation.test.ts",
+            "tests/scenario-matrix.test.ts"
+          ],
+          "orders-review": [
+            "/usr/bin/node",
+            "node_modules/@playwright/test/cli.js",
+            "test",
+            "tests/browser/orders.spec.ts"
+          ]
+        },
+        "developer": {
+          "binary": "/usr/bin/codex",
+          "codex_home": "/workspace/taesan-worker-runtime-prep/funeral-association/developer-profile",
+          "require_origin": true
+        },
+        "reviewer": {
+          "binary": "/usr/bin/codex",
+          "codex_home": "/workspace/taesan-worker-runtime-prep/funeral-association/reviewer-profile",
+          "require_origin": true
+        }
+      },
+      "loader": "manager_bridge.continuous_host.load_host",
+      "pending_prerequisites": [
+        "role_memberships",
+        "private_role_tokens",
+        "codex_profile_authentication",
+        "independent_runtime",
+        "capacity_limits",
+        "qa_contract",
+        "source_connector",
+        "private_load_host_validation",
+        "registered_session_or_approved_fleet_template"
+      ],
+      "authentication_verified": false,
+      "execution_ready": false,
+      "maintenance_enabled": false,
+      "operational_authorized": false,
+      "packet_state": "prepared_references_only_not_installed"
+    },
+    {
+      "project": "bellavita-erp",
+      "requirements_manifest": {
+        "project": "bellavita-erp",
+        "base_sha": "13f78626e415c67ce2d07424f5ba5c1351666581",
+        "repository": "sites/appgprj_6af874873e148191b9677cca35f00557",
+        "config_fingerprint": "824bc442e58f4f5f5de72ce63edc1ced02b4ca81ef1b7231b0f2d172cba33c41",
+        "commandset_digest": "6a042684657489068e52ab3a2f28d51ad5e59d99e78cc90fc38ceb26ccae4a6e",
+        "inspected_files": [
+          {
+            "path": "README.md",
+            "sha256": "f7c65d54882ecdf41111323cfd182312fa16b1d1828aa38ad8a584ae0e8e952b",
+            "bytes": 5487
+          },
+          {
+            "path": "package.json",
+            "sha256": "6b2233136c8b8599da04441d99580d2e32052bbaadedac3458ae1907ab89f0a6",
+            "bytes": 898
+          },
+          {
+            "path": "tests/business.test.js",
+            "sha256": "4703b5b642356cf20ffd17fc85910f7aabc7d9d2edfde9edaae11712cebd76d9",
+            "bytes": 5613
+          },
+          {
+            "path": "tests/settlement.test.js",
+            "sha256": "2bf954e6f3694de184522c89f915c7f72d51cf849122fd000e7a71b75e7c8424",
+            "bytes": 16577
+          },
+          {
+            "path": "tests/finance.test.js",
+            "sha256": "613ef85e583527e4afa4326939b27ba403cae1563224e0ed37d9531b50ce8315",
+            "bytes": 9127
+          }
+        ],
+        "requirements_scope": "selected_files_only",
+        "all_requirements_known": false,
+        "tests_executed": 0
+      },
+      "requirements_digest": "fa8dced235880282850b2c7a1ec7e64ae1294505cfc63eb179ca28f242d83c14",
+      "continuous_host_project": {
+        "project": "bellavita-erp",
+        "repository": "sites/appgprj_6af874873e148191b9677cca35f00557",
+        "source": "/workspace/taesan-rollout-source-recovery/bellavita-erp/.sites-checkout",
+        "candidates": "/workspace/taesan-worker-runtime-prep/bellavita-erp/candidates",
+        "runtime": "/workspace/taesan-worker-runtime-prep/bellavita-erp/runtime",
+        "developer_token_file": "/workspace/taesan-worker-runtime-prep/bellavita-erp/control/developer.token",
+        "reviewer_token_file": "/workspace/taesan-worker-runtime-prep/bellavita-erp/control/reviewer.token",
+        "developer_id": "bellavita-erp-developer",
+        "reviewer_id": "bellavita-erp-reviewer",
+        "checks": {
+          "business": [
+            "/usr/bin/node",
+            "--test",
+            "tests/business.test.js",
+            "tests/settlement.test.js"
+          ],
+          "finance": [
+            "/usr/bin/node",
+            "--test",
+            "tests/finance.test.js"
+          ]
+        },
+        "developer": {
+          "binary": "/usr/bin/codex",
+          "codex_home": "/workspace/taesan-worker-runtime-prep/bellavita-erp/developer-profile",
+          "require_origin": false
+        },
+        "reviewer": {
+          "binary": "/usr/bin/codex",
+          "codex_home": "/workspace/taesan-worker-runtime-prep/bellavita-erp/reviewer-profile",
+          "require_origin": false
+        }
+      },
+      "loader": "manager_bridge.continuous_host.load_host",
+      "pending_prerequisites": [
+        "role_memberships",
+        "private_role_tokens",
+        "codex_profile_authentication",
+        "independent_runtime",
+        "capacity_limits",
+        "qa_contract",
+        "source_connector",
+        "private_load_host_validation",
+        "registered_session_or_approved_fleet_template"
+      ],
+      "authentication_verified": false,
+      "execution_ready": false,
+      "maintenance_enabled": false,
+      "operational_authorized": false,
+      "packet_state": "prepared_references_only_not_installed"
+    },
+    {
+      "project": "hope-sunrise",
+      "requirements_manifest": {
+        "project": "hope-sunrise",
+        "base_sha": "985a918f55f3cd2fbf0445d6ef38c761332577d2",
+        "repository": "sites/appgprj_6af86d66b7108191a8dd1052c4a7302f",
+        "config_fingerprint": "b291164ea5c79dc044b392eab351dada5644e89c3ee57fd6500f82680c766fe9",
+        "commandset_digest": "e9965d7d30d2df8a5d2be33823639aa713b76dacd212d025771a8da49bd9c1e4",
+        "inspected_files": [
+          {
+            "path": "README.md",
+            "sha256": "d7a5e84868742b0baaa6f0a3b336960e43a0227f093ceb62729237b654a42cbd",
+            "bytes": 13269
+          },
+          {
+            "path": "package.json",
+            "sha256": "ecec02ae23aac07a21f757faceb24c46e25e330c12c72547a56db3cade0e2512",
+            "bytes": 489
+          },
+          {
+            "path": "tests/orders.test.mjs",
+            "sha256": "79644727d178f0e9d7cd88a5e213ed59a05c04545f0fcf565b84b28af5bfc222",
+            "bytes": 9896
+          },
+          {
+            "path": "tests/club.test.mjs",
+            "sha256": "a701b7059636eb876dfe70809a06ae17505c8b35071980267d41bff5622f2038",
+            "bytes": 14072
+          },
+          {
+            "path": "tests/club-reward-settlement.test.mjs",
+            "sha256": "67b37888132aaaa9ebb1f14a441b0ff588ca068199145dbca6c8bd2c95b9b1fe",
+            "bytes": 6739
+          }
+        ],
+        "requirements_scope": "selected_files_only",
+        "all_requirements_known": false,
+        "tests_executed": 0
+      },
+      "requirements_digest": "5fc378fae8383868df49273f8fcc70b7c9fcf5b6a11302a99e5743856756a71a",
+      "continuous_host_project": {
+        "project": "hope-sunrise",
+        "repository": "sites/appgprj_6af86d66b7108191a8dd1052c4a7302f",
+        "source": "/workspace/taesan-rollout-source-recovery/hope-sunrise/.sites-checkout",
+        "candidates": "/workspace/taesan-worker-runtime-prep/hope-sunrise/candidates",
+        "runtime": "/workspace/taesan-worker-runtime-prep/hope-sunrise/runtime",
+        "developer_token_file": "/workspace/taesan-worker-runtime-prep/hope-sunrise/control/developer.token",
+        "reviewer_token_file": "/workspace/taesan-worker-runtime-prep/hope-sunrise/control/reviewer.token",
+        "developer_id": "hope-sunrise-developer",
+        "reviewer_id": "hope-sunrise-reviewer",
+        "checks": {
+          "orders": [
+            "/usr/bin/node",
+            "--test",
+            "tests/orders.test.mjs"
+          ],
+          "club-ledger": [
+            "/usr/bin/node",
+            "--test",
+            "tests/club.test.mjs",
+            "tests/club-reward-settlement.test.mjs"
+          ]
+        },
+        "developer": {
+          "binary": "/usr/bin/codex",
+          "codex_home": "/workspace/taesan-worker-runtime-prep/hope-sunrise/developer-profile",
+          "require_origin": false
+        },
+        "reviewer": {
+          "binary": "/usr/bin/codex",
+          "codex_home": "/workspace/taesan-worker-runtime-prep/hope-sunrise/reviewer-profile",
+          "require_origin": false
+        }
+      },
+      "loader": "manager_bridge.continuous_host.load_host",
+      "pending_prerequisites": [
+        "role_memberships",
+        "private_role_tokens",
+        "codex_profile_authentication",
+        "independent_runtime",
+        "capacity_limits",
+        "qa_contract",
+        "source_connector",
+        "private_load_host_validation",
+        "registered_session_or_approved_fleet_template"
+      ],
+      "authentication_verified": false,
+      "execution_ready": false,
+      "maintenance_enabled": false,
+      "operational_authorized": false,
+      "packet_state": "prepared_references_only_not_installed"
+    }
+  ]
+}
