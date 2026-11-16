@@ -28,6 +28,7 @@ class GovernanceService:
         self._manager_running=False
         self.supervision=None
         self.recovery=None
+        self.runtime_transition=None
 
     def stop(self):
         # Signal handler safe: controller fences observe this before dispatch.
@@ -37,6 +38,7 @@ class GovernanceService:
         result=self.controller.status(self.host.manager_token(),self.settings['projects'])
         result['source_watch']=[{'project':project,'state':state} for project,state in sorted(self.source_states.items())]
         if self.supervision is not None:result['supervision']=self.supervision.report(self.host.manager_token(),self.settings['projects'])
+        if self.runtime_transition is not None:result['runtime_transition']=self.runtime_transition.status(self.host.manager_token(),self.settings['projects'])
         return result
 
     def health(self,token,projects):
@@ -81,7 +83,11 @@ class GovernanceService:
             ticks=0;blocked=0;dispatch_scope=None;inactive=[]
             while not self.stop_event.is_set() and (max_ticks is None or ticks<max_ticks):
                 token=self.host.manager_token()
-                if self.supervision is not None:self.supervision.poll(token,stop_event=self.stop_event)
+                fully_drained=False
+                if self.runtime_transition is not None:
+                    transition=self.runtime_transition.status(token,self.settings['projects'])
+                    fully_drained=all(item['new_admission_blocked'] for item in transition['projects'])
+                if self.supervision is not None and not fully_drained:self.supervision.poll(token,stop_event=self.stop_event)
                 if self.stop_event.is_set():break
                 if self.controller.admission_budget is not None:
                     self.controller.admission_budget.poll_auth(token,self.settings['projects'])
@@ -144,13 +150,15 @@ def load_service(config_file):
         host_admission=HostAdmission(host.core,observer=LocalHostObserver(
             application_root=host_settings['application_root'],state_root=host_settings['data_root']))
     return build_service(host,controller,settings,listen=listener,governance='governance' in config,
-        supervision=supervision,host_admission=host_admission)
+        supervision=supervision,host_admission=host_admission,
+        link_templates=({e['project']:e for e in _private_json(host_config).get('projects',[])} if 'governance' in config else None))
 
 
 def build_service(host,controller,settings,*,listen=None,governance=False,
                   qa_providers=None,source_probes=None,connection_profiles=None,
                   supervision=None,owner_token_loader=None,expiration_provider=None,subscription_broker=None,
-                  operating_budget=None,operations_metadata=(),artifact_sources=None,worker_links=None,host_admission=None):
+                  operating_budget=None,operations_metadata=(),artifact_sources=None,worker_links=None,host_admission=None,
+                  backup_health=None,project_link_plan=None,link_templates=None):
     """Compose already trusted host objects; provider arguments never come from HTTP/config."""
     from .continuous_manager import ContinuousManager
     from .three_tier import ThreeTier
@@ -165,7 +173,7 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
         raise ValueError('same trusted host and controller required')
     if type(governance) is not bool or (any(v is not None for v in (qa_providers,connection_profiles)) and not governance):
         raise ValueError('explicit governance registration required')
-    if not governance and (operating_budget is not None or operations_metadata or artifact_sources is not None or worker_links is not None or host_admission is not None):
+    if not governance and (operating_budget is not None or operations_metadata or artifact_sources is not None or worker_links is not None or host_admission is not None or backup_health is not None or project_link_plan is not None or link_templates is not None):
         raise ValueError('explicit governance operations registration required')
     if governance:
         from .operating_budget import OperatingBudget
@@ -228,9 +236,16 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
             from .recovery_readiness import RecoveryReadiness
             from .portfolio_readiness import PortfolioReadiness
             service.recovery=RecoveryReadiness(host.core,controller=controller,supervision=service.supervision)
+            from .runtime_transition import RuntimeTransition
+            from .project_link_plan import ProjectLinkPlan
+            from .continuous_host import ContinuousHost
+            service.runtime_transition=RuntimeTransition(host.core,supervision=service.supervision)
+            links=project_link_plan or ProjectLinkPlan(host.core,host if isinstance(host,ContinuousHost) else None,
+                brokers=() if subscription_broker is None else (subscription_broker,),templates=link_templates)
             readiness=PortfolioReadiness(host.core,connections=connections,budget=budget,operations_reporting=reporting)
             server.operations_control=OperationsControl(server.control_center,preflight,reporting,budget,
-                worker_links=worker_links,recovery=service.recovery,readiness=readiness)
+                worker_links=worker_links,recovery=service.recovery,readiness=readiness,
+                transition=service.runtime_transition,link_plan=links,backup_health=backup_health)
             controller.admission_budget=budget
             host.core.admission_budget=budget
         return service

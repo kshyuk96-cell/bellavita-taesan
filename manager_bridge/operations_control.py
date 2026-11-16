@@ -4,7 +4,7 @@ from .control_center import ControlCenter
 
 
 class OperationsControl:
-    def __init__(self,control,preflight,reporting,budget,*,worker_links=None,recovery=None,readiness=None):
+    def __init__(self,control,preflight,reporting,budget,*,worker_links=None,recovery=None,readiness=None,transition=None,link_plan=None,backup_health=None):
         from .project_connection_preflight import ProjectConnectionPreflight
         from .operations_reporting import OperationsReporting
         from .operating_budget import OperatingBudget
@@ -27,6 +27,13 @@ class OperationsControl:
         for value,kind,expected in ((recovery,'recovery',RecoveryReadiness),(readiness,'readiness',PortfolioReadiness)):
             if value is not None and (not isinstance(value,expected) or value.core is not control.core):
                 raise ValueError('same registered '+kind+' required')
+        from .runtime_transition import RuntimeTransition
+        from .project_link_plan import ProjectLinkPlan
+        from .backup_health import BackupHealth
+        for value,expected in ((transition,RuntimeTransition),(link_plan,ProjectLinkPlan),(backup_health,BackupHealth)):
+            if value is not None and (not isinstance(value,expected) or value.core is not control.core):
+                raise ValueError('same registered transition operations required')
+        self.transition,self.link_plan,self.backup_health=transition,link_plan,backup_health
         self.recovery,self.readiness=recovery,readiness
 
     def inspect(self,token,projects):
@@ -123,3 +130,46 @@ class OperationsControl:
     def register_projects(self,token,request_key,registrations):
         if self.readiness is None:raise NotFound('portfolio readiness not configured')
         return self.readiness.register_batch(token,request_key,registrations)
+
+    def transition_status(self,token,projects):
+        self.control._scope(token,projects)
+        if self.transition is None:raise NotFound('runtime transition not configured')
+        return self.transition.status(token,projects)
+
+    def drain(self,token,projects,expected_revisions,request_key,*,reason='planned_update'):
+        self.control._scope(token,projects,roles=('owner',))
+        if self.transition is None:raise NotFound('runtime transition not configured')
+        return self.transition.drain(token,projects,expected_revisions,request_key,reason=reason)
+
+    def resume(self,token,projects,expected_revisions,request_key):
+        self.control._scope(token,projects,roles=('owner',))
+        if self.transition is None:raise NotFound('runtime transition not configured')
+        return self.transition.resume(token,projects,expected_revisions,request_key)
+
+    def link_inventory(self,token,projects):
+        if self.link_plan is None:raise NotFound('project link planning not configured')
+        return self.link_plan.inventory(token,projects)
+
+    def create_link_plan(self,token,request_key,projects,expected_bindings,role_mappings,expected_host_map_digest,broker_refs):
+        if self.link_plan is None:raise NotFound('project link planning not configured')
+        return self.link_plan.plan(token,request_key,projects,expected_bindings,role_mappings,expected_host_map_digest,broker_refs)
+
+    def get_link_plan(self,token,plan_id):
+        if self.link_plan is None:raise NotFound('project link planning not configured')
+        return self.link_plan.get_plan(token,plan_id)
+
+    def backup_report(self,token,*,verify_latest=False):
+        if self.backup_health is None:raise NotFound('backup health not configured')
+        return self.backup_health.inspect(token,verify_latest=verify_latest)
+
+    def install_backup_policy(self,token,policy,*,expected_revision=0):
+        from .backup_health import BackupHealthPolicy
+        if self.backup_health is None:raise NotFound('backup health not configured')
+        if type(policy) is not dict:raise ValueError('exact backup health policy required')
+        try:value=BackupHealthPolicy(**policy)
+        except TypeError:raise ValueError('exact backup health policy fields required') from None
+        return self.backup_health.install(token,value,expected_revision=expected_revision)
+
+    def rehearse_backup(self,token,backup_id,request_key):
+        if self.backup_health is None:raise NotFound('backup health not configured')
+        return self.backup_health.rehearse(token,backup_id,request_key)
