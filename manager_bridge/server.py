@@ -147,9 +147,19 @@ class Handler(BaseHTTPRequestHandler):
                     data = self.body()
                     return self.respond(200, {'ok': True, 'job': jobs.receive(
                         token, data['approval'], data['request_key'], data['task'])})
-                match = re.fullmatch(r'/v1/qa/jobs/([a-f0-9]{32})(?:/(claim|cancel|result))?', parsed.path)
+                match = re.fullmatch(r'/v1/qa/jobs/([a-f0-9]{32})(?:/(claim|cancel|result|execution|uncertain|reconcile))?', parsed.path)
                 if match:
                     key, action = match.groups()
+                    if method == 'GET' and action == 'execution':
+                        return self.respond(200, {'ok': True, 'execution': jobs.inspect(token, key)})
+                    if method == 'POST' and action in ('uncertain', 'reconcile'):
+                        data = self.body()
+                        if action == 'uncertain':
+                            value = jobs.uncertain(token, key, data['reason'])
+                        else:
+                            value = jobs.reconcile(token, key, evidence_reference=data['evidence_reference'],
+                                process_stopped=data['process_stopped'], effects_absent=data['effects_absent'])
+                        return self.respond(200, {'ok': True, 'job': value})
                     if method == 'GET' and action is None:
                         return self.respond(200, {'ok': True, 'job': jobs.get(token, key)})
                     if method == 'POST' and action == 'result':

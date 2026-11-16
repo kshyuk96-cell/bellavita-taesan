@@ -1,0 +1,15 @@
+{
+  "manager_url": "http://127.0.0.1:8791",
+  "profiles": [
+    {
+      "project": "bellavita",
+      "release": "ledger-offline-v1",
+      "revision": "REPLACE_WITH_REVIEWED_40_CHARACTER_COMMIT",
+      "source": "/srv/taesan/reviewed-qa-source",
+      "runtime": "/srv/taesan/reviewed-python-runtime",
+      "suite": "order-ledger-v1",
+      "timeout": 300,
+      "seed": 20261116
+    }
+  ]
+}
