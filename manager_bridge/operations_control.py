@@ -4,7 +4,8 @@ from .control_center import ControlCenter
 
 
 class OperationsControl:
-    def __init__(self,control,preflight,reporting,budget,*,worker_links=None,recovery=None,readiness=None,transition=None,link_plan=None,backup_health=None):
+    def __init__(self,control,preflight,reporting,budget,*,worker_links=None,recovery=None,readiness=None,transition=None,link_plan=None,backup_health=None,
+                 baselines=None,quality_report=None,quality_handoff=None):
         from .project_connection_preflight import ProjectConnectionPreflight
         from .operations_reporting import OperationsReporting
         from .operating_budget import OperatingBudget
@@ -33,6 +34,12 @@ class OperationsControl:
         for value,expected in ((transition,RuntimeTransition),(link_plan,ProjectLinkPlan),(backup_health,BackupHealth)):
             if value is not None and (not isinstance(value,expected) or value.core is not control.core):
                 raise ValueError('same registered transition operations required')
+        from .business_baselines import BusinessBaselines
+        from .quality_delivery_report import QualityDeliveryReport
+        from .worker_quality_handoff import WorkerQualityHandoff
+        for value,expected in ((baselines,BusinessBaselines),(quality_report,QualityDeliveryReport),(quality_handoff,WorkerQualityHandoff)):
+            if value is not None and (not isinstance(value,expected) or value.core is not control.core):raise ValueError('same registered quality service required')
+        self.baselines,self.quality_report,self.quality_handoff=baselines,quality_report,quality_handoff
         self.transition,self.link_plan,self.backup_health=transition,link_plan,backup_health
         self.recovery,self.readiness=recovery,readiness
 
@@ -173,3 +180,35 @@ class OperationsControl:
     def rehearse_backup(self,token,backup_id,request_key):
         if self.backup_health is None:raise NotFound('backup health not configured')
         return self.backup_health.rehearse(token,backup_id,request_key)
+
+    def baseline_draft(self,token,project,request_key,contract):
+        self.control._scope(token,[project])
+        if self.baselines is None:raise NotFound('business baselines not configured')
+        return self.baselines.draft(token,project,request_key,contract)
+
+    def baseline_current(self,token,project):
+        self.control._scope(token,[project])
+        if self.baselines is None:raise NotFound('business baselines not configured')
+        return self.baselines.current(token,project)
+
+    def baseline_approve(self,token,draft_id,draft_digest,*,expected_revision=0):
+        from .maintenance_registry import name
+        name(draft_id)
+        if self.baselines is None:raise NotFound('business baselines not configured')
+        with self.store._transaction() as c:
+            actor=self.store._authenticate(c,token);self.store._role(actor,('owner',))
+            row=c.execute('SELECT project FROM business_baseline_drafts WHERE id=?',(draft_id,)).fetchone()
+            if row is None:raise NotFound('business baseline draft unavailable')
+        self.control._scope(token,[row['project']],roles=('owner',))
+        return self.baselines.approve(token,draft_id,draft_digest,expected_revision=expected_revision)
+
+    def quality_delivery(self,token,projects,*,limit=20,cursor=None,freshness_limit=3):
+        self.control._scope(token,projects)
+        if self.quality_report is None:raise NotFound('quality delivery reporting not configured')
+        return self.quality_report.report(token,projects,limit=limit,cursor=cursor,freshness_limit=freshness_limit)
+
+    def handoff_packet(self,token,task_id,role,*,candidate_digest=None):
+        task=self.store.get_task(token,task_id)
+        self.control._scope(token,[task['project']])
+        if self.quality_handoff is None:raise NotFound('quality handoff not configured')
+        return self.quality_handoff.generate(token,task_id,role,candidate_digest)

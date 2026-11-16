@@ -181,13 +181,16 @@ class GovernanceGate:
         if not result['admitted']:
             raise Conflict('mandatory QA admission failed: ' + ','.join(result['reasons']))
         with self.store._transaction() as c:
+            from .business_baselines import validate_baseline_qa
+            baseline_qa=validate_baseline_qa(c,self.store,self.store._get(c,self.store._authenticate(c,token),task['id']),observation.report)
+        with self.store._transaction() as c:
             self.registry._get(c, token, task['project'], ('owner', 'manager', 'worker'))
             self.verify_snapshot(c, candidate, policy_digest, {'observed_at':observation.observed_at})
         return dict(result, policy_digest=policy_digest, contract_version=policy['contract_version'],
                     provider_identity=policy['provider_identity'], contract_digest=policy['contract_digest'],
                     report_digest=observation.report['report_digest'], observed_at=observation.observed_at,
                     candidate_digest=candidate['digest'], source_revision=observation.source_revision,
-                    actual_project_verified=False)
+                    actual_project_verified=False,business_baseline_qa=baseline_qa)
 
     def verify_snapshot(self, c, candidate, policy_digest, qa=None):
         snapshot = self._snapshot(c, candidate)
