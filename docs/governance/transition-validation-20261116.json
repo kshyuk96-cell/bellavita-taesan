@@ -61,7 +61,14 @@
     "monthly_usd": 24,
     "actual_performance_qualified": false,
     "resource_created": false,
-    "billing_enabled": false
+    "billing_enabled": false,
+    "os_candidate": {
+      "name": "Debian 13",
+      "slug": "debian-13-x64",
+      "source": "https://docs.digitalocean.com/products/droplets/details/images/",
+      "observed_date": "2026-11-16",
+      "remote_verified": false
+    }
   },
   "access_key": {
     "algorithm": "Ed25519",
@@ -75,5 +82,22 @@
   "tester_engine_executed": false,
   "always_on_verified": false,
   "actual_offsite_restore_verified": false,
-  "overall_control_percentage": null
+  "overall_control_percentage": null,
+  "implementation_commit": "73d197a8159f4f672d5cf55bec783aa662667c42",
+  "current_host_preflight": {
+    "scope": "current_task_cloud_host_only",
+    "application_commit": "73d197a8159f4f672d5cf55bec783aa662667c42",
+    "measurement": {
+      "host_identity": "f470f4954f12ee9c06346927151263659cb0116b45f1040aa85c04911c8ca303",
+      "application_commit": "73d197a8159f4f672d5cf55bec783aa662667c42",
+      "namespace_isolation_verified": true,
+      "private_storage_verified": true,
+      "observed_at": 1794814292.4922552
+    },
+    "models_started": 0,
+    "paid_api_calls": 0,
+    "persistent_boot_verified": false,
+    "offsite_backup_verified": false,
+    "deployment_performed": false
+  }
 }
