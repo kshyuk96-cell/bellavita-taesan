@@ -1,0 +1,629 @@
+{
+  "schema": "hope-qa-batch01/v1",
+  "source_revision": "d12bf6937d056c73ea53e777afd04f6a3afa01e3",
+  "scope": "local_reference_fixture",
+  "local_admission": {
+    "admitted": true,
+    "reasons": [],
+    "warnings": [],
+    "scope": "synthetic_only",
+    "operational_authorization": false,
+    "verified_counts": {
+      "generated": 20,
+      "executed": 20,
+      "asserted": 20,
+      "unique_failures": 0
+    }
+  },
+  "items": [
+    {
+      "item": 1,
+      "title": "검증 환경 식별·운영 실행 차단",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "environment": "local_reference_fixture",
+        "operationalWrites": false,
+        "realCharges": false,
+        "realNotifications": false
+      },
+      "actual": {
+        "environment": "local_reference_fixture",
+        "operationalWrites": false,
+        "realCharges": false,
+        "realNotifications": false
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 2,
+      "title": "생성·초기화 인터페이스",
+      "priority": "P1",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "generation": 1,
+        "matched": true
+      },
+      "actual": {
+        "generation": 1,
+        "matched": true
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 3,
+      "title": "실행별 데이터 공간 분리",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "distinct": true,
+        "own": 200,
+        "cross": 403
+      },
+      "actual": {
+        "distinct": true,
+        "own": 200,
+        "cross": 403
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 4,
+      "title": "초기화 정합성",
+      "priority": "P1",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "generation": 2,
+        "initial_state_matches": true,
+        "stale_status": 409,
+        "history_retained": true
+      },
+      "actual": {
+        "generation": 2,
+        "initial_state_matches": true,
+        "stale_status": 409,
+        "history_retained": true
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 5,
+      "title": "3등급 신규 회원",
+      "priority": "P1",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "U01": {
+          "grade": "hope",
+          "status": "new",
+          "card": "unregistered"
+        },
+        "U02": {
+          "grade": "happy",
+          "status": "new",
+          "card": "unregistered"
+        },
+        "U03": {
+          "grade": "premium",
+          "status": "new",
+          "card": "unregistered"
+        }
+      },
+      "actual": {
+        "U01": {
+          "grade": "hope",
+          "status": "new",
+          "card": "unregistered"
+        },
+        "U02": {
+          "grade": "happy",
+          "status": "new",
+          "card": "unregistered"
+        },
+        "U03": {
+          "grade": "premium",
+          "status": "new",
+          "card": "unregistered"
+        }
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 6,
+      "title": "회원·상품관리자·재무·최고관리자 권한",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "member_ids": [
+          "U04"
+        ],
+        "owner_count": 10,
+        "product_keys": [
+          "products"
+        ],
+        "unauthorized": 403,
+        "finance_seed": 403
+      },
+      "actual": {
+        "member_ids": [
+          "U04"
+        ],
+        "owner_count": 10,
+        "product_keys": [
+          "products"
+        ],
+        "unauthorized": 403,
+        "finance_seed": 403
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 7,
+      "title": "U04 혼합 잔액",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "DP": 600000,
+        "BP": 150000,
+        "SP": 100000
+      },
+      "actual": {
+        "DP": 600000,
+        "BP": 150000,
+        "SP": 100000
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 8,
+      "title": "0·정확·1원 부족 경계",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "U05": 0,
+        "U06": 1000000,
+        "U07": 999999,
+        "U07_BP": 100001
+      },
+      "actual": {
+        "U05": 0,
+        "U06": 1000000,
+        "U07": 999999,
+        "U07_BP": 100001
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 9,
+      "title": "U09 반환 상한",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "principal": 1200000,
+        "used": 450000,
+        "BP": 85000,
+        "DP": 750000,
+        "independent_ceiling": 750000
+      },
+      "actual": {
+        "principal": 1200000,
+        "used": 450000,
+        "BP": 85000,
+        "DP": 750000,
+        "independent_ceiling": 750000
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 10,
+      "title": "국내·해외·문화·크루즈 상품",
+      "priority": "P1",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "P01": [
+          "domestic",
+          300000
+        ],
+        "P02": [
+          "overseas",
+          1000000
+        ],
+        "P03": [
+          "culture",
+          100000
+        ],
+        "P04": [
+          "cruise",
+          1000000
+        ]
+      },
+      "actual": {
+        "P01": [
+          "domestic",
+          300000
+        ],
+        "P02": [
+          "overseas",
+          1000000
+        ],
+        "P03": [
+          "culture",
+          100000
+        ],
+        "P04": [
+          "cruise",
+          1000000
+        ]
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 11,
+      "title": "마지막 1석·매진·객실 재고",
+      "priority": "P1",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "last_seat": 1,
+        "sold_out": 0,
+        "rooms": {
+          "inside": 2,
+          "balcony": 1
+        }
+      },
+      "actual": {
+        "last_seat": 1,
+        "sold_out": 0,
+        "rooms": {
+          "balcony": 1,
+          "inside": 2
+        }
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 12,
+      "title": "예약금·잔금·납기",
+      "priority": "P1",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "deposit_gross": 300000,
+        "balance_gross": 700000,
+        "balance_due": "2027-02-14",
+        "payment_mode": "full_simulator_payment"
+      },
+      "actual": {
+        "deposit_gross": 300000,
+        "balance_gross": 700000,
+        "balance_due": "2027-02-14",
+        "payment_mode": "full_simulator_payment"
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 13,
+      "title": "승인·거절·불명 시뮬레이터",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "unknown": "reconciliation_required",
+        "replay": "reconciliation_required_no_replay",
+        "before_cards": 0,
+        "initial_cards": 1,
+        "resolved_DP": 50000,
+        "declined": "declined",
+        "declined_DP": 0
+      },
+      "actual": {
+        "unknown": "reconciliation_required",
+        "replay": "reconciliation_required_no_replay",
+        "before_cards": 0,
+        "initial_cards": 1,
+        "resolved_DP": 50000,
+        "declined": "declined",
+        "declined_DP": 0
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 14,
+      "title": "미확정 정책 차단",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "bonus": "bonus_order_policy_pending",
+        "corporate": "corporate_policy_pending",
+        "suspension": "suspension_withdrawal_policy_pending",
+        "unchanged": true
+      },
+      "actual": {
+        "bonus": "bonus_order_policy_pending",
+        "corporate": "corporate_policy_pending",
+        "suspension": "suspension_withdrawal_policy_pending",
+        "unchanged": true
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 15,
+      "title": "사전 계약·데이터 대조",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "status": 409,
+        "unchanged": true,
+        "contract_matches": true
+      },
+      "actual": {
+        "status": 409,
+        "unchanged": true,
+        "contract_matches": true
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 16,
+      "title": "3등급 가입 통합",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "U01": {
+          "status": "active",
+          "paid": 75000,
+          "principal": 50000,
+          "signup_fee": 25000,
+          "BP": 25000
+        },
+        "U02": {
+          "status": "active",
+          "paid": 150000,
+          "principal": 100000,
+          "signup_fee": 50000,
+          "BP": 50000
+        },
+        "U03": {
+          "status": "active",
+          "paid": 300000,
+          "principal": 200000,
+          "signup_fee": 100000,
+          "BP": 100000
+        }
+      },
+      "actual": {
+        "U01": {
+          "status": "active",
+          "paid": 75000,
+          "principal": 50000,
+          "signup_fee": 25000,
+          "BP": 25000
+        },
+        "U02": {
+          "status": "active",
+          "paid": 150000,
+          "principal": 100000,
+          "signup_fee": 50000,
+          "BP": 50000
+        },
+        "U03": {
+          "status": "active",
+          "paid": 300000,
+          "principal": 200000,
+          "signup_fee": 100000,
+          "BP": 100000
+        }
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 17,
+      "title": "원금 우선 결제 통합",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "plan": {
+          "DP": 600000,
+          "BP": 100000,
+          "SP": 100000,
+          "card": 200000
+        },
+        "independent_match": true,
+        "stock": 0,
+        "bookings": 1,
+        "card_approvals": 1,
+        "journal": {
+          "DP": -600000,
+          "BP": -100000,
+          "SP": -100000
+        }
+      },
+      "actual": {
+        "plan": {
+          "DP": 600000,
+          "BP": 100000,
+          "SP": 100000,
+          "card": 200000
+        },
+        "independent_match": true,
+        "stock": 0,
+        "bookings": 1,
+        "card_approvals": 1,
+        "journal": {
+          "DP": -600000,
+          "BP": -100000,
+          "SP": -100000
+        }
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 18,
+      "title": "취소·원수단·재고 복원 통합",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "balances": {
+          "DP": 600000,
+          "BP": 150000,
+          "SP": 100000
+        },
+        "stock": 1,
+        "booking": "cancelled",
+        "card_net": 0,
+        "reversals": 3,
+        "original_links": true,
+        "duplicate": "approved_refund_required"
+      },
+      "actual": {
+        "balances": {
+          "DP": 600000,
+          "BP": 150000,
+          "SP": 100000
+        },
+        "stock": 1,
+        "booking": "cancelled",
+        "card_net": 0,
+        "reversals": 3,
+        "original_links": true,
+        "duplicate": "approved_refund_required"
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 19,
+      "title": "탈퇴·청구중단·반환 통합",
+      "priority": "P0",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "ceiling": 750000,
+        "free_bonus_cash": 0,
+        "stopped": true,
+        "DP": 0,
+        "BP": 85000,
+        "returned": 750000,
+        "status": "withdrawn",
+        "returns": 1,
+        "original_source": "seed-principal-U09"
+      },
+      "actual": {
+        "ceiling": 750000,
+        "free_bonus_cash": 0,
+        "stopped": true,
+        "DP": 0,
+        "BP": 85000,
+        "returned": 750000,
+        "status": "withdrawn",
+        "returns": 1,
+        "original_source": "seed-principal-U09"
+      },
+      "reason": null,
+      "customer_site_verified": false
+    },
+    {
+      "item": 20,
+      "title": "증거·결함·고객 보고서 연결",
+      "priority": "P1",
+      "scope": "local_reference_fixture",
+      "status": "PASS",
+      "expected": {
+        "customer_promoted": false,
+        "canonical_cases": 38,
+        "word_created": true,
+        "excel_created": true
+      },
+      "actual": {
+        "customer_promoted": false,
+        "canonical_cases": 38,
+        "word_created": true,
+        "excel_created": true
+      },
+      "reason": null,
+      "customer_site_verified": false
+    }
+  ],
+  "counts": {
+    "PASS": 20,
+    "FAIL": 0,
+    "BLOCKED": 0
+  },
+  "customer_site_verified": false,
+  "operational_authorization": false,
+  "source_files": {
+    "scripts/run_hope_batch01.py": "63a1239e138c327ecb069c21680d8fdc268f330df0857eceec43104bda32de40",
+    "taesan_core/hope_test_data.py": "09d4573ebeed8f0bc0f7bedb78550645c98104d529c8b5715d6c6e2962938b9b",
+    "taesan_core/hope_tour_qa.py": "24559bcbc12fa0ee68129ce071bac95d5cd6056bade8f75d3e08f721aaa0a0ae",
+    "manager_bridge/hope_lab_model.py": "2be75bbe1a915f64967949e85703361c81101306d2327902d4293fc281b17b52",
+    "manager_bridge/hope_lab_store.py": "25c33a24dba67126b7ece9cd72e710686b7071cd6e1865f9f76acb576c120635",
+    "manager_bridge/hope_lab_transport.py": "70749cc21b307f1755b0f33a2a50ba1a52e871af7a0875f878c8ff30d178e503",
+    "manager_bridge/hope_batch01.py": "ebbb5ce891037a915e1186373fef26166dc90d7e0cb5fa13cb89f3a797d11b16",
+    "manager_bridge/hope_batch01_contract.py": "eab4b8a7bee93ef87baef55fda7190f521c074dab82697b11791641bf44e313e",
+    "manager_bridge/hope_batch01_reports.py": "c6d3355a2ce32edc9a06a282d4e41752342805c3277b345dfd7a19a23eb34cb1",
+    "manager_bridge/hope_tour_reporting.py": "dc665de5b68339fcd497131beb1cec2210950a54ce18ec71b2135b9a1eea7e4b",
+    "manager_bridge/hope_tour_exports.py": "a75e8db77a6e46a9902f5b73bc4dce058afee019d93fe6dd75c1d2c9d91e940d",
+    "manager_bridge/hope_tour_acceptance.py": "7f5d845f1e4f80fde71f45efec4cbd6cd177d4c1873441c7cb232bc025e1fa71",
+    "manager_bridge/hope_review_client.py": "55db6fa66f6d463aaa5c6515aedcf12965a2c972d4c9f4f2fa705a4d7afe54b7",
+    "manager_bridge/store.py": "df1277f773ec55e90d4d47a9ab26f45c2bd1d023bd13acb0eaaf836e9e843dcc",
+    "docs/qa/hope-tour/run-20261116/customer-report.json": "21ea9936d3953b2ddfb0930d8ac787917679acf12d0b2d03903339324cdd0897"
+  },
+  "remote_adapter": {
+    "connected": false,
+    "setup_allowed": false,
+    "reason": "test_data_protocol_not_advertised",
+    "operational_authorization": false,
+    "observed_capabilities": {
+      "mode": "isolated_server_review",
+      "testDataProtocol": null,
+      "operationalWrites": false,
+      "realCharges": false,
+      "realNotifications": false,
+      "cardProvider": "simulator"
+    },
+    "read_only": true,
+    "transport": [
+      {
+        "method": "GET",
+        "path": "/review/status.json",
+        "status": 200,
+        "at": "2026-11-16T02:12:55.567343+00:00",
+        "request_id": null,
+        "response_digest": "081a4eca1794ca424b1bfd527aaff84ff092ca99fa178f19836194f0c059d5c2",
+        "elapsed_ms": 1168
+      }
+    ],
+    "source_binding": "not_verified_readiness_only"
+  }
+}
