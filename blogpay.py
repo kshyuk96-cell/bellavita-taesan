@@ -142,6 +142,9 @@ class BlogPay:
                       taxType=item.get('gTaxType', 'TG01'),
                       useInputOption=int(bool(item.get('inputOption'))),
                       sDate=item.get('SDate') or '', eDate=item.get('EDate') or '')
+        # Encode zero as a non-empty numeric string for vendor PHP forms.
+        if item.get('isDeliveryPrice') is not None:
+            fields['isDeliveryPrice']='00' if str(item['isDeliveryPrice'])=='0' else str(item['isDeliveryPrice'])
         fields['enablePayMethod[]'] = [flag for flag in PAYMENT_FLAGS if int(item['enablePayMethod']) & flag]
         for option in item.get('normalOption') or []:
             group = int(option['goodsNormalOptionNum'])
@@ -167,18 +170,14 @@ class BlogPay:
         return tuple(row.get(k) for k in keys), normal, inputs
 
     def same_settings(self, actual, source):
-        """Compare effective settings; retain strict legacy-policy checks.
+        """Compare settings, preserving the checkout address requirement.
 
-        Official goodsModify documents shipSubNum as the required new shipping
-        policy identifier. isDeliveryPrice is an old read-only flag, not a write
-        parameter. Ignore that flag only with an equal explicit new policy ID.
+        isDeliveryPrice controls mandatory postcode validation in the vendor
+        checkout JS. It must match even when shipping policy IDs are equal.
         Disabled today-shipping flags have no cutoff; enabled flags stay strict.
         Fingerprinting remains byte-for-byte unchanged in settings().
         """
         a,b=dict(actual),dict(source)
-        policy=str(source.get('shipSubNum') or '')
-        if policy.isdecimal() and int(policy)>0 and str(actual.get('shipSubNum'))==policy:
-            a['isDeliveryPrice']=b.get('isDeliveryPrice')
         disabled=(None,'','N','0',0)
         if a.get('isTodayShipUse') in disabled and b.get('isTodayShipUse') in disabled:
             a['isTodayShipUse']=b['isTodayShipUse']=None

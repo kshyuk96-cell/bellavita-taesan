@@ -5,6 +5,8 @@ class DeliveryPreservation(unittest.TestCase):
   client=BlogPay('example','fixture')
   source={'shipSubNum':42,'isDelivery':0,'isDeliveryPrice':0,'isTodayShipUse':'N','todayShipTime':'00:00:00'}
   copy={**source,'isDeliveryPrice':1,'isTodayShipUse':None,'todayShipTime':None}
+  self.assertFalse(client.same_settings(copy,source))
+  copy['isDeliveryPrice']=0
   self.assertTrue(client.same_settings(copy,source))
   for altered in ({'shipSubNum':43},{'isDelivery':1},{'enablePayMethod':0},{'eDeliBPrice':3000},{'isTodayShipUse':'Y'}):
    self.assertFalse(client.same_settings({**copy,**altered},source))
