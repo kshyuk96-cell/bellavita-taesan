@@ -11,6 +11,8 @@ class QAJobs:
         self.store = store
         with store._transaction() as c:
             c.executescript('''
+            CREATE TABLE IF NOT EXISTS qa_reconciliation (
+              job TEXT PRIMARY KEY, actor TEXT, evidence TEXT, reason TEXT, created REAL);
             CREATE TABLE IF NOT EXISTS qa_approvals (
               id TEXT PRIMARY KEY, project TEXT, manifest TEXT);
             CREATE TABLE IF NOT EXISTS qa_task_requirements (
@@ -22,7 +24,7 @@ class QAJobs:
             ''')
 
     def approve(self, token, *, project, source_revision, contract, coverage,
-                adapter_release, max_seconds=300):
+                adapter_release, max_seconds=300, execution_profile_digest=None):
         """Owner-only provisioning; deliberately absent from worker HTTP routes.
 
         adapter_release identifies a reviewed, isolated execution image/path.
@@ -44,6 +46,10 @@ class QAJobs:
         manifest = dict(project=project, source_revision=source_revision, contract=contract,
                         coverage=coverage, adapter_release=adapter_release,
                         max_seconds=max_seconds, environment='isolated_nonproduction')
+        if execution_profile_digest is not None:
+            if type(execution_profile_digest) is not str or not re.fullmatch('[a-f0-9]{64}', execution_profile_digest):
+                raise ValueError('execution profile digest required')
+            manifest['execution_profile_digest'] = execution_profile_digest
         _reject_credentials(manifest, token)
         key = digest(manifest)
         with self.store._transaction() as c:
@@ -119,7 +125,42 @@ class QAJobs:
             row, _, _ = self._job(c, token, key, ('owner', 'manager', 'worker'))
             return self._public(row)
 
+    def inspect(self, token, key):
+        with self.store._transaction() as c:
+            row, _, manifest = self._job(c, token, key, ('owner', 'manager', 'worker'))
+            reconciliation = c.execute('SELECT actor,evidence,reason,created FROM qa_reconciliation WHERE job=?',(key,)).fetchone()
+            return {'job':self._public(row), 'manifest':manifest,
+                    'reconciliation':dict(reconciliation) if reconciliation else None}
+
+    def uncertain(self, token, key, reason):
+        if reason not in ('execution_interrupted','result_delivery_uncertain','worker_restarted'):
+            raise ValueError('fixed uncertainty reason required')
+        self.inspect(token, key)  # Persist expiry even if a subsequent action conflicts.
+        with self.store._transaction() as c:
+            row, actor, _ = self._job(c, token, key, ('worker',))
+            if row['worker'] != actor['token_hash'] or row['state'] not in ('running','reconciliation_required'):
+                raise Conflict('no owned uncertain execution')
+            c.execute("UPDATE qa_jobs SET state='reconciliation_required',decision=? WHERE id=?",
+                (canonical_json({'admitted':False,'reasons':[reason],'operational_authorization':False}),key))
+            return self._public(c.execute('SELECT * FROM qa_jobs WHERE id=?',(key,)).fetchone())
+
+    def reconcile(self, token, key, *, evidence_reference, process_stopped, effects_absent):
+        if (type(evidence_reference) is not str or not 1 <= len(evidence_reference) <= 500 or
+                process_stopped is not True or effects_absent is not True):
+            raise ValueError('explicit independent stop and effect reconciliation required')
+        _reject_credentials(evidence_reference, token)
+        self.inspect(token, key)
+        with self.store._transaction() as c:
+            row, actor, _ = self._job(c, token, key, ('owner',))
+            if row['state'] != 'reconciliation_required':
+                raise Conflict('uncertain job required')
+            c.execute('INSERT INTO qa_reconciliation VALUES (?,?,?,?,?)',
+                (key,actor['subject'],evidence_reference,'stopped_effects_absent',self.store._now()))
+            c.execute("UPDATE qa_jobs SET state='reconciled' WHERE id=?",(key,))
+            return self._public(c.execute('SELECT * FROM qa_jobs WHERE id=?',(key,)).fetchone())
+
     def claim(self, token, key):
+        self.inspect(token, key)
         with self.store._transaction() as c:
             row, actor, manifest = self._job(c, token, key, ('worker',))
             if row['state'] != 'queued':
@@ -134,6 +175,7 @@ class QAJobs:
                         manifest=manifest)
 
     def finish(self, token, key, report):
+        self.inspect(token, key)
         _reject_credentials(report, token)
         if len(canonical_json(report).encode()) > 32*1024*1024:
             raise ValueError('report too large')
@@ -148,12 +190,16 @@ class QAJobs:
             if report.get('job_binding') != binding:
                 decision['admitted'] = False
                 decision['reasons'].append('job_binding_mismatch')
+            if not execution_receipt_matches(report, m):
+                decision['admitted'] = False
+                decision['reasons'].append('execution_receipt_mismatch')
             c.execute('UPDATE qa_jobs SET state=?,report=?,decision=? WHERE id=?',
                       ('accepted' if decision['admitted'] else 'blocked', canonical_json(report),
                        canonical_json(decision), key))
             return self._public(c.execute('SELECT * FROM qa_jobs WHERE id=?', (key,)).fetchone())
 
     def cancel(self, token, key):
+        self.inspect(token, key)
         with self.store._transaction() as c:
             row, _, _ = self._job(c, token, key, ('owner', 'manager'))
             if row['state'] not in ('queued', 'running'):
@@ -186,6 +232,21 @@ def require_task_qa(c, task, candidate_revision):
         expected_binding = dict(project=manifest['project'], task=task['id'],
             approval=requirement['approval'], adapter_release=manifest['adapter_release'],
             source_revision=candidate_revision)
-        if decision['admitted'] and report.get('job_binding') == expected_binding:
+        if decision['admitted'] and report.get('job_binding') == expected_binding and execution_receipt_matches(report, manifest):
             return
     raise Conflict('mandatory QA has no current passing evidence')
+
+
+def execution_receipt_matches(report, manifest):
+    if not manifest.get('execution_profile_digest'):
+        return True  # Compatibility: new isolated workers require a profile pin.
+    receipt = report.get('execution_receipt', {})
+    observation = {k:v for k,v in report.items() if k not in
+                   ('execution_receipt','job_binding','report_digest')}
+    observation['report_digest'] = digest(observation)
+    return (type(receipt) is dict and receipt.get('schema') == 'qa-execution-receipt/v1' and
+            receipt.get('profile_digest') == manifest['execution_profile_digest'] and
+            receipt.get('source_revision') == manifest['source_revision'] and
+            receipt.get('isolation_verified') is True and receipt.get('process_exited') is True and
+            receipt.get('network') == 'none' and
+            receipt.get('report_observation_digest') == digest(observation))

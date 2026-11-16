@@ -47,7 +47,9 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def request(base, token, method, path, payload=None):
+def request(base, token, method, path, payload=None, *, max_response_bytes=1048576):
+    if type(max_response_bytes) is not int or not 1 <= max_response_bytes <= 40*1024*1024:
+        raise ValueError('bounded response required')
     base = validate_url(base)
     data = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode() if payload is not None else None
     query = Request(base + path, data=data, method=method,
@@ -55,8 +57,8 @@ def request(base, token, method, path, payload=None):
     opener = build_opener(ProxyHandler({}), NoRedirect())
     try:
         with opener.open(query, timeout=20) as response:
-            raw = response.read(1048577)
-            if len(raw) > 1048576:
+            raw = response.read(max_response_bytes+1)
+            if len(raw) > max_response_bytes:
                 raise ValueError('응답 범위를 초과했어요.')
             return json.loads(raw)
     except HTTPError as error:
