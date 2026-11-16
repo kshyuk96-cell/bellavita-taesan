@@ -4,7 +4,7 @@ from .control_center import ControlCenter
 
 
 class OperationsControl:
-    def __init__(self,control,preflight,reporting,budget):
+    def __init__(self,control,preflight,reporting,budget,*,worker_links=None):
         from .project_connection_preflight import ProjectConnectionPreflight
         from .operations_reporting import OperationsReporting
         from .operating_budget import OperatingBudget
@@ -17,10 +17,20 @@ class OperationsControl:
             raise ValueError('same registered admission budget required')
         self.control,self.preflight,self.reporting,self.budget=control,preflight,reporting,budget
         self.store=control.store
+        if worker_links is not None:
+            from .worker_links import NativeWorkerLinks
+            if not isinstance(worker_links,NativeWorkerLinks) or worker_links.core is not control.core:
+                raise ValueError('same registered native worker links required')
+        self.worker_links=worker_links
 
     def inspect(self,token,projects):
         self.control._scope(token,projects)
         return self.preflight.inspect(token,projects)
+
+    def workers(self,token,projects):
+        self.control._scope(token,projects)
+        if self.worker_links is None:raise NotFound('native worker links not configured')
+        return self.worker_links.inspect(token,projects)
 
     def owner_packet(self,token,request_key,projects,*,expected_fingerprints=None):
         self.control._scope(token,projects)

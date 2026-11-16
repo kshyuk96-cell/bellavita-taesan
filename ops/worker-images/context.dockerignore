@@ -1,0 +1,6 @@
+**
+!app/
+!app/**
+!codex
+!Dockerfile
+!context-manifest.json

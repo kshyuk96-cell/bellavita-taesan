@@ -133,7 +133,7 @@ def load_service(config_file):
 def build_service(host,controller,settings,*,listen=None,governance=False,
                   qa_providers=None,source_probes=None,connection_profiles=None,
                   supervision=None,owner_token_loader=None,expiration_provider=None,subscription_broker=None,
-                  operating_budget=None,operations_metadata=(),artifact_sources=None):
+                  operating_budget=None,operations_metadata=(),artifact_sources=None,worker_links=None):
     """Compose already trusted host objects; provider arguments never come from HTTP/config."""
     from .continuous_manager import ContinuousManager
     from .three_tier import ThreeTier
@@ -148,7 +148,7 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
         raise ValueError('same trusted host and controller required')
     if type(governance) is not bool or (any(v is not None for v in (qa_providers,connection_profiles)) and not governance):
         raise ValueError('explicit governance registration required')
-    if not governance and (operating_budget is not None or operations_metadata or artifact_sources is not None):
+    if not governance and (operating_budget is not None or operations_metadata or artifact_sources is not None or worker_links is not None):
         raise ValueError('explicit governance operations registration required')
     if governance:
         from .operating_budget import OperatingBudget
@@ -206,7 +206,7 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
             from .operations_control import OperationsControl
             preflight=ProjectConnectionPreflight(host.store,host.registry,onboarding,metadata=operations_metadata)
             reporting=OperationsReporting(host.core,summary,controller=controller,artifact_sources=artifact_sources,budget=budget)
-            server.operations_control=OperationsControl(server.control_center,preflight,reporting,budget)
+            server.operations_control=OperationsControl(server.control_center,preflight,reporting,budget,worker_links=worker_links)
             controller.admission_budget=budget
             host.core.admission_budget=budget
         return service

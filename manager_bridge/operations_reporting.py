@@ -82,7 +82,10 @@ class OperationsReporting:
         name(project);name(artifact_key)
         if type(kind) is not str or kind not in KINDS or type(retention_seconds) is not int or not 60<=retention_seconds<=30*86400:
             raise ValueError('bounded artifact kind and retention required')
-        with self.store._transaction() as c:_,configs=self._scope(c,token,[project])
+        with self.store._transaction() as c:
+            _,configs=self._scope(c,token,[project])
+            from .agent_directory import _reject_known_tokens
+            _reject_known_tokens(c,{'project':project,'kind':kind,'artifact_key':artifact_key})
         observer=self.artifact_sources.get((project,kind))
         if observer is None:raise NotFound('trusted artifact source not configured')
         # An opaque source key is never treated as a host path or uploaded proof.
