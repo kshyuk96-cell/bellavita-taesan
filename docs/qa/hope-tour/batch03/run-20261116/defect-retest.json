@@ -1,0 +1,119 @@
+{
+  "original": "9433bf650183d9b8c7efe437b1f0f002bfcc0677",
+  "candidate": "eaacbf0b9a999171e8d288f2e72b3bc3536ca973",
+  "baseline_glossary": {
+    "DP": false,
+    "BP": false,
+    "SP": false,
+    "CP": false,
+    "PG": false,
+    "API": false,
+    "CRM": false,
+    "QA": false,
+    "KPI": false
+  },
+  "candidate_glossary": {
+    "DP": true,
+    "BP": true,
+    "SP": true,
+    "CP": true,
+    "PG": true,
+    "API": true,
+    "CRM": true,
+    "QA": true,
+    "KPI": true
+  },
+  "browser_verified": false,
+  "defects": [
+    {
+      "id": "BUG-POLICY-001",
+      "scenario_ids": [
+        "PAY-01",
+        "E2E-01"
+      ],
+      "severity": "S1",
+      "priority": "P0",
+      "kind": "developer_declaration_conflict_not_runtime_proof",
+      "symptom": "FB-13의 SP→BP→DP→카드 표기가 고객 원금 우선 기준과 충돌",
+      "reproduce": [
+        "검수 상태 JSON 조회",
+        "FB-13 label과 고객 §7/최종 §4 대조"
+      ],
+      "actual": "SP",
+      "expected": "DP",
+      "owner": null,
+      "status": "API_RETEST_MATCH_UI_POLICY_PENDING",
+      "due_date": null,
+      "fixed_revision": null,
+      "retest": "PARTIAL_API_MATCH",
+      "retest_source_revision": "9433bf650183d9b8c7efe437b1f0f002bfcc0677"
+    },
+    {
+      "id": "BUG-TERM-001",
+      "scenario_ids": [
+        "MEM-10"
+      ],
+      "severity": "S3",
+      "priority": "P1",
+      "kind": "server_html_text",
+      "symptom": "고객이 지정한 전체 명칭(약어) 표기를 공개 검수 화면에서 모두 확인할 수 없음",
+      "reproduce": [
+        "검수·개발현황·앱 HTML의 본문 추출",
+        "전체 명칭(약어) 목록과 대조"
+      ],
+      "actual": {
+        "API": false,
+        "BP": false,
+        "CP": false,
+        "CRM": false,
+        "DP": false,
+        "KPI": false,
+        "PG": false,
+        "QA": false,
+        "SP": false
+      },
+      "expected": {
+        "API": true,
+        "BP": true,
+        "CP": true,
+        "CRM": true,
+        "DP": true,
+        "KPI": true,
+        "PG": true,
+        "QA": true,
+        "SP": true
+      },
+      "owner": null,
+      "status": "HTML_RETEST_MATCH_BROWSER_PENDING",
+      "due_date": null,
+      "fixed_revision": null,
+      "retest": "PARTIAL_HTML_MATCH",
+      "retest_source_revision": "eaacbf0b9a999171e8d288f2e72b3bc3536ca973"
+    },
+    {
+      "id": "LIMIT-REVIEW-INVENTORY-001",
+      "scenario_ids": [
+        "PRD-04"
+      ],
+      "severity": "S1",
+      "priority": "P0",
+      "status": "OPEN",
+      "kind": "isolated_review_scope_limit_not_production_oversell_proof",
+      "symptom": "검수 공간별 재고 독립: 전역 마지막1석 공유 보호를 검증할 수 없음",
+      "actual": {
+        "sameWorkspaceSuccessStatuses": [
+          200,
+          409
+        ],
+        "sameWorkspaceBookings": 1,
+        "separateWorkspaceConfirmed": 2,
+        "model": "real Worker CAS; inventories are private per review workspace; no shared supplier inventory"
+      },
+      "expected": "승인된 공유 비운영 재고에서 전체 확정합계1 이하",
+      "owner": null,
+      "due_date": null,
+      "fixed_revision": null,
+      "retest": "FAIL"
+    }
+  ]
+}

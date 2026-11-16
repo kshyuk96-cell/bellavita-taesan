@@ -1,0 +1,69 @@
+{
+  "job_id": "1ad313ce9021c1b2b121b2b9fd9b20c7",
+  "state": "blocked",
+  "artifacts": [
+    {
+      "name": "actual-source-evidence.json.gz",
+      "sha": "b3e037320a41552e6880ed2638d033b633ade0f9e457277227d4e9077a3858e1",
+      "size": 31310
+    },
+    {
+      "name": "batch-summary.json",
+      "sha": "b1445680426b43ca765e70a1226984fc14778f57c12d7d4bf1e8f87efaed05e0",
+      "size": 3017
+    },
+    {
+      "name": "common-report.json.gz",
+      "sha": "83b72e6beb26d7d280aa44891414555b4e6e12c099d740b635e90bdf54959e17",
+      "size": 3514
+    },
+    {
+      "name": "customer-report.docx",
+      "sha": "b37d505317477afcf16e84025502b185c2f3f7b6effc917c4ce74698938f99ca",
+      "size": 46028
+    },
+    {
+      "name": "customer-report.json",
+      "sha": "18c4220b57b25a0886b765536e063c6fa37bfa76b757ffd48309758c99e72334",
+      "size": 61946
+    },
+    {
+      "name": "customer-report.xlsx",
+      "sha": "afdf6290dd44636b32f702e42cdb5dbdf7c9226d2a3c7c654ee71c658cbfea68",
+      "size": 29345
+    },
+    {
+      "name": "defect-retest.json",
+      "sha": "66778f1d0cca8a172a512c04ef767f6885fd2fd0f9fa54e642dc7102d3aa0401",
+      "size": 3217
+    },
+    {
+      "name": "formula-report.json",
+      "sha": "d6f3c25b7c579c0258d118afa6cc607a786a968342a12eaec3942feae0f03e24",
+      "size": 3950
+    },
+    {
+      "name": "source-candidate.patch",
+      "sha": "5fb90fd1826e4560f95c5df8ab8e71bcea5c0fee87fe6ea448531d47a7daa64e",
+      "size": 8897
+    },
+    {
+      "name": "trusted-contract.json.gz",
+      "sha": "0fa7f5be7f6501e3257569edb0992382ed2d3cd95aef339c12005f831aec1569",
+      "size": 2536
+    }
+  ],
+  "http_round_trip_verified": [
+    "actual-source-evidence.json.gz",
+    "batch-summary.json",
+    "common-report.json.gz",
+    "customer-report.docx",
+    "customer-report.json",
+    "customer-report.xlsx",
+    "defect-retest.json",
+    "formula-report.json",
+    "source-candidate.patch",
+    "trusted-contract.json.gz"
+  ],
+  "remote_server_connected": false
+}

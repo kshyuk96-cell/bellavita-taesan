@@ -147,6 +147,13 @@ class Handler(BaseHTTPRequestHandler):
                     data = self.body()
                     return self.respond(200, {'ok': True, 'job': jobs.receive(
                         token, data['approval'], data['request_key'], data['task'])})
+                artifacts = re.fullmatch(r'/v1/qa/jobs/([a-f0-9]{32})/artifacts(?:/([a-zA-Z0-9_.-]+))?', parsed.path)
+                if method == 'GET' and artifacts:
+                    from .hope_registered_runtime import HopeArtifacts
+                    key, name = artifacts.groups()
+                    repository = HopeArtifacts(store)
+                    return self.respond(200, {'ok': True, 'artifact': repository.get(token,key,name)} if name else
+                        {'ok': True, 'artifacts': repository.list(token,key)})
                 match = re.fullmatch(r'/v1/qa/jobs/([a-f0-9]{32})(?:/(claim|cancel|result|execution|uncertain|reconcile))?', parsed.path)
                 if match:
                     key, action = match.groups()
