@@ -93,5 +93,5 @@ def document(report,path):
     for policy in report['policy_decisions_pending']:doc.add_paragraph(policy+' — 정책결정 대기')
     doc.add_paragraph('실제 이용자 참여 0명. 성공률·소요시간·도움요청 미측정. 브라우저/실기기·UI 영상·실제 PG 연동은 미실시.')
     doc.add_paragraph('참조 문서 SHA-256: '+', '.join(report['reference_documents']))
-    doc.add_paragraph('엔진 '+report['engine_revision']+' / 대상 '+report['sut_revision']+' / 정책 '+report['policy_version'])
+    doc.add_paragraph('엔진 '+report['engine_revision']+' / 대상 '+(text(report['sut_revision']) or '미확인')+' / 정책 '+report['policy_version'])
     doc.save(path)
