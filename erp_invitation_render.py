@@ -147,6 +147,9 @@ def message(v,kind,price,url):
 
 def page(v,kind,price,order_url,sample,hero,og,url,preview=False):
     if kind=='event':return event_page(v,price,order_url,sample,og,url,preview)
+    if isinstance(sample,dict):
+        import erp_invitation_auto
+        return erp_invitation_auto.page(__import__(__name__),v,price,order_url,sample,hero,og,url)
     e=lambda s:html.escape(str(s),quote=True)
     title,greeting,sign,ogtitle=words(v,kind);when,date,clock=date_words(v)
     original=f'<a class="action original" href="{e(v["sourceUrl"])}">{"모바일 청첩장" if kind=="wedding" else "원본 초대장"} 보러가기</a>' if v.get('sourceUrl') else ''

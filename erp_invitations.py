@@ -198,6 +198,10 @@ class Engine:
                 for tail in ('Name','Parents','Relation'):values[side+tail]=fields.get(side+'_'+tail.lower(),'')
             warnings_out.append('원본을 모두 읽지 못했습니다. 누락된 항목만 보완해 주세요. 원본 링크는 유지했습니다.')
         values=clean_values(values)
+        if data['kind']=='wedding' and data.get('automatic') is True:
+            import erp_invitation_auto
+            values,photo_warnings=erp_invitation_auto.select_photos(self,values)
+            warnings_out.extend(photo_warnings)
         if data['kind']=='event' and not values['host']:
             labelled=re.search(r'(?:주최(?:\s*측)?|주관)\s*[:：]\s*([^\n.;。]{1,100})',source)
             if labelled:values['host']=labelled.group(1).strip()
@@ -279,7 +283,9 @@ class Engine:
         warnings_out=[]
         if len(set(hashes.values()))<len(hashes):warnings_out.append('사진 중복이 있습니다. 대표·제작 액자·족자의 사진 구성을 확인하세요.')
         if kind=='event' and not photos.get('logo'):warnings_out.append('로고·행사 이미지가 없어 행사명으로 시안을 구성했습니다. 설치 예시를 확인하세요.')
-        return {'status':'done','items':items,'fingerprint':fingerprint,'expires':expires,'warnings':warnings_out}, {'sample.webp':sample,'hero.webp':hero,'thumbnail.jpg':og,'layout.json':json.dumps(boxes,ensure_ascii=False).encode()}
+        import erp_invitation_auto
+        parts=erp_invitation_auto.components(render,v,kind,photos,image)
+        return {'status':'done','items':items,'fingerprint':fingerprint,'expires':expires,'warnings':warnings_out}, {'reference-components.json':json.dumps(parts).encode(),'sample.webp':sample,'hero.webp':hero,'thumbnail.jpg':og,'layout.json':json.dumps(boxes,ensure_ascii=False).encode()}
 
     def recover_publication(self,row,data):
         """Recover the completed filesystem commit if the process died before journal commit."""
@@ -323,7 +329,7 @@ class Engine:
                         if raw:(folder/name).write_bytes(raw)
                     if action=='preview':
                         v=data['values'];sample=render.data_image(assets['sample.webp']);hero=render.data_image(assets['hero.webp']) if assets['hero.webp'] else ''
-                        (folder/'preview.html').write_text(render.page(v,data['kind'],93500,'#',sample,hero,render.data_image(assets['thumbnail.jpg'],'image/jpeg'),'about:blank',preview=True),encoding='utf-8')
+                        (folder/'preview.html').write_text(render.page(v,data['kind'],93500,'#',json.loads(assets['reference-components.json']) if data['kind']=='wedding' else sample,hero,render.data_image(assets['thumbnail.jpg'],'image/jpeg'),'about:blank',preview=True),encoding='utf-8')
                     else:
                         with self.db() as db:previous=db.execute("SELECT * FROM jobs WHERE id=? AND action='preview' AND state='done'",(data.get('previewRequestId'),)).fetchone()
                         if not previous or previous['invitation_id']!=data['invitationId'] or previous['version']!=data['version'] or json.loads(previous['result']).get('fingerprint')!=data.get('fingerprint') or result['fingerprint']!=data.get('fingerprint'):raise ValueError('상품 또는 사진이 변경됐습니다. 현재 버전을 다시 미리보기하세요.')
@@ -335,7 +341,7 @@ class Engine:
                         items=[]
                         for item in result['items']:
                             price=item['price'];url=origin+f'/{price}.html'
-                            page=render.page(data['values'],data['kind'],price,item['orderUrl'],origin+'/sample.webp',origin+'/hero.webp' if assets['hero.webp'] else '',origin+'/thumbnail.jpg',url)
+                            page=render.page(data['values'],data['kind'],price,item['orderUrl'],json.loads(assets['reference-components.json']) if data['kind']=='wedding' else origin+'/sample.webp',origin+'/hero.webp' if assets['hero.webp'] else '',origin+'/thumbnail.jpg',url)
                             (public/f'{price}.html').write_text(page,encoding='utf-8')
                             items.append({**item,'url':url,'message':render.message(data['values'],data['kind'],price,url)})
                         result={**result,'items':items,'jobId':row['public_id'],'thumbnail':origin+'/thumbnail.jpg'}
@@ -377,19 +383,20 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
     if public and method in ('GET','HEAD'):
         status,mime,raw=engine(root,origin,legacy,extract).public(*public.groups())
         handler.send_response(status);handler.send_header('Cache-Control','public, max-age=300' if status==200 else 'no-store')
-        handler.send_header('Content-Security-Policy',"default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'");handler.send_header('X-Content-Type-Options','nosniff');handler.send_header('Referrer-Policy','no-referrer')
+        handler.send_header('Content-Security-Policy',"default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'");handler.send_header('X-Content-Type-Options','nosniff');handler.send_header('Referrer-Policy','no-referrer')
         if mime:handler.send_header('Content-Type',mime)
         handler.end_headers()
         if raw and method!='HEAD':handler.wfile.write(raw)
         return True
     # Distinct token: existing invitation API / Kakao credentials remain unchanged.
     token=os.getenv('ERP_INVITATION_TOKEN','')
-    if not token or not hmac.compare_digest(handler.headers.get('Authorization',''),'Bearer '+token):
+    tokens=[v for v in (token,os.getenv('ERP_AUTOMATION_TOKEN','')) if v]
+    if not any(hmac.compare_digest(handler.headers.get('Authorization',''),'Bearer '+v) for v in tokens):
         handler.send_json({'error':'초대장 서버 인증이 필요합니다.'},401);return True
     if path=='/erp/invitations/capabilities' and method=='GET':
         hashes={name:hashlib.sha256((render.ASSETS/name).read_bytes()).hexdigest() for name in TEMPLATE_HASHES if (render.ASSETS/name).is_file()}
         model=os.getenv('TAESAN_MODEL','')
-        handler.send_json({'bridgeVersion':1,'templatesReady':hashes==TEMPLATE_HASHES,'templateHashes':hashes,
+        handler.send_json({'bridgeVersion':2,'oneClickPhotoSelection':True,'referenceLayout':'geonuk-jiwon','templatesReady':hashes==TEMPLATE_HASHES,'templateHashes':hashes,
                            'storagePersistent':Path(os.getenv('ERP_INVITATION_DATA') or root).resolve().is_relative_to(Path('/var/data')),'templateProductConfigured':bool(os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID')),'autoCopyConfigured':os.getenv('BLOGPAY_INVITATION_AUTO_CREATE')=='1','openaiConfigured':bool(os.getenv('OPENAI_API_KEY')),'blogpayConfigured':bool(os.getenv('BLOGPAY_SHOP_ID') and os.getenv('BLOGPAY_API_TOKEN')),
                            'textModel':model if re.fullmatch(r'(?:gpt-|o[134])[a-zA-Z0-9_.:-]{1,90}',model) else '',
                            'transcriptionModel':os.getenv('TAESAN_TRANSCRIBE_MODEL') or 'gpt-4o-mini-transcribe'})
@@ -410,6 +417,16 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
     if erp_ai.dispatch(handler,method,path):return True
     worker=engine(root,origin,legacy,extract)
     try:
+        if method=='GET' and path=='/erp/invitations/template-candidates':
+            from blogpay import BlogPay
+            client=BlogPay(os.getenv('BLOGPAY_SHOP_ID',''),os.getenv('BLOGPAY_API_TOKEN',''))
+            configured=os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID','').strip()
+            if configured:items=[worker.template_check(configured,client)]
+            else:
+                rows=list(client.products(all_pages=True))
+                candidates=[r for r in rows if '쌀빛그림화환' in r.get('goodName','') and str(r.get('isShow'))=='0' and str(r.get('isRecommend'))=='0'][:12]
+                items=[worker.template_check(str(r['goodNum']),client) for r in candidates]
+            handler.send_json({'items':items,'configured':configured or None});return True
         if method=='POST' and path=='/erp/invitations/template-check':
             size=int(handler.headers.get('Content-Length','0'))
             if not 0<size<=1000:raise ValueError('원본 상품 번호 입력을 확인하세요.')
