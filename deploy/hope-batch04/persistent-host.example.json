@@ -1,0 +1,16 @@
+{
+  "schema": "hope-persistent-host-example/v1",
+  "environment": "isolated_nonproduction",
+  "project": "hope-tour",
+  "database": "/approved/nonproduction/hope-manager/manager.sqlite",
+  "source": "/approved/clean/hope-source-candidate",
+  "adapter_release": "shared-fixture-persistent-manager-v1",
+  "source_profile": "deploy/hope-batch04/source-profile.json",
+  "inventory_contract": "deploy/hope-batch04/inventory-contract.json",
+  "credential_input": "trusted local bootstrap in memory; no raw token file/argument/log",
+  "listen": "127.0.0.1 only",
+  "operational_deployment": false,
+  "supplier_connected": false,
+  "real_pg": false,
+  "restart_policy": "inspect owned running job; reconciliation_required; never auto replay"
+}

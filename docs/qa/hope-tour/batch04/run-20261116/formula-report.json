@@ -1,0 +1,811 @@
+{
+  "source_revision": "6f0d7fc1a7a0b328edaa36568a8522edc86e196f",
+  "stock": [
+    {
+      "id": "atomic",
+      "expression": "available+sum(quantity-released)=capacity",
+      "variables": {
+        "available": 1,
+        "allocated": 0
+      },
+      "units": "TEST room",
+      "rounding": "exact integer",
+      "expected": 1,
+      "actual": 1,
+      "status": "PASS",
+      "approval": "approved QA fixture only; supplier not connected"
+    },
+    {
+      "id": "cancel",
+      "expression": "available+sum(quantity-released)=capacity",
+      "variables": {
+        "available": 1,
+        "allocated": 0
+      },
+      "units": "TEST room",
+      "rounding": "exact integer",
+      "expected": 1,
+      "actual": 1,
+      "status": "PASS",
+      "approval": "approved QA fixture only; supplier not connected"
+    },
+    {
+      "id": "different-members",
+      "expression": "available+sum(quantity-released)=capacity",
+      "variables": {
+        "available": 0,
+        "allocated": 1
+      },
+      "units": "TEST room",
+      "rounding": "exact integer",
+      "expected": 1,
+      "actual": 1,
+      "status": "PASS",
+      "approval": "approved QA fixture only; supplier not connected"
+    },
+    {
+      "id": "duplicate",
+      "expression": "available+sum(quantity-released)=capacity",
+      "variables": {
+        "available": 0,
+        "allocated": 1
+      },
+      "units": "TEST room",
+      "rounding": "exact integer",
+      "expected": 1,
+      "actual": 1,
+      "status": "PASS",
+      "approval": "approved QA fixture only; supplier not connected"
+    },
+    {
+      "id": "expiry",
+      "expression": "available+sum(quantity-released)=capacity",
+      "variables": {
+        "available": 0,
+        "allocated": 1
+      },
+      "units": "TEST room",
+      "rounding": "exact integer",
+      "expected": 1,
+      "actual": 1,
+      "status": "PASS",
+      "approval": "approved QA fixture only; supplier not connected"
+    },
+    {
+      "id": "generation",
+      "expression": "available+sum(quantity-released)=capacity",
+      "variables": {
+        "available": 1,
+        "allocated": 0
+      },
+      "units": "TEST room",
+      "rounding": "exact integer",
+      "expected": 1,
+      "actual": 1,
+      "status": "PASS",
+      "approval": "approved QA fixture only; supplier not connected"
+    },
+    {
+      "id": "partial",
+      "expression": "available+sum(quantity-released)=capacity",
+      "variables": {
+        "available": 0,
+        "allocated": 2
+      },
+      "units": "TEST room",
+      "rounding": "exact integer",
+      "expected": 2,
+      "actual": 2,
+      "status": "PASS",
+      "approval": "approved QA fixture only; supplier not connected"
+    },
+    {
+      "id": "race",
+      "expression": "available+sum(quantity-released)=capacity",
+      "variables": {
+        "available": 0,
+        "allocated": 1
+      },
+      "units": "TEST room",
+      "rounding": "exact integer",
+      "expected": 1,
+      "actual": 1,
+      "status": "PASS",
+      "approval": "approved QA fixture only; supplier not connected"
+    },
+    {
+      "id": "travel-balance",
+      "expression": "available+sum(quantity-released)=capacity",
+      "variables": {
+        "available": 1,
+        "allocated": 0
+      },
+      "units": "TEST room",
+      "rounding": "exact integer",
+      "expected": 1,
+      "actual": 1,
+      "status": "PASS",
+      "approval": "approved QA fixture only; supplier not connected"
+    },
+    {
+      "id": "travel-deposit",
+      "expression": "available+sum(quantity-released)=capacity",
+      "variables": {
+        "available": 1,
+        "allocated": 0
+      },
+      "units": "TEST room",
+      "rounding": "exact integer",
+      "expected": 1,
+      "actual": 1,
+      "status": "PASS",
+      "approval": "approved QA fixture only; supplier not connected"
+    }
+  ],
+  "money": [
+    {
+      "id": "duplicate-0-DP",
+      "expression": "DP=min(total,paid_principal)",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 600000,
+      "actual": 600000,
+      "status": "PASS"
+    },
+    {
+      "id": "duplicate-0-BP",
+      "expression": "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 100000,
+      "actual": 100000,
+      "status": "PASS"
+    },
+    {
+      "id": "duplicate-0-SP",
+      "expression": "SP=min(total-DP-BP,special_available)",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 100000,
+      "actual": 100000,
+      "status": "PASS"
+    },
+    {
+      "id": "duplicate-0-CP",
+      "expression": "0; CP operational policy pending",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "duplicate-0-card",
+      "expression": "card=total-DP-BP-SP",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 200000,
+      "actual": 200000,
+      "status": "PASS"
+    },
+    {
+      "id": "partial-0-DP",
+      "expression": "DP=min(total,paid_principal)",
+      "variables": {
+        "total": 2000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 600000,
+      "actual": 600000,
+      "status": "PASS"
+    },
+    {
+      "id": "partial-0-BP",
+      "expression": "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+      "variables": {
+        "total": 2000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 150000,
+      "actual": 150000,
+      "status": "PASS"
+    },
+    {
+      "id": "partial-0-SP",
+      "expression": "SP=min(total-DP-BP,special_available)",
+      "variables": {
+        "total": 2000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 100000,
+      "actual": 100000,
+      "status": "PASS"
+    },
+    {
+      "id": "partial-0-CP",
+      "expression": "0; CP operational policy pending",
+      "variables": {
+        "total": 2000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "partial-0-card",
+      "expression": "card=total-DP-BP-SP",
+      "variables": {
+        "total": 2000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 1150000,
+      "actual": 1150000,
+      "status": "PASS"
+    },
+    {
+      "id": "partial-1-DP",
+      "expression": "DP=min(total,paid_principal)",
+      "variables": {
+        "total": 2000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 600000,
+      "actual": 600000,
+      "status": "PASS"
+    },
+    {
+      "id": "partial-1-BP",
+      "expression": "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+      "variables": {
+        "total": 2000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 150000,
+      "actual": 150000,
+      "status": "PASS"
+    },
+    {
+      "id": "partial-1-SP",
+      "expression": "SP=min(total-DP-BP,special_available)",
+      "variables": {
+        "total": 2000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 100000,
+      "actual": 100000,
+      "status": "PASS"
+    },
+    {
+      "id": "partial-1-CP",
+      "expression": "0; CP operational policy pending",
+      "variables": {
+        "total": 2000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "partial-1-card",
+      "expression": "card=total-DP-BP-SP",
+      "variables": {
+        "total": 2000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 1150000,
+      "actual": 1150000,
+      "status": "PASS"
+    },
+    {
+      "id": "travel-deposit-0-DP",
+      "expression": "DP=min(total,paid_principal)",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 50000,
+        "bonus_available": 25000,
+        "special_available": 0,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 50000,
+      "actual": 50000,
+      "status": "PASS"
+    },
+    {
+      "id": "travel-deposit-0-BP",
+      "expression": "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 50000,
+        "bonus_available": 25000,
+        "special_available": 0,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 25000,
+      "actual": 25000,
+      "status": "PASS"
+    },
+    {
+      "id": "travel-deposit-0-SP",
+      "expression": "SP=min(total-DP-BP,special_available)",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 50000,
+        "bonus_available": 25000,
+        "special_available": 0,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "travel-deposit-0-CP",
+      "expression": "0; CP operational policy pending",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 50000,
+        "bonus_available": 25000,
+        "special_available": 0,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "travel-deposit-0-card",
+      "expression": "card=total-DP-BP-SP",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 50000,
+        "bonus_available": 25000,
+        "special_available": 0,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 925000,
+      "actual": 925000,
+      "status": "PASS"
+    },
+    {
+      "id": "travel-balance-0-DP",
+      "expression": "DP=min(total,paid_principal)",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 600000,
+      "actual": 600000,
+      "status": "PASS"
+    },
+    {
+      "id": "travel-balance-0-BP",
+      "expression": "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 100000,
+      "actual": 100000,
+      "status": "PASS"
+    },
+    {
+      "id": "travel-balance-0-SP",
+      "expression": "SP=min(total-DP-BP,special_available)",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 100000,
+      "actual": 100000,
+      "status": "PASS"
+    },
+    {
+      "id": "travel-balance-0-CP",
+      "expression": "0; CP operational policy pending",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 0,
+      "actual": 0,
+      "status": "PASS"
+    },
+    {
+      "id": "travel-balance-0-card",
+      "expression": "card=total-DP-BP-SP",
+      "variables": {
+        "total": 1000000,
+        "paid_principal": 600000,
+        "bonus_available": 150000,
+        "special_available": 100000,
+        "bonus_cap_bps": 1000,
+        "signup_fee_excluded": true
+      },
+      "calculation_order": [
+        "DP=min(total,paid_principal)",
+        "BP=min(total-DP,bonus_available,total*bonus_cap_bps//10000)",
+        "SP=min(total-DP-BP,special_available)",
+        "card=total-DP-BP-SP"
+      ],
+      "units": "KRW / point TEST 1:1",
+      "rounding": "exact integer fixture; BP cap floor",
+      "condition": "U04/P02 or U10/P02; full simulator payment; cancellation fee zero TEST assumption",
+      "policy_approval": "customer example only; operational approval pending",
+      "expected": 200000,
+      "actual": 200000,
+      "status": "PASS"
+    }
+  ],
+  "fault_injection": [
+    {
+      "id": "free-stock-corruption",
+      "detected": true,
+      "issues": [
+        "inventory_conservation:different-members"
+      ],
+      "target_detected": null
+    },
+    {
+      "id": "duplicate-debit",
+      "detected": true,
+      "issues": [
+        "duplicate_journal_source"
+      ],
+      "target_detected": false
+    },
+    {
+      "id": "excess-refund",
+      "detected": true,
+      "issues": [
+        "excess_refund_source",
+        "excess_refund_total",
+        "full_refund_source_mismatch",
+        "refund_journal_mismatch"
+      ],
+      "target_detected": true
+    },
+    {
+      "id": "unbalanced-journal",
+      "detected": true,
+      "issues": [
+        "unbalanced_journal"
+      ],
+      "target_detected": true
+    }
+  ],
+  "domain_issues": [],
+  "supplier_connected": false
+}

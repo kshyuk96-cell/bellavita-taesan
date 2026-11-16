@@ -1,0 +1,74 @@
+{
+  "job_id": "a4d54eb365fac782466c2b5846d23e53",
+  "state": "blocked",
+  "sealed": {
+    "artifacts": [
+      {
+        "name": "actual-source-evidence.json.gz",
+        "sha": "31bfb1d69d292852bf5b6279b946658059f4056fcdfd172613c2ac399739d46e",
+        "size": 44064
+      },
+      {
+        "name": "batch-summary.json",
+        "sha": "a6c04d48b85b338eeac315363127e3e0e46e434ce093a7f3448e148fe720b21e",
+        "size": 3264
+      },
+      {
+        "name": "common-report.json.gz",
+        "sha": "b1a133ca7e3871fe71f8c45dfc562eac0b7a2ddcb14a937b3bed5e564d929b23",
+        "size": 3364
+      },
+      {
+        "name": "customer-report.docx",
+        "sha": "522339f5b79a982204454afe2016faf45d007c98e8b4978cd3f6357534e57ab3",
+        "size": 46374
+      },
+      {
+        "name": "customer-report.json",
+        "sha": "59df60401da94433cf77b42ea7faf652f8fb74982b0474eb597814f52b34a0e6",
+        "size": 61352
+      },
+      {
+        "name": "customer-report.xlsx",
+        "sha": "21096b76bf6a98de5e060797c9f21f6716adf4ef37fe34106bcae6f4a89ba17f",
+        "size": 31842
+      },
+      {
+        "name": "defect-retest.json",
+        "sha": "b022ffc84093e4e0aca40bcee575a8c8f07ce4c95acb9eaa1e8f15ee9f921dc9",
+        "size": 3860
+      },
+      {
+        "name": "formula-report.json",
+        "sha": "83e8ed86ca45f94f025c4b15ed939a56222dc3363882f650782316fcfe57cff0",
+        "size": 27450
+      },
+      {
+        "name": "source-candidate.patch",
+        "sha": "2cd1d670d87f3e43e78fd19396a9e94c6a4d78079a859b6bd921892c26b3d4bc",
+        "size": 24017
+      },
+      {
+        "name": "trusted-contract.json.gz",
+        "sha": "50992960c17c58ffc9ebcea889b157e972ecba2406359ddccab6027c26b665e7",
+        "size": 2432
+      }
+    ],
+    "manifest_digest": "5e676cb6ffa938433d1c5b0f98dd8392a2a9f44769779f9b8e275f691e76577b",
+    "sealed": true
+  },
+  "after_process_restart_verified": [
+    "actual-source-evidence.json.gz",
+    "batch-summary.json",
+    "common-report.json.gz",
+    "customer-report.docx",
+    "customer-report.json",
+    "customer-report.xlsx",
+    "defect-retest.json",
+    "formula-report.json",
+    "source-candidate.patch",
+    "trusted-contract.json.gz"
+  ],
+  "raw_tokens_persisted": false,
+  "remote_server_connected": false
+}

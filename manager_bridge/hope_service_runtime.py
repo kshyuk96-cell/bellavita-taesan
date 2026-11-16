@@ -68,15 +68,24 @@ def prepare(profile,root,adapter_root):
         input_source_revision=profile.revision,bundle_digest=hashlib.sha256((root/'sut.bundle.mjs').read_bytes()).hexdigest())
 
 
-def execute_actual_service(profile,adapter_root,*,timeout=90,entrypoint="run.mjs",heartbeat=None):
-    if entrypoint not in ("run.mjs","run-batch03.mjs"):raise ValueError("registered entrypoint required")
+def execute_actual_service(profile,adapter_root,*,timeout=90,entrypoint="run.mjs",heartbeat=None,exchange=None,inventory_contract=None,role="main"):
+    if entrypoint not in ("run.mjs","run-batch03.mjs","run-batch04.mjs"):raise ValueError("registered entrypoint required")
     if type(timeout) is not int or not 1<=timeout<=120:raise ValueError('bounded execution required')
+    if entrypoint=='run-batch04.mjs':
+        from .hope_shared_inventory import validate_contract,check_exchange
+        if role not in ('main','race-a','race-b'):raise ValueError('registered execution role required')
+        inventory_pin=validate_contract(inventory_contract,profile.revision)
+        exchange=check_exchange(exchange,inventory_pin)
+    elif exchange is not None or inventory_contract is not None or role!='main':raise ValueError('shared data only for registered batch04 entrypoint')
     profile.source_check()
     # Only an already-prepared pinned image; execution never pulls another image.
     image=subprocess.run(['docker','image','inspect',profile.image],env=_docker_env(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
     if image.returncode:raise Conflict('approved Node image unavailable')
     with tempfile.TemporaryDirectory(prefix='hope-real-source-') as folder:
         root=Path(folder);pin=prepare(profile,root,Path(adapter_root))
+        if exchange is not None:
+            cfg=json.loads((root/'config.json').read_text());cfg.update(inventory_contract=inventory_contract,inventory_digest=inventory_pin,role=role)
+            (root/'config.json').write_text(json.dumps(cfg));(root/'config.json').chmod(0o644)
         name='hope-qa-'+uuid.uuid4().hex
         args=['docker','run','--rm','--name',name,'--pull','never','--network','none','--read-only',
           '--cap-drop','ALL','--security-opt','no-new-privileges','--user','65534:65534',
@@ -85,6 +94,10 @@ def execute_actual_service(profile,adapter_root,*,timeout=90,entrypoint="run.mjs
           '--ulimit','fsize=67108864:67108864','--mount','type=bind,source='+str(root)+',target=/input,readonly',
           profile.image,'node','--max-old-space-size=384','--permission',
           '--allow-fs-read=/input','--allow-fs-read=/tmp','--allow-fs-write=/tmp','/input/'+entrypoint]
+        if exchange is not None:
+            position=args.index(profile.image)
+            args[position:position]=['--mount','type=bind,source='+str(exchange)+',target=/exchange']
+            args[-1:-1]=['--allow-fs-read=/exchange','--allow-fs-write=/exchange']
         started=time.monotonic()
         if heartbeat:heartbeat()
         try:
@@ -105,7 +118,7 @@ def execute_actual_service(profile,adapter_root,*,timeout=90,entrypoint="run.mjs
             report['source_provenance']=pin
             report['runtime_provenance']=dict(image=profile.image,network='none',read_only=True,user=65534,
                 node_heap_mib=384,cpu_rlimit_seconds=35,cgroup_memory_enforced=False,
-                arbitrary_host_execution=False,elapsed_seconds=round(time.monotonic()-started,3))
+                arbitrary_host_execution=False,container_name=name,execution_role=role,shared_fixture_mount=exchange is not None,elapsed_seconds=round(time.monotonic()-started,3))
             return report
         finally:
             subprocess.run(['docker','rm','-f',name],env=_docker_env(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
