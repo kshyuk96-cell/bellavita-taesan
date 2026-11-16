@@ -1,0 +1,22 @@
+services:
+  - type: worker
+    name: bellavita-erp-production
+    runtime: docker
+    repo: https://github.com/kshyuk96-cell/bellavita-taesan
+    branch: codex/erp-production-bootstrap-20261116
+    dockerfilePath: ./deploy/erp-production/Dockerfile
+    dockerContext: ./deploy/erp-production
+    plan: 0.5c-512mb
+    region: singapore
+    numInstances: 1
+    autoDeployTrigger: 'off'
+    maxShutdownDelaySeconds: 300
+    envVars:
+      - key: ERP_BASE_URL
+        sync: false
+      - key: ERP_SITE_TOKEN
+        sync: false
+      - key: ERP_WORKER_KEY
+        sync: false
+      - key: ERP_RUNTIME_SHA256
+        sync: false
