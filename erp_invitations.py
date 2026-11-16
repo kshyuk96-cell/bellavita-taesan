@@ -242,7 +242,9 @@ class Engine:
             if set(rows)!=set(PRICES):
                 template=os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID','').strip()
                 pinned=os.getenv('BLOGPAY_INVITATION_TEMPLATE_FINGERPRINT','').strip()
-                if os.getenv('BLOGPAY_INVITATION_AUTO_CREATE')!='1' or not template or not pinned:
+                if os.getenv('BLOGPAY_INVITATION_AUTO_CREATE')!='1':
+                    raise ValueError('신규 상품 자동 생성은 주소 입력 조건 검증으로 중지되어 있습니다. 이미 등록된 두 가격 상품은 연결할 수 있습니다.')
+                if not template or not pinned:
                     raise ValueError('해당 행사명의 두 가격 상품이 없습니다. 검증한 복제 원본 상품 번호를 지정해 주세요.')
                 check=self.template_check(template,client)
                 if not check['eligible'] or check['fingerprint']!=pinned:raise ValueError('복제 원본 설정이 검증값과 다릅니다. 원본을 다시 확인해 주세요.')
@@ -438,34 +440,6 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
                     if len(items)>=12:break
                 # Detailed image/settings fingerprints are fetched only for the selected source.
             handler.send_json({'items':items,'configured':configured or None});return True
-        reconcile=re.fullmatch(r'/erp/invitations/jobs/([\w-]{10,100})/reconcile-products',path)
-        if method=='POST' and reconcile:
-            from blogpay import BlogPay
-            with worker.db() as db:row=db.execute('SELECT * FROM jobs WHERE id=?',(reconcile[1],)).fetchone()
-            if not row or row['state'] not in ('done','error'):raise ValueError('완료된 작업 원장을 먼저 확인하세요.')
-            data=json.loads(row['input']);title=render.product_name(data['values'],data['kind'])
-            client=BlogPay(os.getenv('BLOGPAY_SHOP_ID',''),os.getenv('BLOGPAY_API_TOKEN',''))
-            source_id=os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID','')
-            with worker.legacy.PRODUCT_LOCK:
-                check=worker.template_check(source_id,client)
-                if not check['eligible'] or check['fingerprint']!=os.getenv('BLOGPAY_INVITATION_TEMPLATE_FINGERPRINT'):raise ValueError('원본 검증값을 확인하세요.')
-                source=client.detail(source_id);items=[]
-                with sqlite3.connect(worker.root/'invitation_products.sqlite3') as db:
-                    for price in PRICES:
-                        key=hashlib.sha256(f'{title}\0{price}'.encode()).hexdigest()
-                        record=db.execute('SELECT number FROM copies WHERE key=?',(key,)).fetchone()
-                        if not record or not record[0] or str(record[0])==str(source_id):raise ValueError('확정된 복사본 원장이 필요합니다.')
-                        item=client.detail(record[0])
-                        if item.get('goodName')!=title or int(item.get('goodPrice',0))!=price:raise ValueError('복사본 이름과 가격을 확인하세요.')
-                        client.set_sale(item,False)
-                        if os.getenv('ERP_INVITATION_REPAIR_ZERO')=='1':
-                            candidate={**item,'isDeliveryPrice':source.get('isDeliveryPrice')}
-                            if not client.same_settings(candidate,source):raise ValueError('주소 이외의 설정이 다릅니다.')
-                            try:client.edit_copy(candidate,title,price)
-                            except RuntimeError:pass
-                        current=client.detail(record[0])
-                        items.append({'productId':str(record[0]),'price':price,'addressMatches':current.get('isDeliveryPrice')==source.get('isDeliveryPrice'),'settingsMatch':client.same_settings(current,source),'saleStopped':str(current.get('isShow'))=='0'})
-                handler.send_json({'items':items,'allMatched':all(x['settingsMatch'] and x['addressMatches'] and x['saleStopped'] for x in items)});return True
         diagnostic=re.fullmatch(r'/erp/invitations/jobs/([\w-]{10,100})/diagnostics',path)
         if method=='GET' and diagnostic:
             with worker.db() as db:row=db.execute('SELECT * FROM jobs WHERE id=?',(diagnostic[1],)).fetchone()

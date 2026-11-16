@@ -1,7 +1,7 @@
 import unittest
 from blogpay import BlogPay
 class DeliveryPreservation(unittest.TestCase):
- def test_explicit_new_policy_compares_effective_delivery_not_old_read_only_flag(self):
+ def test_matching_policy_never_weakens_checkout_address_requirement(self):
   client=BlogPay('example','fixture')
   source={'shipSubNum':42,'isDelivery':0,'isDeliveryPrice':0,'isTodayShipUse':'N','todayShipTime':'00:00:00'}
   copy={**source,'isDeliveryPrice':1,'isTodayShipUse':None,'todayShipTime':None}

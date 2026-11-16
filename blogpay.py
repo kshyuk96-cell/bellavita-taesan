@@ -142,9 +142,6 @@ class BlogPay:
                       taxType=item.get('gTaxType', 'TG01'),
                       useInputOption=int(bool(item.get('inputOption'))),
                       sDate=item.get('SDate') or '', eDate=item.get('EDate') or '')
-        # Encode zero as a non-empty numeric string for vendor PHP forms.
-        if item.get('isDeliveryPrice') is not None:
-            fields['isDeliveryPrice']='00' if str(item['isDeliveryPrice'])=='0' else str(item['isDeliveryPrice'])
         fields['enablePayMethod[]'] = [flag for flag in PAYMENT_FLAGS if int(item['enablePayMethod']) & flag]
         for option in item.get('normalOption') or []:
             group = int(option['goodsNormalOptionNum'])
