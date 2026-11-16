@@ -351,6 +351,9 @@ class Engine:
             result={**result,'requestId':key}
             with self.db() as db:db.execute('UPDATE jobs SET state=?,result=? WHERE id=?',('done',json.dumps(result,ensure_ascii=False),key))
         except Exception as error:
+            import traceback
+            frames=[{'file':Path(f.filename).name,'line':f.lineno,'function':f.name} for f in traceback.extract_tb(error.__traceback__)[-6:]]
+            print(json.dumps({'event':'ERP_INVITATION_FAILURE','requestId':key,'errorType':type(error).__name__,'frames':frames}),flush=True)
             result={'requestId':key,'status':'error','error':str(error)[:500] if isinstance(error,ValueError) else '제작 서버 연결 또는 원본 자료를 확인해 주세요.'}
             with self.db() as db:db.execute('UPDATE jobs SET state=?,result=? WHERE id=?',('error',json.dumps(result,ensure_ascii=False),key))
         finally:
@@ -430,6 +433,19 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
                     if len(items)>=12:break
                 # Detailed image/settings fingerprints are fetched only for the selected source.
             handler.send_json({'items':items,'configured':configured or None});return True
+        diagnostic=re.fullmatch(r'/erp/invitations/jobs/([\w-]{10,100})/diagnostics',path)
+        if method=='GET' and diagnostic:
+            with worker.db() as db:row=db.execute('SELECT * FROM jobs WHERE id=?',(diagnostic[1],)).fetchone()
+            if not row:handler.send_json({'error':'작업 없음'},404);return True
+            data=json.loads(row['input']);title=render.product_name(data['values'],data['kind'])
+            copies=[];ledger=worker.root/'invitation_products.sqlite3'
+            if ledger.is_file():
+                with sqlite3.connect(ledger) as db:
+                    for price in PRICES:
+                        copy_key=hashlib.sha256(f'{title}\0{price}'.encode()).hexdigest()
+                        record=db.execute('SELECT number,before FROM copies WHERE key=?',(copy_key,)).fetchone()
+                        copies.append({'price':price,'recorded':bool(record),'productId':record[0] if record else None,'baselineProductCount':len(json.loads(record[1])) if record else None})
+            handler.send_json({'requestId':diagnostic[1],'state':row['state'],'copies':copies,'templateConfigured':bool(os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID'))});return True
         if method=='POST' and path=='/erp/invitations/template-check':
             size=int(handler.headers.get('Content-Length','0'))
             if not 0<size<=1000:raise ValueError('원본 상품 번호 입력을 확인하세요.')
