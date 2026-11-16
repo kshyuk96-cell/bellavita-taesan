@@ -5,6 +5,7 @@ or claim arbitrary UI chats are connected. Registered handlers must use ThreeTie
 for every transition. A callback receipt alone cannot confirm technical acceptance.
 """
 from dataclasses import dataclass,asdict
+from contextlib import nullcontext
 import json
 import math
 import threading
@@ -76,10 +77,20 @@ class ActionReceipt:
 
 
 class ContinuousManager:
-    def __init__(self,core,*,handlers=None,max_attempts=8):
+    def __init__(self,core,*,handlers=None,max_attempts=8,admission_budget=None):
         if not isinstance(core,ThreeTier):raise ValueError('registered ThreeTier core required')
         if type(max_attempts) is not int or not 1<=max_attempts<=20:raise ValueError('bounded retry policy required')
         self.core,self.store,self.registry=core,core.store,core.registry
+        admission_budget=admission_budget or core.admission_budget
+        if admission_budget is not None:
+            from .operating_budget import OperatingBudget
+            if not isinstance(admission_budget,OperatingBudget) or admission_budget.core is not core:
+                raise ValueError('same registered admission budget required')
+        self.admission_budget=admission_budget
+        if admission_budget is not None:
+            if core.admission_budget is not None and core.admission_budget is not admission_budget:
+                raise ValueError('core already has a different admission budget')
+            core.admission_budget=admission_budget
         self.handlers=dict(handlers or {});self.max_attempts=max_attempts
         for phase,handler in self.handlers.items():
             if phase not in PHASES or not callable(handler):raise ValueError('registered development phase handler required')
@@ -250,10 +261,18 @@ class ContinuousManager:
         if current['state']=='accepted':valid=valid and current.get('technical_accepted') is True
         return bool(valid),current['state']
 
-    def _mark_uncertain(self,key,epoch,reason):
+    def _mark_uncertain(self,key,epoch,reason,token=None):
         with self.store._transaction() as c:
             c.execute("UPDATE continuous_actions SET state='uncertain',reason=?,updated=? WHERE action_key=? AND epoch=? AND state='running'",(reason,self.store._now(),key,epoch))
             self._event(c,key,reason)
+            if self.admission_budget is not None and token is not None:
+                reservation=c.execute('SELECT id FROM operating_budget_reservations WHERE action_key=?',(key,)).fetchone()
+                if reservation:
+                    try:self.admission_budget.finish_in_transaction(c,token,reservation['id'])
+                    except Exception:
+                        # Revoked authority must not undo the uncertain journal.
+                        # A reserved admission still consumes capacity and quota.
+                        pass
 
     def tick(self,token,projects,instance_id,*,limit=1,lease_seconds=30,stop_event=None,_reconcile_key=None):
         name(instance_id)
@@ -268,6 +287,7 @@ class ContinuousManager:
             actor=self.store._authenticate(c,token);plans=self._plans(c,actor,configs,200)
         results=[]
         for request in plans:
+            reservation_id=None
             if _reconcile_key is not None and (request.phase!='reconcile' or request.prior_action_key!=_reconcile_key):continue
             if len(results)>=limit:break
             if stop_event is not None and stop_event.is_set():break
@@ -292,6 +312,20 @@ class ContinuousManager:
                 attempts=1 if old is None else old['attempts']+1
                 if attempts>self.max_attempts:
                     c.execute("UPDATE continuous_actions SET state='blocked',reason='readiness_attempt_limit',updated=? WHERE action_key=?",(now,request.action_key));continue
+                if self.admission_budget is None and request.phase in ('start','approve_next'):
+                    installed=(c.execute("SELECT 1 FROM sqlite_master WHERE name='operating_budget_policies'").fetchone() and
+                               c.execute('SELECT 1 FROM operating_budget_policies WHERE project=?',(request.project,)).fetchone())
+                    if installed:
+                        results.append({'task_id':request.next_task_id or request.task_id,'phase':request.phase,
+                            'state':'admission_paused','reason':'coordinator_missing','execution_started':False})
+                        continue
+                if self.admission_budget is not None and request.phase in ('start','approve_next'):
+                    admission=self.admission_budget.reserve_in_transaction(c,token,request.project,request.action_key,request.next_task_id or request.task_id)
+                    if admission['allowed'] is not True:
+                        results.append({'task_id':request.next_task_id or request.task_id,'phase':request.phase,
+                            'state':'admission_paused','reason':admission['reason'],'execution_started':False})
+                        continue
+                    reservation_id=admission.get('reservation_id')
                 # The write intent survives a crash between process start and receipt.
                 c.execute("INSERT OR REPLACE INTO continuous_actions VALUES (?,?,?,?,?,?,?,'running',?,?,NULL,NULL,?,?)",
                     (request.action_key,request.task_id,request.project,request.phase,canonical_json(asdict(request)),actor['token_hash'],epoch,attempts,now,old['created'] if old else now,now))
@@ -300,7 +334,9 @@ class ContinuousManager:
                 with self.store._transaction() as c:self._fence(c,token,projects,instance_id,epoch,lease_seconds,request,stop_event,nonce=nonce)
                 return True
             try:
-                heartbeat();outcome=handler(request,heartbeat)
+                heartbeat()
+                scope=self.admission_budget.execution_scope(token,request.action_key) if reservation_id is not None else nullcontext()
+                with scope:outcome=handler(request,heartbeat)
                 if not isinstance(outcome,ActionReceipt) or (outcome.action_key,outcome.task_id,outcome.phase)!=(request.action_key,request.task_id,request.phase) or not 0<=self.store._now()-outcome.observed_at<=300:raise Conflict('exact fresh action receipt required')
                 heartbeat()
                 if outcome.state=='not_ready':
@@ -320,9 +356,10 @@ class ContinuousManager:
                     if state=='confirmed' and request.phase=='reconcile' and request.prior_action_key:
                         c.execute("UPDATE continuous_actions SET state='reconciled',reason=NULL,reference=?,updated=? WHERE action_key=? AND state='uncertain'",(outcome.reference,now,request.prior_action_key))
                     self._event(c,request.action_key,'receipt_'+state,asdict(outcome))
+                    if reservation_id is not None:self.admission_budget.finish_in_transaction(c,token,reservation_id)
                 results.append({'task_id':request.task_id,'phase':request.phase,'state':state,'observed_core_state':current,'execution_started':True})
             except BaseException as error:
-                self._mark_uncertain(request.action_key,epoch,'shutdown_uncertain' if stop_event is not None and stop_event.is_set() else 'handler_uncertain')
+                self._mark_uncertain(request.action_key,epoch,'shutdown_uncertain' if stop_event is not None and stop_event.is_set() else 'handler_uncertain',token)
                 if isinstance(error,(KeyboardInterrupt,SystemExit)):raise
                 results.append({'task_id':request.task_id,'phase':request.phase,'state':'uncertain','execution_started':True})
                 # An authority/leader loss must stop this tick, not proceed to other projects.

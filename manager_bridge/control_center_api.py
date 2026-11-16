@@ -23,6 +23,9 @@ def dispatch(handler,method,path,token,body=None):
     if url.scheme or url.netloc or url.fragment:raise ValueError('relative control route required')
     if not url.path.startswith(PREFIX):return False
     route=url.path[len(PREFIX):]
+    if route.startswith('operations/'):
+        from .operations_control_api import dispatch as operations_dispatch
+        return operations_dispatch(handler,method,path,token,body)
     if method!='POST' or route not in ROUTES:return False
     if url.query:raise ValueError('POST query rejected')
     action,required,optional=ROUTES[route];args=_fields(body,required,optional)

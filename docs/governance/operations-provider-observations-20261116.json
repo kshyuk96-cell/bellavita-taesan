@@ -1,0 +1,144 @@
+{
+  "scope": "read_only_provider_metadata_not_execution_authority",
+  "observed_at": "2026-11-16T04:29:08.722Z",
+  "workspace_id": "tea-dbqjaul6e07s73fcqmo0",
+  "render_services": [
+    {
+      "id": "srv-dbsmfgoae00c738fnhjg",
+      "name": "bellavita-obituary-erp-review-bmb7",
+      "type": "web_service",
+      "branch": "codex/bellavita-review-isolation",
+      "suspended": "not_suspended",
+      "autoDeploy": "no",
+      "plan": "free",
+      "region": "singapore",
+      "hasDisk": false,
+      "updatedAt": "2026-11-15T08:09:05.563753Z",
+      "diskGB": null
+    },
+    {
+      "id": "srv-dbsmcbgae00c738ff18g",
+      "name": "signitone-pilot-zp6o",
+      "type": "web_service",
+      "branch": "main",
+      "suspended": "not_suspended",
+      "autoDeploy": "no",
+      "plan": "0.5c-512mb",
+      "region": "singapore",
+      "hasDisk": true,
+      "updatedAt": "2026-11-16T02:05:52.643568Z",
+      "diskGB": 10
+    },
+    {
+      "id": "srv-dbskef0n74is73a5chk0",
+      "name": "bellavita-invitation-erp-review",
+      "type": "web_service",
+      "branch": "codex/erp-invitation-checkout-20261115",
+      "suspended": "not_suspended",
+      "autoDeploy": "no",
+      "plan": "free",
+      "region": "oregon",
+      "hasDisk": false,
+      "updatedAt": "2026-11-15T05:47:31.984009Z",
+      "diskGB": null
+    },
+    {
+      "id": "srv-dbsfj4mi0phs73d0a8mg",
+      "name": "association-integration-review-gfja",
+      "type": "web_service",
+      "branch": "main",
+      "suspended": "not_suspended",
+      "autoDeploy": "no",
+      "plan": "0.5c-512mb",
+      "region": "singapore",
+      "hasDisk": true,
+      "updatedAt": "2026-11-16T04:05:02.441777Z",
+      "diskGB": 1
+    },
+    {
+      "id": "srv-dbs3drbrjlhs73d278sg",
+      "name": "bellavita-shop-verification-v3b4",
+      "type": "web_service",
+      "branch": "codex/shop-backend",
+      "suspended": "not_suspended",
+      "autoDeploy": "no",
+      "plan": "0.5c-512mb",
+      "region": "oregon",
+      "hasDisk": true,
+      "updatedAt": "2026-11-14T14:57:46.44102Z",
+      "diskGB": 1
+    },
+    {
+      "id": "srv-dbqjqm5bedkc73drfkc0",
+      "name": "bellavita-taesan-test",
+      "type": "web_service",
+      "branch": "main",
+      "suspended": "not_suspended",
+      "autoDeploy": "yes",
+      "plan": "0.5c-512mb",
+      "region": "oregon",
+      "hasDisk": true,
+      "updatedAt": "2026-11-15T03:30:03.447763Z",
+      "diskGB": 1
+    }
+  ],
+  "sites": [
+    {
+      "project_id": "appgprj_6af874873e148191b9677cca35f00557",
+      "status": "active",
+      "current_user_role": "owner",
+      "latest_version_number": 32,
+      "saved_version": 32,
+      "source_commit": "05dcf31d82e05d186c20a71a4d5f51f630342879",
+      "has_live_url": true,
+      "has_deployment_id": true,
+      "observed_at": "2026-11-16T04:26:06.531Z"
+    },
+    {
+      "project_id": "appgprj_6af86d66b7108191a8dd1052c4a7302f",
+      "status": "active",
+      "current_user_role": "owner",
+      "latest_version_number": 39,
+      "saved_version": 39,
+      "source_commit": "10a901e7640781c414a18c0b3e1c672cdccd46cd",
+      "has_live_url": true,
+      "has_deployment_id": true,
+      "observed_at": "2026-11-16T04:26:06.531Z"
+    }
+  ],
+  "deployments": [
+    {
+      "project_id": "appgprj_6af874873e148191b9677cca35f00557",
+      "version_number": 32,
+      "source_commit": "05dcf31d82e05d186c20a71a4d5f51f630342879",
+      "deployment_status": "succeeded",
+      "type": "publish",
+      "observed_at": "2026-11-16T04:26:46.512Z"
+    },
+    {
+      "project_id": "appgprj_6af86d66b7108191a8dd1052c4a7302f",
+      "version_number": 39,
+      "source_commit": "10a901e7640781c414a18c0b3e1c672cdccd46cd",
+      "deployment_status": "succeeded",
+      "type": "publish",
+      "observed_at": "2026-11-16T04:26:46.591Z"
+    }
+  ],
+  "github_heads": [
+    {
+      "project": "bellavita-shop",
+      "repository": "kshyuk96-cell/bellavita-taesan",
+      "branch": "codex/shop-backend",
+      "sha": "d5047f3345b757edfcfbd81a73c609c0392007dd"
+    },
+    {
+      "project": "funeral-association",
+      "repository": "kshyuk96-cell/association-aftercare-platform",
+      "branch": "main",
+      "sha": "fc40c181d25bb605cefebbddec7b9fc19b192909"
+    }
+  ],
+  "operational_writes": 0,
+  "new_resources": 0,
+  "paid_api_calls": 0
+}

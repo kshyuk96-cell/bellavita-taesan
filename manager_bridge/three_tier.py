@@ -114,6 +114,7 @@ class ThreeTier:
     def __init__(self,store,registry,*,source_observers=None,review_hosts=None,stop_observers=None):
         if registry.store is not store:raise ValueError('shared registered store required')
         self.store,self.registry=store,registry
+        self.admission_budget=None
         from .governance_gate import GovernanceGate
         self.governance_gate=GovernanceGate(store,registry)
         self.source_observers=dict(source_observers or {});self.review_hosts=dict(review_hosts or {})
@@ -145,6 +146,17 @@ class ThreeTier:
     def _config(self,c,token,project,roles=('owner','manager','worker')):
         config=self.registry._get(c,token,project,roles)
         return config
+
+    def _admission(self,c,token,task):
+        budget=self.admission_budget
+        if budget is None:
+            installed=(c.execute("SELECT 1 FROM sqlite_master WHERE name='operating_budget_policies'").fetchone() and
+                       c.execute('SELECT 1 FROM operating_budget_policies WHERE project=?',(task['project'],)).fetchone())
+            if installed:raise PermissionDenied('registered admission coordinator required')
+            return
+        from .operating_budget import OperatingBudget
+        if not isinstance(budget,OperatingBudget) or budget.core is not self:raise Conflict('admission coordinator binding changed')
+        budget.authorize_core_admission(c,token,task['id'])
 
     def _live(self,c,hashed,project):
         row=c.execute('SELECT * FROM bridge_tokens WHERE token_hash=?',(hashed,)).fetchone();now=self.store._now()
@@ -271,6 +283,7 @@ class ThreeTier:
                 if old['request_key']!=request_key or old['developer_id']!=developer_id or old['manifest_digest']!=task['manifest_digest'] or old['version']!=task['version'] or old['config_fingerprint']!=config['fingerprint']:raise Conflict('hierarchy assignment changed')
                 return self._public(c,task,old)
             if task['state']!='queued':raise Conflict('exact approved queued task required')
+            self._admission(c,token,task)
             now=self.store._now()
             c.execute("INSERT INTO hierarchy_tasks VALUES (?,?,?,?,?,'development_queued',?,NULL,0,NULL,NULL,NULL,NULL,?,NULL,?)",
                       (task_id,task['project'],task['version'],task['manifest_digest'],config['fingerprint'],developer_id,request_key,now))
@@ -485,6 +498,8 @@ class ThreeTier:
                 state='rework_queued'
                 c.execute('UPDATE hierarchy_tasks SET rework_count=rework_count+1 WHERE task_id=?',(task_id,))
             c.execute('UPDATE hierarchy_tasks SET state=?,updated=? WHERE task_id=?',(state,self.store._now(),task_id));self._event(c,task_id,'technical_'+decision,state,{'candidate_digest':candidate_digest})
+            if state=='accepted' and self.admission_budget is not None:
+                self.admission_budget.complete_task_in_transaction(c,token,task_id)
             return self._public(c,task,c.execute('SELECT * FROM hierarchy_tasks WHERE task_id=?',(task_id,)).fetchone())
 
     def claim_rework(self,token,task_id,lease_seconds=300):
@@ -563,6 +578,7 @@ class ThreeTier:
                 return self._public(c,following,managed)
             if following['state']!='queued':raise Conflict('next task must remain approved and queued')
             if c.execute('SELECT 1 FROM hierarchy_tasks WHERE task_id=?',(next_task_id,)).fetchone():raise Conflict('next task already assigned through a different instruction')
+            self._admission(c,token,following)
             now=self.store._now()
             c.execute("INSERT INTO hierarchy_tasks VALUES (?,?,?,?,?,'development_queued',?,NULL,0,NULL,NULL,NULL,NULL,?,NULL,?)",
                       (next_task_id,parent['project'],following['version'],following['manifest_digest'],config['fingerprint'],developer_id,request_key,now))
