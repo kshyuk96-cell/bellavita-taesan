@@ -50,7 +50,7 @@
 
 원래 Worker를 빌드해 Request/Response 직접 호출한다. 호환 SQLite 계층은 실제 Cloudflare D1 검증이 아니다. 모든 카드·환불은 실제 서비스의 simulator; 외부 통신·발송·배포·실제 결제 없음. seed는 DP 직접 부여 대신 실제 납부/예약/완료 흐름으로 출처를 구성하고, 보너스만 TEST grant를 사용한다. 원금우선 및 9개 BP 상한·취소수수료0은 고객 예제 TEST 정책이며 운영 승인으로 사용하지 않는다.
 
-브라우저 제한: [Sites SKILL.md](skill://plugin_connector_1p_689987207de081918f7544f7d58f6faf/sites/SKILL.md)의 “If `cua_repl.js` is unavailable, skip browser QA” 지침 적용. 지원 도구가 없어 preview server/브라우저 설치/대체 조작을 실행하지 않았다. 준비한 검사 함수는 지원 브라우저 호스트의 인증·소스 일치 맥락에 연결할 후속 코드이며 실행 증거가 아니다.
+브라우저 제한: [Sites SKILL.md](skill://plugin_connector_1p_689987207de08191979cf68eca2941c6/sites/SKILL.md)의 “If `cua_repl.js` is unavailable, skip browser QA” 지침 적용. 지원 도구가 없어 preview server/브라우저 설치/대체 조작을 실행하지 않았다. 준비한 검사 함수는 지원 브라우저 호스트의 인증·소스 일치 맥락에 연결할 후속 코드이며 실행 증거가 아니다.
 
 ## 중앙 관리기 회수
 
