@@ -28,7 +28,7 @@ from PIL import Image, ImageOps
 import erp_invitation_render as render
 import erp_ai
 
-TEMPLATE_HASHES={'event-wreath-catalog.webp': '5a264152394b1d34f847192b3c05ff7d809a4e1e072eff580220e127070d8b25', 'event-v5.css': '852ce3f563c959ed59ee240ec99896434f62bf91e019e14d63ef3ba7927fdfb3', 'rice-wreath-10kg.webp': '6a0e396b644daeaa76ef79aeee3acaa6b9893f24a31aa129fca070b29209c7a7'}
+TEMPLATE_HASHES={'seoul.ttf':'7b3e16b8ccd97d903520f87f22ff970d0ab0594231807d0a0b752eb8fcb670f4','event-wreath-catalog.webp': '5a264152394b1d34f847192b3c05ff7d809a4e1e072eff580220e127070d8b25', 'event-v5.css': '852ce3f563c959ed59ee240ec99896434f62bf91e019e14d63ef3ba7927fdfb3', 'rice-wreath-10kg.webp': '6a0e396b644daeaa76ef79aeee3acaa6b9893f24a31aa129fca070b29209c7a7'}
 PRICES=(93500,99000)
 FIELDS={'name':160,'date':10,'time':5,'venue':180,'address':250,'sourceUrl':1000,'greeting':1200,'note':700,'host':100,'groomName':40,'brideName':40,'groomParents':100,'brideParents':100,'groomRelation':24,'brideRelation':24,'hostSide':8,'logo':1000,'hero':1000,'frame':1000,'scrollLeft':1000,'scrollRight':1000,'congrats':160}
 IMAGE_FIELDS=('logo','hero','frame','scrollLeft','scrollRight')
@@ -275,7 +275,12 @@ class Engine:
         if dt.datetime.now(render.SEOUL).date().isoformat()>expires:raise ValueError('공유 기간이 지난 행사입니다.')
         items=self.products(render.product_name(v,kind))
         photos={key:self.image(v[key]) for key in IMAGE_FIELDS if v.get(key)}
-        image,boxes=render.composite(v,kind,photos);sample=render.image_bytes(image)
+        import erp_invitation_auto
+        if kind=='wedding':
+            reference_parts=erp_invitation_auto.components(render,v,kind,photos)
+            image,boxes=erp_invitation_auto.preview_composite(render,reference_parts)
+        else:image,boxes=render.composite(v,kind,photos)
+        sample=render.image_bytes(image)
         hero=render.image_bytes(photos['hero']) if kind=='wedding' else b''
         og=render.thumbnail(v,kind)
         hashes={k:hashlib.sha256(render.image_bytes(photo)).hexdigest() for k,photo in photos.items()}
@@ -407,7 +412,7 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
     if path=='/erp/invitations/templates' and method=='POST':
         try:
             size=int(handler.headers.get('Content-Length','0'))
-            if not 0<size<=6*1024*1024:raise ValueError('설치 예시 크기를 확인하세요.')
+            if not 0<size<=12*1024*1024:raise ValueError('설치 예시 크기를 확인하세요.')
             data=json.loads(handler.rfile.read(size));name=data.get('name');raw=base64.b64decode(data.get('data',''),validate=True)
             if name not in TEMPLATE_HASHES or hashlib.sha256(raw).hexdigest()!=TEMPLATE_HASHES[name]:raise ValueError('승인된 설치 예시 원본이 필요합니다.')
             with LOCK:

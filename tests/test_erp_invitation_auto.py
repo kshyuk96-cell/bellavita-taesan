@@ -7,6 +7,17 @@ import erp_invitation_auto as auto
 import erp_invitation_render as render
 
 class AutomaticTests(unittest.TestCase):
+    def test_font_loading_does_not_import_optional_matplotlib_runtime(self):
+        import builtins
+        from unittest.mock import patch
+        original=builtins.__import__
+        def imported(name,*args,**kwargs):
+            if name in ('koreanize_matplotlib','matplotlib'):raise ModuleNotFoundError('optional plotting runtime unavailable')
+            return original(name,*args,**kwargs)
+        with patch('builtins.__import__',side_effect=imported):
+            self.assertEqual(render.font(20).size,20)
+            self.assertEqual(render.font(20,True).size,20)
+
     def test_three_verified_photos_fill_slots_without_merging_couples_or_using_rejected_images(self):
         calls=[]
         def image(url):calls.append(url);return Image.new('RGB',(40,30),(int(url[-1])*30,10,20))

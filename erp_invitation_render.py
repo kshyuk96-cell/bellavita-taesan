@@ -14,8 +14,10 @@ def font(size, bold=False):
     path = Path('/usr/share/fonts/opentype/noto/NotoSerifCJK-' + ('Bold' if bold else 'Regular') + '.ttc')
     if path.exists():
         return ImageFont.truetype(str(path), size, index=1)
-    import koreanize_matplotlib
-    root = Path(koreanize_matplotlib.__file__).parent / 'fonts'
+    from importlib.util import find_spec
+    package=find_spec('koreanize_matplotlib')
+    if package is None or not package.origin:raise ValueError('한글 글꼴 파일 연결을 확인하세요.')
+    root = Path(package.origin).parent / 'fonts'
     return ImageFont.truetype(str(root / ('NanumGothicBold.ttf' if bold else 'NanumGothic.ttf')), size)
 
 

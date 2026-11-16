@@ -6,7 +6,7 @@ import json
 import os
 import re
 from pathlib import Path
-from PIL import ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 
 def photo_check(image):
@@ -43,16 +43,40 @@ def select_photos(worker,values,checker=photo_check):
     return values,[]
 
 
-def components(renderer,v,kind,photos,composite):
+def components(renderer,v,kind,photos,composite=None):
     if kind!='wedding':return None
-    # Keep the reference's separate base/frame/scroll layers and positions.
-    width=composite.width//2
-    left=composite.crop((234,479,507,867))
-    right=composite.crop((width+234,479,width+507,867))
+    font_path=renderer.ASSETS/'seoul.ttf'
+    def font(size):return ImageFont.truetype(str(font_path),size) if font_path.is_file() else renderer.font(size,True)
+    def scroll(photo,sender):
+        canvas=Image.new('RGB',(660,934),'#f2e9da')
+        picture=ImageOps.fit(ImageOps.exif_transpose(photo).convert('RGB'),(660,452),Image.Resampling.LANCZOS,centering=(.5,.2))
+        canvas.paste(picture,(0,0));draw=ImageDraw.Draw(canvas)
+        for line,y in [('결혼을 진심으로 축하 드리며 함께 하는 길이',505),('언제나 행복하고 기쁨이 가득하길 기원합니다',541)]:
+            draw.text((330,y),line,font=font(30),fill='#111111',anchor='mt')
+        draw.line((78,578,582,578),fill='#d2bd91',width=1)
+        for size in range(88,15,-1):
+            face=font(size)
+            if draw.textlength(sender,font=face)<=590:break
+        draw.text((330,715),sender,font=face,fill='#192846',anchor='mt')
+        return renderer.data_image(renderer.image_bytes(canvas))
     return {'BASE':renderer.data_image((renderer.ASSETS/'rice-wreath-10kg.webp').read_bytes()),
             'FRAME':renderer.data_image(renderer.image_bytes(photos['frame'])),
-            'SCROLL_LEFT':renderer.data_image(renderer.image_bytes(left)),
-            'SCROLL_RIGHT':renderer.data_image(renderer.image_bytes(right))}
+            'SCROLL_LEFT':scroll(photos['scrollLeft'],'쌀빛그림화환'),
+            'SCROLL_RIGHT':scroll(photos['scrollRight'],renderer.signature(v,'wedding'))}
+
+
+def preview_composite(renderer,parts):
+    def read(value):return Image.open(io.BytesIO(base64.b64decode(value.split(',',1)[1]))).convert('RGBA')
+    base=read(parts['BASE']);width,height=base.size;canvas=Image.new('RGBA',(width*2,height),(0,0,0,0))
+    for n,key in enumerate(('SCROLL_LEFT','SCROLL_RIGHT')):
+        one=base.copy()
+        if n==0:
+            box=(round(width*.128),round(height*.026),round(width*.765),round(height*.333))
+            one.alpha_composite(ImageOps.fit(read(parts['FRAME']),box[2:],Image.Resampling.LANCZOS,centering=(.5,.2)),box[:2])
+        image=read(parts[key]);image=ImageOps.fit(image,(round(width*.385),round(height*.352)),Image.Resampling.LANCZOS)
+        one.alpha_composite(image,(round(width*.325),round(height*.435)))
+        canvas.alpha_composite(one,(n*width,0))
+    return canvas,[]
 
 
 def page(renderer,v,price,order_url,parts,hero,og,url):
