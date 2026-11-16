@@ -68,7 +68,8 @@ def prepare(profile,root,adapter_root):
         input_source_revision=profile.revision,bundle_digest=hashlib.sha256((root/'sut.bundle.mjs').read_bytes()).hexdigest())
 
 
-def execute_actual_service(profile,adapter_root,*,timeout=90):
+def execute_actual_service(profile,adapter_root,*,timeout=90,entrypoint="run.mjs",heartbeat=None):
+    if entrypoint not in ("run.mjs","run-batch03.mjs"):raise ValueError("registered entrypoint required")
     if type(timeout) is not int or not 1<=timeout<=120:raise ValueError('bounded execution required')
     profile.source_check()
     # Only an already-prepared pinned image; execution never pulls another image.
@@ -83,12 +84,14 @@ def execute_actual_service(profile,adapter_root,*,timeout=90):
           '--ulimit','cpu=35:35','--ulimit','nofile=256:256','--ulimit','nproc=128:128',
           '--ulimit','fsize=67108864:67108864','--mount','type=bind,source='+str(root)+',target=/input,readonly',
           profile.image,'node','--max-old-space-size=384','--permission',
-          '--allow-fs-read=/input','--allow-fs-read=/tmp','--allow-fs-write=/tmp','/input/run.mjs']
+          '--allow-fs-read=/input','--allow-fs-read=/tmp','--allow-fs-write=/tmp','/input/'+entrypoint]
         started=time.monotonic()
+        if heartbeat:heartbeat()
         try:
             with tempfile.TemporaryFile() as output:
                 process=subprocess.Popen(args,env=_docker_env(),stdin=subprocess.DEVNULL,stdout=output,stderr=subprocess.DEVNULL)
                 while process.poll() is None:
+                    if heartbeat:heartbeat()
                     if time.monotonic()-started>timeout or os.fstat(output.fileno()).st_size>8*1024*1024:
                         subprocess.run(['docker','rm','-f',name],env=_docker_env(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
                         process.wait(timeout=10);raise Conflict('actual service execution uncertain or limited')
@@ -98,10 +101,16 @@ def execute_actual_service(profile,adapter_root,*,timeout=90):
                 if len(raw)>8*1024*1024:raise Conflict('service evidence limit')
                 report=json.loads(raw)
             profile.source_check()
+            if heartbeat:heartbeat()
             report['source_provenance']=pin
             report['runtime_provenance']=dict(image=profile.image,network='none',read_only=True,user=65534,
                 node_heap_mib=384,cpu_rlimit_seconds=35,cgroup_memory_enforced=False,
                 arbitrary_host_execution=False,elapsed_seconds=round(time.monotonic()-started,3))
             return report
         finally:
+            subprocess.run(['docker','rm','-f',name],env=_docker_env(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
+            if 'process' in locals():
+                try:process.wait(timeout=5)
+                except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5)
+            # Recheck after the CLI exits: cancellation can race container creation.
             subprocess.run(['docker','rm','-f',name],env=_docker_env(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
