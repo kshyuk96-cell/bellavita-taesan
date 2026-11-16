@@ -1,0 +1,2971 @@
+{
+  "schema": "hope-customer-final-report/v1",
+  "reference_documents": [
+    "eda84f0a643fd4feaa5e287cc2065e98304c70478291af37267cff2e00c8a9d0",
+    "d3de4f429c4c080056d3eec2a14380827d3af0b18b16b9a0107572e33e0437a0"
+  ],
+  "policy_version": "hope-customer-20261116-v2",
+  "engine_revision": "e3e06580eddc6d05a282d27ea8673a97a307dc1d",
+  "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+  "summary": {
+    "basis_at": "2026-11-16T10:24:45.545323+09:00",
+    "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+    "total": 38,
+    "counts": {
+      "PASS": 0,
+      "FAIL": 1,
+      "BLOCKED": 12,
+      "NOT RUN": 25
+    },
+    "executed": 11,
+    "execution_basis_pass_rate_percent": 0.0,
+    "unique_observed_checks": 9,
+    "execution_note": "38개 최종 시험의 부분 실행 포함; 실제 HTTP 관찰 수와 합산하지 않음",
+    "business_results": {
+      "UX·보안": {
+        "PASS": 0,
+        "FAIL": 0,
+        "BLOCKED": 1,
+        "NOT RUN": 5
+      },
+      "결제": {
+        "PASS": 0,
+        "FAIL": 0,
+        "BLOCKED": 3,
+        "NOT RUN": 7
+      },
+      "상품": {
+        "PASS": 0,
+        "FAIL": 0,
+        "BLOCKED": 2,
+        "NOT RUN": 6
+      },
+      "통합": {
+        "PASS": 0,
+        "FAIL": 0,
+        "BLOCKED": 2,
+        "NOT RUN": 2
+      },
+      "회원관리": {
+        "PASS": 0,
+        "FAIL": 1,
+        "BLOCKED": 4,
+        "NOT RUN": 5
+      }
+    },
+    "unresolved_S1_S2": 1,
+    "actual_pg": "미연동",
+    "recommendation": "재시험 필요",
+    "usability": {
+      "participants": 0,
+      "task_success_rate": null,
+      "duration": null,
+      "help_requests": null
+    },
+    "operational_authorization": false,
+    "customer_acceptance_approved": false
+  },
+  "approval_gates": [
+    {
+      "stage": "① 계획",
+      "status": "BLOCKED",
+      "reason": "요구사항·기대값 작성 완료; 발주사 사전 승인 미기록"
+    },
+    {
+      "stage": "② 준비",
+      "status": "BLOCKED",
+      "reason": "고정 데이터 정의 완료; U04/P02 등 지정 데이터와 모든 기기 준비 미확인"
+    },
+    {
+      "stage": "③ 실행",
+      "status": "BLOCKED",
+      "reason": "일부 격리 HTTP 관찰만 확보; 화면/PG/실기기 미실시"
+    },
+    {
+      "stage": "④ 결함·UX",
+      "status": "BLOCKED",
+      "reason": "실측 사용성 참가자 0명; 결함 담당·기한 미지정"
+    },
+    {
+      "stage": "⑤ 재시험",
+      "status": "BLOCKED",
+      "reason": "수정 버전·재시험·회귀 실행 미기록"
+    },
+    {
+      "stage": "⑥ 보고·인수",
+      "status": "BLOCKED",
+      "reason": "P0 전항목 통과·S1/S2 0건·실제 PG 증거·정책 승인 조건 미충족"
+    }
+  ],
+  "scenarios": [
+    {
+      "test_id": "MEM-01",
+      "requirement_id": "MEM-01",
+      "priority": "P0",
+      "group": "회원관리",
+      "title": "3등급 최초 납부·월회비/가입비 분리",
+      "tested_at": "2026-11-16T01:22:47.073177+00:00",
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01",
+          "U02",
+          "U03"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": {
+        "balances": {
+          "BP": 25000,
+          "CP": 0,
+          "DP": 50000,
+          "SP": 0
+        },
+        "paid_total": 75000
+      },
+      "expected": "75,000 / 150,000 / 300,000원; 원금은 월회비만",
+      "actual": {
+        "ui": null,
+        "server": {
+          "BP": 25000,
+          "DP": 50000,
+          "paid": 75000,
+          "status": "active"
+        },
+        "pg": null
+      },
+      "status": "BLOCKED",
+      "evidence": {
+        "scope": "isolated_server_review_http",
+        "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+        "observed_at": "2026-11-16T01:22:47.073177+00:00",
+        "steps": {
+          "balances": {
+            "BP": 25000,
+            "CP": 0,
+            "DP": 50000,
+            "SP": 0
+          },
+          "paid_total": 75000
+        }
+      },
+      "note": "일부 HTTP 검사만 수행; 화면·추가 원장/PG 증거 미확보",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "MEM-02",
+      "requirement_id": "MEM-02",
+      "priority": "P0",
+      "group": "회원관리",
+      "title": "카드 거절 시 미활성·미적립",
+      "tested_at": "2026-11-16T01:23:33.083855+00:00",
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01",
+          "C02"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": {
+        "balances": {
+          "BP": 0,
+          "CP": 0,
+          "DP": 0,
+          "SP": 0
+        },
+        "scenario": "decline"
+      },
+      "expected": "납부 대기; DP=BP=0",
+      "actual": {
+        "ui": null,
+        "server": {
+          "BP": 0,
+          "DP": 0,
+          "status": "pending_first_payment"
+        },
+        "pg": null
+      },
+      "status": "BLOCKED",
+      "evidence": {
+        "scope": "isolated_server_review_http",
+        "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+        "observed_at": "2026-11-16T01:23:33.083855+00:00",
+        "steps": {
+          "balances": {
+            "BP": 0,
+            "CP": 0,
+            "DP": 0,
+            "SP": 0
+          },
+          "scenario": "decline"
+        }
+      },
+      "note": "일부 HTTP 검사만 수행; 화면·추가 원장/PG 증거 미확보",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "MEM-03",
+      "requirement_id": "MEM-03",
+      "priority": "P0",
+      "group": "회원관리",
+      "title": "원금 누계/사용/잔액·BP/SP 구분",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U04"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "원금·무상 포인트 별도 표시",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": null,
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "MEM-04",
+      "requirement_id": "MEM-04",
+      "priority": "P0",
+      "group": "회원관리",
+      "title": "정기청구·다음 회차·원장 1회",
+      "tested_at": "2026-11-16T01:22:54.518617+00:00",
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01",
+          "C01"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": {
+        "balances": {
+          "BP": 25000,
+          "CP": 0,
+          "DP": 100000,
+          "SP": 0
+        },
+        "invoice_kinds": [
+          "initial",
+          "monthly"
+        ]
+      },
+      "expected": "월 청구와 원금 적립 각 1회",
+      "actual": {
+        "ui": null,
+        "server": {
+          "DP": 100000,
+          "monthly_invoices": 1
+        },
+        "pg": null
+      },
+      "status": "BLOCKED",
+      "evidence": {
+        "scope": "isolated_server_review_http",
+        "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+        "observed_at": "2026-11-16T01:22:54.518617+00:00",
+        "steps": {
+          "balances": {
+            "BP": 25000,
+            "CP": 0,
+            "DP": 100000,
+            "SP": 0
+          },
+          "invoice_kinds": [
+            "initial",
+            "monthly"
+          ]
+        }
+      },
+      "note": "일부 HTTP 검사만 수행; 화면·추가 원장/PG 증거 미확보",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "MEM-05",
+      "requirement_id": "MEM-05",
+      "priority": "P1",
+      "group": "회원관리",
+      "title": "미납·재시도·휴면·정지·알림",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U08"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "실패 횟수별 승인된 상태 전환",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": null,
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "MEM-06",
+      "requirement_id": "MEM-06",
+      "priority": "P1",
+      "group": "회원관리",
+      "title": "등급 변경 적용일·예정 청구",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01",
+          "U02",
+          "U03"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "적용일·혜택·청구액 일치",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": null,
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "MEM-07",
+      "requirement_id": "MEM-07",
+      "priority": "P0",
+      "group": "회원관리",
+      "title": "탈퇴·정기결제 중단·원금 상한",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U09"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "반환 750,000원 이하; BP 제외",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "MEM-08",
+      "requirement_id": "MEM-08",
+      "priority": "P0",
+      "group": "회원관리",
+      "title": "자격 중지 정책",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U08"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "정지≠자동 전액 환불",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "BLOCKED",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "정책결정 대기",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "MEM-09",
+      "requirement_id": "MEM-09",
+      "priority": "P1",
+      "group": "회원관리",
+      "title": "추천 중복·취소·회수",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "원 보상별 중복 지급/회수 없음",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": null,
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "MEM-10",
+      "requirement_id": "MEM-10",
+      "priority": "P1",
+      "group": "회원관리",
+      "title": "약어 전체 명칭·모바일 도움말",
+      "tested_at": "2026-11-16T01:22:39.332517+00:00",
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U10"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": {
+        "method": "server HTML text; no browser visibility claim",
+        "pages": [
+          "/review/",
+          "/review/features",
+          "/review/app"
+        ]
+      },
+      "expected": "DP/BP/SP/CP 등 전체 명칭·누를 수 있는 설명",
+      "actual": {
+        "ui": null,
+        "server": {
+          "API": false,
+          "BP": false,
+          "CP": false,
+          "CRM": false,
+          "DP": false,
+          "KPI": false,
+          "PG": false,
+          "QA": false,
+          "SP": false
+        },
+        "pg": null
+      },
+      "status": "FAIL",
+      "evidence": {
+        "scope": "server_html_declaration",
+        "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+        "observed_at": "2026-11-16T01:22:39.332517+00:00",
+        "steps": {
+          "method": "server HTML text; no browser visibility claim",
+          "pages": [
+            "/review/",
+            "/review/features",
+            "/review/app"
+          ]
+        }
+      },
+      "note": "관찰한 기대값 불일치; 증거 수준은 별도 명시",
+      "defect_ids": [
+        "BUG-TERM-001"
+      ],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PRD-01",
+      "requirement_id": "PRD-01",
+      "priority": "P0",
+      "group": "상품",
+      "title": "관리자 등록→고객 노출·수정",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P01"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "서버에 저장된 동일 상품 노출",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PRD-02",
+      "requirement_id": "PRD-02",
+      "priority": "P0",
+      "group": "상품",
+      "title": "등급·옵션·객실별 총액",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P01",
+          "P02",
+          "P04"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "표시=서버 견적=결제 총액",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": null,
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PRD-03",
+      "requirement_id": "PRD-03",
+      "priority": "P0",
+      "group": "상품",
+      "title": "신청·확보·확정·관리자 조회",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P02",
+          "U04"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "예약 1건, 재고 1석 차감",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": null,
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PRD-04",
+      "requirement_id": "PRD-04",
+      "priority": "P0",
+      "group": "상품",
+      "title": "마지막 1석 동시신청",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P02"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "확정 합계 1 이하; 초과예약 없음",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PRD-05",
+      "requirement_id": "PRD-05",
+      "priority": "P1",
+      "group": "상품",
+      "title": "매진/마감 차단·대체 안내",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P03"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "신청 차단과 다음 행동 안내",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": null,
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PRD-06",
+      "requirement_id": "PRD-06",
+      "priority": "P1",
+      "group": "상품",
+      "title": "예약금·잔금·미납·기한",
+      "tested_at": "2026-11-16T01:23:09.953613+00:00",
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P04"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": {
+        "realCharges": false,
+        "status": "confirmed"
+      },
+      "expected": "분할청구 합계·확정 상태 일치",
+      "actual": {
+        "ui": null,
+        "server": "confirmed",
+        "pg": null
+      },
+      "status": "BLOCKED",
+      "evidence": {
+        "scope": "isolated_server_review_http",
+        "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+        "observed_at": "2026-11-16T01:23:09.953613+00:00",
+        "steps": {
+          "realCharges": false,
+          "status": "confirmed"
+        }
+      },
+      "note": "일부 HTTP 검사만 수행; 화면·추가 원장/PG 증거 미확보",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PRD-07",
+      "requirement_id": "PRD-07",
+      "priority": "P0",
+      "group": "상품",
+      "title": "취소 후 재고·원수단 복원",
+      "tested_at": "2026-11-16T01:23:26.058638+00:00",
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P02",
+          "R01"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": {
+        "balances": {
+          "BP": 25000,
+          "CP": 0,
+          "DP": 100000,
+          "SP": 0
+        },
+        "provider": "simulator",
+        "refund_status": "refunded"
+      },
+      "expected": "DP/BP/SP·카드·재고 원거래별 복원",
+      "actual": {
+        "ui": null,
+        "server": {
+          "BP": 25000,
+          "DP": 100000,
+          "status": "cancelled"
+        },
+        "pg": null
+      },
+      "status": "BLOCKED",
+      "evidence": {
+        "scope": "isolated_server_review_http",
+        "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+        "observed_at": "2026-11-16T01:23:26.058638+00:00",
+        "steps": {
+          "balances": {
+            "BP": 25000,
+            "CP": 0,
+            "DP": 100000,
+            "SP": 0
+          },
+          "provider": "simulator",
+          "refund_status": "refunded"
+        }
+      },
+      "note": "일부 HTTP 검사만 수행; 화면·추가 원장/PG 증거 미확보",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PRD-08",
+      "requirement_id": "PRD-08",
+      "priority": "P0",
+      "group": "상품",
+      "title": "교차 브라우저 동일 서버 데이터",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P01",
+          "U04"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "상품·예약·원장 동일; 타인 접근 금지",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PAY-01",
+      "requirement_id": "PAY-01",
+      "priority": "P0",
+      "group": "결제",
+      "title": "원금 우선 혼합결제",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U04",
+          "P02"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "DP600000→BP100000→SP100000→카드200000",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PAY-02",
+      "requirement_id": "PAY-02",
+      "priority": "P0",
+      "group": "결제",
+      "title": "원금 충분",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U06"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "DP 전액, BP/SP 차감 0",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": null,
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PAY-03",
+      "requirement_id": "PAY-03",
+      "priority": "P0",
+      "group": "결제",
+      "title": "원금 0",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U05"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "추가 포인트/카드 합계=상품가",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": null,
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PAY-04",
+      "requirement_id": "PAY-04",
+      "priority": "P0",
+      "group": "결제",
+      "title": "등급×상품 BP 상한",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01",
+          "U02",
+          "U03",
+          "P01",
+          "P02",
+          "P03"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "희망15/10/50%;행복20/15/70%;프리미엄25/18/100%",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PAY-05",
+      "requirement_id": "PAY-05",
+      "priority": "P0",
+      "group": "결제",
+      "title": "카드 실패 후 중복차감 방지",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "C02",
+          "U04"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "실패 후 원금·포인트·재고 손실 없음",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": null,
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PAY-06",
+      "requirement_id": "PAY-06",
+      "priority": "P0",
+      "group": "결제",
+      "title": "더블클릭·재시도·중복콜백",
+      "tested_at": "2026-11-16T01:22:54.518617+00:00",
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "C04"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": {
+        "balances": {
+          "BP": 25000,
+          "CP": 0,
+          "DP": 100000,
+          "SP": 0
+        },
+        "invoice_kinds": [
+          "initial",
+          "monthly"
+        ]
+      },
+      "expected": "승인·적립·예약 각각 1회",
+      "actual": {
+        "ui": null,
+        "server": {
+          "DP": 100000,
+          "monthly_invoices": 1
+        },
+        "pg": null
+      },
+      "status": "BLOCKED",
+      "evidence": {
+        "scope": "isolated_server_review_http",
+        "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+        "observed_at": "2026-11-16T01:22:54.518617+00:00",
+        "steps": {
+          "balances": {
+            "BP": 25000,
+            "CP": 0,
+            "DP": 100000,
+            "SP": 0
+          },
+          "invoice_kinds": [
+            "initial",
+            "monthly"
+          ]
+        }
+      },
+      "note": "일부 HTTP 검사만 수행; 화면·추가 원장/PG 증거 미확보",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PAY-07",
+      "requirement_id": "PAY-07",
+      "priority": "P0",
+      "group": "결제",
+      "title": "응답 불명 조회 후 복구",
+      "tested_at": "2026-11-16T01:23:45.329026+00:00",
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "C03"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": {
+        "automatic_retry": false,
+        "balances": {
+          "BP": 25000,
+          "CP": 0,
+          "DP": 50000,
+          "SP": 0
+        },
+        "scenario": "unknown"
+      },
+      "expected": "확인 전 재청구 금지, 원거래 대조",
+      "actual": {
+        "ui": null,
+        "server": {
+          "DP": 50000,
+          "after": "active",
+          "before": "pending_first_payment"
+        },
+        "pg": null
+      },
+      "status": "BLOCKED",
+      "evidence": {
+        "scope": "isolated_server_review_http",
+        "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+        "observed_at": "2026-11-16T01:23:45.329026+00:00",
+        "steps": {
+          "automatic_retry": false,
+          "balances": {
+            "BP": 25000,
+            "CP": 0,
+            "DP": 50000,
+            "SP": 0
+          },
+          "scenario": "unknown"
+        }
+      },
+      "note": "일부 HTTP 검사만 수행; 화면·추가 원장/PG 증거 미확보",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PAY-08",
+      "requirement_id": "PAY-08",
+      "priority": "P0",
+      "group": "결제",
+      "title": "부분취소·원수단·PG/원장",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "C05",
+          "R02"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "원수단 배분 정책 승인 후 대사",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "BLOCKED",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "정책결정 대기",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PAY-09",
+      "requirement_id": "PAY-09",
+      "priority": "P0",
+      "group": "결제",
+      "title": "본인 원금 반환 상한",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U09"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "max(0,1200000-450000)=750000;BP85000 제외",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "PAY-10",
+      "requirement_id": "PAY-10",
+      "priority": "P0",
+      "group": "결제",
+      "title": "PG 승인·취소·정산 대사",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "C01",
+          "C05"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "PG 테스트 기록과 거래별 원장 일치",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "UX-01",
+      "requirement_id": "UX-01",
+      "priority": "P1",
+      "group": "UX·보안",
+      "title": "첫 방문 고객 무설명 완료",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01",
+          "P02"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "성공률·소요시간·오류·도움요청 실측",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": null,
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "UX-02",
+      "requirement_id": "UX-02",
+      "priority": "P1",
+      "group": "UX·보안",
+      "title": "360px 모바일 가독성",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U10"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "360/390/768/1280px 및 실기기 기록",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "UX-03",
+      "requirement_id": "UX-03",
+      "priority": "P1",
+      "group": "UX·보안",
+      "title": "오류 원인·수정·다음 행동",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "C02"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "구체적이고 복구 가능한 오류 안내",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": null,
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "SEC-01",
+      "requirement_id": "SEC-01",
+      "priority": "P0",
+      "group": "UX·보안",
+      "title": "회원의 관리자·재무 접근 거절",
+      "tested_at": "2026-11-16T01:22:58.487965+00:00",
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U10"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": {
+        "action": "runCycle",
+        "authenticated_role": "member",
+        "method": "POST",
+        "status": 403
+      },
+      "expected": "인증·역할·회사/본인 범위 차단",
+      "actual": {
+        "ui": null,
+        "server": 403,
+        "pg": null
+      },
+      "status": "BLOCKED",
+      "evidence": {
+        "scope": "isolated_server_review_http",
+        "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+        "observed_at": "2026-11-16T01:22:58.487965+00:00",
+        "steps": {
+          "action": "runCycle",
+          "authenticated_role": "member",
+          "method": "POST",
+          "status": 403
+        }
+      },
+      "note": "일부 HTTP 검사만 수행; 화면·추가 원장/PG 증거 미확보",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "SEC-02",
+      "requirement_id": "SEC-02",
+      "priority": "P0",
+      "group": "UX·보안",
+      "title": "카드번호 미저장·마스킹·로그",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U10"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "PAN/CVC 미보관, 개인정보 접근 기록",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "OPS-01",
+      "requirement_id": "OPS-01",
+      "priority": "P1",
+      "group": "UX·보안",
+      "title": "백업복구·배포 후 핵심 회귀",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P01",
+          "U01"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "별도 복원 환경·정합성·회귀 증거",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "E2E-01",
+      "requirement_id": "E2E-01",
+      "priority": "P0",
+      "group": "통합",
+      "title": "원금 우선 혼합결제 통합",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U04",
+          "P02"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "원금/포인트/카드/재고/예약/원장 일치",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "E2E-02",
+      "requirement_id": "E2E-02",
+      "priority": "P0",
+      "group": "통합",
+      "title": "취소·환불 통합",
+      "tested_at": "2026-11-16T01:23:26.058638+00:00",
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U04",
+          "P02",
+          "R01"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": {
+        "balances": {
+          "BP": 25000,
+          "CP": 0,
+          "DP": 100000,
+          "SP": 0
+        },
+        "provider": "simulator",
+        "refund_status": "refunded"
+      },
+      "expected": "원수단/재고/화면/PG/원장 일치",
+      "actual": {
+        "ui": null,
+        "server": {
+          "BP": 25000,
+          "DP": 100000,
+          "status": "cancelled"
+        },
+        "pg": null
+      },
+      "status": "BLOCKED",
+      "evidence": {
+        "scope": "isolated_server_review_http",
+        "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+        "observed_at": "2026-11-16T01:23:26.058638+00:00",
+        "steps": {
+          "balances": {
+            "BP": 25000,
+            "CP": 0,
+            "DP": 100000,
+            "SP": 0
+          },
+          "provider": "simulator",
+          "refund_status": "refunded"
+        }
+      },
+      "note": "일부 HTTP 검사만 수행; 화면·추가 원장/PG 증거 미확보",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "E2E-03",
+      "requirement_id": "E2E-03",
+      "priority": "P0",
+      "group": "통합",
+      "title": "탈퇴 통합",
+      "tested_at": null,
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U09"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": null,
+      "expected": "청구 중단→750000원 한도→승인·감사",
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": {
+        "reason": "execution_evidence_unavailable"
+      },
+      "note": "실행 증거 없음",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    },
+    {
+      "test_id": "E2E-04",
+      "requirement_id": "E2E-04",
+      "priority": "P0",
+      "group": "통합",
+      "title": "마지막 재고·타임아웃 복구",
+      "tested_at": "2026-11-16T01:23:45.329026+00:00",
+      "performer": "자동 검증기",
+      "reviewer": null,
+      "deployed_revision": "028a019b2a701120648a69591f34765de4b54825",
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "simulator"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U04",
+          "P02",
+          "C03"
+        ],
+        "restoration": "새 cookie jar의 격리 검수 공간; 운영 자료 초기화 없음"
+      },
+      "execution_steps": {
+        "automatic_retry": false,
+        "balances": {
+          "BP": 25000,
+          "CP": 0,
+          "DP": 50000,
+          "SP": 0
+        },
+        "scenario": "unknown"
+      },
+      "expected": "확보 만료·원거래 조회·중복청구 없음",
+      "actual": {
+        "ui": null,
+        "server": {
+          "DP": 50000,
+          "after": "active",
+          "before": "pending_first_payment"
+        },
+        "pg": null
+      },
+      "status": "BLOCKED",
+      "evidence": {
+        "scope": "isolated_server_review_http",
+        "sut_revision": "028a019b2a701120648a69591f34765de4b54825",
+        "observed_at": "2026-11-16T01:23:45.329026+00:00",
+        "steps": {
+          "automatic_retry": false,
+          "balances": {
+            "BP": 25000,
+            "CP": 0,
+            "DP": 50000,
+            "SP": 0
+          },
+          "scenario": "unknown"
+        }
+      },
+      "note": "일부 HTTP 검사만 수행; 화면·추가 원장/PG 증거 미확보",
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "BUG-POLICY-001",
+      "scenario_ids": [
+        "PAY-01",
+        "E2E-01"
+      ],
+      "severity": "S1",
+      "priority": "P0",
+      "kind": "developer_declaration_conflict_not_runtime_proof",
+      "symptom": "FB-13의 SP→BP→DP→카드 표기가 고객 원금 우선 기준과 충돌",
+      "reproduce": [
+        "검수 상태 JSON 조회",
+        "FB-13 label과 고객 §7/최종 §4 대조"
+      ],
+      "actual": "SP",
+      "expected": "DP",
+      "owner": null,
+      "status": "OPEN",
+      "due_date": null,
+      "fixed_revision": null,
+      "retest": "NOT RUN"
+    },
+    {
+      "id": "BUG-TERM-001",
+      "scenario_ids": [
+        "MEM-10"
+      ],
+      "severity": "S3",
+      "priority": "P1",
+      "kind": "server_html_text",
+      "symptom": "고객이 지정한 전체 명칭(약어) 표기를 공개 검수 화면에서 모두 확인할 수 없음",
+      "reproduce": [
+        "검수·개발현황·앱 HTML의 본문 추출",
+        "전체 명칭(약어) 목록과 대조"
+      ],
+      "actual": {
+        "API": false,
+        "BP": false,
+        "CP": false,
+        "CRM": false,
+        "DP": false,
+        "KPI": false,
+        "PG": false,
+        "QA": false,
+        "SP": false
+      },
+      "expected": {
+        "API": true,
+        "BP": true,
+        "CP": true,
+        "CRM": true,
+        "DP": true,
+        "KPI": true,
+        "PG": true,
+        "QA": true,
+        "SP": true
+      },
+      "owner": null,
+      "status": "OPEN",
+      "due_date": null,
+      "fixed_revision": null,
+      "retest": "NOT RUN"
+    }
+  ],
+  "policy_decisions_pending": [
+    "BP/SP 상대 순서",
+    "CP 사용·반환 조건",
+    "가입비 반환 여부",
+    "자격 중지 시 청구·반환 시점",
+    "취소수수료 원수단별 배분"
+  ],
+  "developer_claims": {
+    "baseline": "customer-feedback-2026-11-v1",
+    "basis": "고객 피드백 80개 검토 항목 중 코드상 완전 반영만 집계; 부분 반영은 0점. 외부 검증/고객 인수율 아님",
+    "complete": 56,
+    "external": 10,
+    "mode": "sandbox",
+    "partial": 14,
+    "pending": 0,
+    "percent": 70,
+    "rows": [
+      {
+        "evidence": "등급/가입 절차 안내·TEST 계정 진입·암호화 가입 구현; 정식 본인/이메일 확인·운영 회원 인증은 미검증",
+        "group": "가입·정기결제",
+        "id": "FB-01",
+        "label": "회원 기본정보·실명 확인",
+        "section": "2",
+        "status": "partial"
+      },
+      {
+        "evidence": "club 회원 계약/청구",
+        "group": "가입·정기결제",
+        "id": "FB-02",
+        "label": "등급·회비·가입비·최초 총액 안내",
+        "section": "2",
+        "status": "complete"
+      },
+      {
+        "evidence": "동의 스냅샷",
+        "group": "가입·정기결제",
+        "id": "FB-03",
+        "label": "필수 동의 분리·선택 마케팅",
+        "section": "2",
+        "status": "complete"
+      },
+      {
+        "evidence": "club 이벤트 상태기계",
+        "group": "가입·정기결제",
+        "id": "FB-04",
+        "label": "첫 승인 후 활성·실패 시 대기",
+        "section": "2",
+        "status": "complete"
+      },
+      {
+        "evidence": "회원번호·상태·승인 완료 청구의 TEST 납부 확인서/인쇄·회원정보 화면 제공; 실제 카드 전표/외부 발송 미연결",
+        "group": "가입·정기결제",
+        "id": "FB-05",
+        "label": "회원번호·가입완료 영수증·안내",
+        "section": "2",
+        "status": "partial"
+      },
+      {
+        "evidence": "청구 유형/여행 이벤트 분리",
+        "group": "가입·정기결제",
+        "id": "FB-06",
+        "label": "월회비·여행대금 거래 구분",
+        "section": "2",
+        "status": "complete"
+      },
+      {
+        "evidence": "어댑터 구현, PG 검증 보류",
+        "group": "가입·정기결제",
+        "id": "FB-07",
+        "label": "PG 빌링·카드 등록/변경/해지 실연동",
+        "section": "2",
+        "status": "external"
+      },
+      {
+        "evidence": "PG vault AES-GCM",
+        "group": "가입·정기결제",
+        "id": "FB-08",
+        "label": "카드번호/CVC 미저장·토큰 암호화",
+        "section": "2",
+        "status": "complete"
+      },
+      {
+        "evidence": "월말 보정/휴면 중지",
+        "group": "가입·정기결제",
+        "id": "FB-09",
+        "label": "월말·한국시간·정기 청구 중지",
+        "section": "2",
+        "status": "complete"
+      },
+      {
+        "evidence": "큐/서명/격리 구현, PG 통합 미검증",
+        "group": "가입·정기결제",
+        "id": "FB-10",
+        "label": "재시도·웹훅 중복·장애 복구",
+        "section": "2",
+        "status": "partial"
+      },
+      {
+        "evidence": "균형 분개와 계산 잔액",
+        "group": "포인트·여행계정",
+        "id": "FB-11",
+        "label": "DP/SP/BP/CP 별도 원장",
+        "section": "3",
+        "status": "complete"
+      },
+      {
+        "evidence": "승인 이벤트 기반",
+        "group": "포인트·여행계정",
+        "id": "FB-12",
+        "label": "월회비 승인 후 DP 적립",
+        "section": "3",
+        "status": "complete"
+      },
+      {
+        "evidence": "clubPlan",
+        "group": "포인트·여행계정",
+        "id": "FB-13",
+        "label": "개인 SP→BP→DP→카드 사용",
+        "section": "3",
+        "status": "complete"
+      },
+      {
+        "evidence": "법인 소속/가용량 제한",
+        "group": "포인트·여행계정",
+        "id": "FB-14",
+        "label": "법인 CP→SP→BP→DP→카드 사용",
+        "section": "3",
+        "status": "complete"
+      },
+      {
+        "evidence": "여행 정책 선택 적용/예약 견적·확보·차감에 동일 한도",
+        "group": "포인트·여행계정",
+        "id": "FB-15",
+        "label": "등급별 BP 사용 한도",
+        "section": "3",
+        "status": "complete"
+      },
+      {
+        "evidence": "serviceReferral/serviceRewards",
+        "group": "포인트·여행계정",
+        "id": "FB-16",
+        "label": "추천인/신규 BP 최초 납부·중복 방지",
+        "section": "3",
+        "status": "complete"
+      },
+      {
+        "evidence": "12회차별 납부액×청구 당시 등급/요율 합산·최종 버림·가입비 제외·중복 방지; 과거 요율 불명확 시 지급 검토",
+        "group": "포인트·여행계정",
+        "id": "FB-17",
+        "label": "연간 BP 산정·적립",
+        "section": "3",
+        "status": "complete"
+      },
+      {
+        "evidence": "발급 로트·잔량·만료·선소진·원 만료일 복원 / 통합 원장 테스트",
+        "group": "포인트·여행계정",
+        "id": "FB-18",
+        "label": "포인트 발급 건별 조건·잔량·유효기간",
+        "section": "3",
+        "status": "complete"
+      },
+      {
+        "evidence": "부분 취소 원수단 배분/역분개",
+        "group": "포인트·여행계정",
+        "id": "FB-19",
+        "label": "원수단 복원·취소 수수료·역분개",
+        "section": "3",
+        "status": "complete"
+      },
+      {
+        "evidence": "TEST 가정은 정책 승인 대체 아님",
+        "group": "포인트·여행계정",
+        "id": "FB-20",
+        "label": "DP 반환·결제카드 만료 등 확정 운영정책",
+        "section": "3",
+        "status": "external"
+      },
+      {
+        "evidence": "기존 상품 카탈로그",
+        "group": "상품·예약",
+        "id": "FB-21",
+        "label": "여행 종류별 상품 분류",
+        "section": "4",
+        "status": "complete"
+      },
+      {
+        "evidence": "상품 편집/카탈로그",
+        "group": "상품·예약",
+        "id": "FB-22",
+        "label": "출발/일정/국가/사진/포함·불포함",
+        "section": "4",
+        "status": "complete"
+      },
+      {
+        "evidence": "판매 마감일 편집·서버 검증·재고·취소정책 연결",
+        "group": "상품·예약",
+        "id": "FB-23",
+        "label": "정원·마감·취소규정",
+        "section": "4",
+        "status": "complete"
+      },
+      {
+        "evidence": "상품 목록/상세 회원가·배정 주문의 서버 회원가 재검증",
+        "group": "상품·예약",
+        "id": "FB-24",
+        "label": "정상가·회원가·등급별 가격",
+        "section": "4",
+        "status": "complete"
+      },
+      {
+        "evidence": "canonical 주문 견적",
+        "group": "상품·예약",
+        "id": "FB-25",
+        "label": "객실·성인·아동·추가 옵션",
+        "section": "4",
+        "status": "complete"
+      },
+      {
+        "evidence": "기존 예약별 예약금·잔금 청구·납기·기한 경과·내부 안내",
+        "group": "상품·예약",
+        "id": "FB-26",
+        "label": "예약금·잔금·납기·미납 안내",
+        "section": "4",
+        "status": "complete"
+      },
+      {
+        "evidence": "기존 예약 이관 및 접수/확보/잔금/확정/출발/완료 이력",
+        "group": "상품·예약",
+        "id": "FB-27",
+        "label": "요청→대기→확정→출발→완료",
+        "section": "4",
+        "status": "complete"
+      },
+      {
+        "evidence": "D1 CAS/15분 확보",
+        "group": "상품·예약",
+        "id": "FB-28",
+        "label": "객실 재고 동시성·포인트 확보",
+        "section": "4",
+        "status": "complete"
+      },
+      {
+        "evidence": "가상 반환/PG 어댑터, 실연동 미검증",
+        "group": "상품·예약",
+        "id": "FB-29",
+        "label": "카드 전액·부분 취소와 DP 반환 분리",
+        "section": "4",
+        "status": "partial"
+      },
+      {
+        "evidence": "예약별 암호화 여행자 이름/국가/서류 상태·출발 안내·소유권 검사",
+        "group": "상품·예약",
+        "id": "FB-30",
+        "label": "예약별 여행자·출발안내·접근 분리",
+        "section": "4",
+        "status": "complete"
+      },
+      {
+        "evidence": "통합 회원 화면의 등급·가입일·마스킹 추천인·상태·회원번호",
+        "group": "마이페이지·회원상태",
+        "id": "FB-31",
+        "label": "등급·가입일·추천인·상태",
+        "section": "5–6",
+        "status": "complete"
+      },
+      {
+        "evidence": "회원정보·납부 이력·TEST 증빙·정기청구 중단 안내/로그아웃 제공; 실제 PG 카드 변경·운영 회원 인증 미검증",
+        "group": "마이페이지·회원상태",
+        "id": "FB-32",
+        "label": "정기결제일·이력·영수증·카드변경·중단",
+        "section": "5–6",
+        "status": "partial"
+      },
+      {
+        "evidence": "본인 범위 원장/잔액 조회",
+        "group": "마이페이지·회원상태",
+        "id": "FB-33",
+        "label": "DP 누적/사용/가용 및 SP/BP/CP 명세",
+        "section": "5–6",
+        "status": "complete"
+      },
+      {
+        "evidence": "기존 예약에서 출발/납부/잔금/취소/원수단 반환 통합 조회",
+        "group": "마이페이지·회원상태",
+        "id": "FB-34",
+        "label": "예약·출발·납부·잔금·취소·반환 조회",
+        "section": "5–6",
+        "status": "complete"
+      },
+      {
+        "evidence": "회원 ID로 연결된 CRM 상담·회원 요청·가족/탈퇴/알림 설정 화면",
+        "group": "마이페이지·회원상태",
+        "id": "FB-35",
+        "label": "상담·가족승계·탈퇴·알림 신청",
+        "section": "5–6",
+        "status": "complete"
+      },
+      {
+        "evidence": "공통 글씨 크기 저장·44px 메뉴·키보드 본문 이동·확인된 전화 설정/도움말; 실기기는 FB-76 별도",
+        "group": "마이페이지·회원상태",
+        "id": "FB-36",
+        "label": "고령 회원 큰 글씨·단순 메뉴·전화",
+        "section": "5–6",
+        "status": "complete"
+      },
+      {
+        "evidence": "납부 대기/기한 경과 알림함·읽음/수신 설정·재시도 안내 구현; 실제 외부 채널 미연결",
+        "group": "마이페이지·회원상태",
+        "id": "FB-37",
+        "label": "1개월 미납 안내·카드변경·재시도",
+        "section": "5–6",
+        "status": "partial"
+      },
+      {
+        "evidence": "미납 상태기계",
+        "group": "마이페이지·회원상태",
+        "id": "FB-38",
+        "label": "2개월 BP 중단·3개월 휴면·6개월 정지",
+        "section": "5–6",
+        "status": "complete"
+      },
+      {
+        "evidence": "종료/정산 보고서",
+        "group": "마이페이지·회원상태",
+        "id": "FB-39",
+        "label": "해지 후 청구 중단·미납/예약/DP 정산 검토",
+        "section": "5–6",
+        "status": "complete"
+      },
+      {
+        "evidence": "DP 삭제 없이 제한만 적용",
+        "group": "마이페이지·회원상태",
+        "id": "FB-40",
+        "label": "미납 DP 임의 소멸 금지",
+        "section": "5–6",
+        "status": "complete"
+      },
+      {
+        "evidence": "4개 법인 등급/협의 금액·조건 확인·다음 회차 변경·연회비 갱신 이력",
+        "group": "법인회원",
+        "id": "FB-41",
+        "label": "Bronze/Silver/Gold/VIP 계약 금액",
+        "section": "7",
+        "status": "complete"
+      },
+      {
+        "evidence": "활성 소속/운영자 지정 담당자만 회사 조회·배분·퇴사 처리",
+        "group": "법인회원",
+        "id": "FB-42",
+        "label": "법인 관리자·직원 역할 분리",
+        "section": "7",
+        "status": "complete"
+      },
+      {
+        "evidence": "법인 계약/CP quota",
+        "group": "법인회원",
+        "id": "FB-43",
+        "label": "회사별 계약·예산·한도·잔여 관리",
+        "section": "7",
+        "status": "complete"
+      },
+      {
+        "evidence": "자신의 계약/소속 예약 범위 제한",
+        "group": "법인회원",
+        "id": "FB-44",
+        "label": "회사 간 데이터 격리",
+        "section": "7",
+        "status": "complete"
+      },
+      {
+        "evidence": "진행 예약/미납/반환 차단·퇴사 정산·동일 회사 인계·기존 여행자 접근 회수/예산 귀속 보존",
+        "group": "법인회원",
+        "id": "FB-45",
+        "label": "직원 퇴사·전근 CP 이관·회수",
+        "section": "7",
+        "status": "complete"
+      },
+      {
+        "evidence": "법인별 기간 원장·회비 수납·직원 배분 보고서",
+        "group": "법인회원",
+        "id": "FB-46",
+        "label": "회사별 기간 정산 보고서",
+        "section": "7",
+        "status": "complete"
+      },
+      {
+        "evidence": "individual/corporate 계약",
+        "group": "법인회원",
+        "id": "FB-47",
+        "label": "개인 회비·법인 계약 분리",
+        "section": "7",
+        "status": "complete"
+      },
+      {
+        "evidence": "배분/예약 확보 포함",
+        "group": "법인회원",
+        "id": "FB-48",
+        "label": "CP 사용내역·직원별 한도 초과 방지",
+        "section": "7",
+        "status": "complete"
+      },
+      {
+        "evidence": "실제 계약 확인 필요",
+        "group": "법인회원",
+        "id": "FB-49",
+        "label": "법인 CP 소유·미사용 환불 정책",
+        "section": "7",
+        "status": "external"
+      },
+      {
+        "evidence": "인증 사용자별 회사 포털/API, 회사 간 권한 검사",
+        "group": "법인회원",
+        "id": "FB-50",
+        "label": "법인 관리자 본인 회사 셀프서비스",
+        "section": "7",
+        "status": "complete"
+      },
+      {
+        "evidence": "기간 가입/등급·청구서 기준 성공률/중복 방지·현재 미납 KPI 분리",
+        "group": "운영·보안",
+        "id": "FB-51",
+        "label": "가입·등급·결제성공률·미납 대시보드",
+        "section": "8",
+        "status": "complete"
+      },
+      {
+        "evidence": "기간 예약/반환·현재 원장 잔액·버전별 TEST 준비금/현금 가정 모델",
+        "group": "운영·보안",
+        "id": "FB-52",
+        "label": "예약·환불·잔액·준비금 대시보드",
+        "section": "8",
+        "status": "complete"
+      },
+      {
+        "evidence": "서버 RBAC/환불 이중 검토",
+        "group": "운영·보안",
+        "id": "FB-53",
+        "label": "상품/예약/포인트/환불 승인 권한",
+        "section": "8",
+        "status": "complete"
+      },
+      {
+        "evidence": "조회/예외 어댑터, PG 실검증 보류",
+        "group": "운영·보안",
+        "id": "FB-54",
+        "label": "PG 일별 승인·취소·정산 대사",
+        "section": "8",
+        "status": "partial"
+      },
+      {
+        "evidence": "호스팅 계정 실제 설정 확인 필요",
+        "group": "운영·보안",
+        "id": "FB-55",
+        "label": "관리자 다중인증",
+        "section": "8",
+        "status": "external"
+      },
+      {
+        "evidence": "신규 CRM/프로필/여행자 암호화·역할별 제한·조회/내보내기 감사 구현; 기존 실제 자료 일괄 정비/전 범위 검수 남음",
+        "group": "운영·보안",
+        "id": "FB-56",
+        "label": "개인정보 암호화·조회/변경 접근기록",
+        "section": "8",
+        "status": "partial"
+      },
+      {
+        "evidence": "두 사이트 전체 DB·R2·정적 미디어·암호화 환경값 백업/해시·새 SQLite/객체 복원; 실제 호스팅 복구 FB-74 별도",
+        "group": "운영·보안",
+        "id": "FB-57",
+        "label": "전체 DB·미디어·외부키 백업/복구",
+        "section": "8",
+        "status": "complete"
+      },
+      {
+        "evidence": "보관기간·법적 보존·별도 보관기한·금융기록 최소 보존·개인정보 없는 검토 목록 구현; 실제 파기 자동화/전 범위 취약점 검수 미완",
+        "group": "운영·보안",
+        "id": "FB-58",
+        "label": "취약점·보관기간·파기 자동화",
+        "section": "8",
+        "status": "partial"
+      },
+      {
+        "evidence": "릴레이/동의 확인, 실제 채널 미연결",
+        "group": "운영·보안",
+        "id": "FB-59",
+        "label": "SMS/Kakao 동의·템플릿·발송결과",
+        "section": "8",
+        "status": "partial"
+      },
+      {
+        "evidence": "append-only journal/audit",
+        "group": "운영·보안",
+        "id": "FB-60",
+        "label": "재무·포인트 변경 감사 이력",
+        "section": "8",
+        "status": "complete"
+      },
+      {
+        "evidence": "정책 검토 스냅샷·승인 시 버전 일치 검사·기존 계약/현재 정책 비교·계약 당시 규칙 설명 구현; 실제 고객 확정 규정/약관 검증 남음",
+        "group": "정책·인수자료",
+        "id": "FB-61",
+        "label": "운영규정·약관·고객설명·시스템 일치",
+        "section": "1,9–12",
+        "status": "partial"
+      },
+      {
+        "evidence": "policyReview/Approve",
+        "group": "정책·인수자료",
+        "id": "FB-62",
+        "label": "정책 검토·시행일·이중 승인",
+        "section": "1,9–12",
+        "status": "complete"
+      },
+      {
+        "evidence": "고정 80항목 반영 현황",
+        "group": "정책·인수자료",
+        "id": "FB-63",
+        "label": "개발사 항목별 구현/상태 응답표",
+        "section": "1,9–12",
+        "status": "complete"
+      },
+      {
+        "evidence": "전체 화면·역할·서버/로컬 저장 범위·테스트 계정/시나리오·자동화 패키지 안내",
+        "group": "정책·인수자료",
+        "id": "FB-64",
+        "label": "화면목록·상태·테스트 계정 안내",
+        "section": "1,9–12",
+        "status": "complete"
+      },
+      {
+        "evidence": "서버 HTML·Playwright 24개 등록/패키지·HTTP 검증 제공; 실제 브라우저 영상/스크린샷 미확보",
+        "group": "정책·인수자료",
+        "id": "FB-65",
+        "label": "실화면·버튼 검수 영상/스크린샷",
+        "section": "1,9–12",
+        "status": "external"
+      },
+      {
+        "evidence": "구성도·핵심 논리 ERD·53개 테이블/컬럼·PG/개인정보 흐름도와 인수 문서",
+        "group": "정책·인수자료",
+        "id": "FB-66",
+        "label": "구조·ERD·PG·개인정보 흐름도",
+        "section": "1,9–12",
+        "status": "complete"
+      },
+      {
+        "evidence": "화면/버전/재현 순서/기대·실제 동작 제보와 재검수·재오픈·인수 가이드 제공; 견적/일정·고객 최종 인수 합의 남음",
+        "group": "정책·인수자료",
+        "id": "FB-67",
+        "label": "견적·일정·테스트 인수 기준",
+        "section": "1,9–12",
+        "status": "partial"
+      },
+      {
+        "evidence": "코드 존재와 소유권 계약은 별도",
+        "group": "정책·인수자료",
+        "id": "FB-68",
+        "label": "소스·도메인·서버·데이터 소유/유지보수 인계",
+        "section": "1,9–12",
+        "status": "external"
+      },
+      {
+        "evidence": "보류, 가정값으로 대체 불가",
+        "group": "정책·인수자료",
+        "id": "FB-69",
+        "label": "PG 결제모델·법무·회계 확인서",
+        "section": "1,9–12",
+        "status": "external"
+      },
+      {
+        "evidence": "요구사항 분모 고정/완료만 집계",
+        "group": "정책·인수자료",
+        "id": "FB-70",
+        "label": "외부 검증과 코드 반영률 별도 표시",
+        "section": "1,9–12",
+        "status": "complete"
+      },
+      {
+        "evidence": "도메인/API 회귀 테스트",
+        "group": "운영 검증·연계",
+        "id": "FB-71",
+        "label": "결제 성공·실패·중복·해지 자동검증",
+        "section": "10–12",
+        "status": "complete"
+      },
+      {
+        "evidence": "D1 CAS/원수단 반환 테스트",
+        "group": "운영 검증·연계",
+        "id": "FB-72",
+        "label": "포인트 사용·복원·동시성 검증",
+        "section": "10–12",
+        "status": "complete"
+      },
+      {
+        "evidence": "정규 주문 견적→D1 예약→분할납부→부분취소/잔금 정리 통합 검증",
+        "group": "운영 검증·연계",
+        "id": "FB-73",
+        "label": "예약·취소·분할 납부 자동검증",
+        "section": "10–12",
+        "status": "complete"
+      },
+      {
+        "evidence": "두 사이트 전체 범위 별도 SQLite/객체 복원·해시/키 검증 구현; 실제 호스팅 복구 훈련 미검증",
+        "group": "운영 검증·연계",
+        "id": "FB-74",
+        "label": "회계 대사·권한·복원 테스트",
+        "section": "10–12",
+        "status": "partial"
+      },
+      {
+        "evidence": "기존 owner-only 유지",
+        "group": "운영 검증·연계",
+        "id": "FB-75",
+        "label": "직원/회원 실제 로그인 접속 검증",
+        "section": "10–12",
+        "status": "external"
+      },
+      {
+        "evidence": "고객 QA 수집 화면만 준비",
+        "group": "운영 검증·연계",
+        "id": "FB-76",
+        "label": "아이폰/안드로이드 실제 기기 검증",
+        "section": "10–12",
+        "status": "external"
+      },
+      {
+        "evidence": "가상 테스트와 별도",
+        "group": "운영 검증·연계",
+        "id": "FB-77",
+        "label": "실회원 소규모 시범 운영",
+        "section": "10–12",
+        "status": "external"
+      },
+      {
+        "evidence": "미납/중복/불명 승인/부분 취소/키 오류/백업 실패/개인정보 요청 수동 절차 및 합격 기준",
+        "group": "운영 검증·연계",
+        "id": "FB-78",
+        "label": "예외처리·장애·수동 운영 매뉴얼",
+        "section": "10–12",
+        "status": "complete"
+      },
+      {
+        "evidence": "본인 바인딩→계약→주문 배정→예약 및 검증된 CRM 프로필 연결",
+        "group": "운영 검증·연계",
+        "id": "FB-79",
+        "label": "상품·CRM·회원 계약 단일 연결",
+        "section": "10–12",
+        "status": "complete"
+      },
+      {
+        "evidence": "지급 근거 거래 정정 자동 감지·재무 검토/분리 승인·승인 건 원 보상 BP 회수/보류/재점검·청구 당시 요율 보존 구현; 실제 고객 확정 취소/보상 정책 검증 남음",
+        "group": "운영 검증·연계",
+        "id": "FB-80",
+        "label": "보상 취소·유효기간·등급변경 확정정책",
+        "section": "10–12",
+        "status": "partial"
+      }
+    ],
+    "total": 80
+  },
+  "workflow_results": {
+    "T01": {
+      "label": "가입·첫 납부",
+      "priority": "P0",
+      "fb_ids": [
+        "FB-01",
+        "FB-02",
+        "FB-03",
+        "FB-04",
+        "FB-05"
+      ],
+      "status": "unmeasured",
+      "counts": {
+        "pass": 1,
+        "fail": 0,
+        "blocked": 0,
+        "unmeasured": 1
+      }
+    },
+    "T02": {
+      "label": "정기청구·중복·불확실 응답",
+      "priority": "P0",
+      "fb_ids": [
+        "FB-07",
+        "FB-09",
+        "FB-10"
+      ],
+      "status": "pass",
+      "counts": {
+        "pass": 3,
+        "fail": 0,
+        "blocked": 0,
+        "unmeasured": 0
+      }
+    },
+    "T03": {
+      "label": "상품 등록·다른 기기 조회",
+      "priority": "P0",
+      "fb_ids": [
+        "FB-21",
+        "FB-22",
+        "FB-23",
+        "FB-79"
+      ],
+      "status": "unmeasured",
+      "counts": {
+        "pass": 0,
+        "fail": 0,
+        "blocked": 0,
+        "unmeasured": 1
+      }
+    },
+    "T04": {
+      "label": "상품 신청·가격·재고·확정",
+      "priority": "P0",
+      "fb_ids": [
+        "FB-24",
+        "FB-25",
+        "FB-26",
+        "FB-27",
+        "FB-28"
+      ],
+      "status": "unmeasured",
+      "counts": {
+        "pass": 1,
+        "fail": 0,
+        "blocked": 0,
+        "unmeasured": 1
+      }
+    },
+    "T05": {
+      "label": "본인 납입원금 우선 사용",
+      "priority": "P0",
+      "fb_ids": [
+        "FB-13",
+        "FB-14"
+      ],
+      "status": "fail",
+      "counts": {
+        "pass": 0,
+        "fail": 1,
+        "blocked": 0,
+        "unmeasured": 1
+      }
+    },
+    "T06": {
+      "label": "BP 한도·미확정 우선순위",
+      "priority": "P0",
+      "fb_ids": [
+        "FB-15",
+        "FB-49",
+        "FB-61"
+      ],
+      "status": "unmeasured",
+      "counts": {
+        "pass": 0,
+        "fail": 0,
+        "blocked": 0,
+        "unmeasured": 3
+      }
+    },
+    "T07": {
+      "label": "취소·원수단 복원·원장 일치",
+      "priority": "P0",
+      "fb_ids": [
+        "FB-19",
+        "FB-29",
+        "FB-80"
+      ],
+      "status": "unmeasured",
+      "counts": {
+        "pass": 1,
+        "fail": 0,
+        "blocked": 0,
+        "unmeasured": 1
+      }
+    },
+    "T08": {
+      "label": "탈퇴·정지·원금 반환 한도",
+      "priority": "P0",
+      "fb_ids": [
+        "FB-20",
+        "FB-33",
+        "FB-39",
+        "FB-40"
+      ],
+      "status": "unmeasured",
+      "counts": {
+        "pass": 0,
+        "fail": 0,
+        "blocked": 0,
+        "unmeasured": 2
+      }
+    },
+    "T09": {
+      "label": "권한·감사·MFA·개인정보",
+      "priority": "P0",
+      "fb_ids": [
+        "FB-44",
+        "FB-53",
+        "FB-55",
+        "FB-56",
+        "FB-60"
+      ],
+      "status": "unmeasured",
+      "counts": {
+        "pass": 1,
+        "fail": 0,
+        "blocked": 0,
+        "unmeasured": 1
+      }
+    },
+    "T10": {
+      "label": "실제 PG·실기기·복구",
+      "priority": "P0",
+      "fb_ids": [
+        "FB-65",
+        "FB-69",
+        "FB-74",
+        "FB-75",
+        "FB-76",
+        "FB-77"
+      ],
+      "status": "unmeasured",
+      "counts": {
+        "pass": 0,
+        "fail": 0,
+        "blocked": 0,
+        "unmeasured": 3
+      }
+    },
+    "TERM": {
+      "label": "전체 용어·도움말",
+      "priority": "P1",
+      "fb_ids": [
+        "FB-33",
+        "FB-61"
+      ],
+      "status": "fail",
+      "counts": {
+        "pass": 0,
+        "fail": 1,
+        "blocked": 0,
+        "unmeasured": 1
+      }
+    }
+  },
+  "ux_observations": [
+    {
+      "screen": "검수/개발현황/앱",
+      "priority": "P1",
+      "before": "약어 전체 명칭 누락 여부 자동 대조",
+      "proposed_after": "전체 명칭(약어)와 키보드/터치 도움말",
+      "actual_user_observation": false
+    }
+  ],
+  "device_matrix": [
+    {
+      "device": "Windows Chrome",
+      "status": "NOT RUN",
+      "evidence": null
+    },
+    {
+      "device": "Windows Edge",
+      "status": "NOT RUN",
+      "evidence": null
+    },
+    {
+      "device": "macOS Safari",
+      "status": "NOT RUN",
+      "evidence": null
+    },
+    {
+      "device": "Android Chrome",
+      "status": "NOT RUN",
+      "evidence": null
+    },
+    {
+      "device": "iPhone Safari",
+      "status": "NOT RUN",
+      "evidence": null
+    }
+  ],
+  "viewport_matrix": [
+    {
+      "width": 360,
+      "status": "NOT RUN",
+      "evidence": null
+    },
+    {
+      "width": 390,
+      "status": "NOT RUN",
+      "evidence": null
+    },
+    {
+      "width": 768,
+      "status": "NOT RUN",
+      "evidence": null
+    },
+    {
+      "width": 1280,
+      "status": "NOT RUN",
+      "evidence": null
+    }
+  ],
+  "retest_regression": {
+    "status": "NOT RUN",
+    "fixed_revision": null,
+    "original_defect_ids": [
+      "BUG-POLICY-001",
+      "BUG-TERM-001"
+    ]
+  }
+}
