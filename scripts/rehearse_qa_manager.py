@@ -62,7 +62,7 @@ def main():
             before = request(base,manager,'POST',review_path,review_body)
             assert before['status'] == 409, before
             events.append(dict(check='mandatory_qa_before_review',status=409,passed=True))
-            for case in ('pass','critical_unmeasured','coverage_missing','source_mismatch','task_mismatch'):
+            for case in ('pass','critical_unmeasured','coverage_missing','source_mismatch','task_mismatch','priority_downgrade'):
                 task_id = task['id'] if case=='pass' else 'rehearsal-'+case
                 received = request(base,manager,'POST','/v1/qa/jobs',dict(
                     approval=approval,request_key='request-'+case,task=task_id))
@@ -74,8 +74,12 @@ def main():
                     adapter_release='reviewed-offline-ledger-v1',source_revision=revision)
                 if case=='critical_unmeasured':
                     report['scenarios'][0].update(status='unmeasured',executed=False,asserted=False)
+                    report['counts'].update(executed=287,asserted=287,**{'pass':287,'unmeasured':1})
                 if case=='coverage_missing': report['coverage']['required'] = []
                 if case=='source_mismatch': report['source_revision'] = '0'*40
+                if case=='priority_downgrade':
+                    report['scenarios'][0]['priority'] = 'P3'
+                    report['scenarios'][0]['risk']['priority'] = 'P3'
                 if case=='task_mismatch': report['job_binding']['task'] = 'unrelated-task'
                 report['report_digest'] = digest({k:v for k,v in report.items() if k!='report_digest'})
                 result = request(base,worker,'POST',path+'/result',dict(report=report))['job']
@@ -84,7 +88,8 @@ def main():
                 expected_state = 'accepted' if case=='pass' else 'blocked'
                 assert result['state'] == expected_state, result['decision']
                 events.append(dict(check=case,state=result['state'],
-                    reasons=result['decision']['reasons'],counts=report['counts'],
+                    reasons=result['decision']['reasons'],submitted_counts=report['counts'],
+                    submitted_report=report,manager_decision=result['decision'],
                     report_digest=report['report_digest'],recovered_identically=True,passed=True))
                 if case=='pass':
                     replay = request(base,worker,'POST',path+'/claim',{})
