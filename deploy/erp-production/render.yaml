@@ -13,10 +13,10 @@ services:
     maxShutdownDelaySeconds: 300
     envVars:
       - key: ERP_BASE_URL
-        sync: false
+        value: https://bellavita-erp-workbench.shrewdmaxim1.chatgpt.site
       - key: ERP_SITE_TOKEN
         sync: false
       - key: ERP_WORKER_KEY
-        sync: false
+        generateValue: true
       - key: ERP_RUNTIME_SHA256
-        sync: false
+        value: c569c6d7433a35648968406605a1ca13755a20abd7450d29e7caf31e854effcb
