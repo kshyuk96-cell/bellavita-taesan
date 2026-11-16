@@ -451,6 +451,7 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
                         record=db.execute('SELECT number,before FROM copies WHERE key=?',(copy_key,)).fetchone()
                         copies.append({'price':price,'recorded':bool(record),'productId':record[0] if record else None,'baselineProductCount':len(json.loads(record[1])) if record else None})
             if any(x['productId'] for x in copies):
+                from blogpay import BlogPay
                 client=BlogPay(os.getenv('BLOGPAY_SHOP_ID',''),os.getenv('BLOGPAY_API_TOKEN',''))
                 template=client.detail(os.getenv('BLOGPAY_INVITATION_TEMPLATE_ID'))
                 for entry in copies:
