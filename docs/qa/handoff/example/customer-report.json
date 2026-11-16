@@ -1,0 +1,2565 @@
+{
+  "schema": "customer-handoff-report/v1",
+  "document_status": "DRAFT_NOT_VERIFIED",
+  "project": "희망투어클럽",
+  "target": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+  "summary": {
+    "total": 38,
+    "counts": {
+      "PASS": 0,
+      "FAIL": 0,
+      "BLOCKED": 0,
+      "NOT RUN": 38
+    },
+    "executed": 0,
+    "customer_ready": false,
+    "recommendation": "검증 준비·미실시; 완료 확인서로 고객 인계 불가",
+    "source_revision": null,
+    "actual_pg": "미검증",
+    "usability": {
+      "participants": 0,
+      "task_success_rate": null
+    },
+    "operational_authorization": false,
+    "customer_acceptance_approved": false
+  },
+  "required_evidence": {
+    "MEM-01": [
+      "mem-01_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "MEM-02": [
+      "mem-02_api",
+      "ui",
+      "policy"
+    ],
+    "MEM-03": [
+      "mem-03_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "MEM-04": [
+      "mem-04_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "MEM-05": [
+      "mem-05_api",
+      "ui"
+    ],
+    "MEM-06": [
+      "mem-06_api",
+      "ui",
+      "policy"
+    ],
+    "MEM-07": [
+      "mem-07_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "MEM-08": [
+      "mem-08_api",
+      "ui",
+      "policy"
+    ],
+    "MEM-09": [
+      "mem-09_api",
+      "ui"
+    ],
+    "MEM-10": [
+      "terms_html",
+      "keyboard_touch",
+      "mobile_help"
+    ],
+    "PRD-01": [
+      "prd-01_api",
+      "ui",
+      "policy"
+    ],
+    "PRD-02": [
+      "prd-02_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "PRD-03": [
+      "prd-03_api",
+      "ui",
+      "policy"
+    ],
+    "PRD-04": [
+      "prd-04_api",
+      "ui",
+      "policy",
+      "inventory",
+      "supplier_inventory"
+    ],
+    "PRD-05": [
+      "prd-05_api",
+      "ui"
+    ],
+    "PRD-06": [
+      "prd-06_api",
+      "ui"
+    ],
+    "PRD-07": [
+      "prd-07_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "PRD-08": [
+      "prd-08_api",
+      "ui",
+      "policy"
+    ],
+    "PAY-01": [
+      "pay-01_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "PAY-02": [
+      "pay-02_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "PAY-03": [
+      "pay-03_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "PAY-04": [
+      "pay-04_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "PAY-05": [
+      "pay-05_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "PAY-06": [
+      "duplicate_booking",
+      "duplicate_payment",
+      "ledger",
+      "ui",
+      "pg",
+      "policy"
+    ],
+    "PAY-07": [
+      "unknown_payment",
+      "ledger",
+      "ui",
+      "pg",
+      "policy"
+    ],
+    "PAY-08": [
+      "partial_refund",
+      "ledger",
+      "inventory",
+      "ui",
+      "pg",
+      "policy"
+    ],
+    "PAY-09": [
+      "pay-09_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "PAY-10": [
+      "pay-10_api",
+      "ui",
+      "ledger",
+      "policy",
+      "pg"
+    ],
+    "UX-01": [
+      "task_metrics",
+      "ui"
+    ],
+    "UX-02": [
+      "mobile_layout",
+      "actual_devices"
+    ],
+    "UX-03": [
+      "ux-03_api",
+      "ui"
+    ],
+    "SEC-01": [
+      "sec-01_api",
+      "ui",
+      "policy"
+    ],
+    "SEC-02": [
+      "sec-02_api",
+      "ui",
+      "policy"
+    ],
+    "OPS-01": [
+      "backup_restore",
+      "regression_api",
+      "ui"
+    ],
+    "E2E-01": [
+      "e2e-01_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "E2E-02": [
+      "refund_flow",
+      "ledger",
+      "inventory",
+      "ui",
+      "pg",
+      "policy"
+    ],
+    "E2E-03": [
+      "e2e-03_api",
+      "ui",
+      "ledger",
+      "policy"
+    ],
+    "E2E-04": [
+      "recovery_api",
+      "last_seat_api",
+      "inventory",
+      "ui",
+      "pg",
+      "policy"
+    ]
+  },
+  "scenarios": [
+    {
+      "test_id": "MEM-01",
+      "requirement_id": "MEM-01",
+      "group": "회원관리",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "3등급 최초 납부·월회비/가입비 분리",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01",
+          "U02",
+          "U03"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "75,000 / 150,000 / 300,000원; 원금은 월회비만",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "MEM-02",
+      "requirement_id": "MEM-02",
+      "group": "회원관리",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "카드 거절 시 미활성·미적립",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01",
+          "C02"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "납부 대기; DP=BP=0",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "MEM-03",
+      "requirement_id": "MEM-03",
+      "group": "회원관리",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "원금 누계/사용/잔액·BP/SP 구분",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U04"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "원금·무상 포인트 별도 표시",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "MEM-04",
+      "requirement_id": "MEM-04",
+      "group": "회원관리",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "정기청구·다음 회차·원장 1회",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01",
+          "C01"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "월 청구와 원금 적립 각 1회",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "MEM-05",
+      "requirement_id": "MEM-05",
+      "group": "회원관리",
+      "priority": "P1",
+      "risk": {
+        "priority": "P1",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "미납·재시도·휴면·정지·알림",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U08"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "실패 횟수별 승인된 상태 전환",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "MEM-06",
+      "requirement_id": "MEM-06",
+      "group": "회원관리",
+      "priority": "P1",
+      "risk": {
+        "priority": "P1",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "등급 변경 적용일·예정 청구",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01",
+          "U02",
+          "U03"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "적용일·혜택·청구액 일치",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "MEM-07",
+      "requirement_id": "MEM-07",
+      "group": "회원관리",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "탈퇴·정기결제 중단·원금 상한",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U09"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "반환 750,000원 이하; BP 제외",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "MEM-08",
+      "requirement_id": "MEM-08",
+      "group": "회원관리",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "자격 중지 정책",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U08"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "정지≠자동 전액 환불",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "MEM-09",
+      "requirement_id": "MEM-09",
+      "group": "회원관리",
+      "priority": "P1",
+      "risk": {
+        "priority": "P1",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "추천 중복·취소·회수",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "원 보상별 중복 지급/회수 없음",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "MEM-10",
+      "requirement_id": "MEM-10",
+      "group": "회원관리",
+      "priority": "P1",
+      "risk": {
+        "priority": "P1",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "약어 전체 명칭·모바일 도움말",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U10"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "DP/BP/SP/CP 등 전체 명칭·누를 수 있는 설명",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PRD-01",
+      "requirement_id": "PRD-01",
+      "group": "상품",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "관리자 등록→고객 노출·수정",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P01"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "서버에 저장된 동일 상품 노출",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PRD-02",
+      "requirement_id": "PRD-02",
+      "group": "상품",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "등급·옵션·객실별 총액",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P01",
+          "P02",
+          "P04"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "표시=서버 견적=결제 총액",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PRD-03",
+      "requirement_id": "PRD-03",
+      "group": "상품",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "신청·확보·확정·관리자 조회",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P02",
+          "U04"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "예약 1건, 재고 1석 차감",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PRD-04",
+      "requirement_id": "PRD-04",
+      "group": "상품",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "마지막 1석 동시신청",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P02"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "확정 합계 1 이하; 초과예약 없음",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PRD-05",
+      "requirement_id": "PRD-05",
+      "group": "상품",
+      "priority": "P1",
+      "risk": {
+        "priority": "P1",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "매진/마감 차단·대체 안내",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P03"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "신청 차단과 다음 행동 안내",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PRD-06",
+      "requirement_id": "PRD-06",
+      "group": "상품",
+      "priority": "P1",
+      "risk": {
+        "priority": "P1",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "예약금·잔금·미납·기한",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P04"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "분할청구 합계·확정 상태 일치",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PRD-07",
+      "requirement_id": "PRD-07",
+      "group": "상품",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "취소 후 재고·원수단 복원",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P02",
+          "R01"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "DP/BP/SP·카드·재고 원거래별 복원",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PRD-08",
+      "requirement_id": "PRD-08",
+      "group": "상품",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "교차 브라우저 동일 서버 데이터",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P01",
+          "U04"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "상품·예약·원장 동일; 타인 접근 금지",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PAY-01",
+      "requirement_id": "PAY-01",
+      "group": "결제",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "원금 우선 혼합결제",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U04",
+          "P02"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "DP600000→BP100000→SP100000→카드200000",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PAY-02",
+      "requirement_id": "PAY-02",
+      "group": "결제",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "원금 충분",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U06"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "DP 전액, BP/SP 차감 0",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PAY-03",
+      "requirement_id": "PAY-03",
+      "group": "결제",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "원금 0",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U05"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "추가 포인트/카드 합계=상품가",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PAY-04",
+      "requirement_id": "PAY-04",
+      "group": "결제",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "등급×상품 BP 상한",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01",
+          "U02",
+          "U03",
+          "P01",
+          "P02",
+          "P03"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "희망15/10/50%;행복20/15/70%;프리미엄25/18/100%",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PAY-05",
+      "requirement_id": "PAY-05",
+      "group": "결제",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "카드 실패 후 중복차감 방지",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "C02",
+          "U04"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "실패 후 원금·포인트·재고 손실 없음",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PAY-06",
+      "requirement_id": "PAY-06",
+      "group": "결제",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "더블클릭·재시도·중복콜백",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "C04"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "승인·적립·예약 각각 1회",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PAY-07",
+      "requirement_id": "PAY-07",
+      "group": "결제",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "응답 불명 조회 후 복구",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "C03"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "확인 전 재청구 금지, 원거래 대조",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PAY-08",
+      "requirement_id": "PAY-08",
+      "group": "결제",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "부분취소·원수단·PG/원장",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "C05",
+          "R02"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "원수단 배분 정책 승인 후 대사",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PAY-09",
+      "requirement_id": "PAY-09",
+      "group": "결제",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "본인 원금 반환 상한",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U09"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "max(0,1200000-450000)=750000;BP85000 제외",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "PAY-10",
+      "requirement_id": "PAY-10",
+      "group": "결제",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "PG 승인·취소·정산 대사",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "C01",
+          "C05"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "PG 테스트 기록과 거래별 원장 일치",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "UX-01",
+      "requirement_id": "UX-01",
+      "group": "UX·보안",
+      "priority": "P1",
+      "risk": {
+        "priority": "P1",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "첫 방문 고객 무설명 완료",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U01",
+          "P02"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "성공률·소요시간·오류·도움요청 실측",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "UX-02",
+      "requirement_id": "UX-02",
+      "group": "UX·보안",
+      "priority": "P1",
+      "risk": {
+        "priority": "P1",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "360px 모바일 가독성",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U10"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "360/390/768/1280px 및 실기기 기록",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "UX-03",
+      "requirement_id": "UX-03",
+      "group": "UX·보안",
+      "priority": "P1",
+      "risk": {
+        "priority": "P1",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "오류 원인·수정·다음 행동",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "C02"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "구체적이고 복구 가능한 오류 안내",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "SEC-01",
+      "requirement_id": "SEC-01",
+      "group": "UX·보안",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "회원의 관리자·재무 접근 거절",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U10"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "인증·역할·회사/본인 범위 차단",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "SEC-02",
+      "requirement_id": "SEC-02",
+      "group": "UX·보안",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "카드번호 미저장·마스킹·로그",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U10"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "PAN/CVC 미보관, 개인정보 접근 기록",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "OPS-01",
+      "requirement_id": "OPS-01",
+      "group": "UX·보안",
+      "priority": "P1",
+      "risk": {
+        "priority": "P1",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "백업복구·배포 후 핵심 회귀",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "P01",
+          "U01"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "별도 복원 환경·정합성·회귀 증거",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "E2E-01",
+      "requirement_id": "E2E-01",
+      "group": "통합",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "원금 우선 혼합결제 통합",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U04",
+          "P02"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "원금/포인트/카드/재고/예약/원장 일치",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "E2E-02",
+      "requirement_id": "E2E-02",
+      "group": "통합",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "취소·환불 통합",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U04",
+          "P02",
+          "R01"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "원수단/재고/화면/PG/원장 일치",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "E2E-03",
+      "requirement_id": "E2E-03",
+      "group": "통합",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "업무 완료와 화면 이해에 영향",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "탈퇴 통합",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U09"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "청구 중단→750000원 한도→승인·감사",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    },
+    {
+      "test_id": "E2E-04",
+      "requirement_id": "E2E-04",
+      "group": "통합",
+      "priority": "P0",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "title": "마지막 재고·타임아웃 복구",
+      "tested_at": null,
+      "performer": null,
+      "reviewer": null,
+      "deployed_revision": null,
+      "environment": {
+        "url": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/",
+        "browser": null,
+        "device": null,
+        "os": null,
+        "pg_mode": "unverified"
+      },
+      "preconditions": {
+        "dataset_ids": [
+          "U04",
+          "P02",
+          "C03"
+        ]
+      },
+      "execution_steps": null,
+      "expected": {
+        "description": "확보 만료·원거래 조회·중복청구 없음",
+        "approval": "customer_reference; unresolved policies require decision"
+      },
+      "actual": {
+        "ui": null,
+        "server": null,
+        "pg": null
+      },
+      "status": "NOT RUN",
+      "evidence": [],
+      "defect_ids": [],
+      "retest": {
+        "fixed_revision": null,
+        "tested_at": null,
+        "actual": null,
+        "final_verdict": "NOT RUN"
+      },
+      "note": "실제 실행 증거를 수집하기 전 준비 상태",
+      "developer_refs": []
+    }
+  ],
+  "qa_added_checks": [
+    {
+      "id": "QA-access-normal",
+      "group": "권한·보안",
+      "title": "정상 업무 완료",
+      "expected": "초기값→행동→최종 상태를 화면과 서버에서 대조",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-access-boundary",
+      "group": "권한·보안",
+      "title": "빈값·잘못된 타입·경계값",
+      "expected": "최소/최대/1원 경계·오류 복구를 확인",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-access-access",
+      "group": "권한·보안",
+      "title": "본인·다른 사용자·회사·역할",
+      "expected": "허용된 업무만 접근 가능하며 정보가 노출되지 않음",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-access-duplicate",
+      "group": "권한·보안",
+      "title": "중복 클릭·요청·재전달",
+      "expected": "같은 요청의 예약·차감·적립·승인은1회",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-access-recovery",
+      "group": "권한·보안",
+      "title": "타임아웃·중단·재시작",
+      "expected": "불명확한 결과는 조회 전 재실행하지 않음",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-access-cancel",
+      "group": "권한·보안",
+      "title": "취소·되돌리기·원수단 복원",
+      "expected": "원거래·재고·잔액·원장이 승인된 정책대로 복원",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-access-regression",
+      "group": "권한·보안",
+      "title": "연관 기능 회귀",
+      "expected": "변경 전 정상 기능과 관련 업무 흐름 유지",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-money-normal",
+      "group": "결제·정산",
+      "title": "정상 업무 완료",
+      "expected": "초기값→행동→최종 상태를 화면과 서버에서 대조",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-money-boundary",
+      "group": "결제·정산",
+      "title": "빈값·잘못된 타입·경계값",
+      "expected": "최소/최대/1원 경계·오류 복구를 확인",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-money-access",
+      "group": "결제·정산",
+      "title": "본인·다른 사용자·회사·역할",
+      "expected": "허용된 업무만 접근 가능하며 정보가 노출되지 않음",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-money-duplicate",
+      "group": "결제·정산",
+      "title": "중복 클릭·요청·재전달",
+      "expected": "같은 요청의 예약·차감·적립·승인은1회",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-money-recovery",
+      "group": "결제·정산",
+      "title": "타임아웃·중단·재시작",
+      "expected": "불명확한 결과는 조회 전 재실행하지 않음",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-money-cancel",
+      "group": "결제·정산",
+      "title": "취소·되돌리기·원수단 복원",
+      "expected": "원거래·재고·잔액·원장이 승인된 정책대로 복원",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    },
+    {
+      "id": "QA-money-regression",
+      "group": "결제·정산",
+      "title": "연관 기능 회귀",
+      "expected": "변경 전 정상 기능과 관련 업무 흐름 유지",
+      "origin": "qa_added",
+      "risk": {
+        "priority": "P0",
+        "impact": "금액·권한·데이터·핵심 업무의 잘못된 처리",
+        "likelihood": "경계·중복·역할·복구 경로에서 발생 가능",
+        "recovery": "원거래와 초기 상태를 복원하고 동일 조건 재시험 필요",
+        "reason": "독립 QA 분류; 개발자의 통과 표시나 낮은 중요도로 자동 하향하지 않음"
+      },
+      "required": [
+        "ui",
+        "api"
+      ],
+      "execution_status": "NOT RUN"
+    }
+  ],
+  "developer_claims": [
+    {
+      "id": "DEV-001",
+      "title": "희망·행복·프리미엄 회원가입 금액 확인",
+      "developer_claimed_status": "claimed_pass",
+      "developer_expected": null,
+      "verified": false,
+      "interpretation": "developer_statement_not_execution_evidence"
+    },
+    {
+      "id": "DEV-002",
+      "title": "원금 우선 결제 및 취소 후 원수단 복원",
+      "developer_claimed_status": "claimed_pass",
+      "developer_expected": null,
+      "verified": false,
+      "interpretation": "developer_statement_not_execution_evidence"
+    },
+    {
+      "id": "DEV-003",
+      "title": "일반회원의 관리자·재무 접근 차단",
+      "developer_claimed_status": "claimed_pass",
+      "developer_expected": null,
+      "verified": false,
+      "interpretation": "developer_statement_not_execution_evidence"
+    }
+  ],
+  "accounts": [],
+  "plan_digest": "aff6bd83c15cb83b19cd329139955c0662cefdcf755c5e3b1643ff9edfe44960",
+  "missing_evidence": [
+    "테스트 계정의 보안 전달",
+    "실제 브라우저 실행과 전후 화면",
+    "후보 버전의 신뢰 가능한 식별·실행 전후 일치",
+    "서버/API·원장·결제 결과의 필요한 읽기 연결",
+    "업무 규칙의 근거와 미확정 항목 확인"
+  ],
+  "policy_decisions_pending": [
+    "BP/SP 상대 순서",
+    "CP 사용·반환 조건",
+    "가입비 반환 여부",
+    "자격 중지 시 청구·반환 시점",
+    "취소수수료 원수단별 배분"
+  ],
+  "read_only_probe": null,
+  "browser_readiness": {
+    "environment": "managed-linux",
+    "supported_tool_present": false,
+    "status": "NOT RUN",
+    "instruction": "skill://plugin_connector_1p_689987207de08191979cf68eca2941c6/sites/SKILL.md",
+    "automatic_fallback": false,
+    "preview_started": false,
+    "browser_installed": false,
+    "actual_browser_verified": false,
+    "source_revision": null,
+    "reason": "candidate_identity_pending; cua_repl_unavailable_skip_browser_qa",
+    "planned_widths": [
+      360,
+      390,
+      768,
+      1280
+    ],
+    "target": "https://hope-tour-feedback.shrewdmaxim1.chatgpt.site/review/"
+  },
+  "defects": [],
+  "formula_report": [],
+  "ux_observations": [],
+  "approval_gates": [
+    {
+      "stage": "준비",
+      "status": "BLOCKED",
+      "reason": "초기값·역할·환경 확인 전"
+    },
+    {
+      "stage": "실행",
+      "status": "BLOCKED",
+      "reason": "화면과 서버의 실제 실행 증거 없음"
+    },
+    {
+      "stage": "재시험",
+      "status": "BLOCKED",
+      "reason": "결함 수정 버전·연관 회귀 확인 전"
+    },
+    {
+      "stage": "고객 인계",
+      "status": "BLOCKED",
+      "reason": "필수 P0/P1과 미해결 주요 결함 판단 전"
+    }
+  ]
+}
