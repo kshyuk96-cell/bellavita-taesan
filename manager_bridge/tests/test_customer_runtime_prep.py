@@ -5,6 +5,7 @@ import io
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -12,8 +13,12 @@ from unittest.mock import patch
 from manager_bridge.customer_runtime_prep import prepare_locked_node, inspect_dependency_tree, validate_locked_registry_inputs, prepare_locked_registry_package, NODE, NPM
 from manager_bridge.store import Conflict
 
+INSTALLER_SENTINEL = str(Path(sys.executable).resolve())
+
 
 class RuntimePreparationTests(unittest.TestCase):
+    # Rejection checks use an existing interpreter as a forbidden installer
+    # sentinel. These cases must reject before executing Node/npm on any host.
     def setUp(self):
         self.temp=self.enterContext(tempfile.TemporaryDirectory());self.root=Path(self.temp)
         self.source=self.root/'original';self.source.mkdir()
@@ -59,7 +64,7 @@ class RuntimePreparationTests(unittest.TestCase):
         subprocess.run(['/usr/bin/git','-C',str(self.source),'add','.npmrc'],check=True,stdout=subprocess.DEVNULL)
         subprocess.run(['/usr/bin/git','-C',str(self.source),'-c','user.name=Fixture','-c','user.email=fixture@invalid','commit','-m','config'],check=True,stdout=subprocess.DEVNULL)
         sha=subprocess.check_output(['/usr/bin/git','-C',str(self.source),'rev-parse','HEAD']).decode().strip()
-        with self.assertRaisesRegex(Conflict,'override'):prepare_locked_node(self.source,sha,self.root/'config')
+        with self.assertRaisesRegex(Conflict,'override'):prepare_locked_node(self.source,sha,self.root/'config',node=INSTALLER_SENTINEL,npm=INSTALLER_SENTINEL)
 
     def test_entire_lock_rejects_nonregistry_targets_and_missing_integrity_before_npm(self):
         base=json.loads((self.source/'package-lock.json').read_text())
@@ -76,11 +81,11 @@ class RuntimePreparationTests(unittest.TestCase):
             calls=[]
             def observe_run(argv,*args,**kwargs):
                 calls.append(argv)
-                if str(argv[0])==NPM:raise AssertionError('installer invoked for hostile lock')
+                if str(argv[0])==INSTALLER_SENTINEL:raise AssertionError('installer invoked for hostile lock')
                 return actual_run(argv,*args,**kwargs)
             with self.subTest(case=i),patch('manager_bridge.customer_runtime_prep.subprocess.run',side_effect=observe_run):
-                with self.assertRaises(Conflict):prepare_locked_node(self.source,sha,self.root/('hostile-'+str(i)))
-                self.assertFalse(any(str(argv[0])==NPM for argv in calls))
+                with self.assertRaises(Conflict):prepare_locked_node(self.source,sha,self.root/('hostile-'+str(i)),node=INSTALLER_SENTINEL,npm=INSTALLER_SENTINEL)
+                self.assertFalse(any(str(argv[0])==INSTALLER_SENTINEL for argv in calls))
 
     def test_omitted_root_dev_dependencies_are_validated_and_duplicate_lock_keys_rejected(self):
         package=json.loads((self.source/'package.json').read_text())
@@ -130,11 +135,11 @@ class RuntimePreparationTests(unittest.TestCase):
         actual_run=subprocess.run;calls=[]
         def observe(argv,*args,**kwargs):
             calls.append(argv)
-            if str(argv[0])==NPM:raise AssertionError('installer invoked on attribute-transformed input')
+            if str(argv[0])==INSTALLER_SENTINEL:raise AssertionError('installer invoked on attribute-transformed input')
             return actual_run(argv,*args,**kwargs)
         with patch('manager_bridge.customer_runtime_prep.subprocess.run',side_effect=observe):
             with self.assertRaisesRegex(Conflict,'exact committed blob'):
-                prepare_locked_node(self.source,sha,self.root/'substituted')
+                prepare_locked_node(self.source,sha,self.root/'substituted',node=INSTALLER_SENTINEL,npm=INSTALLER_SENTINEL)
         staged=json.loads((self.root/'substituted'/'source'/'package.json').read_text())
         self.assertIn(sha,staged['description'])
-        self.assertFalse(any(str(argv[0])==NPM for argv in calls))
+        self.assertFalse(any(str(argv[0])==INSTALLER_SENTINEL for argv in calls))
