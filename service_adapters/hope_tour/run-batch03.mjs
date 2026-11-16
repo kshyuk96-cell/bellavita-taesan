@@ -64,9 +64,9 @@ try{execFileSync('/bin/true')}catch{checks.spawnDenied=true}
 artifacts.confinement={...checks,verified:checks.uid===65534&&checks.networkDenied&&checks.hostFsDenied&&checks.spawnDenied};
 const pages=[];
 for(const path of ['/review/','/review/features','/review/app','/review/policy']){
- const c=await fresh();const original=(await c.call(path)).data;pages.push({path,html:original.replace(/<input\b[^>]*\bname=["']password["'][^>]*>/gi,'<input name="password" value="[REDACTED]" data-qa-redacted="true">')});
+ const c=await fresh();const original=(await c.call(path)).data;pages.push({path,html:original.replace(/<input\b[^>]*\bname=["']password["'][^>]*>/gi,'<input name="password" value="[REDACTED]" data-qa-redacted="true">').replaceAll(api.rvPassword||'HopeTest!2026','[REDACTED]')});
 }
-artifacts.terms_pages=pages;artifacts.html_redactions=['password input elements replaced before reporting; other DOM retained'];
+artifacts.terms_pages=pages;artifacts.html_redactions=['password inputs and displayed synthetic login password replaced before reporting; other DOM retained'];
 const names=['본인 납입금 잔액(DP)','추가 보너스포인트(BP)','특별포인트(SP)','법인 지원포인트(CP)'];
 const adminNames=['전자결제대행사(PG)','시스템 연동 기능(API)','고객관계관리(CRM)','품질검증(QA)','핵심성과지표(KPI)'];
 const jobs=[

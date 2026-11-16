@@ -95,7 +95,9 @@ def main():
                 result=evaluate(raw,service.revision,trusted,host,baseline);last.update(result);raw['browser_plan']=result['browser_plan'];return result['common_report']
             engine=HopeEngine(registry,manifest,evaluator);outcome=QAWorker(QAClient(base,worker),registry,engine=engine).run_once(job['id'])
             if not engine.raw or not last or outcome['state'] not in ('accepted','blocked'):raise ValueError('manager execution uncertain; do not retry automatically')
-            raw=engine.raw;raw.update(engine_revision=revision,engine_files=engine_files,baseline_revision=config['baseline_revision'],manager_probe=probe)
+            raw=engine.raw
+            if 'HopeTest!2026' in json.dumps(raw,ensure_ascii=False):raise ValueError('fixture login value must be redacted before export')
+            raw.update(engine_revision=revision,engine_files=engine_files,baseline_revision=config['baseline_revision'],manager_probe=probe)
             # Recover the actual centrally stored report including job binding/receipt.
             final=jobs.get(owner,job['id']);last['common_report']=final['report'];last['admission']=final['decision']
             prior=json.loads((ROOT/'docs/qa/hope-tour/batch02/run-20261116/customer-report.json').read_text());report=customer_report(raw,last,revision,prior)
