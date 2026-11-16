@@ -45,6 +45,9 @@ def evaluate(raw,source,trusted,host,inventory_pin,inventory_contract):
     from .hope_shared_inventory import validate_contract
     if validate_contract(inventory_contract,source)!=inventory_pin:raise Conflict('trusted inventory contract mismatch')
     stock=independent_stock_check(artifacts['inventory'],inventory_contract['slots']);domain=independent_domain_check(artifacts['cleanDomain'])
+    for label,state in [('duplicate',artifacts.get('duplicate')),('partial',artifacts.get('partial'))]+[(r['slot']+'-'+stage,r.get(stage)) for r in artifacts.get('travelUnknown',[]) for stage in ('final','afterRefund')]:
+        if state is None:domain.append('missing_domain_evidence:'+label)
+        else:domain.extend(label+':'+issue for issue in independent_domain_check(state))
     faults=artifacts.get('faultInjection',[]);expected_faults={'free-stock-corruption','duplicate-debit','excess-refund','unbalanced-journal'}
     detected=[]
     for fault in faults:
@@ -69,7 +72,7 @@ def customer_report(raw,result,*,engine_revision,prior):
     empty=dict(report=dict(counts=dict(executed=16),scenarios=[]),requirements={k:dict(label=v[0],status='unmeasured') for k,v in REQUIREMENTS.items()})
     report=final_report(empty,{},engine_revision=engine_revision,sut_revision=raw['source_revision']);report['defects']=deepcopy(prior.get('defects',[]))
     checks={r['inputs']['item']:r for r in result['common_report']['scenarios']}
-    mapping={'PRD-04':66,'PRD-07':68,'PAY-05':67,'PAY-06':67,'PAY-07':69,'PAY-08':70,'E2E-02':68,'E2E-04':70}
+    mapping={'PRD-04':66,'PRD-07':68,'PAY-06':67,'PAY-07':69,'PAY-08':68,'E2E-02':68,'E2E-04':70}
     for row in report['scenarios']:
         row['environment'].update(url='local-source://'+raw['source_revision']+'/review/',inventory='shared TEST SQLite; supplier not connected');row['deployed_revision']=None
         row['preconditions']['restoration']='전용 review 메모리 DB와 공유 TEST SQLite; 승인된 fixture 자원만'

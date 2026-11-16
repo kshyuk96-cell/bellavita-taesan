@@ -36,7 +36,7 @@ def evidence():
         faults.append(dict(id=name,domain=value,targetDetected=False))
     pages=[dict(path=p,html='<body>'+''.join(v+'('+k+')' for k,v in GLOSSARY.items())+'</body>') for p in ['/review/','/review/features','/review/app','/review/policy']]
     raw=dict(schema='hope-actual-service-batch04/v1',source_revision=SOURCE,inventory_digest=validate_contract(inventory,SOURCE),scope='actual_service_source_shared_test_inventory',role='main',realPG=False,operational_authorization=False,customer_acceptance_approved=False,
-        items=[dict(id=n,actual=deepcopy(EXPECTED[n])) for n in (61,62,63,64,65,67,68,69,70)],artifacts=dict(inventory=stock,cleanDomain=d,faultInjection=faults,terms_pages=pages))
+        items=[dict(id=n,actual=deepcopy(EXPECTED[n])) for n in (61,62,63,64,65,67,68,69,70)],artifacts=dict(inventory=stock,cleanDomain=d,duplicate=deepcopy(d),partial=deepcopy(d),faultInjection=faults,terms_pages=pages))
     return raw,inventory,{n:deepcopy(EXPECTED[n]) for n in (66,76,77,78)}
 
 
@@ -70,6 +70,14 @@ class Batch04Oracles(unittest.TestCase):
         value=deepcopy(clean);value['ledger'].append(deepcopy(value['ledger'][0]));self.assertIn('duplicate_journal_source',independent_domain_check(value))
         value=deepcopy(clean);value['refunds'][0]['quote']['refund']['DP']=101
         self.assertIn('excess_refund_source',independent_domain_check(value))
+
+    def test_card_refund_event_must_match_original_refund(self):
+        state=domain();state['bookings'][0].update(total=110,plan=dict(DP=100,BP=0,SP=0,CP=0,card=10))
+        state['refunds'][0]['quote'].update(refundTotal=110);state['refunds'][0]['quote']['refund']['card']=10
+        state['travelEvents']=[dict(type='refunded',refundId='r',amount=9)]
+        self.assertIn('refund_card_event_mismatch',independent_domain_check(state))
+        state['travelEvents'][0]['amount']=10
+        self.assertEqual([],independent_domain_check(state))
 
     def test_browser_self_claim_cannot_satisfy_four_required_checks(self):
         raw,inv,host=evidence();host.update({n:True for n in (72,73,74,75)})

@@ -83,7 +83,13 @@ def independent_domain_check(state):
         if sum(r['quote']['refundTotal']+r['quote']['fee']-r['quote'].get('additionalDue',0) for r in refunds)>booking['total']:issues.append('excess_refund_total')
         for book in ('DP','BP','SP','CP','card'):
             if sum(r['quote']['refund'][book] for r in refunds)>booking['plan'][book]:issues.append('excess_refund_source')
+        if booking.get('status') in ('confirmed','cancelled','departed','completed'):
+            paid=sum(i['amount'] for i in state['invoices'] if i.get('bookingId')==booking['id'] and i['kind']=='travel' and i['status']=='paid')
+            if paid!=booking['plan']['card']:issues.append('paid_invoice_card_mismatch')
         for refund in refunds:
+            if refund['quote']['refund']['card']>0:
+                events=[e for e in state['travelEvents'] if e.get('refundId')==refund['id'] and e.get('type')=='refunded']
+                if len(events)!=1 or events[0]['amount']!=refund['quote']['refund']['card']:issues.append('refund_card_event_mismatch')
             journal=next((j for j in state['ledger'] if j['sourceKey']=='refund:'+refund['id']),None)
             for book in ('DP','BP','SP','CP'):
                 actual=sum(e['delta'] for e in (journal or {}).get('entries',[]) if e['account']==booking['contractId'] and e['book']==book)
