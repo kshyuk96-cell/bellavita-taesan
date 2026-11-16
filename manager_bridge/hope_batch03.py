@@ -107,7 +107,7 @@ def customer_report(raw,result,engine_revision,prior):
         symptom='검수 공간별 재고 독립: 전역 마지막1석 공유 보호를 검증할 수 없음',actual=raw['artifacts'].get('inventory'),
         expected='승인된 공유 비운영 재고에서 전체 확정합계1 이하',owner=None,due_date=None,fixed_revision=None,retest='FAIL'))
     states=('PASS','FAIL','BLOCKED','NOT RUN')
-    report['summary'].update(browser_plan=plan,counts={s:sum(r['status']==s for r in report['scenarios']) for s in states},
+    report['summary'].update(browser_plan=result['browser_plan'],counts={s:sum(r['status']==s for r in report['scenarios']) for s in states},
         executed=sum(r['execution_steps'] is not None for r in report['scenarios']),unique_observed_checks=sum(result['counts'][s] for s in ('pass','fail')),
         unresolved_S1_S2=sum(d.get('severity') in ('S1','S2') for d in report['defects']),recommendation='인수 차단: 전역재고·브라우저·실제PG·정책 미검증')
     report['summary']['business_results']={g:{s:sum(r['group']==g and r['status']==s for r in report['scenarios']) for s in states} for g in {r['group'] for r in report['scenarios']}}
