@@ -507,6 +507,12 @@ def load_host(config_file,*,profile_guard_factory=None):
     entries=config['projects']
     if type(entries) is not list or not 1<=len(entries)<=100:raise ValueError('explicit bounded project list required')
     store=Store(database);registry=Registry(store);core=ThreeTier(store,registry)
+    from .worker_quality_handoff import WorkerQualityHandoff
+    handoff=WorkerQualityHandoff(core)
+    def quality_provider(project,task_id,role,candidate_digest=None):
+        packet=handoff.generate(_token(manager_path),task_id,role,candidate_digest)
+        if packet['task']['project']!=project:raise Conflict('quality handoff outside registered project')
+        return packet
     projects={};providers={};fleet_box={}
     forbidden=tuple([manager_path,database,data,application,Path(config_file).absolute()]+[Path(value).absolute() for entry in entries if type(entry) is dict for value in (entry.get('developer_token_file','/nonexistent'),entry.get('reviewer_token_file','/nonexistent'))])
     for entry in entries:
@@ -538,6 +544,7 @@ def load_host(config_file,*,profile_guard_factory=None):
             with store._transaction() as c:
                 task,_,row,member=core._bound(c,current_token,assignment['id'],'developer')
                 store._lease(task,store._authenticate(c,current_token),assignment['lease_token'],c=c)
+                if assignment.get('business_baseline')!=json.loads(task['approval']).get('business_baseline'):raise Conflict('native business baseline assignment changed')
                 return (task['state']=='running' and row['state'] in ('developing','rework_developing') and
                         task['project']==project and task['version']==assignment['version'] and
                         task['manifest_digest']==assignment['manifest_digest'] and
@@ -556,7 +563,7 @@ def load_host(config_file,*,profile_guard_factory=None):
             raise ValueError('developer profile guard must be registered')
         developer=CodexHost(devsetting['binary'],devsetting['codex_home'],{
             project:ProjectBinding(project,entry['repository'],source,require_origin=devsetting.get('require_origin',True))},
-            authorize=authorize,authorize_reservation=authorize_reservation if entry.get('worker_mode')=='deferred_native' else None,diagnostic_sink=_transport_journal(store,project,'developer'),clock=store.clock,execution_timeout=devsetting.get('execution_timeout',180),profile_guard=developer_guard)
+            authorize=authorize,authorize_reservation=authorize_reservation if entry.get('worker_mode')=='deferred_native' else None,diagnostic_sink=_transport_journal(store,project,'developer'),clock=store.clock,execution_timeout=devsetting.get('execution_timeout',180),profile_guard=developer_guard,quality_provider=quality_provider)
         reviewer_guard=(profile_guard_factory('reviewer',project,entry['reviewer_id'],transport_settings['reviewer']['codex_home'],reviewfile)
                         if profile_guard_factory is not None else None)
         if profile_guard_factory is not None and not callable(reviewer_guard):
@@ -573,7 +580,7 @@ def load_host(config_file,*,profile_guard_factory=None):
                             actor['subject']==reviewer['subject'] and task['project']==project)
             transport=CodexHost(settings['binary'],settings['codex_home'],{
                 project:ProjectBinding(project,repository,frozen,require_origin=settings.get('require_origin',True))},
-                authorize_review=authorize_review,diagnostic_sink=_transport_journal(store,project,'reviewer'),clock=store.clock,execution_timeout=settings.get('execution_timeout',180),profile_guard=profile_guard)
+                authorize_review=authorize_review,diagnostic_sink=_transport_journal(store,project,'reviewer'),clock=store.clock,execution_timeout=settings.get('execution_timeout',180),profile_guard=profile_guard,quality_provider=quality_provider)
             transport.verify_confidentiality(project,forbidden,heartbeat=heartbeat)
             return transport
         projects[project]=ProjectHost(project,entry['repository'],source,candidates,runtime,

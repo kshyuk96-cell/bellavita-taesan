@@ -7,6 +7,11 @@ PREFIX='/v1/representative/runtime/governance/control/operations/'
 ROUTES={
     'preflight':('inspect',('projects',),()),
     'workers':('workers',('projects',),()),
+    'quality/baseline/draft':('baseline_draft',('project','request_key','contract'),()),
+    'quality/baseline/current':('baseline_current',('project',),()),
+    'quality/baseline/approve':('baseline_approve',('draft_id','draft_digest'),('expected_revision',)),
+    'quality/report':('quality_delivery',('projects',),('limit','cursor','freshness_limit')),
+    'quality/handoff':('handoff_packet',('task_id','role'),('candidate_digest',)),
     'host/report':('host_report',('projects',),()),
     'host/install':('install_host',('project','requirement'),('expected_revision',)),
     'host/refresh':('refresh_host',('project',),()),
@@ -47,7 +52,7 @@ def dispatch(handler,method,path,token,body=None):
     store=handler.server.store
     with store._transaction() as c:
         actor=store._authenticate(c,token)
-        store._role(actor,('owner',) if route in ('budget/install','host/install','projects/register','transition/drain','transition/resume','links/inventory','links/plan','links/get','backup/report','backup/policy','backup/rehearse') else ('owner','manager'))
+        store._role(actor,('owner',) if route in ('budget/install','host/install','projects/register','transition/drain','transition/resume','links/inventory','links/plan','links/get','backup/report','backup/policy','backup/rehearse','quality/baseline/approve') else ('owner','manager'))
     operations=getattr(handler.server,'operations_control',None)
     if operations is None:raise NotFound('operations control not configured')
     if not isinstance(operations,OperationsControl) or operations.store is not store:raise ValueError('registered operations control required')

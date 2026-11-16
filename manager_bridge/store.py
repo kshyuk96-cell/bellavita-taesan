@@ -528,6 +528,8 @@ class Store:
                 assignment = {**self._public(self._get(c, actor, row['id'])), 'lease_token': lease}
                 if policy_row:
                     assignment['execution_policy'] = policy
+                if assignment.get('approval',{}).get('business_baseline') is not None:
+                    assignment['business_baseline']=assignment['approval']['business_baseline']
                 return assignment
             return None
 
@@ -536,6 +538,8 @@ class Store:
             if c.execute('SELECT 1 FROM governance_restore_marker WHERE reconciliation_required=1 LIMIT 1').fetchone():
                 raise Conflict('restored state requires explicit verification before execution')
         approval=json.loads(row['approval']) if row['approval'] else {}
+        from .business_baselines import validate_task
+        validate_task(c,self,row)
         if json.loads(row['manifest'])['kind']=='development':
             if c is None:raise Conflict('development execution requires a transactional fence')
             enrolled=(c.execute("SELECT 1 FROM sqlite_master WHERE name='governance_enrolled_projects'").fetchone()

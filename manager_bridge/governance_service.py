@@ -242,10 +242,17 @@ def build_service(host,controller,settings,*,listen=None,governance=False,
             service.runtime_transition=RuntimeTransition(host.core,supervision=service.supervision)
             links=project_link_plan or ProjectLinkPlan(host.core,host if isinstance(host,ContinuousHost) else None,
                 brokers=() if subscription_broker is None else (subscription_broker,),templates=link_templates)
+            from .business_baselines import BusinessBaselines
+            from .quality_delivery_report import QualityDeliveryReport
+            from .worker_quality_handoff import WorkerQualityHandoff
+            baselines=BusinessBaselines(host.core)
+            quality_report=QualityDeliveryReport(host.core,baselines)
+            quality_handoff=WorkerQualityHandoff(host.core)
             readiness=PortfolioReadiness(host.core,connections=connections,budget=budget,operations_reporting=reporting)
             server.operations_control=OperationsControl(server.control_center,preflight,reporting,budget,
                 worker_links=worker_links,recovery=service.recovery,readiness=readiness,
-                transition=service.runtime_transition,link_plan=links,backup_health=backup_health)
+                transition=service.runtime_transition,link_plan=links,backup_health=backup_health,
+                baselines=baselines,quality_report=quality_report,quality_handoff=quality_handoff)
             controller.admission_budget=budget
             host.core.admission_budget=budget
         return service

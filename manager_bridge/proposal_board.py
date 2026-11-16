@@ -89,6 +89,9 @@ def validate_execution(c, store, task):
             or {'id':proposal['id'],'digest':proposal['fingerprint']} not in json.loads(batch['snapshot'])):
         raise Conflict('exact approved proposal batch task link required')
     snapshot=json.loads(proposal['snapshot'])
+    from .business_baselines import validate_task,pin
+    baseline=validate_task(c,store,task)
+    if snapshot.get('business_baseline')!=pin(baseline):raise Conflict('proposal business baseline snapshot differs')
     manifest={k:snapshot['spec'][k] for k in ('project','repository','base_sha','description','checks','kind')}
     if (json.loads(task['manifest'])!=manifest or task['manifest_digest']!=digest(manifest)
             or approval.get('version')!=task['version'] or approval.get('manifest_digest')!=task['manifest_digest']):
@@ -147,6 +150,9 @@ class ProposalBoard:
         if config['fingerprint']!=snapshot['config_fingerprint'] or _source(c,row['project'],config,self.store._now())!=snapshot['source']:
             raise Conflict('proposal source or configuration changed; create a new proposal')
         _validate_parent(c,self.store,snapshot)
+        from .business_baselines import snapshot_for_proposal,pin
+        if snapshot['spec']['kind']=='development' and snapshot.get('business_baseline')!=pin(snapshot_for_proposal(c,self.store,row['project'])):
+            raise Conflict('proposal business baseline changed; create a new proposal')
         return snapshot
 
     def _prepare_spec(self,token,request_key,spec,source='manager_proposal'):
@@ -175,6 +181,8 @@ class ProposalBoard:
         observed=_source(c,manifest['project'],config,self.store._now())
         parent_authority=_parent_authority(c,self.store,spec) if observed['sha']!=manifest['base_sha'] else None
         snapshot={'spec':spec,'config_fingerprint':config['fingerprint'],'source':observed}
+        from .business_baselines import snapshot_for_proposal,pin
+        if manifest['kind']=='development':snapshot['business_baseline']=pin(snapshot_for_proposal(c,self.store,manifest['project']))
         if parent_authority is not None:snapshot['parent_authority']=parent_authority
         key=secrets.token_hex(16)
         c.execute('INSERT INTO manager_proposals VALUES (?,?,?,?,?,?,NULL)',(key,actor['token_hash'],request_key,manifest['project'],canonical_json(snapshot),digest(snapshot)))
@@ -370,6 +378,7 @@ class ProposalBoard:
                 policy={'version':1,'manifest_digest':md,'allowed_paths':spec['allowed_paths'],'dependencies':bindings,'routing_required':True}
                 approval={'actor':actor['subject'],'version':1,'manifest_digest':md,'approved_at':now,'policy_digest':digest(policy),
                           'proposal_batch_id':batch_id,'proposal_id':row['id'],'proposal_digest':row['fingerprint'],'owner_hash':actor['token_hash'],'qa_policy_digest':qa_policy_digest}
+                if snapshot.get('business_baseline') is not None:approval['business_baseline']=snapshot['business_baseline']
                 c.execute("INSERT INTO bridge_tasks (id,project,request_key,manifest,manifest_digest,version,state,approval,created,updated) VALUES (?,?,?,?,?,1,'queued',?,?,?)",(task,row['project'],'proposal-'+row['id'],canonical_json(manifest),md,canonical_json(approval),now,now))
                 c.execute('INSERT INTO bridge_task_policy VALUES (?,?,?)',(task,canonical_json(policy),digest(policy)))
                 c.execute('UPDATE manager_proposals SET task=? WHERE id=?',(task,row['id']))
