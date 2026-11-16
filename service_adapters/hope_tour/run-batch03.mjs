@@ -80,7 +80,13 @@ const jobs=[
    const c=await fresh(dataset);await c.command('registerCard',{scenario:'success'});await c.command('signup',{grade,consents:{terms:true,privacy:true,recurring:true,marketing:false}});
    const doc=await document(c),ct=doc.state.contracts[0];
    doc.state=api.coApply(doc.state,{action:'grant',contractId:ct.id,book:'BP',amount:2000000,sourceKey:'TEST-bp-limit',reason:'TEST only',day:doc.meta.day,acknowledgeSandbox:true},{id:api.rvAccounts[1].actorId,role:api.rvAccounts[1].role},doc.meta.day+'T01:00:00Z').state;
-   bridge.select(doc,{...product,stock:1});const view=api.rvView(doc,api.rvAccounts[0]);rows.push({grade,category:product.category,total:view.quote.total,DP:view.paymentPlan.DP,BP:view.paymentPlan.BP,SP:view.paymentPlan.SP,card:view.paymentPlan.card});
+   bridge.select(doc,{...product,stock:1});const view=api.rvView(doc,api.rvAccounts[0]);
+   const run=async(action,fields={})=>{const out=await api.rvApply(doc,{action,...fields,requestId:crypto.randomUUID()},api.rvAccounts[0],env);Object.assign(doc,out.document);return out.result};
+   const booking=await run('book',{expectedTotal:view.quote.total});
+   for(const invoice of doc.state.invoices.filter(i=>i.bookingId===booking.id&&i.status==='unpaid'))await run('payInvoice',{invoiceId:invoice.id});
+   const after=api.rvView(doc,api.rvAccounts[0]);
+   rows.push({grade,category:product.category,total:view.quote.total,DP:view.paymentPlan.DP,BP:view.paymentPlan.BP,SP:view.paymentPlan.SP,card:view.paymentPlan.card,
+    beforeBalances:view.balances,afterBalances:after.balances,paidCard:doc.state.invoices.filter(i=>i.bookingId===booking.id&&i.kind==='travel'&&i.status==='paid').reduce((n,i)=>n+i.amount,0),confirmed:doc.state.bookings.find(b=>b.id===booking.id).status==='confirmed'});
   }artifacts.bpMatrix=rows;return {count:rows.length,matched:rows.every(r=>r.BP===Math.min(r.total-r.DP,Math.floor(r.total*({hope:{domestic:1500,overseas:1000,culture:5000},happy:{domestic:2000,overseas:1500,culture:7000},premium:{domestic:2500,overseas:1800,culture:10000}}[r.grade][r.category])/10000)))}}),
  item(57,'카드거절·동일 요청 중복',{declinedNoLoss:true,duplicatesSingleBooking:true,duplicateConflict:409},async()=>{
   const c=await fresh();await c.command('registerCard',{scenario:'decline'});const before=await c.state(),book=await c.command('book',{expectedTotal:before.quote.total});

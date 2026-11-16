@@ -21,6 +21,8 @@ def evidence():
     raw['artifacts']['terms_pages']=[dict(path=p,html=body) for p in ['/review/','/review/features','/review/app','/review/policy']]
     caps={'hope':[150000,100000,500000],'happy':[200000,150000,700000],'premium':[250000,180000,1000000]}
     raw['artifacts']['bpMatrix']=[dict(grade=g,category=c,total=1000000,DP=0,BP=amount,SP=0,card=1000000-amount) for g,amounts in caps.items() for c,amount in zip(['domestic','overseas','culture'],amounts)]
+    for row in raw['artifacts']['bpMatrix']:
+        row.update(beforeBalances=dict(DP=0,BP=2000000,SP=0),afterBalances=dict(DP=0,BP=2000000-row['BP'],SP=0),paidCard=row['card'],confirmed=True)
     baseline=dict(source_revision='b'*40,artifacts=dict(terms_pages=[dict(path=p['path'],html='<body>DP only</body>') for p in raw['artifacts']['terms_pages']]))
     host={n:deepcopy(EXPECTED[n]) for n in range(48,55)}
     return raw,baseline,host
@@ -36,6 +38,14 @@ class Batch03Tests(unittest.TestCase):
         raw,old,host=evidence();raw['artifacts']['bpMatrix'][0]['BP']+=1
         result=evaluate(raw,SOURCE,contract(SOURCE),host,old)
         self.assertEqual(result['counts']['fail'],1)
+
+    def test_quote_match_does_not_hide_actual_journal_or_card_mismatch(self):
+        raw,old,host=evidence()
+        for key in ('journal','card'):
+            value=deepcopy(raw);row=value['artifacts']['bpMatrix'][0]
+            if key=='journal':row['afterBalances']['BP']+=1
+            else:row['paidCard']+=1
+            with self.subTest(key=key):self.assertEqual(evaluate(value,SOURCE,contract(SOURCE),host,old)['counts']['fail'],1)
 
     def test_required_bp_combination_cannot_be_duplicated(self):
         raw,old,host=evidence();raw['artifacts']['bpMatrix'][-1]=raw['artifacts']['bpMatrix'][0]

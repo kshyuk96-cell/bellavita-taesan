@@ -71,6 +71,8 @@ def evaluate(raw,source,trusted,host,baseline):
         if any(type(row.get(k)) is not int or row[k]<0 for k in ('total','DP','BP','SP','card')):matched=False;continue
         expected=min(row['total']-row['DP'],row['total']*caps[row['grade']][row['category']]//10000)
         matched &= row['BP']==expected and sum(row[k] for k in ('DP','BP','SP','card'))==row['total']
+        matched &= row.get('confirmed') is True and row.get('paidCard')==row['card']
+        matched &= all(type(row.get('beforeBalances',{}).get(k)) is int and type(row.get('afterBalances',{}).get(k)) is int and row['beforeBalances'][k]-row['afterBalances'][k]==row[k] for k in ('DP','BP','SP'))
     actual[56]=dict(count=len(matrix),matched=bool(matched))
     def execute(inputs):
         n=inputs['item']
