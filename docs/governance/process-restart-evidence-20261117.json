@@ -1,0 +1,249 @@
+{
+  "schema_version": "governance-restart-rehearsal/v1",
+  "scope": "disposable_synthetic_process_restart",
+  "state": "passed",
+  "completed": true,
+  "scenarios": {
+    "clean": {
+      "state": "passed",
+      "completed": true,
+      "original_command_duplicated": false,
+      "original_write_receipts": 1,
+      "duplicate_observation_scope": "fixed_fixture_value1_receipts",
+      "accepted_after_process_restart": true,
+      "same_task_and_database_verified": true,
+      "first_process": {
+        "stage": "clean_first",
+        "task_id": "51cfa515a186ef8353645bad9a349d91",
+        "source_head": "9a1f50a1e9e3e5fa8c043bd5d5979db0be065d3f",
+        "database_identity_digest": "8792a739ff121f0388f21e7188d9ab52d5c073ac636801abb53b1d7cd6b57a8f",
+        "manager_pid": 22480,
+        "instance_id": "synthetic-clean_first",
+        "leader_released": true,
+        "hierarchy_state": "developing",
+        "host_phase": "executed",
+        "technical_accepted": false,
+        "rework_count": 0,
+        "developer_commands": 1,
+        "semantic_commands": 0,
+        "source_value": 1,
+        "project_quarantined": false,
+        "actions": [
+          {
+            "phase": "start",
+            "state": "confirmed"
+          },
+          {
+            "phase": "dispatch_development",
+            "state": "confirmed"
+          }
+        ],
+        "mechanical_checks": [],
+        "operational_change": false,
+        "process_exit": 0,
+        "elapsed_seconds": 0.360467
+      },
+      "second_process": {
+        "stage": "clean_resume",
+        "task_id": "51cfa515a186ef8353645bad9a349d91",
+        "source_head": "67071f8c6ec548df279d017f32182cfe46afbd2f",
+        "database_identity_digest": "8792a739ff121f0388f21e7188d9ab52d5c073ac636801abb53b1d7cd6b57a8f",
+        "manager_pid": 22497,
+        "instance_id": "synthetic-clean_resume",
+        "leader_released": true,
+        "hierarchy_state": "accepted",
+        "host_phase": "frozen",
+        "technical_accepted": true,
+        "rework_count": 1,
+        "developer_commands": 2,
+        "semantic_commands": 2,
+        "source_value": 2,
+        "project_quarantined": false,
+        "actions": [
+          {
+            "phase": "collect_development",
+            "state": "confirmed"
+          },
+          {
+            "phase": "review",
+            "state": "confirmed"
+          },
+          {
+            "phase": "rework_decision",
+            "state": "confirmed"
+          },
+          {
+            "phase": "dispatch_rework",
+            "state": "confirmed"
+          },
+          {
+            "phase": "collect_development",
+            "state": "confirmed"
+          },
+          {
+            "phase": "review",
+            "state": "confirmed"
+          },
+          {
+            "phase": "technical_decision",
+            "state": "confirmed"
+          }
+        ],
+        "mechanical_checks": [
+          {
+            "argv_digest": "f04ed28f826c435bab8897a50494090665e74d5c7744a4c9779b314b5c74c7e2",
+            "elapsed_seconds": 0.053945,
+            "exit_code": 0,
+            "name": "mechanical-structure"
+          }
+        ],
+        "operational_change": false,
+        "process_exit": 0,
+        "elapsed_seconds": 1.725572
+      },
+      "developer_command_journal": [
+        {
+          "command_digest": "0d0318035f15e806b11ff6a44d1e75dbbd8a59183bff08556b723a87ffa6b9d0",
+          "elapsed_seconds": 0.044133,
+          "exit_code": 0,
+          "manager_pid": 22480,
+          "stdout_digest": "8a5a6ef71284ef777257bb609a24574ad60391c0eb769e1228f5eea1bb36d3d4",
+          "task_id": "51cfa515a186ef8353645bad9a349d91",
+          "written_value": 1
+        },
+        {
+          "command_digest": "0d0318035f15e806b11ff6a44d1e75dbbd8a59183bff08556b723a87ffa6b9d0",
+          "elapsed_seconds": 0.038979,
+          "exit_code": 0,
+          "manager_pid": 22497,
+          "stdout_digest": "876e8ff7bd8d2c9d16ffb4ba0cdb5ba7d14dfca8b290b9a22d7e608792f5e263",
+          "task_id": "51cfa515a186ef8353645bad9a349d91",
+          "written_value": 2
+        }
+      ],
+      "semantic_command_journal": [
+        {
+          "candidate_digest": "a667fd4530dc11057d09901a6137f0a2d33b8249b41f630c66d26dfcf38cb16f",
+          "command_digest": "f871c9d4572b95943cf11796c2a1fcea4d6e0c5afdeff67ed918421f5491138d",
+          "elapsed_seconds": 0.059117,
+          "exit_code": 1,
+          "head_sha": "85f67619ccedba9301c12368711f5c60d7e0fddd",
+          "manager_pid": 22497,
+          "observed_value": 1,
+          "recommendation": "rework",
+          "stdout_digest": "05d6c38b87a73dab1426a8f7993150f2630adc67da39647e4cadc469f5fd3f15",
+          "worker_scope": "fixed_synthetic_semantic_command"
+        },
+        {
+          "candidate_digest": "13ce55e692a15d0dcd61be83d9669b9f7d4d5c2868f8cf5152640d4484d8a231",
+          "command_digest": "e45bc79575c5e4f47b832a2bd01fa85ead39a6687ae31416d9cf4f5d0bf85370",
+          "elapsed_seconds": 0.037713,
+          "exit_code": 0,
+          "head_sha": "67071f8c6ec548df279d017f32182cfe46afbd2f",
+          "manager_pid": 22497,
+          "observed_value": 2,
+          "recommendation": "pass",
+          "stdout_digest": "a0c521cd35f4f33988b93f5ac3fc4f690ba37a3dda26f8a2515f67a16a718dc7",
+          "worker_scope": "fixed_synthetic_semantic_command"
+        }
+      ]
+    },
+    "uncertain": {
+      "state": "passed",
+      "completed": true,
+      "normal_restart_reexecuted": false,
+      "quarantine_preserved": true,
+      "same_task_and_database_verified": true,
+      "first_process": {
+        "stage": "uncertain_first",
+        "task_id": "387c2abc148601efe80f48a4000ac504",
+        "source_head": "c6118a30988bd0b89880c27e8e5654c547b5a34e",
+        "database_identity_digest": "f8de79cfb8263c423ca51fb0b9a9de8992b0363e29e9092df1b894a73272fcd1",
+        "manager_pid": 22827,
+        "instance_id": "synthetic-uncertain_first",
+        "leader_released": true,
+        "hierarchy_state": "developing",
+        "host_phase": "uncertain",
+        "technical_accepted": false,
+        "rework_count": 0,
+        "developer_commands": 1,
+        "semantic_commands": 0,
+        "source_value": 1,
+        "project_quarantined": true,
+        "actions": [
+          {
+            "phase": "start",
+            "state": "confirmed"
+          },
+          {
+            "phase": "dispatch_development",
+            "state": "uncertain"
+          }
+        ],
+        "mechanical_checks": [],
+        "operational_change": false,
+        "process_exit": 0,
+        "elapsed_seconds": 0.345768
+      },
+      "second_process": {
+        "stage": "uncertain_resume",
+        "task_id": "387c2abc148601efe80f48a4000ac504",
+        "source_head": "c6118a30988bd0b89880c27e8e5654c547b5a34e",
+        "database_identity_digest": "f8de79cfb8263c423ca51fb0b9a9de8992b0363e29e9092df1b894a73272fcd1",
+        "manager_pid": 22844,
+        "instance_id": "synthetic-uncertain_resume",
+        "leader_released": true,
+        "hierarchy_state": "developing",
+        "host_phase": "uncertain",
+        "technical_accepted": false,
+        "rework_count": 0,
+        "developer_commands": 1,
+        "semantic_commands": 0,
+        "source_value": 1,
+        "project_quarantined": true,
+        "actions": [
+          {
+            "phase": "reconcile",
+            "state": "project_quarantined"
+          },
+          {
+            "phase": "reconcile",
+            "state": "project_quarantined"
+          },
+          {
+            "phase": "reconcile",
+            "state": "project_quarantined"
+          },
+          {
+            "phase": "reconcile",
+            "state": "project_quarantined"
+          }
+        ],
+        "mechanical_checks": [],
+        "operational_change": false,
+        "process_exit": 0,
+        "elapsed_seconds": 0.176255
+      },
+      "developer_command_journal": [
+        {
+          "command_digest": "6bb790090ad0445d24e36cd6a427409065fb47e017c8aae5918dd85185968afd",
+          "elapsed_seconds": 0.041324,
+          "exit_code": 0,
+          "manager_pid": 22827,
+          "stdout_digest": "8a5a6ef71284ef777257bb609a24574ad60391c0eb769e1228f5eea1bb36d3d4",
+          "task_id": "387c2abc148601efe80f48a4000ac504",
+          "written_value": 1
+        }
+      ],
+      "semantic_command_journal": []
+    }
+  },
+  "true_os_reboot_verified": false,
+  "actual_codex_execution_verified": false,
+  "model_calls": 0,
+  "customer_repositories_used": false,
+  "external_tester_engine_used": false,
+  "operational_change": false,
+  "workspaces_destroyed_on_return": true,
+  "always_on_verified": false
+}
