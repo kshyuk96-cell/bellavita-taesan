@@ -33,7 +33,7 @@ def inspect_runtime(control,token,projects):
             'maintenance_enabled_count':sum(v['config']['maintenance_enabled'] is True for v in configs.values())})]
         items.append(section('roles',counts('hierarchy_members','role',('taesan','developer','reviewer'))))
         items.append(section('tasks',counts('bridge_tasks','state',('pending_approval','queued','running','reported','reviewed','cancelled','needs_verification'))))
-        items.append(section('actions',counts('continuous_actions','state',('waiting','running','uncertain','complete','blocked'))))
+        items.append(section('actions',counts('continuous_actions','state',('queued','running','uncertain','confirmed','reconciled','blocked'))))
         items.append(section('schedules',counts('governance_supervision_jobs','state',('running','uncertain','observed','unavailable','retention_required'),
             'scope=?',(digest(sorted(projects)),))))
         items.append(section('authentication_records',counts('operating_budget_auth','state',('ready','expired','unknown','unavailable'))))

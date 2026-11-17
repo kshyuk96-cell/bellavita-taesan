@@ -17,7 +17,7 @@ FLAGS={'automatic_replay','credential_refresh_performed','providers_invoked',
        'scheduler_running_verified','always_on_verified','execution_authorized'}
 STATES={'taesan','developer','reviewer','pending_approval','queued','running','reported',
         'reviewed','cancelled','needs_verification','waiting','uncertain','complete',
-        'blocked','observed','unavailable','retention_required','ready','expired',
+        'blocked','confirmed','reconciled','observed','unavailable','retention_required','ready','expired',
         'unknown','accepting','draining','preparing','uploading','stored'}
 
 
