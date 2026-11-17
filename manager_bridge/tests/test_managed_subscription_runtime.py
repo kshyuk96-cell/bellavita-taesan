@@ -109,3 +109,35 @@ class ManagedSubscriptionRuntimeTests(unittest.TestCase):
         from manager_bridge.fleet_codex import CodexHost
         host=object.__new__(CodexHost);host.profile_guard=guards[0];host._binding=lambda project:None
         with host._profile_scope('project') as value:self.assertEqual('developer',value['role'])
+
+    def test_bound_runtime_builds_two_guarded_native_admission_observers(self):
+        self.setup_runtime();self.guards();broker=self.runtime.bind(self.host,self.settings,self.schedule)
+        broker.refresh_and_distribute(self.owner,0,'auth-observers-ready')
+        entry={'project':'project','repository':'fixture/project','source':str(self.root),'developer_id':'dev','reviewer_id':'reviewer','developer':{'binary':'/bin/true','codex_home':str(self.devhome)},'reviewer':{'binary':'/bin/true','codex_home':str(self.reviewhome)}}
+        observer=self.runtime.make_auth_observer(self.host,{'projects':[entry]})
+        from manager_bridge.subscription_observations import NativeSubscriptionObserver,SubscriptionObservation
+        fp=self.registry.get(self.manager,'project')['fingerprint']
+        with patch.object(NativeSubscriptionObserver,'read',return_value=SubscriptionObservation('project',fp,'observed',self.now,self.now+30,True,())) as read:
+            self.assertEqual('ready',observer('project').state);self.assertEqual(2,read.call_count)
+        self.assertTrue(all(o.host.profile_guard is not None for o in observer.observers['project'].values()))
+
+    def test_governance_loader_requires_policy_and_installs_auth_observer(self):
+        self.setup_runtime()
+        hc=self.root/'host.json';hc.write_text('{}');hc.chmod(0o600)
+        config=self.root/'service.json';config.write_text(json.dumps({'version':1,'host_config_file':str(hc),'listen':{'port':0},'governance':{},'supervision':{'subscription_interval':300}}));config.chmod(0o600)
+        controller=ContinuousManager(self.core)
+        def loader(path,*,profile_guard_factory):
+            for t in self.targets:profile_guard_factory(t.role,t.project,t.member_id,t.home,self.paths[t.member_id])
+            return self.host,controller,self.settings
+        from manager_bridge.operating_budget import BudgetAuthObservation,BudgetPolicy
+        fp=self.registry.get(self.manager,'project')['fingerprint']
+        observe=lambda project:BudgetAuthObservation(project,fp,'ready',self.now,self.now+30,'fixture/dual-role')
+        with patch('manager_bridge.governance_service.load_host',side_effect=loader),patch.object(self.runtime,'make_auth_observer',return_value=observe):
+            service=load_service(config,subscription_runtime=self.runtime)
+        self.addCleanup(service.close)
+        gate=controller.admission_budget
+        self.assertIs(gate.auth_observer,observe);self.assertTrue(gate.require_policy)
+        self.assertFalse(gate.check(self.manager,'project')['allowed'])
+        gate.install(self.owner,'project',BudgetPolicy(1,2,60))
+        gate.refresh_auth(self.manager,'project')
+        self.assertTrue(gate.check(self.manager,'project')['allowed'])

@@ -11,7 +11,7 @@ The foreground service CLI now accepts `--subscription-config /absolute/private/
 }
 ```
 
-No tokens, API keys, endpoint selectors, callbacks or dynamic modules belong in this JSON. Worker targets and their roles/homes are derived from the registered host configuration rather than a second independently maintained target list. The service file must explicitly configure a bounded `supervision.subscription_interval`.
+No tokens, API keys, endpoint selectors, callbacks or dynamic modules belong in this JSON. Worker targets and their roles/homes are derived from the registered host configuration rather than a second independently maintained target list. The service file must explicitly configure `governance: {}` and a bounded `supervision.subscription_interval`. Managed governance startup installs dual-role native authentication observations and requires an owner-installed operating-budget policy; neither a missing policy nor unverified authentication permits new work.
 
 `load_managed_service` constructs the existing fixed `CodexSubscriptionRefresher` from the canonical home and the first configured native developer binary/source binding. The canonical profile and owner credential are refused inside worker source, candidate and runtime directories. The canonical profile must also be separate from the application source. Existing host validation checks the pinned clean application, project memberships, workspaces and separate developer/reviewer profiles.
 

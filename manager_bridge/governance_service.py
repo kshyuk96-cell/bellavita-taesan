@@ -158,10 +158,15 @@ def load_service(config_file,*,subscription_runtime=None):
         host_settings=_private_json(host_config)
         host_admission=HostAdmission(host.core,observer=LocalHostObserver(
             application_root=host_settings['application_root'],state_root=host_settings['data_root']))
+    managed_budget=None
+    if subscription_runtime is not None and 'governance' in config:
+        from .operating_budget import OperatingBudget
+        managed_budget=OperatingBudget(host.core,require_policy=True,host_admission=host_admission,
+            auth_observer=subscription_runtime.make_auth_observer(host,_private_json(host_config)))
     return build_service(host,controller,settings,listen=listener,governance='governance' in config,
         supervision=supervision,host_admission=host_admission,
         owner_token_loader=None if subscription_runtime is None else subscription_runtime.owner_token,
-        subscription_broker=subscription_broker,
+        subscription_broker=subscription_broker,operating_budget=managed_budget,
         link_templates=({e['project']:e for e in _private_json(host_config).get('projects',[])} if 'governance' in config else None))
 
 
