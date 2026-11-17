@@ -16,10 +16,17 @@ def main(argv=None):
     group.add_argument('--once',action='store_true')
     group.add_argument('--max-ticks',type=int)
     group.add_argument('--status',action='store_true')
+    group.add_argument('--preflight',action='store_true',help='Read-only ten-check managed launch diagnostics')
     args=parser.parse_args(argv)
     if args.max_ticks is not None and not 1<=args.max_ticks<=100000:parser.error('max-ticks must be 1..100000')
+    if args.preflight and args.subscription_config is None:parser.error('--preflight requires --subscription-config')
     service=None;previous={}
     try:
+        if args.preflight:
+            from manager_bridge.managed_launch_preflight import inspect_managed_launch
+            result=inspect_managed_launch(args.config,args.subscription_config)
+            print(json.dumps(result,allow_nan=False))
+            return 0 if result['configuration_preflight_passed'] else 2
         if args.subscription_config is None:
             service=load_service(args.config)
         else:
