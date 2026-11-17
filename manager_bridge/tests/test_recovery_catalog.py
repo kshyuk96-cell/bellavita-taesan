@@ -69,3 +69,18 @@ class RecoveryCatalogTests(unittest.TestCase):
         catalog.trust.provider=revoked_key
         with self.assertRaises(PermissionDenied):catalog.restore(grant)
         self.assertFalse((self.root/'recovered.sqlite3').exists())
+
+    def test_grant_uses_one_issuance_instant_with_advancing_clock(self):
+        service,catalog=self.setup_catalog()
+        import itertools
+        ticks=itertools.count(1000,0.01)
+        catalog.trust.clock=lambda:next(ticks)
+        grant=self.grant(catalog)
+        self.assertEqual(300,grant.expires_at-grant.issued_at)
+        self.assertEqual(1000,grant.issued_at)
+
+    def test_invalid_issuance_clock_denied(self):
+        service,catalog=self.setup_catalog()
+        for value in (float('nan'),float('inf'),True,0):
+            catalog.trust.clock=lambda:value
+            with self.assertRaises(PermissionDenied):self.grant(catalog)

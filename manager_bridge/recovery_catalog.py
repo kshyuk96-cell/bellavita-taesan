@@ -55,7 +55,10 @@ class RecoveryTrust:
         name(authorized)
         target=_path(destination);_directory(target.parent)
         if target.exists():raise Conflict('new recovery destination required')
-        value={'scope':self.scope,'owner_subject':authorized,'issued_at':self.clock(),'catalog_id':catalog_id,'destination':str(target),'expires_at':self.clock()+ttl,'nonce':os.urandom(16).hex()}
+        issued_at=self.clock()
+        if type(issued_at) not in (int,float) or not math.isfinite(issued_at) or issued_at<=0:
+            raise PermissionDenied('finite recovery clock required')
+        value={'scope':self.scope,'owner_subject':authorized,'issued_at':issued_at,'catalog_id':catalog_id,'destination':str(target),'expires_at':issued_at+ttl,'nonce':os.urandom(16).hex()}
         grant=RecoveryGrant(**value,signature=self.sign(b'grant-v1',value))
         self.verify(grant)
         return grant
