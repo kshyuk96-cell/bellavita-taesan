@@ -127,7 +127,7 @@ class GovernanceService:
         self.stop();self.server.server_close()
 
 
-def load_service(config_file):
+def load_service(config_file,*,subscription_runtime=None):
     config=_private_json(config_file)
     if config.get('version')!=1 or type(config.get('version')) is not int or not {'version','host_config_file'}<=set(config) or set(config)-{'version','host_config_file','listen','governance','supervision','local_host_admission'}:
         raise ValueError('exact governance service configuration required')
@@ -137,12 +137,21 @@ def load_service(config_file):
     if 'local_host_admission' in config and ('governance' not in config or type(config['local_host_admission']) is not dict or config['local_host_admission']):
         raise ValueError('local host admission requires exact governance registration')
     host_config=_private_file(config['host_config_file'])
-    host,controller,settings=load_host(host_config)
+    if subscription_runtime is not None:
+        from .managed_subscription_runtime import ManagedSubscriptionRuntime
+        if type(subscription_runtime) is not ManagedSubscriptionRuntime:
+            raise ValueError('trusted managed subscription runtime required')
+        host,controller,settings=load_host(host_config,profile_guard_factory=subscription_runtime.guard_factory)
+    else:
+        host,controller,settings=load_host(host_config)
     supervision=None
     if 'supervision' in config:
         from .governance_supervision import SupervisionSettings
         if type(config['supervision']) is not dict:raise ValueError('explicit supervision settings required')
         supervision=SupervisionSettings(**config['supervision'])
+    subscription_broker=None
+    if subscription_runtime is not None:
+        subscription_broker=subscription_runtime.bind(host,settings,supervision)
     host_admission=None
     if 'local_host_admission' in config:
         from .host_admission import HostAdmission,LocalHostObserver
@@ -151,6 +160,8 @@ def load_service(config_file):
             application_root=host_settings['application_root'],state_root=host_settings['data_root']))
     return build_service(host,controller,settings,listen=listener,governance='governance' in config,
         supervision=supervision,host_admission=host_admission,
+        owner_token_loader=None if subscription_runtime is None else subscription_runtime.owner_token,
+        subscription_broker=subscription_broker,
         link_templates=({e['project']:e for e in _private_json(host_config).get('projects',[])} if 'governance' in config else None))
 
 
