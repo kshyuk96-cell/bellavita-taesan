@@ -11,6 +11,7 @@ from manager_bridge.governance_service import load_service
 def main(argv=None):
     parser=argparse.ArgumentParser(description='Trusted governance service')
     parser.add_argument('--config',type=Path,required=True)
+    parser.add_argument('--subscription-config',type=Path,help='Private fixed native subscription bootstrap settings')
     group=parser.add_mutually_exclusive_group()
     group.add_argument('--once',action='store_true')
     group.add_argument('--max-ticks',type=int)
@@ -19,7 +20,11 @@ def main(argv=None):
     if args.max_ticks is not None and not 1<=args.max_ticks<=100000:parser.error('max-ticks must be 1..100000')
     service=None;previous={}
     try:
-        service=load_service(args.config)
+        if args.subscription_config is None:
+            service=load_service(args.config)
+        else:
+            from manager_bridge.managed_service_launch import load_managed_service
+            service=load_managed_service(args.config,args.subscription_config)
         for sig in (signal.SIGTERM,signal.SIGINT):previous[sig]=signal.signal(sig,lambda *_:service.stop())
         result=service.status() if args.status else service.run(max_ticks=1 if args.once else args.max_ticks)
         print(json.dumps(result,ensure_ascii=False,allow_nan=False));return 0

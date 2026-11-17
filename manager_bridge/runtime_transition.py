@@ -120,9 +120,12 @@ class UnitDraft:
     user: str = 'taesan-manager'
     group: str = 'taesan-manager'
     unit_name: str = 'taesan-governance'
+    subscription_config_file: str | None = None
 
     def __post_init__(self):
-        for field in ('application_root','python','config_file','state_directory'):
+        fields=('application_root','python','config_file','state_directory')
+        if self.subscription_config_file is not None:fields+=('subscription_config_file',)
+        for field in fields:
             value=getattr(self,field)
             if type(value) is not str or len(value)>512 or not value.startswith('/') or value.startswith('//') or not re.fullmatch(r'[A-Za-z0-9_/.-]+',value) or '..' in Path(value).parts:
                 raise ValueError('fixed physical-style absolute unit path required')
@@ -151,7 +154,7 @@ Group={draft.group}
 UMask=0077
 WorkingDirectory={draft.application_root}
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart={draft.python} {draft.application_root}/scripts/run_governance_service.py --config {draft.config_file}
+ExecStart={draft.python} {draft.application_root}/scripts/run_governance_service.py --config {draft.config_file}{' --subscription-config '+draft.subscription_config_file if draft.subscription_config_file is not None else ''}
 Restart=on-failure
 RestartSec=15
 KillSignal=SIGTERM

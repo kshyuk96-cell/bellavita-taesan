@@ -13,9 +13,10 @@ def main(argv=None):
         parser.add_argument('--'+field,required=True)
     parser.add_argument('--user',default='taesan-manager');parser.add_argument('--group',default='taesan-manager')
     parser.add_argument('--unit-name',default='taesan-governance')
+    parser.add_argument('--subscription-config-file')
     args=parser.parse_args(argv)
     try:
-        draft=UnitDraft(args.application_root,args.python,args.config_file,args.state_directory,args.user,args.group,args.unit_name)
+        draft=UnitDraft(args.application_root,args.python,args.config_file,args.state_directory,args.user,args.group,args.unit_name,args.subscription_config_file)
         result=write_unit_draft(draft,args.output)
         print(json.dumps(result,allow_nan=False));return 0
     except Exception:
