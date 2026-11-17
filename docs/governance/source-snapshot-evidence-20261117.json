@@ -1,0 +1,106 @@
+{
+  "scope": "private_primary_source_snapshot_preparation",
+  "projects": {
+    "bellavita-shop": {
+      "pin": {
+        "project": "bellavita-shop",
+        "source_kind": "github",
+        "source_ref": "kshyuk96-cell/bellavita-taesan",
+        "branch": "codex/shop-backend",
+        "sha": "d5047f3345b757edfcfbd81a73c609c0392007dd",
+        "revision": "source-head"
+      },
+      "config_fingerprint": "50ebe8c0c06c7d392dd2e5d1693fd25377c79155b156fca21c9dabf5b8c95979",
+      "archive_sha256": "d8e13d50a01ba30a6e00d28fd04789acb6f3282c07b7e77a6b61781c787bbc93",
+      "tree_sha256": "a91687840058df482f6b79a9cb673542a44f50e24cc638228fd7ee10f0aef345",
+      "files": 210,
+      "source_bytes": 13952883,
+      "observed_at": 1794878331.6308868,
+      "filesystem_nodes": 220,
+      "maximum_depth": 3,
+      "post_stage_tree_verified": true,
+      "credential_filename_redactions": [],
+      "full_original_source": true,
+      "current_source_confirmed_at_staging": true,
+      "currentness_is_not_permanent": true
+    },
+    "funeral-association": {
+      "pin": {
+        "project": "funeral-association",
+        "source_kind": "github",
+        "source_ref": "kshyuk96-cell/association-aftercare-platform",
+        "branch": "main",
+        "sha": "5fa7133d98b2a7f7614f968a5c4c536cdbda5737",
+        "revision": "source-head"
+      },
+      "config_fingerprint": "4f5e4ec8c7ecc491b651cbe6b56a87949f94dd8aff367de0b626c46e7ed44d05",
+      "archive_sha256": "6bf35d6c02634ceab52f31d4a14fee8b52b8d5a07ff1c63857f2719dc74c44a9",
+      "tree_sha256": "8310aecea1351b82f7ba95d56591a46f59a6689b7f8c36d6b06e842e532b8c23",
+      "files": 569,
+      "source_bytes": 27510309,
+      "observed_at": 1794878335.372619,
+      "filesystem_nodes": 654,
+      "maximum_depth": 5,
+      "post_stage_tree_verified": true,
+      "credential_filename_redactions": [
+        ".env.example",
+        ".env.production.example",
+        "deploy/staging/.env.example"
+      ],
+      "full_original_source": false,
+      "current_source_confirmed_at_staging": true,
+      "currentness_is_not_permanent": true
+    },
+    "bellavita-erp": {
+      "pin": {
+        "project": "bellavita-erp",
+        "source_kind": "sites",
+        "source_ref": "appgprj_6af874873e148191b9677cca35f00557",
+        "branch": "main",
+        "sha": "8d692430f9b5042c5eee160b91de403abbaddbab",
+        "revision": "source-head"
+      },
+      "config_fingerprint": "4a37f1438b6fefe4e09fcffd62bf0dbd3c530b569afd09095fdfb966b5797a97",
+      "archive_sha256": "af55d27c70938561287774e41e3b51c76763c5fe2eddf817c93f68c408f5a8c2",
+      "tree_sha256": "4c28b4fb1ab8e30bda48754f8c394558668b8ac7fe1bf1f6df8918c76b334e22",
+      "files": 261,
+      "source_bytes": 3480080,
+      "observed_at": 1794878615.969869,
+      "filesystem_nodes": 283,
+      "maximum_depth": 4,
+      "post_stage_tree_verified": true,
+      "credential_filename_redactions": [],
+      "full_original_source": true,
+      "current_source_confirmed_at_staging": true,
+      "currentness_is_not_permanent": true
+    },
+    "hope-sunrise": {
+      "pin": {
+        "project": "hope-sunrise",
+        "source_kind": "sites",
+        "source_ref": "appgprj_6af86d66b7108191a8dd1052c4a7302f",
+        "branch": "main",
+        "sha": "ac4bca8be5080b1bdc47826bdb98e3e247a49a13",
+        "revision": "source-head"
+      },
+      "config_fingerprint": "1f49838266e6fdca8de6a595da5a14f470ad93d3f73fc25933c36c146357509b",
+      "archive_sha256": "08d15954470871017252ad586f401e2a3300cbb408e0bf4746d689f464447517",
+      "tree_sha256": "ae0fd344d32b70082049fd9ef0bc977f195166bb28000ef9d77b15d2b2b0d2e5",
+      "files": 312,
+      "source_bytes": 35328955,
+      "observed_at": 1794878621.2726269,
+      "filesystem_nodes": 331,
+      "maximum_depth": 5,
+      "post_stage_tree_verified": true,
+      "credential_filename_redactions": [],
+      "full_original_source": true,
+      "current_source_confirmed_at_staging": true,
+      "currentness_is_not_permanent": true
+    }
+  },
+  "models_started": 0,
+  "deployment_performed": false,
+  "worker_activation_performed": false,
+  "credential_content_audit_verified": false,
+  "git_commit_independently_verified_by_stager": false
+}
