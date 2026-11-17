@@ -1,0 +1,193 @@
+{
+  "schema_version": "governance-operational-qualification/v1",
+  "metric": "operational_checkpoint_coverage",
+  "not_an_ai_capability_or_product_quality_score": true,
+  "checkpoint_count": 10,
+  "points_per_checkpoint": 10,
+  "target_points": 90,
+  "target_rule": "sum(passed checkpoint weights) >= 90 AND every critical checkpoint has current independently verified operational evidence",
+  "evidence_rule": {
+    "required_fields": [
+      "checkpoint_id",
+      "application_commit",
+      "host_identity",
+      "scope",
+      "observed_at",
+      "expires_or_review_at",
+      "verifier",
+      "artifact_digest",
+      "limitations"
+    ],
+    "rejected_as_sufficient": [
+      "model_success_text",
+      "process_exit_zero_alone",
+      "synthetic_test_pass_alone",
+      "old_ready_snapshot",
+      "configured_schedule_without_run_evidence",
+      "manual_success_flag_without_verification"
+    ],
+    "unknown_or_stale_counts_as_pass": false
+  },
+  "sustained_observation_minimum_seconds": 86400,
+  "current_operational_score": null,
+  "execution_authorized": false,
+  "activation_or_spending_approved_by_this_file": false,
+  "checkpoints": [
+    {
+      "id": "acceptance_contract",
+      "name": "운영 기준 확정",
+      "weight": 10,
+      "critical": false,
+      "required_evidence": [
+        "버전이 고정된 체크포인트와 필수 조건",
+        "검증자·시각·실행 버전·증거 범위를 기록하는 규칙"
+      ],
+      "supporting_paths": [
+        "docs/governance/operational-qualification-plan.md"
+      ],
+      "operational_state": "unverified"
+    },
+    {
+      "id": "dedicated_host",
+      "name": "관리용 호스트 연결",
+      "weight": 10,
+      "critical": true,
+      "required_evidence": [
+        "실제 호스트와 실행 코드 버전 대조",
+        "namespace 격리 및 사설 저장소 fsync 검사",
+        "고객 서비스와 분리된 실행 범위"
+      ],
+      "supporting_paths": [
+        "scripts/check_governance_host.py"
+      ],
+      "operational_state": "unverified"
+    },
+    {
+      "id": "durable_credentials",
+      "name": "장기 인증과 키 보관",
+      "weight": 10,
+      "critical": true,
+      "required_evidence": [
+        "소유자·관리자·작업자 인증의 별도 보안 보관",
+        "백업 암호화 키와 복구 서명 키의 독립 보관",
+        "호스트 손실 뒤 키 회수 검증: 원문 노출 없음"
+      ],
+      "supporting_paths": [
+        "manager_bridge/subscription_broker.py",
+        "manager_bridge/recovery_catalog.py"
+      ],
+      "operational_state": "unverified"
+    },
+    {
+      "id": "membership_cleanup",
+      "name": "관리자·시험 역할 정리",
+      "weight": 10,
+      "critical": false,
+      "required_evidence": [
+        "기존 관리자 역할 보존 여부와 최종 관리 범위 확인",
+        "만료·폐기된 시험 토큰과 남은 역할 기록 검토",
+        "작업이 진행 중인 역할을 무단 변경하지 않았다는 근거"
+      ],
+      "supporting_paths": [
+        "manager_bridge/three_tier.py"
+      ],
+      "operational_state": "unverified"
+    },
+    {
+      "id": "automatic_service_start",
+      "name": "서비스 설치와 자동 시작",
+      "weight": 10,
+      "critical": false,
+      "required_evidence": [
+        "고정 커밋과 비공개 설정을 사용한 서비스 설치",
+        "실제 서비스 관리자에서 자동 시작 확인",
+        "상태 조회와 작업 실행을 구분한 운영 절차"
+      ],
+      "supporting_paths": [
+        "scripts/prepare_governance_unit.py",
+        "scripts/run_governance_service.py"
+      ],
+      "operational_state": "unverified"
+    },
+    {
+      "id": "authentication_recovery",
+      "name": "인증 만료 대응",
+      "weight": 10,
+      "critical": true,
+      "required_evidence": [
+        "두 역할의 현재 인증·사용 한도 조회",
+        "만료·사용 불가 시 새 배정 차단",
+        "지원되는 재인증 뒤 복구 검증: API 키 우회 없음"
+      ],
+      "supporting_paths": [
+        "manager_bridge/dual_role_admission.py",
+        "manager_bridge/managed_service_launch.py"
+      ],
+      "operational_state": "unverified"
+    },
+    {
+      "id": "restart_recovery",
+      "name": "재시작 복구",
+      "weight": 10,
+      "critical": true,
+      "required_evidence": [
+        "실제 대상 호스트의 서비스 중지·재시작 검증",
+        "진행 상태·불확실 작업 기록 보존",
+        "중복 개발·검토·후속 지시가 실행되지 않았다는 근거"
+      ],
+      "supporting_paths": [
+        "manager_bridge/recovery_readiness.py",
+        "manager_bridge/runtime_transition.py"
+      ],
+      "operational_state": "unverified"
+    },
+    {
+      "id": "offsite_recovery",
+      "name": "운영 백업과 복원",
+      "weight": 10,
+      "critical": true,
+      "required_evidence": [
+        "운영용 관리 상태의 암호화 외부 저장·회수",
+        "원본 호스트·DB 없이 독립 키로 복원",
+        "복원 후 격리와 재실행 차단 확인"
+      ],
+      "supporting_paths": [
+        "manager_bridge/encrypted_backup.py",
+        "manager_bridge/recovery_catalog.py"
+      ],
+      "operational_state": "unverified"
+    },
+    {
+      "id": "limited_project_pilot",
+      "name": "한 프로젝트 제한 운영",
+      "weight": 10,
+      "critical": true,
+      "required_evidence": [
+        "정확한 소스·요구사항·비용·변경 범위를 고정",
+        "실제 개발자→독립 검토자→태산이 인수",
+        "인수된 결과에 묶인 다음 지시와 결과 회수 검증"
+      ],
+      "supporting_paths": [
+        "manager_bridge/continuous_host.py",
+        "manager_bridge/worker_quality_handoff.py"
+      ],
+      "operational_state": "unverified"
+    },
+    {
+      "id": "sustained_observation",
+      "name": "지속 운영 관찰",
+      "weight": 10,
+      "critical": true,
+      "required_evidence": [
+        "최소 24시간의 실제 운영 관찰 구간",
+        "예정된 점검 대비 누락·중복·실패·재시도 집계",
+        "비용 한도·장애·인증·소스 변경 이력을 함께 검토"
+      ],
+      "supporting_paths": [
+        "manager_bridge/governance_supervision.py",
+        "manager_bridge/runtime_diagnostics.py"
+      ],
+      "operational_state": "unverified"
+    }
+  ]
+}
