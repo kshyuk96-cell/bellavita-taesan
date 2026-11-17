@@ -485,46 +485,6 @@ class ContinuousHost:
             budget.confirm_verified_unstarted_in_transaction(c,owner,reservation['id'],identifier)
         return {'requeued':True,'retry_executed':False,'runtime_proof_scope':'current_native_runtime_only','historical_runtime_auto_verified':False,'proof_id':identifier,'action_key':action_key,'task_id':task['id']}
 
-    def _recover_unstarted_deferred_start(self,request,task,host,token,heartbeat):
-        """Explicit recovery only when the original start has no durable effects."""
-        from .continuous_manager import ActionRequest
-        if host.worker_mode!='deferred_native' or host.session_id is not None or self.fleet is None or request.prior_action_key is None:
-            return None
-        if self.core.admission_budget is not None:
-            raise Conflict('budgeted uncertain start requires separate admission recovery')
-        with self.store._transaction() as c:
-            actor=self.store._authenticate(c,token)
-            prior=c.execute('SELECT * FROM continuous_actions WHERE action_key=?',(request.prior_action_key,)).fetchone()
-            if prior is None or prior['state']!='uncertain' or prior['phase']!='start' or prior['actor_hash']!=actor['token_hash']:
-                raise Conflict('exact prior uncertain deferred start required')
-            original=ActionRequest(**json.loads(prior['request']))
-            if original.phase!='start' or original.state!='unassigned':raise Conflict('original queued deferred start required')
-            if any(getattr(original,k)!=getattr(request,k) for k in ('task_id','project','version','manifest_digest','config_fingerprint')):
-                raise Conflict('prior deferred start binding changed')
-            # Preserve the separate old metadata-create recovery path.
-            if c.execute('SELECT 1 FROM fleet_creates WHERE task_id=?',(task['id'],)).fetchone():return None
-            if task['state']!='queued' or task.get('worker') is not None or task.get('report') is not None:
-                raise Conflict('deferred start no-effect task proof unavailable')
-            for table in ('continuous_host_assignments','continuous_host_reservations','hierarchy_tasks','fleet_deliveries'):
-                if c.execute('SELECT 1 FROM '+table+' WHERE task_id=?',(task['id'],)).fetchone():
-                    raise Conflict('deferred start already has durable effects')
-            if c.execute('SELECT 1 FROM continuous_host_sessions WHERE project=?',(host.project,)).fetchone():
-                raise Conflict('deferred start already has actual session')
-            _,config,template=self.fleet._template(c,token,host.project,host.fleet_template)
-            if template['host_ref']!=host.fleet_host_ref:raise Conflict('deferred template host changed')
-            self.fleet._approved_task(c,token,task['id'])
-            self.core._member(c,host.project,host.developer_id,'developer',config)
-            self.core._member(c,host.project,host.reviewer_id,'reviewer',config)
-        source=_observe(host.source)
-        if source['sha']!=task['manifest']['base_sha'] or not source['tracked_and_visible_untracked_clean']:
-            raise Conflict('unstarted deferred approved source changed')
-        heartbeat()
-        # Use the original exact action key. The controller confirms original
-        # progress; no uncertain journal is cleared or execution retried here.
-        result=self.start(original,heartbeat)
-        if result.state!='observed':raise Conflict('unstarted deferred recovery did not start')
-        return self._receipt(request,suffix='unstarted_deferred_start_completed')
-
     def _recover_metadata_start(self,request,task,host,token,heartbeat):
         """Explicitly finish a proven metadata-only old start; never retry it."""
         if host.worker_mode!='deferred_native' or request.prior_action_key is None or task['state']!='queued' or task.get('worker') is not None or task.get('report') is not None:
@@ -555,8 +515,7 @@ class ContinuousHost:
         task,host,token=self._task(request);row=self._row(task['id']);heartbeat()
         with self.store._transaction() as c:managed=c.execute('SELECT 1 FROM hierarchy_tasks WHERE task_id=?',(task['id'],)).fetchone()
         if managed is None:
-            recovered=self._recover_unstarted_deferred_start(request,task,host,token,heartbeat)
-            return recovered if recovered is not None else self._recover_metadata_start(request,task,host,token,heartbeat)
+            return self._recover_metadata_start(request,task,host,token,heartbeat)
         if row and row['phase'] in ('executing','uncertain','freezing'):
             return self._receipt(request,'unavailable','action_bound_stop_evidence_required')
         current=self.core.get(token,task['id'])

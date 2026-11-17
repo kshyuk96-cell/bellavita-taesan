@@ -328,14 +328,15 @@ class HostTests(unittest.TestCase):
             action=c.execute("SELECT action_key FROM continuous_actions WHERE phase='start'").fetchone()[0]
         fleet.register_template(self.owner,'project','native-template','native-host',max_sessions=4,expires_at=self.now+3600)
         return task,action
-    def test_explicit_no_effect_deferred_start_recovers_original_action(self):
+    def test_unproven_no_effect_deferred_start_is_not_reissued_by_manager(self):
         task,action=self.unstarted_deferred()
         result=self.scheduler.reconcile(self.manager,['project'],'fixture-instance',action)
-        self.assertEqual(result['actions'][0]['state'],'confirmed')
-        self.assertEqual(self.core.get(self.manager,task['id'])['state'],'development_queued')
+        self.assertNotEqual(result['actions'][0]['state'],'confirmed')
+        self.assertEqual(self.store.get_task(self.manager,task['id'])['state'],'queued')
         self.assertEqual(self.transport.native_calls,0)
         with self.store._transaction() as c:
-            self.assertEqual(c.execute('SELECT start_action_key FROM continuous_host_reservations').fetchone()[0],action)
+            self.assertEqual(c.execute('SELECT count(*) FROM continuous_host_reservations').fetchone()[0],0)
+            self.assertEqual(c.execute('SELECT count(*) FROM hierarchy_tasks').fetchone()[0],0)
     def test_budgeted_no_effect_deferred_start_remains_quarantined(self):
         task,action=self.unstarted_deferred()
         self.core.admission_budget=object()
