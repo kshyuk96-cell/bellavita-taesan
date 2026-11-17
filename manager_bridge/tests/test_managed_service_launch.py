@@ -24,11 +24,11 @@ class ManagedServiceLaunchTests(unittest.TestCase):
         self.hostpath=self.root/'host.json';self.servicepath=self.root/'service.json';self.subpath=self.root/'subscription.json'
         self.entry={'project':'project','repository':'fixture/project','source':str(self.root/'source'),
             'candidates':str(self.root/'candidates'),'runtime':str(self.root/'runtime'),
-            'developer_id':'dev','reviewer_id':'reviewer',
-            'developer':{'binary':'/bin/true','codex_home':str(self.devhome)},
-            'reviewer':{'binary':'/bin/true','codex_home':str(self.reviewhome)}}
+            'developer_id':'dev','reviewer_id':'reviewer','developer_token_file':str(self.paths['dev']),'reviewer_token_file':str(self.paths['reviewer']),'checks':{'fixture-check':['/bin/true']},
+            'developer':{'binary':str(Path('/usr/bin/true').resolve()),'codex_home':str(self.devhome)},
+            'reviewer':{'binary':str(Path('/usr/bin/true').resolve()),'codex_home':str(self.reviewhome)}}
         self.hostconfig={'application_root':str(self.root/'application'),'projects':[self.entry]}
-        self.serviceconfig={'version':1,'host_config_file':str(self.hostpath),'listen':{'port':0},'supervision':{'subscription_interval':300}}
+        self.serviceconfig={'version':1,'host_config_file':str(self.hostpath),'listen':{'port':0},'governance':{},'supervision':{'subscription_interval':300}}
         self.subconfig={'version':1,'broker_ref':'fixture-broker','canonical_home':str(self.canonical),'owner_token_file':str(self.ownerpath)}
         self.write_files()
 
@@ -115,3 +115,7 @@ class ManagedServiceLaunchTests(unittest.TestCase):
         self.assertIn('--subscription-config '+str(private),output.read_text())
         self.assertNotIn('SYNTHETIC_DO_NOT_READ',run.stdout+run.stderr+output.read_text())
         self.assertFalse(json.loads(run.stdout)['installed'])
+
+    def test_managed_cli_cannot_omit_governance_admission(self):
+        self.setup_files();self.serviceconfig.pop('governance');self.write_files()
+        with self.assertRaises(ValueError):self.load()

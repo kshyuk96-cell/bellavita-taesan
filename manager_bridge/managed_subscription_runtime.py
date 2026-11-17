@@ -23,6 +23,7 @@ class ManagedSubscriptionRuntime:
         self.refresh_callback=refresh_callback
         self._broker=None
         self._guards={}
+        self._callbacks={}
         if len({(t.project,t.member_id) for t in targets})!=len(targets):
             raise ValueError('unique managed targets required')
 
@@ -48,6 +49,7 @@ class ManagedSubscriptionRuntime:
             token=self._worker_token(broker.core,project,member_id,role,token_path)
             with broker.profile_guard(token,project,member_id) as value:
                 yield value
+        self._callbacks[key]=guard
         return guard
 
     def bind(self,host,settings,supervision):
@@ -71,6 +73,33 @@ class ManagedSubscriptionRuntime:
             broker._auth(c,self.owner_token(),owner=True)
         self._broker=broker
         return broker
+
+    def make_auth_observer(self,host,host_config):
+        from pathlib import Path
+        from .dual_role_admission import DualRoleSubscriptionAdmission
+        from .fleet_codex import CodexHost,ProjectBinding
+        from .subscription_observations import NativeSubscriptionObserver
+        if self._broker is None or self._broker.core is not host.core:
+            raise Conflict('bound same-core subscription runtime required')
+        observers={};seen=set()
+        for entry in host_config['projects']:
+            project=entry['project']
+            if project in observers:raise ValueError('duplicate authentication project')
+            roles={}
+            for role in ('developer','reviewer'):
+                key=(project,entry[role+'_id'])
+                target=next((t for t in self.targets if (t.project,t.member_id)==key and t.role==role),None)
+                if target is None or _physical(entry[role]['codex_home'])!=target.home:
+                    raise ValueError('exact registered metadata profile required')
+                setting=entry[role]
+                native=CodexHost(setting['binary'],target.home,{
+                    project:ProjectBinding(project,entry['repository'],Path(entry['source']),
+                        require_origin=setting.get('require_origin',True))},profile_guard=self._callbacks[key])
+                roles[role]=NativeSubscriptionObserver(host.core,native,target.member_id)
+                seen.add(key)
+            observers[project]=roles
+        if seen!={(t.project,t.member_id) for t in self.targets}:raise ValueError('exact authentication observer scope required')
+        return DualRoleSubscriptionAdmission(host.core,observers,host.manager_token)
 
     @staticmethod
     def _worker_token(core,project,member_id,role,path):

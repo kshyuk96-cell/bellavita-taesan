@@ -31,6 +31,7 @@ def inspect_managed_launch(service_file,subscription_file):
         if (set(service)-allowed or type(service.get('version')) is not int or service['version']!=1
                 or set(sub)!={'version','broker_ref','canonical_home','owner_token_file'}
                 or type(sub['version']) is not int or sub['version']!=1):raise ValueError()
+        if type(service.get('governance')) is not dict or service['governance']:raise ValueError()
         name(sub['broker_ref']);host_file=_private_file(service['host_config_file']);host=_private_json(host_file)
         required={'version','application_root','expected_source_commit','data_root','database','manager_token_file','instance_id','projects'}
         if (not required<=set(host) or set(host)-required-{'poll_seconds','reference_materials'}

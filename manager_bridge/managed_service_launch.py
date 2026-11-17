@@ -14,6 +14,8 @@ from .subscription_broker import SubscriptionTarget, CodexSubscriptionRefresher,
 def load_managed_service(service_file, subscription_file):
     service_config=_private_json(service_file)
     subscription=_private_json(subscription_file)
+    if type(service_config.get('governance')) is not dict or service_config['governance']:
+        raise ValueError('managed launch requires registered governance admission')
     fields={'version','broker_ref','canonical_home','owner_token_file'}
     if (set(subscription)!=fields or type(subscription['version']) is not int
             or subscription['version']!=1):
