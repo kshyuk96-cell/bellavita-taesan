@@ -97,8 +97,11 @@ class GovernanceSupervision:
     def _claim(self,token,job,interval):
         with self.store._transaction() as c:
             configs=self._auth(c,token,self.projects);now=self.store._now()
+            if type(now) not in (int,float) or not math.isfinite(now) or now<=0:
+                raise Conflict('finite supervision clock required')
             row=c.execute('SELECT * FROM governance_supervision_jobs WHERE scope=? AND job=?',(self.scope,job)).fetchone()
-            if row and (row['state'] in ('running','uncertain') or row['next_due']>now):return None
+            if row and not _record_clock_valid(row):raise Conflict('stored supervision clock unavailable')
+            if row and (row['state'] in ('running','uncertain') or now<row['last_attempt'] or row['next_due']>now):return None
             attempt=secrets.token_hex(16)
             c.execute("INSERT OR REPLACE INTO governance_supervision_jobs VALUES (?,?,?,?,'running',?,?,NULL)",
                       (self.scope,job,self.binding,attempt,now,now+interval))
@@ -110,8 +113,8 @@ class GovernanceSupervision:
             if self._auth(c,token,self.projects)!=configs:raise Conflict('supervision configuration changed')
             from .agent_directory import _reject_known_tokens
             _reject_known_tokens(c,snapshot)
-            updated=c.execute("UPDATE governance_supervision_jobs SET state=?,snapshot=? WHERE scope=? AND job=? AND attempt=? AND state='running'",
-                      (state,canonical_json({**snapshot,'_configs':configs}),self.scope,job,attempt))
+            updated=c.execute("UPDATE governance_supervision_jobs SET state=?,snapshot=? WHERE scope=? AND job=? AND attempt=? AND binding=? AND state='running'",
+                      (state,canonical_json({**snapshot,'_configs':configs}),self.scope,job,attempt,self.binding))
             if updated.rowcount!=1:raise Conflict('supervision attempt ownership changed')
 
     def _backup(self,attempt):
@@ -172,21 +175,69 @@ class GovernanceSupervision:
         with self.store._transaction() as c:
             # Shared recovery/backup/subscription snapshots cover the whole host
             # scope; subset filtering cannot authorize those aggregate facts.
-            self._auth(c,token,self.projects)
-            configs=self._auth(c,token,projects)
-            rows=c.execute('SELECT job,state,last_attempt,next_due,snapshot FROM governance_supervision_jobs WHERE scope=? ORDER BY job',(self.scope,)).fetchall()
+            all_configs=self._auth(c,token,self.projects)
+            self._auth(c,token,projects)
+            now=self.store._now()
+            expected={'auth','health','recovery'}
+            if self.settings.subscription_interval is not None:expected.add('subscription')
+            if self.settings.backup_interval is not None:expected.add('backup')
+            rows=c.execute('SELECT job,state,last_attempt,next_due,snapshot,binding FROM governance_supervision_jobs WHERE scope=? ORDER BY job',(self.scope,)).fetchall()
             jobs=[]
             for row in rows:
                 snapshot=json.loads(row['snapshot']) if row['snapshot'] else {'state':'unresolved_attempt','automatic_replay':False}
                 recorded_configs=snapshot.pop('_configs',{})
-                stale=self.store._now()>=row['next_due'] or any(recorded_configs.get(p)!=configs[p] for p in projects)
+                clock_valid=_positive_time(now) and _record_clock_valid(row)
+                binding_current=row['binding']==self.binding
+                config_current=all(recorded_configs.get(p)==all_configs[p] for p in self.projects)
+                stale=not clock_valid or now<row['last_attempt'] or now>=row['next_due'] or not config_current or not binding_current
+                diagnostic=_schedule_diagnostic(dict(row),snapshot,now,row['job'] in expected,binding_current,config_current)
                 if row['job']=='auth' and 'items' in snapshot:snapshot['items']=[item for item in snapshot['items'] if item['project'] in projects]
-                jobs.append({'job':row['job'],'state':row['state'],'last_attempt':row['last_attempt'],'next_due':row['next_due'],'stale':stale,'reconciliation_required':row['state'] in ('running','uncertain'),'snapshot':snapshot})
+                jobs.append({'job':row['job'],'state':row['state'],'last_attempt':row['last_attempt'] if _positive_time(row['last_attempt']) else None,'next_due':row['next_due'] if _positive_time(row['next_due']) else None,'stale':stale,'reconciliation_required':row['state'] in ('running','uncertain'),'snapshot':snapshot,
+                             'schedule':diagnostic})
+            present={row['job'] for row in rows}
+            missing=sorted(expected-present)
+            attention=sorted(set([j['schedule']['reason'] for j in jobs if j['schedule']['attention_required']]+(['schedule_not_observed'] if missing else [])))
+            due=[j['next_due'] for j in jobs if j['job'] in expected and j['state'] not in ('running','uncertain') and _record_clock_valid(j)]
+            schedule_health={'expected_jobs':sorted(expected),'missing_jobs':missing,
+                'attention_reasons':attention,'attention_required':bool(attention),
+                'next_recorded_due':min(due) if due else None,'automatic_replay':False,
+                'scope':'retained_local_schedule_diagnostics_only','scheduler_running_verified':False}
             subscription=next((job for job in jobs if job['job']=='subscription'),None)
             observed=bool(subscription and subscription['state']=='observed' and subscription['snapshot'].get('refresh_requested') is True)
             unknown=bool(subscription and subscription['state'] in ('running','uncertain'))
             refresh_fact={key:subscription['snapshot'][key] for key in ('generation','profiles_updated','observed_at')} if observed else None
-            return {'projects':list(projects),'jobs':jobs,'backup_enabled':self.settings.backup_interval is not None,'subscription_enabled':self.settings.subscription_interval is not None,
+            return {'projects':list(projects),'jobs':jobs,'schedule_health':schedule_health,'backup_enabled':self.settings.backup_interval is not None,'subscription_enabled':self.settings.subscription_interval is not None,
                     'credential_refresh_performed':True if observed else (None if unknown else False),
                     'credential_refresh_scope':'last_retained_subscription_attempt',
                     'observed_subscription_refresh':refresh_fact,'messages_sent':False,'always_on_verified':False}
+
+
+def _schedule_diagnostic(row,snapshot,now,enabled,binding_current,config_current):
+    valid=_positive_time(now) and _record_clock_valid(row)
+    elapsed=max(0,now-row['last_attempt']) if valid else None
+    overdue=max(0,now-row['next_due']) if valid else None
+    reason='waiting';action='none';attention=False
+    if not valid:reason,action,attention='clock_unavailable','verify_clock',True
+    elif now<row['last_attempt']:reason,action,attention='clock_rollback','verify_clock',True
+    elif row['state'] in ('running','uncertain'):
+        reason,action,attention='attempt_unresolved','review_attempt_evidence',True
+    elif not enabled:reason='disabled_history_retained'
+    elif not binding_current:reason,action,attention='schedule_settings_changed','verify_schedule_registration',True
+    elif not config_current:reason,action,attention='project_configuration_changed','verify_project_registration',True
+    elif row['state']=='retention_required':reason,action,attention='retention_limit','review_backup_retention',True
+    elif row['state']=='unavailable':reason,action,attention='observer_unavailable','check_registered_connection',True
+    elif row['job']=='auth' and any(i.get('state')!='current' for i in snapshot.get('items',[])):
+        reason,action,attention='credentials_need_attention','check_registered_credentials',True
+    elif now>=row['next_due']:reason,action='due','poll_registered_schedule'
+    return {'enabled':enabled,'settings_current':binding_current,'project_configuration_current':config_current,
+            'elapsed_seconds':elapsed,'overdue_seconds':overdue,'reason':reason,'next_action':action,
+            'attention_required':attention,'automatic_replay':False,'worker_stop_inferred':False}
+
+
+def _positive_time(value):
+    return type(value) in (int,float) and math.isfinite(value) and value>0
+
+
+def _record_clock_valid(row):
+    return (_positive_time(row['last_attempt']) and _positive_time(row['next_due'])
+            and row['next_due']>=row['last_attempt'])
