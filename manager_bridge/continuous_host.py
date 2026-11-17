@@ -155,6 +155,7 @@ class ContinuousHost:
                 project TEXT PRIMARY KEY,session_id TEXT,creation_ref TEXT,updated REAL);
                 CREATE TABLE IF NOT EXISTS continuous_host_history (action_key TEXT PRIMARY KEY,record TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS continuous_host_reservations (task_id TEXT PRIMARY KEY,reservation_id TEXT,start_action_key TEXT,version INTEGER,manifest_digest TEXT,config_fingerprint TEXT,updated REAL);
+                CREATE TABLE IF NOT EXISTS continuous_unstarted_proofs (proof_id TEXT PRIMARY KEY,proof TEXT NOT NULL,consumed INTEGER NOT NULL DEFAULT 0);
                 CREATE TABLE IF NOT EXISTS continuous_host_diagnostics (id INTEGER PRIMARY KEY AUTOINCREMENT,task_id TEXT,action_key TEXT,stage TEXT,category TEXT,recorded REAL);''')
         for project in self.projects:
             if project in core.source_observers or project in core.review_hosts:raise ValueError('do not replace an already registered verification host')
@@ -403,6 +404,87 @@ class ContinuousHost:
         self.core.approve_next(token,request.task_id,request.next_task_id,request.candidate_digest,request.action_key,developer_id=host.developer_id)
         return self._receipt(request)
 
+    @staticmethod
+    def _assert_no_start_effects(c,task_id,project,*,require_diagnostics=False):
+        # Every possible native execution has a durable reservation/assignment
+        # intent before process spawn. Missing completion receipts are not proof.
+        for table in ('continuous_host_assignments','continuous_host_reservations','hierarchy_tasks','fleet_creates','fleet_deliveries'):
+            if c.execute('SELECT 1 FROM '+table+' WHERE task_id=?',(task_id,)).fetchone():
+                raise Conflict('start already has durable execution intent')
+        if c.execute('SELECT 1 FROM continuous_host_sessions WHERE project=?',(project,)).fetchone():
+            raise Conflict('start already has actual session')
+        diagnostics=c.execute("SELECT 1 FROM sqlite_master WHERE name='continuous_transport_diagnostics'").fetchone()
+        if require_diagnostics and not diagnostics:raise Conflict('native diagnostic journal unavailable')
+        if diagnostics:
+            records=c.execute('SELECT record FROM continuous_transport_diagnostics WHERE project=? LIMIT 1001',(project,)).fetchall()
+            if len(records)>1000:raise Conflict('bounded native diagnostic proof exceeded')
+            for row in records:
+                context=json.loads(row['record']).get('context',{})
+                if context.get('task_id')==task_id:raise Conflict('start already has native diagnostic effects')
+        if c.execute('SELECT 1 FROM continuous_tick_guard').fetchone():raise Conflict('coordinator tick guard must be absent')
+        leader=c.execute('SELECT * FROM continuous_leader WHERE singleton=1').fetchone()
+        if leader is None or leader['expires']!=0:raise Conflict('coordinator must be explicitly released')
+
+    def requeue_verified_unstarted(self,owner,action_key):
+        """Owner-only no-effect queue repair; never starts or reruns a worker.
+
+        Trusted local operator must independently verify the original failed
+        runtime was this unchanged deferred native host. Current type checks do
+        not establish historical runtime identity; no HTTP route exposes this.
+        """
+        from .continuous_manager import ActionRequest
+        from .fleet_codex import CodexHost
+        from .operating_budget import OperatingBudget
+        budget=self.core.admission_budget
+        if type(budget) is not OperatingBudget or budget.core is not self.core:
+            raise Conflict('same registered operating budget required')
+        token=self.manager_token()
+        with self.store._transaction() as c:
+            actor=self.store._authenticate(c,owner);self.store._role(actor,('owner',))
+            prior=c.execute('SELECT * FROM continuous_actions WHERE action_key=?',(action_key,)).fetchone()
+            if prior is None or prior['phase']!='start' or prior['state']!='uncertain':raise Conflict('original uncertain start required')
+            request=ActionRequest(**json.loads(prior['request']))
+            if request.action_key!=action_key or request.phase!='start' or request.state!='unassigned':raise Conflict('exact queued start required')
+            manager=self.store._authenticate(c,token)
+            raw=self.store._get(c,manager,request.task_id);task=self.store._public(raw)
+            current_config=self.registry._get(c,token,request.project)
+            if (task['project'],task['version'],task['manifest_digest'],current_config['fingerprint'])!=(request.project,request.version,request.manifest_digest,request.config_fingerprint):raise Conflict('original task or config changed')
+            host=self.projects.get(request.project)
+            if host is None or task['manifest']['repository']!=host.repository or any(check not in host.checks for check in task['manifest']['checks']):raise Conflict('original host binding changed')
+            if prior['actor_hash']!=manager['token_hash']:raise Conflict('original manager credential changed')
+            self.registry._get(c,owner,request.project,('owner',))
+            if (prior['task_id'],prior['project'])!=(task['id'],host.project):raise Conflict('original action task changed')
+            if host.worker_mode!='deferred_native' or host.session_id is not None or type(host.developer_transport) is not CodexHost or self.fleet is None:
+                raise Conflict('registered deferred native host required')
+            native_binding=host.developer_transport._binding(host.project)
+            if native_binding.cwd!=host.source or native_binding.repository!=host.repository:raise Conflict('native source host differs')
+            if task['state']!='queued' or task.get('worker') is not None or task.get('report') is not None:raise Conflict('original task already started')
+            self._assert_no_start_effects(c,task['id'],host.project,require_diagnostics=True)
+            _,config,template=self.fleet._template(c,token,host.project,host.fleet_template)
+            if template['host_ref']!=host.fleet_host_ref:raise Conflict('current fleet template differs')
+            provider=self.fleet.providers.get((host.project,host.fleet_host_ref))
+            if provider is None or not provider.execution_provisioning:raise Conflict('current native provisioning unavailable')
+            used=c.execute('SELECT COUNT(*) FROM fleet_creates WHERE project=? AND template_ref=?',(host.project,host.fleet_template)).fetchone()[0]
+            if used>=template['max_sessions']:raise Conflict('current native session cap reached')
+            if any(raw[k] is not None for k in ('worker_subject','worker_token_hash','lease_hash','lease_expires','progress','report','review')):raise Conflict('original task has worker effects')
+            self.fleet._approved_task(c,token,task['id'])
+            self.core._member(c,host.project,host.developer_id,'developer',config)
+            self.core._member(c,host.project,host.reviewer_id,'reviewer',config)
+            self.core._actor(c,token,host.project,'taesan',config)
+            source=_observe(host.source)
+            if source['sha']!=task['manifest']['base_sha'] or not source['tracked_and_visible_untracked_clean']:raise Conflict('approved clean base required')
+            reservation=c.execute('SELECT * FROM operating_budget_reservations WHERE action_key=?',(action_key,)).fetchone()
+            if reservation is None or reservation['state']!='uncertain' or reservation['started_at'] is not None:raise Conflict('exact unstarted uncertain admission required')
+            proof={'schema':1,'runtime_proof_scope':'current_native_runtime_only','historical_runtime_auto_verified':False,'action_key':action_key,'manager_hash':manager['token_hash'],'owner_hash':actor['token_hash'],
+                'project':host.project,'task_id':task['id'],'version':task['version'],'manifest_digest':task['manifest_digest'],
+                'config_fingerprint':config['fingerprint'],'source_sha':source['sha'],'source_digest':digest(source),
+                'reservation_id':reservation['id'],'policy_digest':reservation['policy_digest'],'recorded':self.store._now()}
+            identifier=digest(proof)
+            c.execute('INSERT INTO continuous_unstarted_proofs VALUES (?,?,0)',(identifier,canonical_json(proof)))
+            c.execute("UPDATE continuous_actions SET state='waiting',reason='readiness_pending',next_due=?,updated=? WHERE action_key=?",(self.store._now(),self.store._now(),action_key))
+            budget.confirm_verified_unstarted_in_transaction(c,owner,reservation['id'],identifier)
+        return {'requeued':True,'retry_executed':False,'runtime_proof_scope':'current_native_runtime_only','historical_runtime_auto_verified':False,'proof_id':identifier,'action_key':action_key,'task_id':task['id']}
+
     def _recover_metadata_start(self,request,task,host,token,heartbeat):
         """Explicitly finish a proven metadata-only old start; never retry it."""
         if host.worker_mode!='deferred_native' or request.prior_action_key is None or task['state']!='queued' or task.get('worker') is not None or task.get('report') is not None:
@@ -432,7 +514,8 @@ class ContinuousHost:
     def reconcile(self,request,heartbeat):
         task,host,token=self._task(request);row=self._row(task['id']);heartbeat()
         with self.store._transaction() as c:managed=c.execute('SELECT 1 FROM hierarchy_tasks WHERE task_id=?',(task['id'],)).fetchone()
-        if managed is None:return self._recover_metadata_start(request,task,host,token,heartbeat)
+        if managed is None:
+            return self._recover_metadata_start(request,task,host,token,heartbeat)
         if row and row['phase'] in ('executing','uncertain','freezing'):
             return self._receipt(request,'unavailable','action_bound_stop_evidence_required')
         current=self.core.get(token,task['id'])

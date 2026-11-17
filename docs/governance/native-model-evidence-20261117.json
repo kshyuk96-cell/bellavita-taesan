@@ -1,0 +1,90 @@
+{
+  "schema_version": "native-model-lab-evidence/v1",
+  "scope": "isolated_synthetic_repository_actual_codex_subscription",
+  "application_commit": "217f5ae",
+  "accepted_at_completion": true,
+  "current_acceptance_claimed": false,
+  "tasks": {
+    "parent": {
+      "task_id": "34270862cff7e31d1b2f9ea147479b1c",
+      "candidate_digest": "1096f60c00ba06dd188075f54dc310dc611cf548cab8947ba41c2a82f229482b",
+      "head_sha": "b5ebc5c886915b41fb53a65ee63390fe435406f8",
+      "accepted_at_completion": true,
+      "developer_turn_completed": true,
+      "developer_command_successes": 1,
+      "developer_command_failures": 0,
+      "reviewer_command_exit_codes": [
+        0,
+        0
+      ],
+      "native_process_spawns": 2,
+      "native_error_item_count": 2,
+      "mechanical_checks": [
+        {
+          "name": "native_marker",
+          "exit_code": 0
+        }
+      ],
+      "frozen_output_exact": true,
+      "output": {
+        "scope": "native-lab",
+        "stage": "parent",
+        "value": 1
+      }
+    },
+    "followup": {
+      "task_id": "10d3559788334200836f5e33aad98b13",
+      "candidate_digest": "24c3d68a809c286d7d3486db378eadb85da444c62adbd11c43642d16b69c3096",
+      "head_sha": "688fceb3f99b44d7de5e8496524837bbf25fbd6a",
+      "accepted_at_completion": true,
+      "developer_turn_completed": true,
+      "developer_command_successes": 1,
+      "developer_command_failures": 0,
+      "reviewer_command_exit_codes": [
+        0,
+        0
+      ],
+      "native_process_spawns": 2,
+      "native_error_item_count": 2,
+      "mechanical_checks": [
+        {
+          "name": "native_marker",
+          "exit_code": 0
+        }
+      ],
+      "frozen_output_exact": true,
+      "output": {
+        "scope": "native-lab",
+        "stage": "followup",
+        "value": 2
+      }
+    }
+  },
+  "paid_api_key_calls": 0,
+  "model_process_spawns": 4,
+  "customer_data_written": false,
+  "deployment_performed": false,
+  "always_on_verified": false,
+  "existing_ui_chat_control_verified": false,
+  "ai_business_quality_score": null,
+  "three_roles_independent": true,
+  "same_developer_session": true,
+  "developer_session_identity_sha256": "e90dd954f5a30a96bd508d9ac6018e549980cb98df872a69fc4106e864b15a9d",
+  "exact_parent_dependency_verified": true,
+  "setup_recovery": {
+    "cause": "missing_future_worker_template_before_any_native_execution",
+    "explicit_owner_proof_consumed": true,
+    "retry_executed_by_recovery": false,
+    "historical_runtime_auto_verified": false,
+    "original_runtime_independently_preserved": true
+  },
+  "all_maintenance_inactive_after_pilot": true,
+  "broker": {
+    "generation": 4,
+    "state": "ready",
+    "target_count": 10,
+    "existing_profiles_preserved": 8,
+    "new_lab_profiles": 2,
+    "single_canonical_authority": true
+  }
+}
