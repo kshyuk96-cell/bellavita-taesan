@@ -63,7 +63,40 @@ class WorkflowTraceTests(unittest.TestCase):
         report=self.trace.report(self.fx.manager,task['id'])
         self.assertTrue(report['controller_history_available']);self.assertEqual(report['action_count'],1)
         self.assertFalse(report['actions'][0]['binding_matches_task']);self.assertEqual(report['actions'][0]['recorded_state'],'uncertain')
+        self.assertTrue(report['recovery']['project_quarantined_recorded'])
+        self.assertEqual(report['recovery']['state'],'manual_reconciliation_required')
+        self.assertFalse(report['recovery']['automatic_retry_authorized'])
         self.assertNotIn('private-',json.dumps(report));self.assertNotIn('actor_hash',json.dumps(report))
+
+    def test_other_task_uncertainty_quarantines_selected_project_without_revealing_identity(self):
+        ContinuousManager(self.fx.core);selected=self.fx.task();uncertain=self.fx.task()
+        with self.fx.store._transaction() as c:
+            c.execute('INSERT INTO continuous_actions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                      ('b'*64,uncertain['id'],'project','dispatch_development','{}',token_hash(self.fx.manager),1,'uncertain',1,1000,None,None,1000,1000))
+        report=self.trace.report(self.fx.manager,selected['id'])
+        self.assertEqual(report['recovery']['project_uncertain_actions'],1)
+        self.assertEqual(report['recovery']['task_uncertain_actions'],0)
+        self.assertEqual(report['action_count'],0);self.assertNotIn(uncertain['id'],json.dumps(report))
+
+    def test_running_lease_expiry_never_grants_replay_or_marks_worker_stopped(self):
+        ContinuousManager(self.fx.core);task=self.fx.task()
+        with self.fx.store._transaction() as c:
+            c.execute('INSERT INTO continuous_actions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                      ('c'*64,task['id'],'project','dispatch_development','{}',token_hash(self.fx.manager),1,'running',1,900,None,None,900,900))
+        self.fx.now+=1000
+        report=self.trace.report(self.fx.manager,task['id'])
+        self.assertEqual(report['recovery']['state'],'running_outcome_pending')
+        self.assertFalse(report['recovery']['lease_expiry_allows_retry']);self.assertFalse(report['recovery']['processes_stopped_verified'])
+        with self.fx.store._transaction() as c:
+            self.assertEqual(c.execute("SELECT state FROM continuous_actions WHERE action_key=?",('c'*64,)).fetchone()[0],'running')
+
+    def test_other_project_uncertainty_does_not_change_this_projects_status(self):
+        ContinuousManager(self.fx.core);task=self.fx.task();other=self.fx.task(project='other')
+        with self.fx.store._transaction() as c:
+            c.execute('INSERT INTO continuous_actions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                      ('d'*64,other['id'],'other','start','{}',token_hash(self.fx.manager),1,'uncertain',1,1000,None,None,1000,1000))
+        report=self.trace.report(self.fx.manager,task['id'])
+        self.assertEqual(report['recovery']['state'],'no_uncertainty_recorded');self.assertFalse(report['recovery']['project_quarantined_recorded'])
 
     def test_actual_host_assignment_schema_joins_exact_action_binding(self):
         from manager_bridge.tests import test_continuous_host as host_fixtures

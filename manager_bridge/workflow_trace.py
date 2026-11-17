@@ -22,7 +22,17 @@ class WorkflowTrace:
             events=[{'id':r['id'],'kind':r['kind'],'recorded_state':r['state'],'recorded_at':r['recorded']}
                     for r in c.execute('SELECT * FROM hierarchy_events WHERE task_id=? ORDER BY id DESC LIMIT ?',(task_id,limit))]
             events.reverse();actions=[];action_count=0
+            recovery={'state':'controller_history_unavailable','project_quarantined_recorded':False,
+                      'project_uncertain_actions':0,'task_uncertain_actions':0,'task_running_actions':0,
+                      'automatic_retry_authorized':False,'lease_expiry_allows_retry':False,
+                      'processes_stopped_verified':False,'reconciliation_performed':False}
             if 'continuous_actions' in tables:
+                uncertain=c.execute("SELECT count(*) FROM continuous_actions WHERE project=? AND state='uncertain'",(task['project'],)).fetchone()[0]
+                task_uncertain=c.execute("SELECT count(*) FROM continuous_actions WHERE project=? AND task_id=? AND state='uncertain'",(task['project'],task_id)).fetchone()[0]
+                running=c.execute("SELECT count(*) FROM continuous_actions WHERE project=? AND task_id=? AND state='running'",(task['project'],task_id)).fetchone()[0]
+                recovery.update(state='manual_reconciliation_required' if uncertain else 'running_outcome_pending' if running else 'no_uncertainty_recorded',
+                                project_quarantined_recorded=bool(uncertain),project_uncertain_actions=uncertain,
+                                task_uncertain_actions=task_uncertain,task_running_actions=running)
                 action_count=c.execute('SELECT count(*) FROM continuous_actions WHERE task_id=? AND project=?',(task_id,task['project'])).fetchone()[0]
                 for action in c.execute('SELECT * FROM continuous_actions WHERE task_id=? AND project=? ORDER BY created DESC,action_key DESC LIMIT ?',(task_id,task['project'],limit)):
                     try:
@@ -57,7 +67,7 @@ class WorkflowTrace:
                    'events':events,'event_count':total,'events_truncated':total>len(events),
                    'actions':actions,'action_count':action_count,'actions_truncated':action_count>len(actions),
                    'controller_history_available':'continuous_actions' in tables,'action_history_scope':'selected_project_task_all_actors',
-                   'host_history_scope':'current_assignment_only','host':host,
+                   'host_history_scope':'current_assignment_only','host':host,'recovery':recovery,
                    'next_assignments':edges,'next_assignment_count':edge_count,'next_assignments_truncated':edge_count>len(edges),
                    'fresh_observers_invoked':False,'current_technical_acceptance_verified':False,
                    'snapshot_digest_is_signature':False,'execution_authorized':False,'operational_authorized':False,'always_on_verified':False}
