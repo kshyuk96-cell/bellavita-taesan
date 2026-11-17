@@ -14,7 +14,7 @@ import zipfile
 ALLOWED = {'client.py','render_child.py','company_renderer.py','asset_bundle.py','company/__init__.py','company/render.py','company/sender.py','company/event_scroll.py','legacy_adapter.py','legacy_vision.py','legacy/server.py','legacy/automation.py','legacy/invitation.py','legacy/messages.json','legacy/face_detection_yunet_2023mar.onnx','legacy/YUNET-LICENSE.txt','manifest.json'}
 
 
-def download_runtime(origin, token, expected_digest):
+def download_runtime(origin, token, expected_digest, worker_key=None):
     u=urllib.parse.urlsplit(origin)
     if u.scheme!='https' or not u.hostname or u.username or u.password or u.path not in ('','/') or u.query or u.fragment:
         raise ValueError('HTTPS ERP origin required')
@@ -22,7 +22,9 @@ def download_runtime(origin, token, expected_digest):
         raise ValueError('Pinned runtime digest required')
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self,*args):return None
-    request=urllib.request.Request(origin.rstrip('/')+'/production-runtime.zip',headers={'OAI-Sites-Authorization':'Bearer '+token})
+    headers={'OAI-Sites-Authorization':'Bearer '+token}
+    if worker_key:headers['X-Production-Worker-Key']=worker_key
+    request=urllib.request.Request(origin.rstrip('/')+'/production-runtime.zip',headers=headers)
     with urllib.request.build_opener(NoRedirect).open(request,timeout=45) as response:
         data=response.read(2*1024*1024+1)
     if len(data)>2*1024*1024 or hashlib.sha256(data).hexdigest()!=expected_digest:
@@ -60,7 +62,7 @@ def pair_worker(origin, token, key, runtime_digest):
         def redirect_request(self,*args):return None
     body=json.dumps({'key':key,'runtimeSha':runtime_digest}).encode()
     request=urllib.request.Request(origin.rstrip('/')+'/api/production/worker/pair',data=body,headers={
-        'OAI-Sites-Authorization':'Bearer '+token,'Origin':origin.rstrip('/'),'Content-Type':'application/json'})
+        'OAI-Sites-Authorization':'Bearer '+token,'X-Production-Worker-Key':key,'Origin':origin.rstrip('/'),'Content-Type':'application/json'})
     with urllib.request.build_opener(NoRedirect).open(request,timeout=30) as response:
         result=json.loads(response.read(4096))
     if result.get('paired') is not True:raise ValueError('Worker pairing failed')
@@ -70,7 +72,7 @@ def main():
     for name in ('ERP_BASE_URL','ERP_SITE_TOKEN','ERP_WORKER_KEY','ERP_RUNTIME_SHA256'):
         if not os.environ.get(name):raise SystemExit('Missing required server secret/config: '+name)
     try:
-        data=download_runtime(os.environ['ERP_BASE_URL'],os.environ['ERP_SITE_TOKEN'],os.environ['ERP_RUNTIME_SHA256'])
+        data=download_runtime(os.environ['ERP_BASE_URL'],os.environ['ERP_SITE_TOKEN'],os.environ['ERP_RUNTIME_SHA256'],os.environ['ERP_WORKER_KEY'])
         root=extract_runtime(data,tempfile.mkdtemp(prefix='erp-production-runtime-'))
         pair_worker(os.environ['ERP_BASE_URL'],os.environ['ERP_SITE_TOKEN'],os.environ['ERP_WORKER_KEY'],os.environ['ERP_RUNTIME_SHA256'])
     except Exception:
