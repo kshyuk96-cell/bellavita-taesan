@@ -1,0 +1,13 @@
+# Ten-section retained runtime diagnostics
+
+`POST /v1/representative/runtime/governance/control/operations/diagnostics` accepts exactly `projects`. An existing authenticated owner or manager can request registered project scope. This route reads one consistent database transaction with SQLite `query_only` enabled; it invokes no native metadata RPC, source observer, backup transport, authentication refresher or task handler.
+
+The ten aggregate sections cover registration, roles, task states, controller action states, retained schedule states, retained authentication states, host requirement counts, transition modes, restore quarantine and encrypted backup states. No IDs, tokens, profile paths, candidate paths, repository names, provider errors or raw state strings are returned. Unknown stored states count in `other_count`. Missing tables mean `not_recorded`, not zero verified problems. Backup totals require the global owner; limited owners and managers receive `restricted` without totals. Schedule counts match only the exact selected-project scope digest, not a larger shared host scope.
+
+The original project authority is reauthenticated and fingerprint-checked inside the snapshot transaction. No runtime records or approvals are written. Credential/profile values and database blobs are not exported. The restore quarantine flag retains its existing global safety meaning for authorized project readers.
+
+Run `python scripts/inspect_governance_runtime.py --base-url https://YOUR_EXISTING_MANAGER --token-file /private/manager.token --project PROJECT`. Repeat `--project` for a bounded unique set of at most 100. The client contacts only this fixed read endpoint on the explicitly supplied HTTPS origin, or HTTP loopback, using the existing no-redirect/no-proxy API transport. It does not construct or start the service. The response has an exact bounded schema and fixed vocabulary; unexpected fields and live-execution claims are rejected rather than printed. Failures emit one generic error without raw provider text or automatic retries.
+
+Exit 0 means the retained-state report was obtained and validated, not that the system is healthy or ready. Authentication validity, current membership, native execution, scheduler availability and always-on hosting remain unverified. No execution/admission authority is inferred from counts. This command works only when a separately started manager API is reachable; it is not a replacement for the pending permanent host.
+
+Synthetic validation includes database-byte stability, role/scope restrictions, global backup restriction, fixed-vocabulary filtering, strict HTTP fields, no-provider calls, CLI error sanitization, actual CLI-to-loopback execution and configuration-drift rejection.

@@ -47,6 +47,10 @@ class OperationsControl:
         self.transition,self.link_plan,self.backup_health=transition,link_plan,backup_health
         self.recovery,self.readiness=recovery,readiness
 
+    def diagnostics(self,token,projects):
+        from .runtime_diagnostics import inspect_runtime
+        return inspect_runtime(self.control,token,projects)
+
     def inspect(self,token,projects):
         self.control._scope(token,projects)
         return self.preflight.inspect(token,projects)
