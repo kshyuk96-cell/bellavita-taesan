@@ -319,6 +319,107 @@ class HostTests(unittest.TestCase):
             self.assertEqual(c.execute('SELECT count(*) FROM fleet_creates').fetchone()[0],2)
             self.assertEqual(c.execute("SELECT count(*) FROM fleet_creates WHERE state='created'").fetchone()[0],1)
             self.assertEqual(c.execute("SELECT state FROM continuous_actions WHERE action_key=?",(action,)).fetchone()[0],'reconciled')
+    def unstarted_deferred(self):
+        fleet=self.deferred()
+        with self.store._transaction() as c:
+            c.execute('DELETE FROM fleet_templates')
+        task=self.task();self.tick();self.now+=31
+        with self.store._transaction() as c:
+            action=c.execute("SELECT action_key FROM continuous_actions WHERE phase='start'").fetchone()[0]
+        fleet.register_template(self.owner,'project','native-template','native-host',max_sessions=4,expires_at=self.now+3600)
+        return task,action
+    def test_explicit_no_effect_deferred_start_recovers_original_action(self):
+        task,action=self.unstarted_deferred()
+        result=self.scheduler.reconcile(self.manager,['project'],'fixture-instance',action)
+        self.assertEqual(result['actions'][0]['state'],'confirmed')
+        self.assertEqual(self.core.get(self.manager,task['id'])['state'],'development_queued')
+        self.assertEqual(self.transport.native_calls,0)
+        with self.store._transaction() as c:
+            self.assertEqual(c.execute('SELECT start_action_key FROM continuous_host_reservations').fetchone()[0],action)
+    def test_budgeted_no_effect_deferred_start_remains_quarantined(self):
+        task,action=self.unstarted_deferred()
+        self.core.admission_budget=object()
+        result=self.scheduler.reconcile(self.manager,['project'],'fixture-instance',action)
+        self.assertNotEqual(result['actions'][0]['state'],'confirmed')
+        self.assertEqual(self.store.get_task(self.manager,task['id'])['state'],'queued')
+        with self.store._transaction() as c:
+            self.assertEqual(c.execute('SELECT count(*) FROM fleet_creates').fetchone()[0],0)
+        self.assertEqual(self.transport.native_calls,0)
+    def budgeted_unstarted(self):
+        from manager_bridge.operating_budget import OperatingBudget,BudgetPolicy,BudgetAuthObservation
+        from manager_bridge.fleet_codex import CodexHost,ProjectBinding
+        fleet=self.deferred()
+        with self.store._transaction() as c:c.execute('DELETE FROM fleet_templates')
+        budget=OperatingBudget(self.core,auth_observer=lambda p:BudgetAuthObservation(p,self.registry.get(self.owner,p)['fingerprint'],'ready',self.now,self.now+100,'fixture/auth'))
+        budget.install(self.owner,'project',BudgetPolicy(1,2,3600));budget.refresh_auth(self.manager,'project')
+        self.scheduler=ContinuousManager(self.core,handlers=self.host.handlers(),admission_budget=budget)
+        task=self.task();self.tick();self.scheduler.release(self.manager,['project'],'fixture-instance')
+        with self.store._transaction() as c:action=c.execute("SELECT action_key FROM continuous_actions WHERE phase='start'").fetchone()[0]
+        fleet.register_template(self.owner,'project','native-template','native-host',max_sessions=4,expires_at=self.now+3600)
+        home=self.root/'native-profile';home.mkdir(mode=0o700)
+        _transport_journal(self.store,'project','developer')
+        native=CodexHost('/bin/true',home,{'project':ProjectBinding('project','fixture/project',self.source,require_origin=False)})
+        object.__setattr__(self.project,'developer_transport',native)
+        return task,action,budget
+    def test_owner_requeues_verified_unstarted_real_budget_without_execution(self):
+        task,action,budget=self.budgeted_unstarted()
+        result=self.host.requeue_verified_unstarted(self.owner,action)
+        self.assertTrue(result['requeued']);self.assertFalse(result['retry_executed'])
+        with self.store._transaction() as c:
+            row=c.execute('SELECT * FROM continuous_actions WHERE action_key=?',(action,)).fetchone()
+            self.assertEqual((row['state'],row['reason'],row['attempts']),('waiting','readiness_pending',1))
+            self.assertEqual(c.execute('SELECT state FROM operating_budget_reservations').fetchone()[0],'confirmed_not_started')
+            self.assertEqual(c.execute('SELECT consumed FROM continuous_unstarted_proofs').fetchone()[0],1)
+            self.assertEqual(c.execute('SELECT count(*) FROM fleet_creates').fetchone()[0],0)
+        self.assertEqual(self.transport.native_calls,0)
+        with self.assertRaises(Conflict):self.host.requeue_verified_unstarted(self.owner,action)
+        # Ordinary coordinator admission, not the repair, performs the retry.
+        object.__setattr__(self.project,'developer_transport',self.transport)
+        self.tick()
+        self.assertEqual(self.core.get(self.manager,task['id'])['state'],'development_queued')
+        with self.store._transaction() as c:
+            self.assertEqual(c.execute('SELECT attempts FROM continuous_actions WHERE action_key=?',(action,)).fetchone()[0],2)
+            self.assertEqual(c.execute('SELECT state FROM operating_budget_reservations').fetchone()[0],'started')
+    def test_owner_requeue_rejects_nonowner_and_rolls_back_changed_budget(self):
+        task,action,budget=self.budgeted_unstarted()
+        from manager_bridge.store import PermissionDenied
+        from manager_bridge.operating_budget import BudgetPolicy
+        with self.assertRaises(PermissionDenied):self.host.requeue_verified_unstarted(self.manager,action)
+        budget.install(self.owner,'project',BudgetPolicy(1,3,3600),expected_revision=1)
+        with self.assertRaises(Conflict):self.host.requeue_verified_unstarted(self.owner,action)
+        with self.store._transaction() as c:
+            self.assertEqual(c.execute('SELECT state FROM continuous_actions WHERE action_key=?',(action,)).fetchone()[0],'uncertain')
+            self.assertEqual(c.execute('SELECT state FROM operating_budget_reservations').fetchone()[0],'uncertain')
+            self.assertEqual(c.execute('SELECT count(*) FROM continuous_unstarted_proofs').fetchone()[0],0)
+    def test_owner_requeue_accepts_small_real_clock_advance(self):
+        task,action,budget=self.budgeted_unstarted()
+        consume=budget.confirm_verified_unstarted_in_transaction
+        def advanced(*args):
+            self.now+=0.001
+            return consume(*args)
+        budget.confirm_verified_unstarted_in_transaction=advanced
+        self.assertTrue(self.host.requeue_verified_unstarted(self.owner,action)['requeued'])
+    def test_owner_requeue_denies_missing_or_task_bound_diagnostics(self):
+        task,action,budget=self.budgeted_unstarted()
+        sink=_transport_journal(self.store,'project','developer')
+        sink({'version':1,'project':'project','stage':'source_checked','category':'none','observed_at':self.now,'context':{'task_id':task['id']}})
+        with self.assertRaises(Conflict):self.host.requeue_verified_unstarted(self.owner,action)
+        with self.store._transaction() as c:c.execute('DROP TABLE continuous_transport_diagnostics')
+        with self.assertRaises(Conflict):self.host.requeue_verified_unstarted(self.owner,action)
+    def test_owner_requeue_denies_active_tick_guard(self):
+        task,action,budget=self.budgeted_unstarted()
+        with self.store._transaction() as c:c.execute('INSERT INTO continuous_tick_guard VALUES (1,?,?,?)',('fixture',1,self.now-100))
+        with self.assertRaises(Conflict):self.host.requeue_verified_unstarted(self.owner,action)
+    def test_owner_requeue_denies_existing_intent(self):
+        task,action,budget=self.budgeted_unstarted()
+        # A durable reservation is already an effect, regardless of no process.
+        self.host._reservation(self.store.get_task(self.manager,task['id']),self.project,self.manager,action)
+        with self.assertRaises(Conflict):self.host.requeue_verified_unstarted(self.owner,action)
+        with self.store._transaction() as c:self.assertEqual(c.execute('SELECT state FROM operating_budget_reservations').fetchone()[0],'uncertain')
+    def test_owner_requeue_requires_explicit_release_not_expired_leader(self):
+        task,action,budget=self.budgeted_unstarted()
+        with self.store._transaction() as c:c.execute('UPDATE continuous_leader SET expires=?',(self.now-1,))
+        with self.assertRaises(Conflict):self.host.requeue_verified_unstarted(self.owner,action)
     def test_durable_diagnostics_accept_fixed_metadata_reject_raw_output_and_tokens(self):
         sink=_transport_journal(self.store,'project','developer')
         record={'version':1,'project':'project','stage':'spawned','category':'none','observed_at':self.now,'identity':{'boot_id':SESSION,'pid':123,'pgid':123,'sid':123,'start_ticks':123},'context':{'task_id':'a'*32}}

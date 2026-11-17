@@ -310,6 +310,41 @@ class OperatingBudget:
         self._event(c,row['id'],state)
         return {'reservation_id':row['id'],'state':state,'automatic_replay':False,'monetary_spend':None}
 
+    def confirm_verified_unstarted_in_transaction(self,c,owner,reservation_id,proof_id):
+        """Consume trusted host owner proof atomically; default finish stays sticky."""
+        from .continuous_host import ContinuousHost
+        _hex(proof_id);actor=self.store._authenticate(c,owner);self.store._role(actor,('owner',))
+        row=self._get(c,owner,reservation_id)
+        config=self.registry._get(c,owner,row['project'],('owner',))
+        if self._quarantined(c):raise Conflict('restored admission remains quarantined')
+        audit=c.execute('SELECT * FROM continuous_unstarted_proofs WHERE proof_id=?',(proof_id,)).fetchone()
+        if audit is None or audit['consumed']!=0:raise Conflict('fresh unconsumed host proof required')
+        proof=json.loads(audit['proof'])
+        if digest(proof)!=proof_id or proof.get('schema')!=1 or type(proof.get('recorded')) not in (int,float) or not math.isfinite(proof['recorded']) or not 0<=self.store._now()-proof['recorded']<=5 or proof.get('owner_hash')!=actor['token_hash']:
+            raise Conflict('host owner proof binding changed')
+        if proof.get('runtime_proof_scope')!='current_native_runtime_only' or proof.get('historical_runtime_auto_verified') is not False:raise Conflict('explicit runtime proof scope required')
+        for key in ('project','task_id','version','manifest_digest','config_fingerprint','policy_digest'):
+            if proof.get(key)!=row[key]:raise Conflict('host admission proof differs')
+        if proof.get('reservation_id')!=row['id'] or proof.get('action_key')!=row['action_key'] or proof.get('manager_hash')!=row['actor_hash']:
+            raise Conflict('host original admission identity changed')
+        action=self._action(c,row)
+        if action is None or action['phase']!='start' or action['state']!='waiting' or action['reason']!='readiness_pending':
+            raise Conflict('verified no-start queue transition unavailable')
+        if row['state']!='uncertain' or row['started_at'] is not None or config['fingerprint']!=row['config_fingerprint']:
+            raise Conflict('uncertain execution cannot be refunded')
+        task=self.store._get(c,actor,row['task_id'])
+        if task['state']!='queued' or any(task[k] is not None for k in ('worker_subject','worker_token_hash','lease_hash','lease_expires','progress','report','review')) or task['version']!=row['version'] or task['manifest_digest']!=row['manifest_digest']:
+            raise Conflict('verified queued task changed')
+        policy=c.execute('SELECT policy_digest FROM operating_budget_policies WHERE project=?',(row['project'],)).fetchone()
+        if policy is None or policy['policy_digest']!=row['policy_digest']:raise Conflict('admission policy changed')
+        if proof.get('source_sha')!=json.loads(task['manifest'])['base_sha']:raise Conflict('approved source proof differs')
+        _hex(proof.get('source_digest'))
+        ContinuousHost._assert_no_start_effects(c,row['task_id'],row['project'],require_diagnostics=True)
+        c.execute('UPDATE continuous_unstarted_proofs SET consumed=1 WHERE proof_id=?',(proof_id,))
+        c.execute("UPDATE operating_budget_reservations SET state='confirmed_not_started',updated=? WHERE id=?",(self.store._now(),row['id']))
+        self._event(c,row['id'],'confirmed_not_started')
+        return {'state':'confirmed_not_started','automatic_replay':False,'proof_id':proof_id}
+
     def _complete(self,c,token,reservation_id):
         row=self._get(c,token,reservation_id);actor,config=self._auth(c,token,row['project'])
         if self._quarantined(c):raise Conflict('restored reservation requires verification')
