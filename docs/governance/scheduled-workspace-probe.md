@@ -1,0 +1,11 @@
+# Scheduled workspace continuity probe
+
+A delivered schedule message and a model's success statement do not establish that a cloud worker accessed the original private workspace. This probe lets the owner prepare a private random challenge, retain its SHA256 outside the worker prompt, and independently verify a receipt written by an actual command.
+
+Use a new owned physical 0700 directory for each run. Run `scripts/check_scheduled_workspace.py prepare --state-root ABSOLUTE_PRIVATE_DIRECTORY`, then pass only that directory and the returned challenge hash to the scheduled command. The scheduled command runs `respond --state-root ... --expected-hash ...`; the original owner later runs `verify` with the same arguments. Do not include the private challenge contents in logs, prompts or source control. The default validity is five minutes. Delayed runs require a new explicitly prepared probe, never resetting an existing challenge.
+
+Files are bounded regular owned 0600 files, opened without following symlinks. Hard links, public modes, nonfinite/backwards clocks, expiry, challenge replacement and modified receipts are refused. New files use exclusive creation and file/directory fsync. Existing files are never overwritten. Missing markers fail rather than creating substitute evidence. Reads and writes use a pinned directory descriptor.
+
+Verification establishes private workspace continuity only. Scheduler-accounted execution must be checked separately against its run record. The same workspace user can access the HMAC secret and forge a receipt; this is not remote attestation or a trust boundary against that user. It does not prove safe shared-database access, authentication validity, unattended availability, reboot recovery, test quality or authority to start a task. No integration with worker admission or automatic replay is added.
+
+Validation: eleven focused cases and the related host preflight/admission/transition suite, 33 tests total, passed. A real separate Python child wrote a receipt, exited zero, and its parent independently verified the HMAC and a different PID. This manual child-process run is not reported as scheduled execution. No cloud resource or recurring schedule is created by this feature.
