@@ -36,6 +36,9 @@ class Management(unittest.TestCase):
  def test_sms_audit_never_claims_delivery_or_sends(self):
   with patch.dict(os.environ,{'SOLAPI_API_KEY':'x','SOLAPI_API_SECRET':'y','SOLAPI_FROM':'z'}):r=m.notifications(self.root)
   self.assertTrue(r['providerConfigured']);self.assertFalse(r['queueEnabled']);self.assertEqual(r['customer']['state'],'not-configured');self.assertIsNone(r['staff']['delivered'])
+ def test_staff_recipient_configuration_is_counted_without_sending(self):
+  with patch.dict(os.environ,{'INVITATION_STAFF_NOTIFY_PHONES':'010-0000-0001,01000000001,invalid'}):r=m.notifications(self.root)
+  self.assertEqual(r['staff']['recipients'],1);self.assertFalse(r['queueEnabled']);self.assertIsNone(r['staff']['delivered'])
  def test_invalid_period_rejected(self):
   with self.assertRaises(ValueError):m.query(self.worker,self.root,{'from':['2099-02-01'],'to':['2099-01-01']})
  def test_unauthenticated_management_is_denied_by_bridge(self):

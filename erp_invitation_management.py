@@ -21,10 +21,14 @@ def read_db(path):
 def notifications(root):
     result={'customer':{'state':'not-configured','message':'자체 주문 결제 요청은 smsuse=n이며 별도 고객 주문알림 발송기가 없습니다.'},'staff':{'state':'disabled','recipients':0,'accepted':0,'uncertain':0,'delivered':None},'providerConfigured':all(os.getenv(k) for k in ('SOLAPI_API_KEY','SOLAPI_API_SECRET','SOLAPI_FROM')),'queueEnabled':False,'payappConfigured':all(os.getenv('INVITATION_PAYAPP_'+k) for k in ('USER_ID','LINK_KEY','LINK_VALUE','REQUEST_KEY')),'checkoutEnabled':os.getenv('INVITATION_CHECKOUT_ENABLED')=='1','localCheckoutEnabled':os.getenv('INVITATION_LOCAL_CHECKOUT_ENABLED')=='1','checkoutPilotRestricted':bool(os.getenv('INVITATION_CHECKOUT_PILOT_JOBS')),'blogpay':'자체 주문서·페이앱 결제 기준입니다. 별도 고객 알림 발송 연결이 필요합니다.'}
     result['localTemplateReady']=all((Path(root)/'invitations'/'7f494a310ca9371914b8863b45732bd5'/f'{price}.order.json').is_file() for price in (93500,99000))
+    configured_phones={re.sub(r'[^0-9]','',p) for p in os.getenv('INVITATION_STAFF_NOTIFY_PHONES','').split(',')}
+    configured_phones={p for p in configured_phones if re.fullmatch(r'01[016789][0-9]{7,8}',p)}
+    result['staff']['recipients']=len(configured_phones)
     c=read_db(Path(root)/'state.sqlite3')
     if c:
         try:
-            result['staff']['recipients']=c.execute("SELECT COUNT(*) FROM order_staff_notify n JOIN staff s ON s.owner=n.owner WHERE n.center='구로'").fetchone()[0]
+            legacy={re.sub(r'[^0-9]','',r[0]) for r in c.execute("SELECT n.phone FROM order_staff_notify n JOIN staff s ON s.owner=n.owner WHERE n.center='구로'")}
+            result['staff']['recipients']=len(configured_phones|legacy)
             for state,n in c.execute('SELECT state,COUNT(*) FROM order_sms GROUP BY state'):
                 if state=='접수 완료':result['staff']['accepted']+=n
                 else:result['staff']['uncertain']+=n
