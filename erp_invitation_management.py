@@ -74,7 +74,10 @@ def query(worker,root,params):
     c=read_db(Path(root)/'state.sqlite3')
     if c:
         try:
-            rows=c.execute("SELECT i.*,o.order_number AS legacy_order_number FROM invitation_orders i LEFT JOIN order_operations o ON replace(o.id,'-','')=i.id WHERE substr(i.created,1,10)>=? AND substr(i.created,1,10)<=? ORDER BY i.created DESC LIMIT 1000",(start,end)).fetchall()
+            target=params.get('id',[''])[0]
+            count=c.execute('SELECT COUNT(*) FROM invitation_orders WHERE substr(created,1,10)>=? AND substr(created,1,10)<=?',(start,end)).fetchone()[0]
+            pages=max(1,(count+499)//500)
+            rows=c.execute("SELECT i.*,o.order_number AS legacy_order_number FROM invitation_orders i LEFT JOIN order_operations o ON replace(o.id,'-','')=i.id WHERE substr(i.created,1,10)>=? AND substr(i.created,1,10)<=? AND (?='' OR 'payapp:'||i.id=?) ORDER BY i.created DESC LIMIT 500 OFFSET ?",(start,end,target,target,0 if target else (page-1)*500)).fetchall()
             for row in rows:
                 d=paid_order(row)
                 if not params.get('id') or d['id']==params['id'][0]:orders.append(d)
@@ -88,7 +91,7 @@ def query(worker,root,params):
         if target.startswith('blogpay:'):
             fields['sOrderNum']=target.split(':')[1]
         response=client.request('orderList',**fields);raw=response.get('orderList') or {};rows=raw.values() if isinstance(raw,dict) else raw
-        pages=int(response.get('pagenation',{}).get('pageCount',1))
+        pages=max(pages,int(response.get('pagenation',{}).get('pageCount',1)))
         for r in rows:
             goodlist=r.get('goodList') or {};goods=goodlist.values() if isinstance(goodlist,dict) else goodlist
             for index,g in enumerate(goods):
