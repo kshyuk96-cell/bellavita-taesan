@@ -26,3 +26,18 @@ class Memorial(unittest.TestCase):
    for price in checkout_products.PRICES:(folder/f'{price}.order.json').write_text(json.dumps(baseline))
    v,_=memorial.extract(SOURCE);_,items,products=checkout_products.build(root,'https://example.org',{'kind':'memorial','invitationId':'memorial-test','version':1,'values':v})
    self.assertEqual(len(items),2);self.assertEqual([p['price'] for p in products.values()],[93500,99000]);self.assertIn('근조 문구',str(products));self.assertNotIn('결혼',str(products));self.assertNotIn('축하',str(products));self.assertEqual(products[93500]['kind'],'memorial')
+ def test_end_to_end_parse_banner_publish_and_memorial_checkout(self):
+  import checkout
+  from types import SimpleNamespace
+  with tempfile.TemporaryDirectory() as tmp,patch.dict('os.environ',{'TAESAN_DATA':tmp}):
+   root=Path(tmp);folder=root/'invitations'/checkout_products.TEMPLATE;folder.mkdir(parents=True)
+   baseline={'images':['https://example.org/product.jpg'],'groups':[{'label':label,'choices':{'1':{'label':'기존 선택','amount':0,'custom':False}}} for label in ['축하 문구','받으시는 분','상품 선택']]}
+   for price in checkout_products.PRICES:(folder/f'{price}.order.json').write_text(json.dumps(baseline))
+   engine=bridge.Engine(root,'https://example.org',SimpleNamespace(checkout=checkout),None,async_jobs=False)
+   request={'requestId':'memorial-parse-100','invitationId':'memorial-record-100','version':1,'kind':'memorial','source':SOURCE,'action':'parse','values':{},'orderMode':'invitation-checkout'}
+   parsed=engine.submit(request);self.assertEqual(parsed['status'],'done');self.assertEqual(parsed['missing'],[])
+   preview=engine.submit({**request,'requestId':'memorial-preview-100','action':'preview','values':parsed['values']});self.assertEqual(preview['status'],'done')
+   result=engine.submit({**request,'requestId':'memorial-publish-100','action':'publish','values':parsed['values'],'previewRequestId':'memorial-preview-100','fingerprint':preview['fingerprint']});self.assertEqual(result['status'],'done');self.assertEqual(len(result['items']),2)
+   for item in result['items']:
+    self.assertNotIn('축하',item['message']);key=item['orderUrl'].split('/i/')[1].split('/')[0];product=checkout.read(root,key,str(item['price']));self.assertEqual(product['kind'],'memorial');page=checkout.render(product,'#',False);self.assertNotIn('웨딩',page);self.assertNotIn('축하',page);self.assertIn('근조 문구',page);self.assertIn('/sample.webp',product['images'][0])
+   engine.executor.shutdown()

@@ -269,7 +269,9 @@ def render(product, action, can_pay):
         button_state='' if can_pay else 'disabled', can_submit='true' if can_pay else 'false',
         notice='' if can_pay else '<p class="hint">현재 결제를 이용할 수 없습니다. 문의 031-8067-8580</p>')
     if product.get('kind')=='memorial':
-        page=page.replace('축하 문구','근조 문구').replace('신청해주신 쌀빛그림화환은 친환경 웨딩갤러리를 만들기 위해 액자를 설치하고<br>예식 후 쌀로 교환하여 혼주님께 드리거나 필요한 시설에 기부합니다.','조문의 마음을 전하는 쌀빛그림화환입니다.<br>선택한 상품과 빈소 정보를 확인해 주세요.')
+        page=page.replace('웨딩액자','액자').replace('축하 문구','근조 문구').replace('신청해주신 쌀빛그림화환은 친환경 웨딩갤러리를 만들기 위해 액자를 설치하고<br>예식 후 쌀로 교환하여 혼주님께 드리거나 필요한 시설에 기부합니다.','조문의 마음을 전하는 쌀빛그림화환입니다.<br>선택한 상품과 빈소 정보를 확인해 주세요.')
+        if product.get('images'):
+            page=re.sub(r'<img src="https://bellavita1004\.blogpay\.io/img/editor/[^"]+" alt="쌀빛그림화환 상세 안내" loading="lazy">','<img src="'+escape(product['images'][0])+'" alt="쌀빛그림화환 안내" loading="lazy">',page)
     return page
 
 
