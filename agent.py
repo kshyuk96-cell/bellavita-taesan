@@ -1553,6 +1553,8 @@ if __name__ == '__main__':
         raise SystemExit(0)
     if len(os.getenv('TAESAN_WEBHOOK_SECRET', '')) < 32:
         raise SystemExit('TAESAN_WEBHOOK_SECRET에 32자 이상의 임의 문자열이 필요합니다.')
+    import erp_invitation_management
+    print("ERP_INVITATION_NOTIFICATION_AUDIT " + json.dumps(erp_invitation_management.notifications(ROOT)), flush=True)
     owner_alerts.start(db)
     start_order_queue()
     ThreadingHTTPServer((os.getenv('TAESAN_BIND', '127.0.0.1'), int(os.getenv('PORT', '8080'))),

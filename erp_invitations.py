@@ -26,6 +26,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from PIL import Image, ImageOps
 import erp_invitation_render as render
+import erp_invitation_management
 import erp_ai
 
 TEMPLATE_HASHES={'seoul.ttf':'7b3e16b8ccd97d903520f87f22ff970d0ab0594231807d0a0b752eb8fcb670f4','event-wreath-catalog.webp': '5a264152394b1d34f847192b3c05ff7d809a4e1e072eff580220e127070d8b25', 'event-v5.css': '852ce3f563c959ed59ee240ec99896434f62bf91e019e14d63ef3ba7927fdfb3', 'rice-wreath-10kg.webp': '6a0e396b644daeaa76ef79aeee3acaa6b9893f24a31aa129fca070b29209c7a7'}
@@ -426,6 +427,7 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
         return True
     if erp_ai.dispatch(handler,method,path):return True
     worker=engine(root,origin,legacy,extract)
+    if erp_invitation_management.dispatch(handler,method,path,root,worker):return True
     try:
         if method=='GET' and path=='/erp/invitations/template-candidates':
             from blogpay import BlogPay
