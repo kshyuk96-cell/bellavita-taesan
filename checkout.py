@@ -36,6 +36,11 @@ def enabled():
 
 
 def payment_enabled(job):
+    if os.getenv('INVITATION_LOCAL_CHECKOUT_ENABLED')=='1':
+        root=Path(os.getenv('TAESAN_DATA','taesan-data')).resolve()
+        product=read(root,job,'93500')
+        if product and product.get('localCheckout') and read(root,job,'99000'):
+            return True
     pilot_jobs = os.getenv('INVITATION_CHECKOUT_PILOT_JOBS', '')
     if pilot_jobs:
         return job in (item.strip() for item in pilot_jobs.split(','))
