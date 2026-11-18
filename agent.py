@@ -1555,6 +1555,16 @@ if __name__ == '__main__':
         raise SystemExit('TAESAN_WEBHOOK_SECRET에 32자 이상의 임의 문자열이 필요합니다.')
     import erp_invitation_management
     print("ERP_INVITATION_NOTIFICATION_AUDIT " + json.dumps(erp_invitation_management.notifications(ROOT)), flush=True)
+    def memorial_source_probe():
+        source=os.getenv('ERP_MEMORIAL_PROBE_URL','')
+        if not source:return
+        try:
+            raw=erp_invitations.erp_memorial_invitation.fetch_source(source,erp_invitations)
+            values,warnings=erp_invitations.erp_memorial_invitation.extract(raw)
+            print('ERP_MEMORIAL_SOURCE_PROBE '+json.dumps({'fetched':True,'bytes':len(raw),'present':[k for k in ('deceasedName','venue','funeralRoom','address','mourners','date','time') if values.get(k)],'missing':erp_invitations.missing('memorial',values)},ensure_ascii=False),flush=True)
+        except Exception as error:
+            print('ERP_MEMORIAL_SOURCE_PROBE '+json.dumps({'fetched':False,'errorType':type(error).__name__},ensure_ascii=False),flush=True)
+    if os.getenv('ERP_MEMORIAL_PROBE_URL'):threading.Thread(target=memorial_source_probe,daemon=True).start()
     owner_alerts.start(db)
     start_order_queue()
     ThreadingHTTPServer((os.getenv('TAESAN_BIND', '127.0.0.1'), int(os.getenv('PORT', '8080'))),
