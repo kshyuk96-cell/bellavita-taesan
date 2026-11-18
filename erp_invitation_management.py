@@ -19,7 +19,8 @@ def read_db(path):
 
 
 def notifications(root):
-    result={'customer':{'state':'not-configured','message':'자체 주문 결제 요청은 smsuse=n이며 별도 고객 주문알림 발송기가 없습니다.'},'staff':{'state':'disabled','recipients':0,'accepted':0,'uncertain':0,'delivered':None},'providerConfigured':all(os.getenv(k) for k in ('SOLAPI_API_KEY','SOLAPI_API_SECRET','SOLAPI_FROM')),'queueEnabled':False,'blogpay':'블로그페이 자체 고객·판매자 알림 설정과 실제 수신 여부는 API로 확인되지 않습니다.'}
+    result={'customer':{'state':'not-configured','message':'자체 주문 결제 요청은 smsuse=n이며 별도 고객 주문알림 발송기가 없습니다.'},'staff':{'state':'disabled','recipients':0,'accepted':0,'uncertain':0,'delivered':None},'providerConfigured':all(os.getenv(k) for k in ('SOLAPI_API_KEY','SOLAPI_API_SECRET','SOLAPI_FROM')),'queueEnabled':False,'payappConfigured':all(os.getenv('INVITATION_PAYAPP_'+k) for k in ('USER_ID','LINK_KEY','LINK_VALUE','REQUEST_KEY')),'checkoutEnabled':os.getenv('INVITATION_CHECKOUT_ENABLED')=='1','checkoutPilotRestricted':bool(os.getenv('INVITATION_CHECKOUT_PILOT_JOBS')),'blogpay':'자체 주문서·페이앱 결제 기준입니다. 별도 고객 알림 발송 연결이 필요합니다.'}
+    result['localTemplateReady']=all((Path(root)/'invitations'/'7f494a310ca9371914b8863b45732bd5'/f'{price}.order.json').is_file() for price in (93500,99000))
     c=read_db(Path(root)/'state.sqlite3')
     if c:
         try:
@@ -32,7 +33,7 @@ def notifications(root):
     return result
 
 
-def products(worker):
+def products(worker,root=None):
     items={}
     with worker.db() as c:
         rows=c.execute("SELECT input,result,created_at,invitation_id FROM jobs WHERE action IN ('preview','publish') AND state='done' ORDER BY created_at DESC LIMIT 2000").fetchall()
@@ -42,8 +43,21 @@ def products(worker):
             for item in result.get('items',[]):
                 key=str(item.get('productId',''))
                 if not re.fullmatch(r'\d+',key) or key in items:continue
-                items[key]={'productId':key,'price':item.get('price'),'orderUrl':item.get('orderUrl',''),'url':item.get('url',''),'verifiedAt':row['created_at'],'invitationId':row['invitation_id'],'name':v.get('name',''),'date':v.get('date',''),'time':v.get('time',''),'venue':v.get('venue',''),'address':v.get('address',''),'kind':data.get('kind',''),'hostSide':v.get('hostSide',''),'groomName':v.get('groomName',''),'brideName':v.get('brideName',''),'groomParents':v.get('groomParents',''),'brideParents':v.get('brideParents',''),'sourceUrl':v.get('sourceUrl',''),'verification':'saved-result'}
+                items[key]={'productId':key,'source':'own-checkout' if re.search(r'/i/[a-f0-9]{32}/(?:93500|99000)/order$',item.get('orderUrl','')) else 'blogpay','price':item.get('price'),'orderUrl':item.get('orderUrl',''),'url':item.get('url',''),'verifiedAt':row['created_at'],'invitationId':row['invitation_id'],'name':v.get('name',''),'date':v.get('date',''),'time':v.get('time',''),'venue':v.get('venue',''),'address':v.get('address',''),'kind':data.get('kind',''),'hostSide':v.get('hostSide',''),'groomName':v.get('groomName',''),'brideName':v.get('brideName',''),'groomParents':v.get('groomParents',''),'brideParents':v.get('brideParents',''),'sourceUrl':v.get('sourceUrl',''),'verification':'saved-result'}
         except (ValueError,TypeError):continue
+    if root is not None:
+        base=Path(root)/'invitations'
+        if base.is_dir():
+            for folder in sorted(base.iterdir(),key=lambda p:p.stat().st_mtime,reverse=True)[:1000]:
+                if not re.fullmatch(r'[a-f0-9]{32}',folder.name) or not folder.is_dir():continue
+                for price in (93500,99000):
+                    file=folder/f'{price}.order.json'
+                    if not file.is_file():continue
+                    try:
+                        v=json.loads(file.read_text());url=worker.origin+f'/i/{folder.name}/{price}/order'
+                        if any(x.get('orderUrl')==url for x in items.values()):continue
+                        key='own:'+folder.name+':'+str(price);items[key]={'productId':key,'source':'own-checkout','price':price,'orderUrl':url,'url':worker.origin+f'/i/{folder.name}/{price}.html','name':v.get('title',''),'date':str(v.get('event_time',''))[:10],'time':str(v.get('event_time',''))[11:16],'verification':'own-snapshot','invitationId':'','verifiedAt':''}
+                    except (ValueError,OSError):continue
     return list(items.values())
 
 
@@ -70,7 +84,7 @@ def query(worker,root,params):
         a,b=dt.date.fromisoformat(start),dt.date.fromisoformat(end);page=int(params.get('page',['1'])[0])
         if a>b or (b-a).days>366 or not 1<=page<=100:raise ValueError()
     except ValueError:raise ValueError('조회 기간은 1년 이내, 페이지는 1~100으로 입력하세요.')
-    catalog=products(worker);known={x['productId']:x for x in catalog};orders=[];warnings=[];pages=1
+    catalog=[p for p in products(worker,root) if p.get('source')=='own-checkout'];orders=[];warnings=[];pages=1
     c=read_db(Path(root)/'state.sqlite3')
     if c:
         try:
@@ -83,32 +97,8 @@ def query(worker,root,params):
                 if not params.get('id') or d['id']==params['id'][0]:orders.append(d)
         except sqlite3.OperationalError:warnings.append('자체 주문 원장이 아직 없습니다.')
         finally:c.close()
-    if known and os.getenv('BLOGPAY_SHOP_ID') and os.getenv('BLOGPAY_API_TOKEN'):
-        from blogpay import BlogPay
-        client=BlogPay(os.environ['BLOGPAY_SHOP_ID'],os.environ['BLOGPAY_API_TOKEN'])
-        target=params.get('id',[''])[0]
-        fields={'sDateS':start,'sDateE':end,'sPageSize':500,'page':page}
-        if target.startswith('blogpay:'):
-            fields['sOrderNum']=target.split(':')[1]
-        response=client.request('orderList',**fields);raw=response.get('orderList') or {};rows=raw.values() if isinstance(raw,dict) else raw
-        pages=max(pages,int(response.get('pagenation',{}).get('pageCount',1)))
-        for r in rows:
-            goodlist=r.get('goodList') or {};goods=goodlist.values() if isinstance(goodlist,dict) else goodlist
-            for index,g in enumerate(goods):
-                product=known.get(str(g.get('goodNum','')))
-                if not product:continue
-                key='blogpay:'+str(r.get('orderNum',''))+':'+str(g.get('orderGoodNum',index))
-                if target and key!=target:continue
-                state=str(r.get('orderState',''));paid=state in ('4','8','9','10','16');cancel=state in ('32','64','65','66','67','68') or str(r.get('cancelState') or '0')!='0'
-                quantity=int(g.get('orderQty') or 1)
-                opts=[]
-                for x in g.get('inputOption') or []:
-                    if isinstance(x,dict):opts.append([str(x.get('name') or x.get('label') or ''),str(x.get('value') or '')])
-                wedding=product.get('kind')=='wedding'
-                orders.append({'id':key,'source':'blogpay','sourceId':str(r.get('orderNum','')),'createdAt':r.get('registDate',''),'state':'cancelled' if cancel else 'paid' if paid else 'waiting','stateLabel':r.get('orderStateStr') or state,'amount':int(g.get('orderPrice') or g.get('goodPrice') or 0),'quantity':quantity,'productId':product['productId'],'title':g.get('goodName') or product['name'],'buyer':r.get('orderName',''),'buyerPhone':r.get('orderTel',''),'options':opts,'fields':{'date':product['date'],'time':product['time'],'address':' / '.join(dict.fromkeys(x for x in [product['address'],product['venue']] if x)),'recipient':label_value(opts,['받는 분','받으시는 분']) or (' '.join(filter(None,[product.get('groomName'),product.get('brideName')]))+' 예식' if wedding else product['name']),'sender':label_value(opts,['보내는 분','보내시는 분']),'size':label_value(opts,['규격','사이즈']) or '2호 선물형','artwork':'','message':label_value(opts,['문구']),'eventType':'결혼' if wedding else '일반 행사','photoTo':r.get('orderTel','')}})
-    elif known:warnings.append('블로그페이 API 연결이 없어 해당 주문은 조회하지 못했습니다.')
     if pages>page:warnings.append('다음 페이지 주문이 있습니다. 다음 페이지도 확인하세요.')
-    return {'orders':sorted(orders,key=lambda r:r['createdAt'],reverse=True),'products':catalog,'notifications':notifications(root),'from':start,'to':end,'page':page,'pages':pages,'warnings':warnings,'autoCreateEnabled':os.getenv('BLOGPAY_INVITATION_AUTO_CREATE')=='1'}
+    return {'orders':sorted(orders,key=lambda r:r['createdAt'],reverse=True),'products':catalog,'notifications':notifications(root),'from':start,'to':end,'page':page,'pages':pages,'warnings':warnings,'autoCreateEnabled':True,'productMode':'own-checkout'}
 
 
 def dispatch(handler,method,path,root,worker):

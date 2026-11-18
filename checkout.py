@@ -116,7 +116,13 @@ def parse_product(tree, row, url, shop):
 
 def read(root, job, price):
     try:
-        return json.loads((root / 'invitations' / job / f'{price}.order.json').read_text(encoding='utf-8'))
+        product=json.loads((root / 'invitations' / job / f'{price}.order.json').read_text(encoding='utf-8'))
+        if product.get('localCheckout'):
+            publication=product.get('publicationId','')
+            if not re.fullmatch(r'[a-f0-9]{32}',publication):return None
+            manifest=Path(os.getenv('ERP_INVITATION_DATA') or root)/'erp-invitations'/'public'/publication/'result.json'
+            if not manifest.is_file() or json.loads(manifest.read_text()).get('fingerprint')!=product.get('releaseFingerprint'):return None
+        return product
     except FileNotFoundError:
         return None
 

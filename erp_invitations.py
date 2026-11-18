@@ -27,6 +27,7 @@ from urllib.parse import urlsplit
 from PIL import Image, ImageOps
 import erp_invitation_render as render
 import erp_invitation_management
+import erp_local_checkout
 import erp_ai
 
 TEMPLATE_HASHES={'seoul.ttf':'7b3e16b8ccd97d903520f87f22ff970d0ab0594231807d0a0b752eb8fcb670f4','event-wreath-catalog.webp': '5a264152394b1d34f847192b3c05ff7d809a4e1e072eff580220e127070d8b25', 'event-v5.css': '852ce3f563c959ed59ee240ec99896434f62bf91e019e14d63ef3ba7927fdfb3', 'rice-wreath-10kg.webp': '6a0e396b644daeaa76ef79aeee3acaa6b9893f24a31aa129fca070b29209c7a7'}
@@ -112,7 +113,7 @@ def download_image(url):
 
 class Engine:
     def __init__(self,root,origin,legacy,extract,*,async_jobs=True):
-        self.root=Path(root)/'erp-invitations';self.root.mkdir(parents=True,exist_ok=True)
+        self.checkout_root=Path(os.getenv('TAESAN_DATA') or root);self.root=Path(root)/'erp-invitations';self.root.mkdir(parents=True,exist_ok=True)
         self.origin=origin.rstrip('/');self.legacy=legacy;self.extract=extract;self.async_jobs=async_jobs
         self.executor=concurrent.futures.ThreadPoolExecutor(max_workers=2,thread_name_prefix='erp-invitation')
         self.active=set()
@@ -138,7 +139,7 @@ class Engine:
         if not isinstance(data,dict):raise ValueError('입력 형식 오류')
         key=data.get('requestId','');inv=data.get('invitationId','');version=data.get('version')
         if not re.fullmatch(r'[\w-]{10,100}',key) or not re.fullmatch(r'[\w-]{10,130}',inv) or type(version) is not int or not 0<version<100000:raise ValueError('요청 ID 또는 버전 오류')
-        if data.get('action') not in ('parse','preview','publish') or data.get('kind') not in ('event','wedding') or data.get('orderMode')!='blogpay-direct':raise ValueError('ERP 주문 경로를 확인하세요.')
+        if data.get('action') not in ('parse','preview','publish') or data.get('kind') not in ('event','wedding') or data.get('orderMode') not in ('blogpay-direct','invitation-checkout'):raise ValueError('ERP 주문 경로를 확인하세요.')
         if not isinstance(data.get('source'),str) or not 0<len(data['source'])<=6000 or len(set(re.findall(r'https?://[^\s<>]+',data['source'])))>1:raise ValueError('원본은 6,000자 이하로 입력하세요.')
         data={**data,'values':clean_values(data.get('values',{}))};hashed=digest(data)
         with LOCK,self.db() as db:
@@ -276,7 +277,8 @@ class Engine:
         year,month=(when.year+1,1) if when.month==12 else (when.year,when.month+1)
         expires=dt.date(year,month,min(when.day,calendar.monthrange(year,month)[1])).isoformat()
         if dt.datetime.now(render.SEOUL).date().isoformat()>expires:raise ValueError('공유 기간이 지난 행사입니다.')
-        items=self.products(render.product_name(v,kind))
+        local=data.get('orderMode')=='invitation-checkout'
+        local_key,items,snapshots=erp_local_checkout.build(self.checkout_root,self.origin,data) if local else ('',self.products(render.product_name(v,kind)),{})
         photos={key:self.image(v[key]) for key in IMAGE_FIELDS if v.get(key)}
         import erp_invitation_auto
         if kind=='wedding':
@@ -287,13 +289,13 @@ class Engine:
         hero=render.image_bytes(photos['hero']) if kind=='wedding' else b''
         og=render.thumbnail(v,kind)
         hashes={k:hashlib.sha256(render.image_bytes(photo)).hexdigest() for k,photo in photos.items()}
-        fingerprint=digest({'values':v,'kind':kind,'items':items,'images':hashes})
+        fingerprint=digest({'values':v,'kind':kind,'items':items,'images':hashes,**({'orderMode':'invitation-checkout','products':snapshots} if local else {})})
         warnings_out=[]
         if len(set(hashes.values()))<len(hashes):warnings_out.append('사진 중복이 있습니다. 대표·제작 액자·족자의 사진 구성을 확인하세요.')
         if kind=='event' and not photos.get('logo'):warnings_out.append('로고·행사 이미지가 없어 행사명으로 시안을 구성했습니다. 설치 예시를 확인하세요.')
         import erp_invitation_auto
         parts=erp_invitation_auto.components(render,v,kind,photos,image)
-        return {'status':'done','items':items,'fingerprint':fingerprint,'expires':expires,'warnings':warnings_out}, {'reference-components.json':json.dumps(parts).encode(),'sample.webp':sample,'hero.webp':hero,'thumbnail.jpg':og,'layout.json':json.dumps(boxes,ensure_ascii=False).encode()}
+        return {'status':'done','items':items,'fingerprint':fingerprint,'expires':expires,'warnings':warnings_out}, {**({'local-products.json':json.dumps({'key':local_key,'products':snapshots}).encode()} if local else {}),'reference-components.json':json.dumps(parts).encode(),'sample.webp':sample,'hero.webp':hero,'thumbnail.jpg':og,'layout.json':json.dumps(boxes,ensure_ascii=False).encode()}
 
     def recover_publication(self,row,data):
         """Recover the completed filesystem commit if the process died before journal commit."""
@@ -353,6 +355,8 @@ class Engine:
                             (public/f'{price}.html').write_text(page,encoding='utf-8')
                             items.append({**item,'url':url,'message':render.message(data['values'],data['kind'],price,url)})
                         result={**result,'items':items,'jobId':row['public_id'],'thumbnail':origin+'/thumbnail.jpg'}
+                        if data.get('orderMode')=='invitation-checkout':
+                            local=json.loads(assets['local-products.json']);erp_local_checkout.publish(self.checkout_root,local['key'],local['products'],row['public_id'],result['fingerprint'],self.origin,data['kind']=='wedding',data['values'].get('weddingCrop'))
                         # Manifest is written last: incomplete pages cannot become public.
                         temp=public/'result.tmp';temp.write_text(json.dumps(result,ensure_ascii=False),encoding='utf-8');temp.replace(public/'result.json')
                         with self.db() as db:db.execute('INSERT INTO publications VALUES(?,?,?)',(publication_key,result['fingerprint'],json.dumps(result,ensure_ascii=False)))
@@ -484,6 +488,18 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
             size=int(handler.headers.get('Content-Length','0'))
             if not 0<size<=5*1024*1024:raise ValueError('사진 크기 오류')
             handler.send_json(worker.upload(handler.rfile.read(size)),201);return True
+        order_preview=re.fullmatch(r'/erp/invitations/jobs/([\w-]{10,100})/order-preview/(93500|99000)',path)
+        if method=='GET' and order_preview:
+            with worker.db() as c:row=c.execute("SELECT * FROM jobs WHERE id=? AND action='preview' AND state='done'",(order_preview[1],)).fetchone()
+            if not row:handler.send_json({'error':'검증된 주문서 없음'},404);return True
+            file=worker.root/'private'/row['id']/'local-products.json'
+            if not file.is_file():handler.send_json({'error':'자체 주문서가 아닙니다.'},409);return True
+            product=json.loads(file.read_text())['products'][order_preview[2]]
+            if json.loads(row['input'])['kind']=='wedding':product['wedding_photo']='https://preview.invalid/hero.webp'
+            page=legacy.checkout.render(product,'#',can_pay=False)
+            hero=worker.root/'private'/row['id']/'hero.webp'
+            if hero.is_file():page=page.replace('https://preview.invalid/hero.webp',render.data_image(hero.read_bytes()))
+            raw=page.encode();handler.send_response(200);handler.send_header('Content-Type','text/html; charset=utf-8');handler.send_header('Cache-Control','no-store');handler.end_headers();handler.wfile.write(raw);return True
         match=re.fullmatch(r'/erp/invitations/jobs/([\w-]{10,100})(/preview)?',path)
         if method=='GET' and match:
             result=worker.get(match[1])

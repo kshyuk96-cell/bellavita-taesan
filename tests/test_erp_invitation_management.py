@@ -21,7 +21,7 @@ class Management(unittest.TestCase):
    c=sqlite3.connect(self.journal);c.row_factory=sqlite3.Row
    try:yield c
    finally:c.close()
-  self.worker=SimpleNamespace(db=db)
+  self.worker=SimpleNamespace(db=db,origin="https://example.org")
   c=sqlite3.connect(self.root/'state.sqlite3');checkout.setup(c);order_operations.setup(c);c.execute('CREATE TABLE staff(owner TEXT)');c.commit();c.close()
  def tearDown(self):self.temp.cleanup()
  def test_filters_unknown_goods_preserves_cancel_and_does_not_write(self):
@@ -31,7 +31,7 @@ class Management(unittest.TestCase):
     self.assertions=endpoint
     return {'orderList':{'x':{'orderNum':'test-order','orderState':'4','registDate':'2099-01-01','orderName':'가상 주문자','orderTel':'01000000000','goodList':{'a':{'goodNum':'123','orderGoodNum':'1','orderQty':'1','orderPrice':'99000'},'b':{'goodNum':'999','orderGoodNum':'2'}}}},'pagenation':{'pageCount':2}}
   with patch.dict(os.environ,{'BLOGPAY_SHOP_ID':'testshop','BLOGPAY_API_TOKEN':'fake'}),patch('blogpay.BlogPay',Client):r=m.query(self.worker,self.root,{'from':['2099-01-01'],'to':['2099-01-02']})
-  self.assertEqual(len(r['orders']),1);self.assertEqual(r['orders'][0]['state'],'paid');self.assertEqual(r['orders'][0]['fields']['sender'],'');self.assertEqual(r['pages'],2)
+  self.assertEqual(len(r['orders']),0);self.assertEqual(len(r['products']),0);self.assertEqual(r['pages'],1)
   c=sqlite3.connect(self.root/'state.sqlite3');self.assertEqual(c.execute('SELECT COUNT(*) FROM order_sms').fetchone()[0],0);c.close()
  def test_sms_audit_never_claims_delivery_or_sends(self):
   with patch.dict(os.environ,{'SOLAPI_API_KEY':'x','SOLAPI_API_SECRET':'y','SOLAPI_FROM':'z'}):r=m.notifications(self.root)
