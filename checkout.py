@@ -233,12 +233,12 @@ def render(product, action, can_pay):
             extra = f' (+{amount:,}원)' if amount else ''
             custom = ' data-custom="1"' if choice['custom'] else ''
             greeting = (f' data-greeting="{escape(re.sub(r"^\d+\.\s*", "", choice["label"]))}"'
-                        if group['label'] == '축하 문구' and not choice['custom'] else '')
+                        if group['label'] in ('축하 문구','근조 문구') and not choice['custom'] else '')
             kg = re.search(r'(?<!\d)(10|20|30)\s*(?:kg|㎏|키로|킬로)', choice['label'], re.I) if group['label'] == '상품 선택' else None
             weight = f' data-kg="{kg[1]}"' if kg else ''
             options.append(f'<option value="{escape(code)}" data-amount="{amount}"{custom}{greeting}{weight}>'
                            f'{escape(choice["label"])}{extra}</option>')
-        greeting = ' id="greeting-choice"' if group['label'] == '축하 문구' else ''
+        greeting = ' id="greeting-choice"' if group['label'] in ('축하 문구','근조 문구') else ''
         groups.append(f'<label>{escape(group["label"])}<select name="choice{index}"{greeting} required>'
                       + ''.join(options) + '</select></label>')
     pictures = ''.join(f'<img src="{escape(src)}" alt="쌀빛그림화환 상품 사진"'
@@ -262,12 +262,15 @@ def render(product, action, can_pay):
         </figure><div class="gallery" id="wreath-fallback" role="group" aria-label="상품 사진" tabindex="0" hidden>{pictures}</div>'''
     else:
         pictures = f'<div class="gallery" role="group" aria-label="상품 사진" tabindex="0">{pictures}</div>'
-    return Template(TEMPLATE.read_text(encoding='utf-8')).substitute(
+    page=Template(TEMPLATE.read_text(encoding='utf-8')).substitute(
         escaped, action=escape(action), groups=''.join(groups), pictures=pictures,
         base=str(product['price']), base_display=f'{product["price"]:,}',
         attempt=secrets.token_hex(16),
         button_state='' if can_pay else 'disabled', can_submit='true' if can_pay else 'false',
         notice='' if can_pay else '<p class="hint">현재 결제를 이용할 수 없습니다. 문의 031-8067-8580</p>')
+    if product.get('kind')=='memorial':
+        page=page.replace('축하 문구','근조 문구').replace('신청해주신 쌀빛그림화환은 친환경 웨딩갤러리를 만들기 위해 액자를 설치하고<br>예식 후 쌀로 교환하여 혼주님께 드리거나 필요한 시설에 기부합니다.','조문의 마음을 전하는 쌀빛그림화환입니다.<br>선택한 상품과 빈소 정보를 확인해 주세요.')
+    return page
 
 
 def normalize_order(product, fields):

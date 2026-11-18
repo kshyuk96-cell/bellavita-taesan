@@ -28,11 +28,13 @@ from PIL import Image, ImageOps
 import erp_invitation_render as render
 import erp_invitation_management
 import erp_local_checkout
+import erp_memorial_invitation
 import erp_ai
 
 TEMPLATE_HASHES={'seoul.ttf':'7b3e16b8ccd97d903520f87f22ff970d0ab0594231807d0a0b752eb8fcb670f4','event-wreath-catalog.webp': '5a264152394b1d34f847192b3c05ff7d809a4e1e072eff580220e127070d8b25', 'event-v5.css': '852ce3f563c959ed59ee240ec99896434f62bf91e019e14d63ef3ba7927fdfb3', 'rice-wreath-10kg.webp': '6a0e396b644daeaa76ef79aeee3acaa6b9893f24a31aa129fca070b29209c7a7'}
 PRICES=(93500,99000)
 FIELDS={'name':160,'date':10,'time':5,'venue':180,'address':250,'sourceUrl':1000,'greeting':1200,'note':700,'host':100,'groomName':40,'brideName':40,'groomParents':100,'brideParents':100,'groomRelation':24,'brideRelation':24,'hostSide':8,'logo':1000,'hero':1000,'frame':1000,'scrollLeft':1000,'scrollRight':1000,'congrats':160}
+FIELDS.update(erp_memorial_invitation.FIELDS)
 IMAGE_FIELDS=('logo','hero','frame','scrollLeft','scrollRight')
 LOCK=threading.RLock()
 ENGINES={}
@@ -66,7 +68,7 @@ def clean_values(values):
 
 
 def missing(kind,v):
-    keys=['name','date','time','venue','address']+(['host'] if kind=='event' else ['groomName','brideName','groomParents','brideParents','groomRelation','brideRelation',*IMAGE_FIELDS[1:]])
+    keys=['name','date','time','venue','address']+(['deceasedName'] if kind=='memorial' else ['host'] if kind=='event' else ['groomName','brideName','groomParents','brideParents','groomRelation','brideRelation',*IMAGE_FIELDS[1:]])
     return [k for k in keys if not v.get(k)]
 
 
@@ -139,7 +141,7 @@ class Engine:
         if not isinstance(data,dict):raise ValueError('입력 형식 오류')
         key=data.get('requestId','');inv=data.get('invitationId','');version=data.get('version')
         if not re.fullmatch(r'[\w-]{10,100}',key) or not re.fullmatch(r'[\w-]{10,130}',inv) or type(version) is not int or not 0<version<100000:raise ValueError('요청 ID 또는 버전 오류')
-        if data.get('action') not in ('parse','preview','publish') or data.get('kind') not in ('event','wedding') or data.get('orderMode') not in ('blogpay-direct','invitation-checkout'):raise ValueError('ERP 주문 경로를 확인하세요.')
+        if data.get('action') not in ('parse','preview','publish') or data.get('kind') not in ('event','wedding','memorial') or data.get('orderMode') not in ('blogpay-direct','invitation-checkout'):raise ValueError('ERP 주문 경로를 확인하세요.')
         if not isinstance(data.get('source'),str) or not 0<len(data['source'])<=6000 or len(set(re.findall(r'https?://[^\s<>]+',data['source'])))>1:raise ValueError('원본은 6,000자 이하로 입력하세요.')
         data={**data,'values':clean_values(data.get('values',{}))};hashed=digest(data)
         with LOCK,self.db() as db:
@@ -179,6 +181,10 @@ class Engine:
         return download_image(value)
 
     def parse(self,data):
+        if data['kind']=='memorial':
+            import sys
+            v,warnings_out=erp_memorial_invitation.extract(data['source'],lambda url:erp_memorial_invitation.fetch_source(url,sys.modules[__name__]))
+            values=clean_values(v);return {'status':'done','values':values,'missing':missing('memorial',values),'warnings':warnings_out}
         # Reuse all five provider parsers. On incomplete/unsupported sources, return
         # only available fields; never drop the original URL or invent relationships.
         source=data['source'];warnings_out=[]
@@ -496,6 +502,7 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
             if not file.is_file():handler.send_json({'error':'자체 주문서가 아닙니다.'},409);return True
             product=json.loads(file.read_text())['products'][order_preview[2]]
             if json.loads(row['input'])['kind']=='wedding':product['wedding_photo']='https://preview.invalid/hero.webp'
+            if product.get('kind')=='memorial':product['images']=[render.data_image((worker.root/'private'/row['id']/'sample.webp').read_bytes())]
             page=legacy.checkout.render(product,'#',can_pay=False)
             hero=worker.root/'private'/row['id']/'hero.webp'
             if hero.is_file():page=page.replace('https://preview.invalid/hero.webp',render.data_image(hero.read_bytes()))

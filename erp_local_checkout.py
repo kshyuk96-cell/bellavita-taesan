@@ -20,13 +20,16 @@ def build(root,origin,data):
   if not source.is_file():raise ValueError('기존 자체 주문서 기준 양식이 없습니다. 93,500원·99,000원 양식을 확인하세요.')
   original=json.loads(source.read_text());groups=copy.deepcopy(original['groups'])
   if {g['label'] for g in groups}!={'축하 문구','받으시는 분','상품 선택'}:raise ValueError('기준 주문서 옵션을 확인하세요.')
-  if data['kind']=='event':
+  if data['kind'] in ('event','memorial'):
    for g in groups:
-    if g['label']=='받으시는 분':g['choices']={'1':{'label':v['name'],'amount':0,'custom':False}}
-    if g['label']=='축하 문구':g['choices']={'0':{'label':'직접 입력','amount':0,'custom':True},'1':{'label':'행사 개최를 진심으로 축하드립니다.','amount':0,'custom':False}}
+    if g['label']=='받으시는 분':g['choices']={'1':{'label':('故 '+v['deceasedName']) if data['kind']=='memorial' else v['name'],'amount':0,'custom':False}}
+    if g['label']=='축하 문구':g['choices']={'0':{'label':'직접 입력','amount':0,'custom':True},'1':{'label':'삼가 고인의 명복을 빕니다.' if data['kind']=='memorial' else '행사 개최를 진심으로 축하드립니다.','amount':0,'custom':False}}
+  if data['kind']=='memorial':
+   for g in groups:
+    if g['label']=='축하 문구':g['label']='근조 문구'
   number=str(int(hashlib.sha256((key+':'+str(price)).encode()).hexdigest()[:15],16))
   when=dt.datetime.fromisoformat(v['date']+'T'+v['time']).replace(tzinfo=dt.timezone(dt.timedelta(hours=9)))
-  snapshots[price]={'number':number,'title':v['name'],'price':price,'images':original.get('images',[]),'groups':groups,'date':v['date'],'clock':v['time'],'venue':v['venue'],'address':v['address'],'source':v.get('sourceUrl',''),'event_time':when.isoformat(),'localCheckout':True,'kind':data['kind']}
+  snapshots[price]={'number':number,'title':('故 '+v['deceasedName']+' 부고') if data['kind']=='memorial' else v['name'],'price':price,'images':original.get('images',[]),'groups':groups,'date':v['date'],'clock':v['time'],'venue':v['venue'],'address':v['address'],'source':v.get('sourceUrl',''),'event_time':when.isoformat(),'localCheckout':True,'kind':data['kind']}
   items.append({'price':price,'productId':number,'orderUrl':origin+f'/i/{key}/{price}/order','verified':True,'source':'own-checkout'})
  return key,items,snapshots
 
@@ -34,6 +37,7 @@ def publish(root,key,snapshots,publication,fingerprint,origin,wedding=False,crop
  folder=Path(root)/'invitations'/key;folder.mkdir(parents=True,exist_ok=True)
  for price,snapshot in snapshots.items():
   product={**snapshot,'publicationId':publication,'releaseFingerprint':fingerprint}
+  if product.get('kind')=='memorial':product['images']=[origin+'/erp/i/'+publication+'/sample.webp']
   if wedding:product['wedding_photo']=origin+'/erp/i/'+publication+'/hero.webp'
   if crop is not None:product['wedding_crop']=crop
   raw=json.dumps(product,ensure_ascii=False);target=folder/f'{price}.order.json'

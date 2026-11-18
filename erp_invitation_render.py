@@ -1,3 +1,4 @@
+import erp_memorial_invitation
 """Approved-layout renderer. All dynamic text is escaped; images are embedded, not fetched by customers."""
 import base64
 import datetime as dt
@@ -58,11 +59,12 @@ def paste_photo(canvas, photo, box):
 
 
 def signature(v,kind):
-    if kind=='event': return v.get('host','').rstrip('.。')
+    if kind in ('event','memorial'): return v.get('host','').rstrip('.。')
     return v.get(('bride' if v.get('hostSide')=='bride' else 'groom')+'Parents','').rstrip('.。')
 
 
 def words(v,kind):
+    if kind=='memorial':return v['name'],v.get('greeting') or '삼가 고인의 명복을 빕니다.',v.get('host') or v.get('mourners',''),v['name']
     parents=signature(v,kind)
     if kind=='event':
         return v['name'],v.get('greeting') or '귀한 걸음으로 함께해 주시면 감사하겠습니다.',parents,v['name']
@@ -77,6 +79,9 @@ def words(v,kind):
 
 
 def composite(v,kind,photos):
+    if kind=='memorial':
+        import sys
+        return erp_memorial_invitation.banner(sys.modules[__name__],v)
     boxes=[]
     if kind=='event':
         canvas=Image.open(ASSETS/'event-wreath-catalog.webp').convert('RGBA')
@@ -137,6 +142,9 @@ def product_name(v,kind):
 
 
 def message(v,kind,price,url):
+    if kind=='memorial':
+        _,date,clock=date_words(v)
+        return '\n\n'.join([v['name'],'삼가 고인의 명복을 빕니다.',f"빈소: {v['venue']} {v.get('funeralRoom','')}\n주소: {v['address']}\n발인: {date} {clock}",'상주: '+(v.get('mourners') or v.get('host') or '원본 확인'),url,f'쌀빛그림화환 안내 · {price:,}원','문의 031-8067-8580'])
     _,greeting,sign,_=words(v,kind);_,date,clock=date_words(v)
     hello=[line.strip() for line in greeting.splitlines() if line.strip()]
     greeting=(hello[0] if hello else '초대합니다.')+'\n'+(' '.join(hello[1:]) if len(hello)>1 else '귀한 걸음으로 함께해 주시면 감사하겠습니다.')
@@ -148,6 +156,9 @@ def message(v,kind,price,url):
 
 
 def page(v,kind,price,order_url,sample,hero,og,url,preview=False):
+    if kind=='memorial':
+        import sys
+        return erp_memorial_invitation.page(sys.modules[__name__],v,price,order_url,sample,og,url,preview)
     if kind=='event':return event_page(v,price,order_url,sample,og,url,preview)
     if isinstance(sample,dict):
         import erp_invitation_auto
