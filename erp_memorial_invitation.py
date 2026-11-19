@@ -7,7 +7,7 @@ from urllib.parse import urlsplit,urljoin
 from lxml import html
 from PIL import Image,ImageDraw
 
-FIELDS={'deceasedName':80,'mourners':800,'departure':100,'admission':100,'funeralRoom':120,'burial':200,'contactPhone':30}
+FIELDS={'productPrefix':100,'deceasedName':80,'mourners':800,'departure':100,'admission':100,'funeralRoom':120,'burial':200,'contactPhone':30}
 
 def fetch_source(url,bridge):
  for _ in range(4):
@@ -37,7 +37,7 @@ def extract(source,fetcher=None):
   for e in tree.xpath('//div|//p|//tr|//li|//dt|//dd|//h1|//h2|//section'):e.tail='\n'+(e.tail or '')
   text=tree.text_content()
  lines=[' '.join(x.split()) for x in text.splitlines() if x.strip()];labels={}
- names=['고인','고인명','성함','빈소','장례식장','주소','장례식장주소','상주','대표상주','발인','발인일시','입관','입관일시','장지']
+ names=['고인','고인명','성함','빈소','장례식장','주소','장례식장주소','상주','대표상주','발인','발인일시','입관','입관일시','입관일','발인일','장지','1차 장지','2차 장지']
  for i,line in enumerate(lines):
   m=re.match(r'^('+ '|'.join(names)+r')\s*[:：]\s*(.+)$',line)
   if m:labels[m[1]]=m[2]
@@ -46,7 +46,7 @@ def extract(source,fetcher=None):
  if not deceased:
   m=re.search(r'故\s*([가-힣]{2,10})(?:\s*님|\s*[（(]|\s*(?:별세|소천|영면)|\n|$)',joined);deceased=m[1] if m else ''
  deceased=re.sub(r'^故\s*','',deceased);deceased=re.split(r'님|[（(]|별세|소천|영면',deceased)[0].strip()[:80]
- departure=labels.get('발인') or labels.get('발인일시') or '';match=re.search(r'(20\d{2})[.년/\-]\s*(\d{1,2})[.월/\-]\s*(\d{1,2})',departure);date=''
+ departure=labels.get('발인') or labels.get('발인일시') or labels.get('발인일') or '';match=re.search(r'(20\d{2})[.년/\-]\s*(\d{1,2})[.월/\-]\s*(\d{1,2})',departure);date=''
  if match:
   try:date=dt.date(*map(int,match.groups())).isoformat()
   except ValueError:pass
@@ -58,10 +58,26 @@ def extract(source,fetcher=None):
  if not address:
   road=[x for x in lines if re.search(r'(?:서울|경기|인천|부산|대구|대전|광주|울산|세종|강원|충남|충북|충청|전남|전북|전라|경남|경북|경상|제주).*(?:로|길|동|읍|면)\s*\d',x)]
   if len(set(road))==1:address=road[0]
+ if not room:
+  found=re.search(r'((?:(?:지하|특|VIP)\s*)?\d+(?:층\s*)?(?:특\s*)?\d*호실|(?:특|VIP)\s*\d+호)',venue,re.I)
+  if found:
+   room=found[0].strip()
+   if venue.endswith(room):venue=venue[:-len(room)].strip(' /·,')
  if not venue and room:venue=room
- values={'name':('故 '+deceased+' 부고') if deceased else '', 'deceasedName':deceased,'date':date,'time':time,'venue':venue,'funeralRoom':room,'address':address,'host':labels.get('대표상주',''),'mourners':labels.get('상주',''),'departure':departure,'admission':labels.get('입관') or labels.get('입관일시') or '','burial':labels.get('장지',''),'sourceUrl':url,'greeting':'삼가 고인의 명복을 빕니다.','note':''}
+ values={'productPrefix':'','name':('故 '+deceased+' 부고') if deceased else '', 'deceasedName':deceased,'date':date,'time':time,'venue':venue,'funeralRoom':room,'address':address,'host':labels.get('대표상주',''),'mourners':labels.get('상주',''),'departure':departure,'admission':labels.get('입관') or labels.get('입관일시') or labels.get('입관일') or '','burial':labels.get('장지') or ' / '.join(x for x in [labels.get('1차 장지'),labels.get('2차 장지')] if x),'sourceUrl':url,'greeting':'삼가 고인의 명복을 빕니다.','note':''}
  warnings.append('발인 일시는 주문 마감 기준이며 실제 배송 일시와 다릅니다. 원문과 빈소·상주 정보를 확인하세요.')
  return values,warnings
+
+def product_title(values):
+ """Only staff-supplied prefix; venue and room are the automatic suffix."""
+ prefix=values.get('productPrefix','').strip()
+ if not prefix:raise ValueError('상품명 앞부분을 직접 입력하세요. 예: 홍길동 대표님 모친상')
+ venue=values.get('venue','').strip();room=values.get('funeralRoom','').strip()
+ if not venue:raise ValueError('상품명에 넣을 장례식장을 확인하세요.')
+ compact=lambda s:re.sub(r'\s+','',s)
+ suffix=venue if not room or compact(room) in compact(venue) else venue+' '+room
+ return prefix+' · '+suffix
+
 
 def banner(renderer,v):
  canvas=Image.new('RGB',(1200,760),'#f3f0e8');draw=ImageDraw.Draw(canvas);draw.rectangle((28,28,1172,732),outline='#46433d',width=3)

@@ -68,7 +68,7 @@ def clean_values(values):
 
 
 def missing(kind,v):
-    keys=['name','date','time','venue','address']+(['deceasedName'] if kind=='memorial' else ['host'] if kind=='event' else ['groomName','brideName','groomParents','brideParents','groomRelation','brideRelation',*IMAGE_FIELDS[1:]])
+    keys=['name','date','time','venue','address']+(['deceasedName','productPrefix'] if kind=='memorial' else ['host'] if kind=='event' else ['groomName','brideName','groomParents','brideParents','groomRelation','brideRelation',*IMAGE_FIELDS[1:]])
     return [k for k in keys if not v.get(k)]
 
 

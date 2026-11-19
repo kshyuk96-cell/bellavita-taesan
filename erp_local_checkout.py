@@ -6,6 +6,7 @@ import json
 import os
 import re
 import secrets
+from erp_memorial_invitation import product_title
 from pathlib import Path
 
 TEMPLATE='7f494a310ca9371914b8863b45732bd5'
@@ -29,7 +30,7 @@ def build(root,origin,data):
     if g['label']=='축하 문구':g['label']='근조 문구'
   number=str(int(hashlib.sha256((key+':'+str(price)).encode()).hexdigest()[:15],16))
   when=dt.datetime.fromisoformat(v['date']+'T'+v['time']).replace(tzinfo=dt.timezone(dt.timedelta(hours=9)))
-  snapshots[price]={'number':number,'title':('故 '+v['deceasedName']+' 부고') if data['kind']=='memorial' else v['name'],'price':price,'images':original.get('images',[]),'groups':groups,'date':v['date'],'clock':v['time'],'venue':v['venue'],'address':v['address'],'source':v.get('sourceUrl',''),'event_time':when.isoformat(),'localCheckout':True,'kind':data['kind']}
+  snapshots[price]={'number':number,'title':product_title(v) if data['kind']=='memorial' else v['name'],'price':price,'images':original.get('images',[]),'groups':groups,'date':v['date'],'clock':v['time'],'venue':v['venue'],'address':v['address'],'source':v.get('sourceUrl',''),'event_time':when.isoformat(),'localCheckout':True,'kind':data['kind']}
   items.append({'price':price,'productId':number,'orderUrl':origin+f'/i/{key}/{price}/order','verified':True,'source':'own-checkout'})
  return key,items,snapshots
 
