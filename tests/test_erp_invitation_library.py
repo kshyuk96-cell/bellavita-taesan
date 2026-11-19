@@ -39,3 +39,31 @@ class Library(unittest.TestCase):
    for p in m.PRICES:(root/f'{p}.html').write_text(f'<html><head></head><body><h1>{p}</h1></body></html>')
    with self.assertRaises(ValueError):m.edit_documents(root,row,{'fields':{'0':'무료'}})
    with self.assertRaises(ValueError):m.edit_documents(root,row,{'design':{'color':'red;display:none'}})
+ def test_existing_external_pair_migrates_to_own_checkout_once(self):
+  import contextlib,sqlite3
+  from types import SimpleNamespace
+  with tempfile.TemporaryDirectory() as tmp:
+   root=Path(tmp);engine_root=root/'erp-invitations';key='c'*32;folder=engine_root/'public'/key;folder.mkdir(parents=True)
+   template=root/'invitations'/'7f494a310ca9371914b8863b45732bd5';template.mkdir(parents=True)
+   olditems=[]
+   for price in m.PRICES:
+    (template/f'{price}.order.json').write_text(json.dumps({'groups':[{'label':label,'choices':{'1':{'label':'기본','amount':0,'custom':False}}} for label in ['축하 문구','받으시는 분','상품 선택']],'images':[]}))
+    (folder/f'{price}.html').write_text(f'<html><head></head><body><h1>가상 예식</h1><a href="https://bp2.kr/test{price}">주문</a></body></html>')
+    olditems.append({'price':price,'productId':str(price),'orderUrl':f'https://bp2.kr/test{price}','url':f'https://test.example/erp/i/{key}/{price}.html'})
+   result={'jobId':key,'fingerprint':'d'*64,'items':olditems};(folder/'result.json').write_text(json.dumps(result))
+   job={'invitationId':'IV-migration-fixture','version':1,'kind':'wedding','values':{'name':'가상 예식','date':'2099-01-01','time':'12:00','venue':'가상홀','address':'가상주소'}}
+   dbpath=root/'jobs.sqlite';c=sqlite3.connect(dbpath);c.execute('CREATE TABLE jobs(input,result,public_id,created_at,action,state)');c.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?)',(json.dumps(job),json.dumps(result),key,m.now().isoformat(),'publish','done'));c.commit();c.close()
+   @contextlib.contextmanager
+   def db():
+    c=sqlite3.connect(dbpath);c.row_factory=sqlite3.Row
+    try:yield c
+    finally:c.close()
+   worker=SimpleNamespace(root=engine_root,origin='https://test.example',db=db)
+   rows=m.catalog(worker,root)['items'];self.assertEqual(len(rows),1)
+   self.assertTrue(all('/i/' in l['orderUrl'] for l in rows[0]['links']))
+   self.assertNotIn('bp2.kr',m.current_html(root,m.state(root)[key],93500))
+   self.assertEqual(m.catalog(worker,root)['items'][0]['revision'],1)
+   m.update(root,key,{'action':'sales','revision':1,'stopped':True},'staff')
+   for link in rows[0]['links']:
+    localkey=link['orderUrl'].split('/i/')[1].split('/')[0]
+    product=checkout.read(root,localkey,str(link['price']));self.assertIsNotNone(product);self.assertFalse(checkout.available(product))

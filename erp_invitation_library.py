@@ -46,11 +46,21 @@ def register(worker,root):
             try:
                 job=json.loads(row['input']);result=json.loads(row['result']);key=result.get('jobId') or (row['public_id'] if 'public_id' in row.keys() else '');v=job['values']
                 if not re.fullmatch('[a-f0-9]{32}',key) or len(result.get('items',[]))!=2:continue
-                if key in data:continue
+                if key in data and (data[key].get('orderRewrites') or all('/i/' in x.get('orderUrl','') for x in data[key]['links'])):continue
+                old_row=data.get(key,{})
                 folder=worker.root/'public'/key
                 if not all((folder/f'{p}.html').is_file() for p in PRICES):continue
-                data[key]={'id':key,'kind':job['kind'],'createdAt':result.get('publishedAt') or dt.datetime.fromtimestamp((folder/'result.json').stat().st_mtime,dt.timezone.utc).isoformat(),'date':v.get('date',''),'title':v.get('productPrefix') or v.get('name',''),'folder':str(folder),'links':result['items'],'revision':1,'salesStopped':False,'invitationId':job.get('invitationId','')};changed=True
-            except (ValueError,KeyError,TypeError):continue
+                data[key]={'id':key,'kind':job['kind'],'createdAt':result.get('publishedAt') or dt.datetime.fromtimestamp((folder/'result.json').stat().st_mtime,dt.timezone.utc).isoformat(),'date':v.get('date',''),'title':v.get('productPrefix') or v.get('name',''),'folder':str(folder),'links':result['items'],'revision':1,'salesStopped':False,'invitationId':job.get('invitationId',''),**old_row};changed=True
+                # Earlier ERP publications used BlogPay links. Reuse the approved
+                # own-checkout snapshots so every managed pair shares the same gate.
+                if any('/i/' not in x.get('orderUrl','') for x in result['items']):
+                    import erp_local_checkout
+                    local_key,links,snapshots=erp_local_checkout.build(root,worker.origin,job)
+                    erp_local_checkout.publish(root,local_key,snapshots,key,result['fingerprint'],worker.origin,job['kind']=='wedding',v.get('weddingCrop'))
+                    data[key]['orderRewrites']={old['orderUrl']:new['orderUrl'] for old,new in zip(sorted(result['items'],key=lambda x:x['price']),links)}
+                    data[key]['links']=[{**old,**new} for old,new in zip(sorted(result['items'],key=lambda x:x['price']),links)]
+
+            except (ValueError,KeyError,TypeError,OSError):continue
         legacy=Path(root)/'invitations'
         if legacy.is_dir():
             for folder in legacy.iterdir():
@@ -80,8 +90,9 @@ def product_status(root,product):
     return None
 
 def current_html(root,row,price):
-    if row.get('editPath'):return (base(root)/row['editPath']/f'{price}.html').read_text()
-    return (Path(row['folder'])/f'{price}.html').read_text()
+    raw=(base(root)/row['editPath']/f'{price}.html').read_text() if row.get('editPath') else (Path(row['folder'])/f'{price}.html').read_text()
+    for old,new in row.get('orderRewrites',{}).items():raw=raw.replace(old,new)
+    return raw
 def nodes(tree):
     return tree.xpath('//h1[not(*)]|//h2[not(*)]|//h3[not(*)]|//p[not(*)]')
 def detail(root,row):

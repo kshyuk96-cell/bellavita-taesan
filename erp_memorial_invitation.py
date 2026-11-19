@@ -65,7 +65,7 @@ def extract(source,fetcher=None):
    if venue.endswith(room):venue=venue[:-len(room)].strip(' /·,')
  if not venue and room:venue=room
  values={'productPrefix':'','name':('故 '+deceased+' 부고') if deceased else '', 'deceasedName':deceased,'date':date,'time':time,'venue':venue,'funeralRoom':room,'address':address,'host':labels.get('대표상주',''),'mourners':labels.get('상주',''),'departure':departure,'admission':labels.get('입관') or labels.get('입관일시') or labels.get('입관일') or '','burial':labels.get('장지') or ' / '.join(x for x in [labels.get('1차 장지'),labels.get('2차 장지')] if x),'sourceUrl':url,'greeting':'삼가 고인의 명복을 빕니다.','note':''}
- warnings.append('발인 일시는 주문 마감 기준이며 실제 배송 일시와 다릅니다. 원문과 빈소·상주 정보를 확인하세요.')
+ warnings.append('발인 일시는 실제 배송 일시와 다릅니다. 초대장은 링크 발행 후 72시간 운영합니다. 원문과 빈소·상주 정보를 확인하세요.')
  return values,warnings
 
 def product_title(values):
