@@ -127,12 +127,17 @@ def read(root, job, price):
             if not re.fullmatch(r'[a-f0-9]{32}',publication):return None
             manifest=Path(os.getenv('ERP_INVITATION_DATA') or root)/'erp-invitations'/'public'/publication/'result.json'
             if not manifest.is_file() or json.loads(manifest.read_text()).get('fingerprint')!=product.get('releaseFingerprint'):return None
+        product['_libraryKey']=job
+        product['_libraryRoot']=str(root)
         return product
     except FileNotFoundError:
         return None
 
 
 def available(product):
+    import erp_invitation_library as library
+    gate=library.product_status(Path(product.get('_libraryRoot') or os.getenv('TAESAN_DATA','taesan-data')),product)
+    if gate is not None:return gate['operating'] and not gate['salesStopped']
     return dt.datetime.now(SEOUL) < dt.datetime.fromisoformat(product['event_time'])
 
 
@@ -348,6 +353,7 @@ def payapp_request(config, order_id, order, origin):
 
 
 def start_order(db, job, price, product, fields, origin, config):
+    if product.get('_libraryRoot') and not available(product):raise ValueError('이 행사의 판매가 중지되거나 운영 기간이 종료됐어요.')
     attempt = fields.get('attempt', '')
     if not re.fullmatch(r'[a-f0-9]{32}', attempt):
         raise ValueError('주문서를 다시 열어 주세요.')

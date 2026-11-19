@@ -1,3 +1,4 @@
+import erp_invitation_library
 """ERP-only async invitation bridge. Add dispatch(self, ...) before existing agent routes.
 
 Existing /jobs, Kakao and payment paths are not changed. This bridge reuses only
@@ -124,6 +125,7 @@ class Engine:
             db.execute('CREATE TABLE IF NOT EXISTS publications(key TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, result TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS uploads(id TEXT PRIMARY KEY, digest TEXT UNIQUE NOT NULL, path TEXT NOT NULL)')
             recover=[r['id'] for r in db.execute("SELECT id FROM jobs WHERE state IN ('queued','running')")]
+        erp_invitation_library.register(self,self.checkout_root)
         for key in recover:self.schedule(key)
 
     def db(self):
@@ -360,7 +362,7 @@ class Engine:
                             page=render.page(data['values'],data['kind'],price,item['orderUrl'],json.loads(assets['reference-components.json']) if data['kind']=='wedding' else origin+'/sample.webp',origin+'/hero.webp' if assets['hero.webp'] else '',origin+'/thumbnail.jpg',url)
                             (public/f'{price}.html').write_text(page,encoding='utf-8')
                             items.append({**item,'url':url,'message':render.message(data['values'],data['kind'],price,url)})
-                        result={**result,'items':items,'jobId':row['public_id'],'thumbnail':origin+'/thumbnail.jpg'}
+                        result={**result,'items':items,'jobId':row['public_id'],'publishedAt':dt.datetime.now(dt.timezone.utc).isoformat(),'thumbnail':origin+'/thumbnail.jpg'}
                         if data.get('orderMode')=='invitation-checkout':
                             local=json.loads(assets['local-products.json']);erp_local_checkout.publish(self.checkout_root,local['key'],local['products'],row['public_id'],result['fingerprint'],self.origin,data['kind']=='wedding',data['values'].get('weddingCrop'))
                         # Manifest is written last: incomplete pages cannot become public.
@@ -368,6 +370,7 @@ class Engine:
                         with self.db() as db:db.execute('INSERT INTO publications VALUES(?,?,?)',(publication_key,result['fingerprint'],json.dumps(result,ensure_ascii=False)))
             result={**result,'requestId':key}
             with self.db() as db:db.execute('UPDATE jobs SET state=?,result=? WHERE id=?',('done',json.dumps(result,ensure_ascii=False),key))
+            if action=='publish':erp_invitation_library.register(self,self.checkout_root)
         except Exception as error:
             import traceback
             frames=[{'file':Path(f.filename).name,'line':f.lineno,'function':f.name} for f in traceback.extract_tb(error.__traceback__)[-6:]]
@@ -379,6 +382,8 @@ class Engine:
 
     def public(self,key,name):
         if not re.fullmatch(r'[a-f0-9]{32}',key) or name not in ('93500.html','99000.html','thumbnail.jpg','sample.webp','hero.webp'):return 404,None,None
+        managed=erp_invitation_library.public(self.checkout_root,key,name)
+        if managed:return managed
         folder=self.root/'public'/key
         try:result=json.loads((folder/'result.json').read_text())
         except (OSError,ValueError):return 404,None,None
@@ -399,11 +404,18 @@ def engine(root,origin,legacy,extract):
 
 def dispatch(handler,method,path,root,origin,legacy,extract):
     """Return True when consumed. Invoke before existing do_GET/do_POST routes."""
+    legacy_page=re.fullmatch(r'/i/([a-f0-9]{32})/(93500\.html|99000\.html)',path)
+    if legacy_page and method in ('GET','HEAD'):
+        worker=engine(root,origin,legacy,extract);reply=erp_invitation_library.public(root,*legacy_page.groups())
+        if reply:
+            status,mime,raw=reply;handler.send_response(status);handler.send_header('Content-Type',mime);handler.send_header('Cache-Control','no-store');handler.send_header('Content-Length',str(len(raw)));handler.end_headers()
+            if method!='HEAD':handler.wfile.write(raw)
+            return True
     if not path.startswith(('/erp/invitations/','/erp/i/','/erp/ai/')):return False
     public=re.fullmatch(r'/erp/i/([a-f0-9]{32})/(93500\.html|99000\.html|thumbnail\.jpg|sample\.webp|hero\.webp)',path)
     if public and method in ('GET','HEAD'):
         status,mime,raw=engine(root,origin,legacy,extract).public(*public.groups())
-        handler.send_response(status);handler.send_header('Cache-Control','public, max-age=300' if status==200 else 'no-store')
+        handler.send_response(status);handler.send_header('Cache-Control','no-store')
         handler.send_header('Content-Security-Policy',"default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'");handler.send_header('X-Content-Type-Options','nosniff');handler.send_header('Referrer-Policy','no-referrer')
         if mime:handler.send_header('Content-Type',mime)
         handler.end_headers()
@@ -437,6 +449,7 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
         return True
     if erp_ai.dispatch(handler,method,path):return True
     worker=engine(root,origin,legacy,extract)
+    if erp_invitation_library.dispatch(handler,method,path,root,worker):return True
     if erp_invitation_management.dispatch(handler,method,path,root,worker):return True
     try:
         if method=='GET' and path=='/erp/invitations/template-candidates':

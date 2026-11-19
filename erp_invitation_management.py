@@ -62,6 +62,13 @@ def products(worker,root=None):
                         if any(x.get('orderUrl')==url for x in items.values()):continue
                         key='own:'+folder.name+':'+str(price);items[key]={'productId':key,'source':'own-checkout','price':price,'orderUrl':url,'url':worker.origin+f'/i/{folder.name}/{price}.html','name':v.get('title',''),'date':str(v.get('event_time',''))[:10],'time':str(v.get('event_time',''))[11:16],'verification':'own-snapshot','invitationId':'','verifiedAt':''}
                     except (ValueError,OSError):continue
+    if root is not None:
+        import erp_invitation_library as library
+        catalog=library.catalog(worker,root)['items']
+        for item in items.values():
+            match=next((r for r in catalog if any(x.get('orderUrl')==item.get('orderUrl') for x in r['links'])),None)
+            if match:item.update({k:match[k] for k in ('operating','operatingUntil','salesStopped','saleStatus')})
+            else:item['saleStatus']='미발행'
     return list(items.values())
 
 
