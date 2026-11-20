@@ -117,6 +117,19 @@ def data_image(raw,mime='image/webp'):
 
 
 def thumbnail(v,kind):
+    if kind=='wedding':
+        canvas=Image.new('RGB',(1200,630),'#eee7d7');draw=ImageDraw.Draw(canvas)
+        draw.rectangle((55,43,1145,588),fill='#fffdf7',outline='#e3d4bb',width=2)
+        draw.line((553,109,648,109),fill='#a58a5b',width=2)
+        side='bride' if v.get('hostSide')=='bride' else 'groom'
+        parents=v.get(side+'Parents','');name=v[side+'Name'];short=name[1:] if len(name)==3 else name
+        parent_count=len([part for part in __import__('re').split(r'[·ㆍ,]',parents) if part.strip()])
+        possessive='제' if parent_count==1 else '저희'
+        tail='이' if short and 0xac00<=ord(short[-1])<=0xd7a3 and (ord(short[-1])-0xac00)%28 else ''
+        fit_text(canvas,f"{possessive} {v[side+'Relation']} {short}{tail}의",(110,150,1090,243),78,fill='#24271f',bold=False,max_lines=1)
+        fit_text(canvas,'결혼식에 초대드립니다.',(110,240,1090,338),78,fill='#24271f',bold=False,max_lines=1)
+        fit_text(canvas,parents.replace('·',' ')+' 올림',(105,405,1095,534),104,fill='#24271f',bold=False,max_lines=1)
+        return image_bytes(canvas,'JPEG')
     canvas=Image.new('RGB',(1200,630),'#eee6d7');draw=ImageDraw.Draw(canvas)
     draw.rectangle((56,39,1144,591),fill='#fffdf7',outline='#e3d4bb',width=2)
     title,_,sign,_=words(v,kind)
@@ -126,6 +139,7 @@ def thumbnail(v,kind):
     fit_text(canvas,title,(110,155,1090,367),64,fill='#24271f',bold=False,max_lines=3)
     fit_text(canvas,sign,(110,430,1090,540),82,fill='#24271f',max_lines=2)
     return image_bytes(canvas,'JPEG')
+
 
 
 def date_words(v):
