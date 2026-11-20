@@ -180,6 +180,9 @@ def message(v,kind,price,url):
 def page(v,kind,price,order_url,sample,hero,og,url,preview=False):
     if kind=='memorial':
         import sys
+        if isinstance(sample,dict):
+            import erp_memorial_auto
+            return erp_memorial_auto.page(sys.modules[__name__],v,price,order_url,sample,og,url,preview)
         return erp_memorial_invitation.page(sys.modules[__name__],v,price,order_url,sample,og,url,preview)
     if kind=='event':return event_page(v,price,order_url,sample,og,url,preview)
     if isinstance(sample,dict):

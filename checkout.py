@@ -129,7 +129,8 @@ def read(root, job, price):
             if not manifest.is_file() or json.loads(manifest.read_text()).get('fingerprint')!=product.get('releaseFingerprint'):return None
         product['_libraryKey']=job
         product['_libraryRoot']=str(root)
-        return product
+        import erp_invitation_product_edits
+        return erp_invitation_product_edits.apply(root,job,price,product)
     except FileNotFoundError:
         return None
 
@@ -286,7 +287,7 @@ def render(product, action, can_pay):
         base=str(product['price']), base_display=f'{product["price"]:,}',
         attempt=secrets.token_hex(16),
         button_state='' if can_pay else 'disabled', can_submit='true' if can_pay else 'false',
-        notice='' if can_pay else '<p class="hint">현재 결제를 이용할 수 없습니다. 문의 031-8067-8580</p>')
+        notice=('<p class="hint order-notice" style="white-space:pre-line">'+escape(str(product['orderNotice']))+'</p>' if product.get('orderNotice') else '')+('' if can_pay else '<p class="hint">현재 결제를 이용할 수 없습니다. 문의 031-8067-8580</p>'))
     if product.get('kind')=='memorial':
         page=page.replace('웨딩액자','액자').replace('축하 문구','근조 문구').replace('신청해주신 쌀빛그림화환은 친환경 웨딩갤러리를 만들기 위해 액자를 설치하고<br>예식 후 쌀로 교환하여 혼주님께 드리거나 필요한 시설에 기부합니다.','조문의 마음을 전하는 쌀빛그림화환입니다.<br>선택한 상품과 빈소 정보를 확인해 주세요.')
         if product.get('images'):

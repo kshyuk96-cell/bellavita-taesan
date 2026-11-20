@@ -110,6 +110,18 @@ def products(worker,root=None):
                 linked=next((link for link in match['links'] if link.get('orderUrl')==item.get('orderUrl')),None)
                 if linked and (not item.get('url') or item.get('verification')=='own-snapshot'):item['url']=linked.get('url') or item['orderUrl']
             else:item['saleStatus']='미발행'
+        # Native product text may be edited independently of a read-only legacy
+        # invitation. Apply only the display/fulfillment overlay, never payment data.
+        import checkout
+        for item in items.values():
+            item['canEditProduct']=False;item['productEditRevision']=0
+            native=re.fullmatch(r'/i/([a-f0-9]{32})/(93500|99000)/order',urlsplit(item.get('orderUrl','')).path)
+            if item.get('source')!='own-checkout' or not native:continue
+            try:
+                product=checkout.read(Path(root),native[1],native[2])
+                if product:
+                    item.update(name=product.get('title',''),venue=product.get('venue',''),address=product.get('address',''),orderNotice=product.get('orderNotice',''),canEditProduct=True,productEditRevision=product.get('_productEditRevision',0))
+            except (OSError,ValueError,TypeError,sqlite3.Error):continue
     return list(items.values())
 
 
@@ -159,6 +171,21 @@ def query(worker,root,params):
 
 
 def dispatch(handler,method,path,root,worker):
+    if path in ('/erp/invitations/product-detail','/erp/invitations/product-update'):
+        expected='GET' if path.endswith('product-detail') else 'POST'
+        if method!=expected:handler.send_json({'error':'상품 조회는 GET, 수정은 POST 요청으로 처리합니다.'},405);return True
+        try:
+            import erp_invitation_product_edits as product_edits
+            if method=='GET':
+                params=parse_qs(urlsplit(getattr(handler,'path',path)).query)
+                result=product_edits.detail(root,params.get('productId',[''])[0])
+            else:
+                size=int(handler.headers.get('Content-Length','0'))
+                if not 0<size<=20000:raise ValueError('상품 수정 요청 크기를 확인하세요.')
+                payload=json.loads(handler.rfile.read(size));result=product_edits.update(root,payload,payload.get('actor','ERP 직원'))
+            handler.send_json(result)
+        except (ValueError,TypeError,KeyError,sqlite3.Error) as error:handler.send_json({'error':str(error)[:240]},409)
+        return True
     if path=='/erp/invitations/pending-orders':
         if method!='GET':handler.send_json({'error':'승인 대기 목록은 조회만 허용됩니다.'},405);return True
         try:

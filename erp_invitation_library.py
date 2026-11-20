@@ -8,6 +8,9 @@ import hashlib
 import json
 import os
 import re
+import secrets
+import shutil
+import tempfile
 import threading
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -203,6 +206,12 @@ def public(root,key,name):
     if not status(row)['operating']:return (410,'text/plain; charset=utf-8','운영 기간이 종료된 초대장입니다.'.encode())
     if name in ('93500.html','99000.html'):
         return (200,'text/html; charset=utf-8',current_html(root,row,int(name.split('.')[0])).encode())
+    refreshed=row.get('renderRefresh') or {}
+    if name in ('sample.webp','thumbnail.jpg') and refreshed.get('assetPath'):
+        target=base(root)/refreshed['assetPath']/name
+        try:raw=target.read_bytes()
+        except OSError:return (404,None,None)
+        return (200,'image/jpeg' if name.endswith('.jpg') else 'image/webp',raw)
     return None
 
 
@@ -256,12 +265,96 @@ def refresh_thumbnail(worker,root,key,actor):
         source=json.loads(job['input'])
         from erp_invitation_render import thumbnail
         raw=thumbnail(source['values'],source['kind']);version=hashlib.sha256(raw).hexdigest()[:16]
-        target=Path(row['folder'])/'thumbnail.jpg'
+        target=(base(root)/row['renderRefresh']['assetPath'] if (row.get('renderRefresh') or {}).get('assetPath') else Path(row['folder']))/'thumbnail.jpg'
         if target.is_file() and not target.with_name('thumbnail.previous.jpg').exists():target.with_name('thumbnail.previous.jpg').write_bytes(target.read_bytes())
         temp=target.with_name('thumbnail.refresh.tmp');temp.write_bytes(raw);temp.replace(target)
         row['thumbnailVersion']=version;row['revision']+=1;row['updatedAt']=now().isoformat();row['updatedBy']=str(actor)[:160]
         save(root,data)
         return {'id':key,'revision':row['revision'],'thumbnailVersion':version}
+
+
+def refresh_memorial(worker,root,key,actor):
+    """Refresh the approved memorial rendering without touching product/payment data.
+
+    Both pages and their assets are prepared privately, then one atomic library
+    state switch makes the complete version visible at the existing public URLs.
+    The original publication manifest/fingerprint and checkout snapshots stay put.
+    """
+    with LOCK:
+        data=state(root);row=data.get(key)
+        if (not row or row.get('deleted') or row.get('external') or row.get('readOnly')
+                or row.get('orderOnly') or row.get('kind')!='memorial'):
+            raise ValueError('ERP에서 발행한 자체 부고 초대장만 새 디자인으로 갱신할 수 있습니다.')
+        with worker.db() as db:
+            job=db.execute("SELECT input FROM jobs WHERE public_id=? AND action='publish' AND state='done' ORDER BY created_at DESC LIMIT 1",(key,)).fetchone()
+        if not job:raise ValueError('발행 원본을 확인할 수 없습니다.')
+        source=json.loads(job['input']);original=source.get('values') or {}
+        links=row.get('links') or []
+        if (source.get('kind')!='memorial' or source.get('orderMode')!='invitation-checkout'
+                or len(links)!=2 or {item.get('price') for item in links}!=set(PRICES)
+                or any(not isinstance(item.get('url'),str) or not item['url']
+                       or not re.fullmatch(re.escape(worker.origin)+r'/i/[a-f0-9]{32}/(?:93500|99000)/order',item.get('orderUrl','')) for item in links)):
+            raise ValueError('기존 두 가격의 자체 주문서·초대장 연결을 확인하세요.')
+        if not isinstance(original.get('host'),str) or not original['host'].strip():
+            raise ValueError('발행 원본의 고객 상주 이름·호칭을 먼저 확인하세요.')
+        folder=Path(row['folder']);manifest=(folder/'result.json').read_bytes()
+        published=json.loads(manifest)
+        if not isinstance(published.get('fingerprint'),str) or not re.fullmatch(r'[a-f0-9]{64}',published['fingerprint']):
+            raise ValueError('기존 발행 검증값을 확인할 수 없습니다.')
+        # No submit/prepare/products/publish call: parsing only reads the obituary.
+        parsed=worker.parse({**source,'requestId':'library-memorial-refresh-'+key,'action':'parse'})
+        if not isinstance(parsed,dict) or parsed.get('status')!='done' or not isinstance(parsed.get('values'),dict):
+            raise ValueError('원본 부고 정보를 다시 확인하지 못했습니다.')
+        fresh=parsed['values'];values={**original,**{k:v for k,v in fresh.items() if v not in ('',None)}}
+        for field in ('host','productPrefix','greeting','note'):
+            if isinstance(original.get(field),str) and original[field].strip():values[field]=original[field].strip()
+        import erp_memorial_invitation
+        # Refresh never carries forward old or unrelated mourners' account data.
+        values['mournerAccounts']=erp_memorial_invitation.clean_mourner_accounts(fresh.get('mournerAccounts',[]),values['host'])
+        if any(not values.get(field) for field in ('name','deceasedName','date','time','venue','address','productPrefix')):
+            raise ValueError('원본 부고의 고인·일시·빈소·주소와 상품명 앞부분을 확인하세요.')
+        import erp_invitation_render as renderer
+        import erp_memorial_auto
+        parts=erp_memorial_auto.components(renderer,values)
+        image,boxes=erp_memorial_auto.preview_composite(renderer,parts)
+        sample=renderer.image_bytes(image);thumbnail=renderer.thumbnail(values,'memorial')
+        thumbnail_version=hashlib.sha256(thumbnail).hexdigest()[:16]
+        origin=worker.origin+'/erp/i/'+key
+        documents={str(item['price'])+'.html':erp_memorial_auto.page(renderer,values,item['price'],item['orderUrl'],parts,
+                   origin+'/thumbnail.jpg?v='+thumbnail_version,item['url']).encode('utf-8') for item in links}
+        assets={'sample.webp':sample,'thumbnail.jpg':thumbnail,
+                'reference-components.json':json.dumps(parts,ensure_ascii=False).encode('utf-8'),
+                'layout.json':json.dumps(boxes,ensure_ascii=False).encode('utf-8'),
+                'render-values.json':json.dumps(values,ensure_ascii=False).encode('utf-8')}
+        revision=row['revision']+1
+        relative=f'{key}/{revision}-memorial-{secrets.token_hex(4)}'
+        parent=base(root)/key;parent.mkdir(parents=True,exist_ok=True)
+        previous_assets=(base(root)/(row.get('renderRefresh') or {})['assetPath']
+                         if (row.get('renderRefresh') or {}).get('assetPath') else folder)
+        with tempfile.TemporaryDirectory(prefix='.memorial-refresh-',dir=parent) as staging:
+            staged=Path(staging);backup=staged/'backup';backup.mkdir()
+            (backup/'state.json').write_bytes((base(root)/'state.json').read_bytes())
+            (backup/'result.json').write_bytes(manifest)
+            (backup/'job-input.json').write_text(job['input'],encoding='utf-8')
+            for price in PRICES:(backup/f'{price}.html').write_text(current_html(root,row,price),encoding='utf-8')
+            for name in ('sample.webp','thumbnail.jpg','reference-components.json','layout.json','render-values.json'):
+                if (previous_assets/name).is_file():shutil.copyfile(previous_assets/name,backup/name)
+            for name,raw in {**assets,**documents}.items():(staged/name).write_bytes(raw)
+            # Nothing points to this folder until all output and backups exist.
+            staged.replace(base(root)/relative)
+        at=now().isoformat();who=str(actor)[:160]
+        row.update(editPath=relative,revision=revision,thumbnailVersion=thumbnail_version,updatedAt=at,updatedBy=who)
+        row['renderRefresh']={'kind':'memorial','version':erp_memorial_auto.RENDER_VERSION,'assetPath':relative,
+                              'at':at,'actor':who,'originalFingerprint':published['fingerprint'],
+                              'inputSha256':hashlib.sha256(job['input'].encode()).hexdigest(),
+                              'sampleSha256':hashlib.sha256(sample).hexdigest(),
+                              'customer':values['host'],'accountCount':len(values['mournerAccounts'])}
+        row.setdefault('history',[]).append({'revision':revision,'action':'refresh-memorial','at':at,'by':who,
+                                             'renderVersion':erp_memorial_auto.RENDER_VERSION,'editPath':relative})
+        save(root,data)
+        return {'id':key,'revision':revision,'renderVersion':erp_memorial_auto.RENDER_VERSION,
+                'thumbnailVersion':thumbnail_version,'accountCount':len(values['mournerAccounts']),
+                'links':links,'warnings':parsed.get('warnings',[])}
 
 
 
@@ -289,6 +382,8 @@ def dispatch(handler,method,path,root,worker):
         data=register(worker,root);key=resolve_key(data,payload)
         if payload.get('action')=='refresh-thumbnail':
             handler.send_json(refresh_thumbnail(worker,root,key,payload.get('actor','ERP 직원')));return True
+        if payload.get('action')=='refresh-memorial':
+            handler.send_json(refresh_memorial(worker,root,key,payload.get('actor','ERP 직원')));return True
         if key not in data:raise ValueError('발행된 초대장을 찾지 못했습니다.')
         if payload.get('action')=='detail':handler.send_json(detail(root,data[key]));return True
         handler.send_json(update(root,key,payload,payload.get('actor','ERP 직원')))

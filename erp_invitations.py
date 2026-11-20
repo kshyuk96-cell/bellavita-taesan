@@ -65,6 +65,8 @@ def clean_values(values):
         value=out[key]
         if value and not (key in IMAGE_FIELDS and re.fullmatch(r'attachment:[a-f0-9]{32}',value)) and not safe_https(value):raise ValueError('HTTPS 주소를 확인하세요: '+key)
     erp_manual_blogpay.validate_pair(out)
+    out['mournerAccounts']=erp_memorial_invitation.clean_mourner_accounts(values.get('mournerAccounts',[]),out.get('host') or out.get('productPrefix'))
+    if out.get('portrait') and not safe_https(out['portrait']):raise ValueError('고인 사진의 공개 HTTPS 주소를 확인하세요.')
     out['hostSide']='bride' if out['hostSide']=='bride' else 'groom'
     out['wreathRestriction']=values.get('wreathRestriction') is True
     out['images']=[u for u in values.get('images',[]) if isinstance(u,str) and safe_https(u)][:20]
@@ -213,7 +215,11 @@ class Engine:
         self.progress(data.get('requestId',''),1,'원본 청첩장 읽기','공개 링크의 행사 정보와 사진 목록을 읽고 있습니다.')
         if data['kind']=='memorial':
             import sys
-            v,warnings_out=erp_memorial_invitation.extract(data['source'],lambda url:erp_memorial_invitation.fetch_source(url,sys.modules[__name__]))
+            manual=data.get('values') or {};target=manual.get('host') or manual.get('productPrefix') or ''
+            v,warnings_out=erp_memorial_invitation.extract(data['source'],lambda url:erp_memorial_invitation.fetch_source(url,sys.modules[__name__]),target_mourner=target,account_fetcher=lambda url,fields:erp_memorial_invitation.fetch_source(url,sys.modules[__name__],method='POST',data=fields))
+            for key in ('host','productPrefix'):
+                if isinstance(manual.get(key),str) and manual[key].strip():v[key]=manual[key].strip()
+            if not manual.get('host') and manual.get('productPrefix'):v['host']=erp_memorial_invitation.normalize_mourner_name(target)
             self.progress(data.get('requestId',''),2,'행사 정보 추출','원본에서 확인한 항목을 정리하고 있습니다.')
             values=clean_values(v);return {'status':'done','values':values,'missing':missing('memorial',values),'warnings':warnings_out}
         # Reuse all five provider parsers. On incomplete/unsupported sources, return
@@ -325,6 +331,10 @@ class Engine:
         if kind=='wedding':
             parts=erp_invitation_auto.components(render,v,kind,photos)
             image,boxes=erp_invitation_auto.preview_composite(render,parts)
+        elif kind=='memorial':
+            import erp_memorial_auto
+            parts=erp_memorial_auto.components(render,v)
+            image,boxes=erp_memorial_auto.preview_composite(render,parts)
         else:
             image,boxes=render.composite(v,kind,photos)
             parts=erp_invitation_auto.components(render,v,kind,photos,image)
@@ -335,7 +345,7 @@ class Engine:
         hero=render.image_bytes(photos['hero']) if kind=='wedding' else b''
         og=render.thumbnail(v,kind)
         hashes={k:hashlib.sha256(render.image_bytes(photo)).hexdigest() for k,photo in photos.items()}
-        fingerprint=digest({'values':v,'kind':kind,'items':items,'images':hashes,'orderMode':data.get('orderMode'),**({'renderVersion':getattr(erp_invitation_auto,'RENDER_VERSION','wedding-rules-v2')} if kind=='wedding' else {}),**({'orderMode':'invitation-checkout','products':snapshots} if local else {})})
+        fingerprint=digest({'values':v,'kind':kind,'items':items,'images':hashes,'orderMode':data.get('orderMode'),**({'renderVersion':getattr(erp_invitation_auto,'RENDER_VERSION','wedding-rules-v2')} if kind=='wedding' else {'renderVersion':erp_memorial_auto.RENDER_VERSION} if kind=='memorial' else {}),**({'orderMode':'invitation-checkout','products':snapshots} if local else {})})
         warnings_out=[]
         if len(set(hashes.values()))<len(hashes):warnings_out.append('사진 중복이 있습니다. 대표·제작 액자·족자의 사진 구성을 확인하세요.')
         if kind=='event' and not photos.get('logo'):warnings_out.append('로고·행사 이미지가 없어 행사명으로 시안을 구성했습니다. 설치 예시를 확인하세요.')
@@ -383,7 +393,7 @@ class Engine:
                         if raw:(folder/name).write_bytes(raw)
                     if action=='preview':
                         v=data['values'];sample=render.data_image(assets['sample.webp']);hero=render.data_image(assets['hero.webp']) if assets['hero.webp'] else ''
-                        (folder/'preview.html').write_text(render.page(v,data['kind'],93500,'#',json.loads(assets['reference-components.json']) if data['kind']=='wedding' else sample,hero,render.data_image(assets['thumbnail.jpg'],'image/jpeg'),'about:blank',preview=True),encoding='utf-8')
+                        (folder/'preview.html').write_text(render.page(v,data['kind'],93500,'#',json.loads(assets['reference-components.json']) if data['kind'] in ('wedding','memorial') else sample,hero,render.data_image(assets['thumbnail.jpg'],'image/jpeg'),'about:blank',preview=True),encoding='utf-8')
                     else:
                         with self.db() as db:previous=db.execute("SELECT * FROM jobs WHERE id=? AND action='preview' AND state='done'",(data.get('previewRequestId'),)).fetchone()
                         if not previous or previous['invitation_id']!=data['invitationId'] or previous['version']!=data['version'] or json.loads(previous['result']).get('fingerprint')!=data.get('fingerprint') or result['fingerprint']!=data.get('fingerprint'):raise ValueError('상품 또는 사진이 변경됐습니다. 현재 버전을 다시 미리보기하세요.')
@@ -396,7 +406,7 @@ class Engine:
                         items=[]
                         for item in result['items']:
                             price=item['price'];url=origin+f'/{price}.html'
-                            page=render.page(data['values'],data['kind'],price,item['orderUrl'],json.loads(assets['reference-components.json']) if data['kind']=='wedding' else origin+'/sample.webp',origin+'/hero.webp' if assets['hero.webp'] else '',origin+'/thumbnail.jpg',url)
+                            page=render.page(data['values'],data['kind'],price,item['orderUrl'],json.loads(assets['reference-components.json']) if data['kind'] in ('wedding','memorial') else origin+'/sample.webp',origin+'/hero.webp' if assets['hero.webp'] else '',origin+'/thumbnail.jpg',url)
                             (public/f'{price}.html').write_text(page,encoding='utf-8')
                             items.append({**item,'url':url,'message':render.message(data['values'],data['kind'],price,url)})
                         result={**result,'items':items,'jobId':row['public_id'],'publishedAt':dt.datetime.now(dt.timezone.utc).isoformat(),'thumbnail':origin+'/thumbnail.jpg'}
