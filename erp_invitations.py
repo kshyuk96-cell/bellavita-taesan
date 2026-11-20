@@ -55,6 +55,7 @@ def safe_https(value):
 
 
 def clean_values(values):
+    import invitation_charmcard
     if not isinstance(values,dict):raise ValueError('입력 항목을 확인하세요.')
     out={}
     for key,limit in FIELDS.items():
@@ -63,13 +64,13 @@ def clean_values(values):
         out[key]=v.strip()
     for key in ('sourceUrl',*IMAGE_FIELDS):
         value=out[key]
-        if value and not (key in IMAGE_FIELDS and re.fullmatch(r'attachment:[a-f0-9]{32}',value)) and not safe_https(value):raise ValueError('HTTPS 주소를 확인하세요: '+key)
+        if value and not (key in IMAGE_FIELDS and re.fullmatch(r'attachment:[a-f0-9]{32}',value)) and not (key=='sourceUrl' and invitation_charmcard.is_card_url(value)) and not safe_https(value):raise ValueError('HTTPS 주소를 확인하세요: '+key)
     erp_manual_blogpay.validate_pair(out)
     out['mournerAccounts']=erp_memorial_invitation.clean_mourner_accounts(values.get('mournerAccounts',[]),out.get('host') or out.get('productPrefix'))
     if out.get('portrait') and not safe_https(out['portrait']):raise ValueError('고인 사진의 공개 HTTPS 주소를 확인하세요.')
     out['hostSide']='bride' if out['hostSide']=='bride' else 'groom'
     out['wreathRestriction']=values.get('wreathRestriction') is True
-    out['images']=[u for u in values.get('images',[]) if isinstance(u,str) and safe_https(u)][:20]
+    out['images']=[u for u in values.get('images',[]) if isinstance(u,str) and (safe_https(u) or re.fullmatch(r'attachment:[a-f0-9]{32}',u))][:20]
     return out
 
 
@@ -227,6 +228,17 @@ class Engine:
         source=data['source'];warnings_out=[]
         try:
             event=self.legacy.parse_source(source,self.extract)
+            import invitation_charmcard
+            if invitation_charmcard.is_card_url(event.get('source','')):
+                attachments=[]
+                self.progress(data.get('requestId',''),3,'참카드 원본 사진 수집','HTTP 원본 사진을 제작용 첨부로 저장하고 있습니다.',completedPhotos=0)
+                for url in event.get('photos',[])[:20]:
+                    if not invitation_charmcard.is_image_url(url):continue
+                    try:attachments.append('attachment:'+self.upload(invitation_charmcard.fetch(url,image=True))['id'])
+                    except (ValueError,OSError):continue
+                event={**event,'photos':attachments,'image':next(iter(attachments),'')}
+                warnings_out.extend(event.get('warnings') or [])
+                if not attachments:warnings_out.append('참카드 원본 사진을 저장하지 못했습니다. 사진을 직접 첨부해 주세요.')
             self.progress(data.get('requestId',''),2,'행사 정보 추출','원본에서 확인한 예식일·장소·혼주 정보를 정리하고 있습니다.')
             when=event.get('when');families=event.get('families') or []
             values={'name':event.get('name',''),'date':when.date().isoformat() if when else '', 'time':when.strftime('%H:%M') if when else '', 'venue':event.get('venue',''),'address':event.get('address',''),'sourceUrl':event.get('source',''),'greeting':event.get('greeting',''),'note':event.get('note',''),'host':event.get('signature','').removesuffix(' 올림'),'hostSide':event.get('host_side',''),'wreathRestriction':event.get('wreath_restriction') is True,'images':event.get('photos') or [],'hero':event.get('image','')}

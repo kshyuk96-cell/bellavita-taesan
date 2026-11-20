@@ -36,6 +36,17 @@ class MemorialCheckoutUI(unittest.TestCase):
         self.assertIn("sender.addEventListener('focus', resetCloseUp)", output)
         self.assertIn("message.addEventListener('focus', showCloseUp)", output)
 
+    def test_memorial_weight_uses_one_complete_artwork_without_duplicate_text(self):
+        tree = html.fromstring(checkout.render(checkout.apply_memorial_rules(self.product()), '#', False))
+        mark = tree.xpath('//div[@class="memorial-rice-mark"]')[0]
+        self.assertEqual(mark.xpath('./img/@id'), ['scroll-weight'])
+        self.assertEqual(mark.xpath('./img/@src'), ['/checkout-art/rice-10kg.webp'])
+        self.assertFalse(mark.xpath('.//span|.//strong|.//small'))
+        self.assertFalse(tree.xpath('//*[@id="scroll-weight-label"]'))
+        icon = tree.xpath('//link[@rel="icon"]/@href')
+        self.assertEqual(len(icon), 1)
+        self.assertTrue(icon[0].startswith('data:image/svg+xml,'))
+
     def test_read_upgrades_old_published_snapshot_without_rewriting_it(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

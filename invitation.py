@@ -161,6 +161,13 @@ def itscard_fields(card):
 
 
 def parse_page(source, raw, extract=None):
+    import invitation_charmcard
+    if invitation_charmcard.is_card_url(source):
+        card=invitation_charmcard.fields(source,raw);families=card['families'];photos=card['photos']
+        return {'name':' '.join(family[2] for family in families if family[2])+' 결혼','when':parse_time(card['date'],required=False),
+                'venue':card['venue'],'address':card['address'],'families':families,'source':card['source'],
+                'image':next(iter(photos),''),'photos':photos,'wedding_photo':next(iter(photos),''),
+                'greeting':card['greeting'],'signature':'','note':'','host_side':'','wreath_restriction':False,'warnings':card['warnings']}
     tree = dom.fromstring(raw)
     host = urlsplit(source).hostname.removeprefix('www.')
     meta = {m.get('property'): m.get('content', '') for m in tree.xpath('//meta[@property]')}
@@ -342,18 +349,21 @@ def event_fields(fields, source, when, venue, address, families, images, wedding
 
 
 def parse_source(source, extract):
-    urls = list(dict.fromkeys(re.findall(r'https://[^\s<>"\]]+', source)))
+    import invitation_charmcard
+    urls = list(dict.fromkeys(re.findall(r'https?://[^\s<>"\]]+', source)))
     if len(urls) > 1:
         raise MissingInformation('청첩장이나 초대장 링크를 한 개만 보내주세요.')
     source_url = urls[0].rstrip(').,') if urls else ''
-    if source_url and not https_url(source_url):
+    charmcard=invitation_charmcard.is_card_url(source_url)
+    if source_url and not https_url(source_url) and not charmcard:
         raise MissingInformation('초대장 주소를 확인해 주세요.')
     supplement = source.replace(urls[0], '', 1).strip() if urls else source
     configured = set(filter(None, (host.strip().lower() for host in os.getenv('INVITATION_PUBLIC_HOSTS', '').split(','))))
     hosts = HOSTS | configured
-    if source_url and urlsplit(source_url).hostname.removeprefix('www.') in hosts:
+    if source_url and (charmcard or urlsplit(source_url).hostname.removeprefix('www.') in hosts):
         try:
-            event = parse_page(source_url, get_page(source_url, hosts=hosts), lambda text: extract(text + '\n' + supplement))
+            raw=invitation_charmcard.decode(invitation_charmcard.fetch(source_url)) if charmcard else get_page(source_url, hosts=hosts)
+            event = parse_page(source_url, raw, lambda text: extract(text + '\n' + supplement))
             if supplement:
                 fields = extract(supplement)
                 for key, size in (('address', 200), ('host_side', 8), ('note', 500)):

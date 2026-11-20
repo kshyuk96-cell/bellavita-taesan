@@ -332,7 +332,7 @@ def render(product, action, can_pay):
             <img class="wreath-base" src="{escape(memorial['base'])}" alt="근조 쌀빛그림화환">
             <img class="memorial-frame-photo" src="{escape(memorial['frame'])}" alt="44번 설악산 울산바위 은하수 작품 액자">
             <div class="scroll-paper memorial-scroll-paper">
-              <div class="memorial-rice-mark"><img class="scroll-weight" id="scroll-weight" src="/checkout-art/rice-10kg.webp" alt="쌀 10kg"><span id="scroll-weight-label">쌀 <strong>10</strong><small>kg</small></span></div>
+              <div class="memorial-rice-mark"><img class="scroll-weight" id="scroll-weight" src="/checkout-art/rice-10kg.webp" alt="쌀 10kg"></div>
               <p class="scroll-greeting" id="scroll-greeting"></p>
               <div class="scroll-sender" id="scroll-sender"></div>
             </div>
