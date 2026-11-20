@@ -34,8 +34,8 @@ class Management(unittest.TestCase):
   self.assertEqual(len(r['orders']),0);self.assertEqual(len(r['products']),0);self.assertEqual(r['pages'],1)
   c=sqlite3.connect(self.root/'state.sqlite3');self.assertEqual(c.execute('SELECT COUNT(*) FROM order_sms').fetchone()[0],0);c.close()
  def test_sms_audit_never_claims_delivery_or_sends(self):
-  with patch.dict(os.environ,{'SOLAPI_API_KEY':'x','SOLAPI_API_SECRET':'y','SOLAPI_FROM':'z'}):r=m.notifications(self.root)
-  self.assertTrue(r['providerConfigured']);self.assertFalse(r['queueEnabled']);self.assertEqual(r['customer']['state'],'not-configured');self.assertIsNone(r['staff']['delivered'])
+  with patch.dict(os.environ,{'SOLAPI_API_KEY':'x','SOLAPI_API_SECRET':'y','SOLAPI_FROM':'z','INVITATION_ORDER_SMS_ENABLED':'0'}):r=m.notifications(self.root)
+  self.assertTrue(r['providerConfigured']);self.assertFalse(r['queueEnabled']);self.assertEqual(r['customer']['state'],'disabled');self.assertIsNone(r['staff']['delivered'])
  def test_staff_recipient_configuration_is_counted_without_sending(self):
   with patch.dict(os.environ,{'INVITATION_STAFF_NOTIFY_PHONES':'010-0000-0001,01000000001,invalid'}):r=m.notifications(self.root)
   self.assertEqual(r['staff']['recipients'],1);self.assertFalse(r['queueEnabled']);self.assertIsNone(r['staff']['delivered'])

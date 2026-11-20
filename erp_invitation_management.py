@@ -19,20 +19,39 @@ def read_db(path):
 
 
 def notifications(root):
-    result={'customer':{'state':'not-configured','message':'자체 주문 결제 요청은 smsuse=n이며 별도 고객 주문알림 발송기가 없습니다.'},'staff':{'state':'disabled','recipients':0,'accepted':0,'uncertain':0,'delivered':None},'providerConfigured':all(os.getenv(k) for k in ('SOLAPI_API_KEY','SOLAPI_API_SECRET','SOLAPI_FROM')),'queueEnabled':False,'payappConfigured':all(os.getenv('INVITATION_PAYAPP_'+k) for k in ('USER_ID','LINK_KEY','LINK_VALUE','REQUEST_KEY')),'checkoutEnabled':os.getenv('INVITATION_CHECKOUT_ENABLED')=='1','localCheckoutEnabled':os.getenv('INVITATION_LOCAL_CHECKOUT_ENABLED')=='1','checkoutPilotRestricted':bool(os.getenv('INVITATION_CHECKOUT_PILOT_JOBS')),'blogpay':'자체 주문서·페이앱 결제 기준입니다. 별도 고객 알림 발송 연결이 필요합니다.'}
+    import order_sms
+    active = order_sms.enabled()
+    provider = order_sms.configured()
+    readiness = 'ready' if active and provider else 'provider-missing' if active else 'disabled'
+    note = ('새 결제 완료 주문에 고객·직원 알림을 발송합니다. 접수 완료는 단말 수신 확인과 다릅니다.'
+            if readiness == 'ready' else '문자 서비스의 사업자 인증·발신번호 인증·API 연결·잔액 확인이 필요합니다.'
+            if active else '주문 문자 알림이 꺼져 있습니다.')
+    audience = lambda: {'state':readiness,'pending':0,'accepted':0,'uncertain':0,'expired':0,'delivered':None}
+    result={'customer':audience(),'staff':{**audience(),'recipients':len(order_sms.staff_phones())},
+            'providerConfigured':provider,'provider':order_sms.provider_name(),'queueEnabled':active,
+            'payappConfigured':all(os.getenv('INVITATION_PAYAPP_'+k) for k in ('USER_ID','LINK_KEY','LINK_VALUE','REQUEST_KEY')),
+            'checkoutEnabled':os.getenv('INVITATION_CHECKOUT_ENABLED')=='1',
+            'localCheckoutEnabled':os.getenv('INVITATION_LOCAL_CHECKOUT_ENABLED')=='1',
+            'checkoutPilotRestricted':bool(os.getenv('INVITATION_CHECKOUT_PILOT_JOBS')),
+            'blogpay':'자체 주문서·페이앱 결제 기준입니다. 결제 완료 후 직원 확인을 거쳐 ERP 주문에 등록합니다.'}
+    result['customer']['message']=note
     result['localTemplateReady']=all((Path(root)/'invitations'/'7f494a310ca9371914b8863b45732bd5'/f'{price}.order.json').is_file() for price in (93500,99000))
-    configured_phones={re.sub(r'[^0-9]','',p) for p in os.getenv('INVITATION_STAFF_NOTIFY_PHONES','').split(',')}
-    configured_phones={p for p in configured_phones if re.fullmatch(r'01[016789][0-9]{7,8}',p)}
-    result['staff']['recipients']=len(configured_phones)
     c=read_db(Path(root)/'state.sqlite3')
     if c:
         try:
-            legacy={re.sub(r'[^0-9]','',r[0]) for r in c.execute("SELECT n.phone FROM order_staff_notify n JOIN staff s ON s.owner=n.owner WHERE n.center='구로'")}
-            result['staff']['recipients']=len(configured_phones|legacy)
-            for state,n in c.execute('SELECT state,COUNT(*) FROM order_sms GROUP BY state'):
-                if state=='접수 완료':result['staff']['accepted']+=n
-                else:result['staff']['uncertain']+=n
-        except sqlite3.OperationalError:result['staff']['state']='unavailable'
+            result['staff']['recipients']=len(order_sms.staff_phones(c))
+            exists=c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='invitation_notice_outbox'").fetchone()
+            if exists:
+                for recipient,state,n in c.execute('SELECT audience,state,COUNT(*) FROM invitation_notice_outbox GROUP BY audience,state'):
+                    if recipient in ('customer','staff') and state in ('pending','accepted','uncertain','expired'):
+                        result[recipient][state]+=n
+            # Retain prior staff-provider acceptance counts without labelling them delivered.
+            exists=c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='order_sms'").fetchone()
+            if exists:
+                for state,n in c.execute('SELECT state,COUNT(*) FROM order_sms GROUP BY state'):
+                    result['staff']['accepted' if state=='접수 완료' else 'uncertain']+=n
+        except sqlite3.OperationalError:
+            result['staff']['state']='unavailable'
         finally:c.close()
     return result
 
@@ -47,7 +66,7 @@ def products(worker,root=None):
             for item in result.get('items',[]):
                 key=str(item.get('productId',''))
                 if not re.fullmatch(r'\d+',key) or key in items:continue
-                items[key]={'productId':key,'source':'own-checkout' if re.search(r'/i/[a-f0-9]{32}/(?:93500|99000)/order$',item.get('orderUrl','')) else 'blogpay','price':item.get('price'),'orderUrl':item.get('orderUrl',''),'url':item.get('url',''),'verifiedAt':row['created_at'],'invitationId':row['invitation_id'],'name':v.get('name',''),'date':v.get('date',''),'time':v.get('time',''),'venue':v.get('venue',''),'address':v.get('address',''),'kind':data.get('kind',''),'hostSide':v.get('hostSide',''),'groomName':v.get('groomName',''),'brideName':v.get('brideName',''),'groomParents':v.get('groomParents',''),'brideParents':v.get('brideParents',''),'sourceUrl':v.get('sourceUrl',''),'verification':'saved-result'}
+                items[key]={'productId':key,'source':'own-checkout' if re.search(r'/i/[a-f0-9]{32}/(?:93500|99000)/order$',item.get('orderUrl','')) else 'blogpay','price':item.get('price'),'orderUrl':item.get('orderUrl',''),'url':item.get('url',''),'verifiedAt':row['created_at'],'invitationId':row['invitation_id'],'name':v.get('name',''),'date':v.get('date',''),'time':v.get('time',''),'venue':v.get('venue',''),'address':v.get('address',''),'kind':data.get('kind',''),'hostSide':v.get('hostSide',''),'groomName':v.get('groomName',''),'brideName':v.get('brideName',''),'groomParents':v.get('groomParents',''),'brideParents':v.get('brideParents',''),'sourceUrl':v.get('sourceUrl',''),'verification':'saved-result','orderMode':data.get('orderMode','')}
         except (ValueError,TypeError):continue
     if root is not None:
         base=Path(root)/'invitations'
@@ -65,6 +84,16 @@ def products(worker,root=None):
     if root is not None:
         import erp_invitation_library as library
         catalog=library.catalog(worker,root)['items']
+        # Existing externally published pairs have no engine job or local product
+        # snapshot. Index both supplied prices explicitly, preserving their links.
+        for row in catalog:
+            if not row.get('external'):continue
+            v=row.get('values') or {}
+            for link in row.get('links',[]):
+                price=link.get('price')
+                if price not in (93500,99000):continue
+                key='external:'+row['id']+':'+str(price)
+                items[key]={'productId':key,'source':'blogpay','external':True,'readOnly':True,'orderMode':'blogpay-manual','price':price,'orderUrl':link.get('orderUrl',''),'url':link.get('url',''),'verifiedAt':row.get('createdAt',''),'invitationId':row.get('invitationId') or row['id'],'name':row['title'],'date':row.get('date',''),'time':v.get('time',''),'venue':v.get('venue',''),'address':v.get('address',''),'kind':row['kind'],'hostSide':v.get('hostSide',''),'groomName':v.get('groomName',''),'brideName':v.get('brideName',''),'groomParents':v.get('groomParents',''),'brideParents':v.get('brideParents',''),'verification':'provided-links'}
         for item in items.values():
             match=next((r for r in catalog if any(x.get('orderUrl')==item.get('orderUrl') for x in r['links'])),None)
             if match:item.update({k:match[k] for k in ('operating','operatingUntil','salesStopped','saleStatus')})
@@ -97,7 +126,7 @@ def query(worker,root,params):
         a,b=dt.date.fromisoformat(start),dt.date.fromisoformat(end);page=int(params.get('page',['1'])[0])
         if a>b or (b-a).days>366 or not 1<=page<=100:raise ValueError()
     except ValueError:raise ValueError('조회 기간은 1년 이내, 페이지는 1~100으로 입력하세요.')
-    catalog=[p for p in products(worker,root) if p.get('source')=='own-checkout'];orders=[];warnings=[];pages=1
+    catalog=[p for p in products(worker,root) if p.get('source')=='own-checkout' or p.get('external') or p.get('orderMode')=='blogpay-manual'];orders=[];warnings=[];pages=1
     c=read_db(Path(root)/'state.sqlite3')
     if c:
         try:

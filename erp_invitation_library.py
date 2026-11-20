@@ -11,6 +11,7 @@ import re
 import threading
 from pathlib import Path
 from urllib.parse import urlsplit
+import erp_manual_blogpay
 from zoneinfo import ZoneInfo
 from lxml import html
 
@@ -46,14 +47,14 @@ def register(worker,root):
             try:
                 job=json.loads(row['input']);result=json.loads(row['result']);key=result.get('jobId') or (row['public_id'] if 'public_id' in row.keys() else '');v=job['values']
                 if not re.fullmatch('[a-f0-9]{32}',key) or len(result.get('items',[]))!=2:continue
-                if key in data and (data[key].get('orderRewrites') or all('/i/' in x.get('orderUrl','') for x in data[key]['links'])):continue
+                if key in data and (data[key].get('orderMode')=='blogpay-manual' or data[key].get('orderRewrites') or all('/i/' in x.get('orderUrl','') for x in data[key]['links'])):continue
                 old_row=data.get(key,{})
                 folder=worker.root/'public'/key
                 if not all((folder/f'{p}.html').is_file() for p in PRICES):continue
-                data[key]={'id':key,'kind':job['kind'],'createdAt':result.get('publishedAt') or dt.datetime.fromtimestamp((folder/'result.json').stat().st_mtime,dt.timezone.utc).isoformat(),'date':v.get('date',''),'title':v.get('productPrefix') or v.get('name',''),'folder':str(folder),'links':result['items'],'revision':1,'salesStopped':False,'invitationId':job.get('invitationId',''),**old_row};changed=True
+                data[key]={'id':key,'kind':job['kind'],'createdAt':result.get('publishedAt') or dt.datetime.fromtimestamp((folder/'result.json').stat().st_mtime,dt.timezone.utc).isoformat(),'date':v.get('date',''),'title':v.get('productPrefix') or v.get('name',''),'folder':str(folder),'links':result['items'],'revision':1,'salesStopped':False,'invitationId':job.get('invitationId',''),'orderMode':job.get('orderMode',''),**old_row};changed=True
                 # Earlier ERP publications used BlogPay links. Reuse the approved
                 # own-checkout snapshots so every managed pair shares the same gate.
-                if any('/i/' not in x.get('orderUrl','') for x in result['items']):
+                if job.get('orderMode')!='blogpay-manual' and any('/i/' not in x.get('orderUrl','') for x in result['items']):
                     import erp_local_checkout
                     local_key,links,snapshots=erp_local_checkout.build(root,worker.origin,job)
                     erp_local_checkout.publish(root,local_key,snapshots,key,result['fingerprint'],worker.origin,job['kind']=='wedding',v.get('weddingCrop'))
@@ -90,12 +91,14 @@ def product_status(root,product):
     return None
 
 def current_html(root,row,price):
+    if row.get('external'):raise ValueError('외부 발행 초대장은 등록된 링크에서 확인하세요. ERP에서 문구·디자인을 직접 수정할 수 없습니다.')
     raw=(base(root)/row['editPath']/f'{price}.html').read_text() if row.get('editPath') else (Path(row['folder'])/f'{price}.html').read_text()
     for old,new in row.get('orderRewrites',{}).items():raw=raw.replace(old,new)
     return raw
 def nodes(tree):
     return tree.xpath('//h1[not(*)]|//h2[not(*)]|//h3[not(*)]|//p[not(*)]')
 def detail(root,row):
+    if row.get('external'):return {'id':row['id'],'revision':row['revision'],'title':row['title'],'fields':[],'design':{},'external':True,'readOnly':True,'links':row['links'],'notice':'외부 발행 링크를 관리 목록에 등록한 초대장입니다. 문구·디자인·상품 판매 상태는 원래 발행 사이트와 블로그페이에서 수정하세요.'}
     tree=html.fromstring(current_html(root,row,93500));other=nodes(html.fromstring(current_html(root,row,99000)))
     return {'id':row['id'],'revision':row['revision'],'title':row['title'],'fields':[{'key':str(i),'text':e.text or ''} for i,e in enumerate(nodes(tree)) if (e.text or '').strip() and i<len(other) and e.text==other[i].text],'design':row.get('design',{})}
 def edit_documents(root,row,payload):
@@ -132,9 +135,11 @@ def update(root,key,payload,actor):
     with LOCK:
         data=state(root);row=data.get(key)
         if not row:raise ValueError('발행된 초대장을 찾지 못했습니다.')
+        if row.get('external'):raise ValueError('외부 발행 초대장입니다. 문구·디자인은 원래 발행 사이트에서, 상품 판매 중지는 블로그페이에서 처리하세요.')
         if payload.get('revision')!=row['revision']:raise ValueError('다른 직원이 수정했습니다. 새로고침하세요.')
         action=payload.get('action')
         if action=='preview':return {'documents':edit_documents(root,row,payload),'revision':row['revision']}
+        if action=='sales' and row.get('orderMode')=='blogpay-manual':raise ValueError('수동 연결된 블로그페이 상품입니다. 두 상품의 판매 상태는 블로그페이에서 변경하세요.')
         if action=='sales':
             if type(payload.get('stopped')) is not bool:raise ValueError('판매 상태를 확인하세요.')
             row['salesStopped']=payload['stopped']
@@ -150,11 +155,50 @@ def update(root,key,payload,actor):
 
 def public(root,key,name):
     row=state(root).get(key)
-    if not row:return None
+    if not row or row.get('external'):return None
     if not status(row)['operating']:return (410,'text/plain; charset=utf-8','운영 기간이 종료된 초대장입니다.'.encode())
     if name in ('93500.html','99000.html'):
         return (200,'text/html; charset=utf-8',current_html(root,row,int(name.split('.')[0])).encode())
     return None
+
+
+def external_url(value):
+    if not isinstance(value,str) or len(value)>1500:return False
+    try:
+        p=urlsplit(value);host=(p.hostname or '').lower()
+        return bool(p.scheme=='https' and not p.username and not p.password and not p.fragment and p.port in (None,443) and re.fullmatch(r'(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}',host) and not host.endswith(('.local','.internal','.localhost')))
+    except ValueError:return False
+
+def register_external_pair(root,payload,actor):
+    """Index an existing pair without changing either original URL or creating products."""
+    kind=payload.get('kind');values=payload.get('values') or {};title=payload.get('title','')
+    if not isinstance(values,dict):raise ValueError('초대장 입력값을 확인하세요.')
+    date=payload.get('date') or values.get('date','')
+    if kind not in ('wedding','event','memorial') or not isinstance(values,dict) or not isinstance(title,str) or not 0<len(title.strip())<=160:raise ValueError('초대장 종류·제목을 확인하세요.')
+    try:
+        if not isinstance(date,str) or not re.fullmatch(r'20\d\d-\d\d-\d\d',date):raise ValueError()
+        dt.date.fromisoformat(date)
+    except (ValueError,TypeError):raise ValueError('행사 날짜를 YYYY-MM-DD로 입력하세요.') from None
+    items=payload.get('items') or payload.get('links')
+    if not isinstance(items,list) or len(items)!=2 or any(not isinstance(x,dict) for x in items):raise ValueError('두 가격의 초대장·상품 링크를 함께 등록하세요.')
+    if {x.get('price') for x in items}!=set(PRICES):raise ValueError('93,500원과 99,000원 초대장을 각각 등록하세요.')
+    links=[]
+    for item in sorted(items,key=lambda x:x['price']):
+        url=item.get('url','');order=item.get('orderUrl','')
+        if not external_url(url) or not erp_manual_blogpay.order_url(order,os.getenv('BLOGPAY_SHOP_ID') or None):raise ValueError('공개 HTTPS 초대장 링크와 현재 상점의 블로그페이 상품 링크를 확인하세요.')
+        links.append({'price':item['price'],'url':url,'orderUrl':order,'source':'manual-blogpay','verification':'provided-links'})
+    if len({x['url'] for x in links})!=2 or len({x['orderUrl'] for x in links})!=2:raise ValueError('두 가격은 서로 다른 초대장·상품 링크를 사용해야 합니다.')
+    if len({urlsplit(x['url']).hostname for x in links})!=1:raise ValueError('두 초대장은 같은 발행 사이트의 링크를 사용하세요.')
+    key=hashlib.sha256(json.dumps(links,sort_keys=True).encode()).hexdigest()[:32]
+    with LOCK:
+        data=state(root)
+        if key in data:
+            if not data[key].get('external'):raise ValueError('기존 발행 정보와 충돌합니다.')
+            return {'id':key,'revision':data[key]['revision'],'replayed':True,**status(data[key])}
+        kept={k:str(values[k])[:250] for k in ('name','date','time','venue','address','groomName','brideName','groomParents','brideParents','groomRelation','brideRelation','hostSide') if isinstance(values.get(k),str)}
+        created=now().isoformat();row={'id':key,'external':True,'readOnly':True,'orderMode':'blogpay-manual','kind':kind,'createdAt':created,'date':date,'title':title.strip(),'values':kept,'links':links,'revision':1,'salesStopped':False,'updatedAt':created,'updatedBy':str(actor)[:160]}
+        data[key]=row;save(root,data)
+    return {'id':key,'revision':1,'replayed':False,**status(row)}
 
 def dispatch(handler,method,path,root,worker):
     if path!='/erp/invitations/library':return False
@@ -163,7 +207,10 @@ def dispatch(handler,method,path,root,worker):
         if method!='POST':handler.send_json({'error':'허용하지 않는 요청입니다.'},405);return True
         size=int(handler.headers.get('Content-Length','0'))
         if not 0<size<=40000:raise ValueError('요청 크기를 확인하세요.')
-        payload=json.loads(handler.rfile.read(size));key=payload.get('id','');data=register(worker,root)
+        payload=json.loads(handler.rfile.read(size))
+        if payload.get('action')=='register-external-pair':
+            handler.send_json(register_external_pair(root,payload,payload.get('actor','ERP 직원')));return True
+        key=payload.get('id','');data=register(worker,root)
         if key not in data:raise ValueError('발행된 초대장을 찾지 못했습니다.')
         if payload.get('action')=='detail':handler.send_json(detail(root,data[key]));return True
         handler.send_json(update(root,key,payload,payload.get('actor','ERP 직원')))

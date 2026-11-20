@@ -429,4 +429,7 @@ def receive_payment(db, fields, config):
         connection.execute('UPDATE invitation_orders SET state=?, payment_number=? WHERE id=?', (state, number, attempt))
         if state == 'paid':
             stage_paid(connection, row)
+            if row['state'] != 'paid':
+                import order_sms
+                order_sms.enqueue_paid(connection, row)
     return True

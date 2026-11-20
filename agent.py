@@ -108,6 +108,7 @@ def db():
     owner_alerts.setup(connection)
     staff_features.setup(connection)
     order_operations.setup(connection)
+    order_sms.setup(connection)
     development_queue.setup(connection)
     return connection
 
@@ -1567,5 +1568,6 @@ if __name__ == '__main__':
     if os.getenv('ERP_MEMORIAL_PROBE_URL'):threading.Thread(target=memorial_source_probe,daemon=True).start()
     owner_alerts.start(db)
     start_order_queue()
+    order_sms.start(db, os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'))
     ThreadingHTTPServer((os.getenv('TAESAN_BIND', '127.0.0.1'), int(os.getenv('PORT', '8080'))),
                         Handler).serve_forever()

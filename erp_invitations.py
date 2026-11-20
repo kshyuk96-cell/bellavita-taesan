@@ -31,11 +31,13 @@ import erp_invitation_management
 import erp_local_checkout
 import erp_memorial_invitation
 import erp_ai
+import erp_manual_blogpay
 
 TEMPLATE_HASHES={'seoul.ttf':'7b3e16b8ccd97d903520f87f22ff970d0ab0594231807d0a0b752eb8fcb670f4','event-wreath-catalog.webp': '5a264152394b1d34f847192b3c05ff7d809a4e1e072eff580220e127070d8b25', 'event-v5.css': '852ce3f563c959ed59ee240ec99896434f62bf91e019e14d63ef3ba7927fdfb3', 'rice-wreath-10kg.webp': '6a0e396b644daeaa76ef79aeee3acaa6b9893f24a31aa129fca070b29209c7a7'}
 PRICES=(93500,99000)
 FIELDS={'name':160,'date':10,'time':5,'venue':180,'address':250,'sourceUrl':1000,'greeting':1200,'note':700,'host':100,'groomName':40,'brideName':40,'groomParents':100,'brideParents':100,'groomRelation':24,'brideRelation':24,'hostSide':8,'logo':1000,'hero':1000,'frame':1000,'scrollLeft':1000,'scrollRight':1000,'congrats':160}
 FIELDS.update(erp_memorial_invitation.FIELDS)
+FIELDS.update(erp_manual_blogpay.FIELDS)
 IMAGE_FIELDS=('logo','hero','frame','scrollLeft','scrollRight')
 LOCK=threading.RLock()
 ENGINES={}
@@ -62,6 +64,7 @@ def clean_values(values):
     for key in ('sourceUrl',*IMAGE_FIELDS):
         value=out[key]
         if value and not (key in IMAGE_FIELDS and re.fullmatch(r'attachment:[a-f0-9]{32}',value)) and not safe_https(value):raise ValueError('HTTPS 주소를 확인하세요: '+key)
+    erp_manual_blogpay.validate_pair(out)
     out['hostSide']='bride' if out['hostSide']=='bride' else 'groom'
     out['wreathRestriction']=values.get('wreathRestriction') is True
     out['images']=[u for u in values.get('images',[]) if isinstance(u,str) and safe_https(u)][:20]
@@ -143,7 +146,7 @@ class Engine:
         if not isinstance(data,dict):raise ValueError('입력 형식 오류')
         key=data.get('requestId','');inv=data.get('invitationId','');version=data.get('version')
         if not re.fullmatch(r'[\w-]{10,100}',key) or not re.fullmatch(r'[\w-]{10,130}',inv) or type(version) is not int or not 0<version<100000:raise ValueError('요청 ID 또는 버전 오류')
-        if data.get('action') not in ('parse','preview','publish') or data.get('kind') not in ('event','wedding','memorial') or data.get('orderMode') not in ('blogpay-direct','invitation-checkout'):raise ValueError('ERP 주문 경로를 확인하세요.')
+        if data.get('action') not in ('parse','preview','publish') or data.get('kind') not in ('event','wedding','memorial') or data.get('orderMode') not in ('blogpay-direct','blogpay-manual','invitation-checkout'):raise ValueError('ERP 주문 경로를 확인하세요.')
         if not isinstance(data.get('source'),str) or not 0<len(data['source'])<=6000 or len(set(re.findall(r'https?://[^\s<>]+',data['source'])))>1:raise ValueError('원본은 6,000자 이하로 입력하세요.')
         data={**data,'values':clean_values(data.get('values',{}))};hashed=digest(data)
         with LOCK,self.db() as db:
@@ -285,24 +288,26 @@ class Engine:
         year,month=(when.year+1,1) if when.month==12 else (when.year,when.month+1)
         expires=dt.date(year,month,min(when.day,calendar.monthrange(year,month)[1])).isoformat()
         if dt.datetime.now(render.SEOUL).date().isoformat()>expires:raise ValueError('공유 기간이 지난 행사입니다.')
-        local=data.get('orderMode')=='invitation-checkout'
-        local_key,items,snapshots=erp_local_checkout.build(self.checkout_root,self.origin,data) if local else ('',self.products(render.product_name(v,kind)),{})
+        # Validate four source photos, face-safe crops and banner geometry before
+        # making any checkout/product records. A failed photo must not create products.
         photos={key:self.image(v[key]) for key in IMAGE_FIELDS if v.get(key)}
         import erp_invitation_auto
         if kind=='wedding':
-            reference_parts=erp_invitation_auto.components(render,v,kind,photos)
-            image,boxes=erp_invitation_auto.preview_composite(render,reference_parts)
-        else:image,boxes=render.composite(v,kind,photos)
+            parts=erp_invitation_auto.components(render,v,kind,photos)
+            image,boxes=erp_invitation_auto.preview_composite(render,parts)
+        else:
+            image,boxes=render.composite(v,kind,photos)
+            parts=erp_invitation_auto.components(render,v,kind,photos,image)
+        local=data.get('orderMode')=='invitation-checkout'
+        local_key,items,snapshots=erp_local_checkout.build(self.checkout_root,self.origin,data) if local else ('',erp_manual_blogpay.products(v) if data.get('orderMode')=='blogpay-manual' else self.products(render.product_name(v,kind)),{})
         sample=render.image_bytes(image)
         hero=render.image_bytes(photos['hero']) if kind=='wedding' else b''
         og=render.thumbnail(v,kind)
         hashes={k:hashlib.sha256(render.image_bytes(photo)).hexdigest() for k,photo in photos.items()}
-        fingerprint=digest({'values':v,'kind':kind,'items':items,'images':hashes,**({'orderMode':'invitation-checkout','products':snapshots} if local else {})})
+        fingerprint=digest({'values':v,'kind':kind,'items':items,'images':hashes,'orderMode':data.get('orderMode'),**({'renderVersion':getattr(erp_invitation_auto,'RENDER_VERSION','wedding-rules-v2')} if kind=='wedding' else {}),**({'orderMode':'invitation-checkout','products':snapshots} if local else {})})
         warnings_out=[]
         if len(set(hashes.values()))<len(hashes):warnings_out.append('사진 중복이 있습니다. 대표·제작 액자·족자의 사진 구성을 확인하세요.')
         if kind=='event' and not photos.get('logo'):warnings_out.append('로고·행사 이미지가 없어 행사명으로 시안을 구성했습니다. 설치 예시를 확인하세요.')
-        import erp_invitation_auto
-        parts=erp_invitation_auto.components(render,v,kind,photos,image)
         return {'status':'done','items':items,'fingerprint':fingerprint,'expires':expires,'warnings':warnings_out}, {**({'local-products.json':json.dumps({'key':local_key,'products':snapshots}).encode()} if local else {}),'reference-components.json':json.dumps(parts).encode(),'sample.webp':sample,'hero.webp':hero,'thumbnail.jpg':og,'layout.json':json.dumps(boxes,ensure_ascii=False).encode()}
 
     def recover_publication(self,row,data):
