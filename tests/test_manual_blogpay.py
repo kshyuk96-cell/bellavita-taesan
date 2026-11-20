@@ -65,6 +65,27 @@ class ExternalPair(unittest.TestCase):
    for mutate in [lambda p:p['items'][1].update(price=93500),lambda p:p['items'][1].update(url=p['items'][0]['url']),lambda p:p['items'][0].update(url='https://127.0.0.1/a'),lambda p:p.update(values=['bad']),lambda p:p.update(date='20991128')]:
     p=self.payload();mutate(p)
     with self.assertRaises(ValueError):library.register_external_pair(Path(tmp),p,'staff')
+ def test_explicit_legacy_single_registration_preserves_one_real_link_and_counts_it_once(self):
+  payload={'action':'register-external-pair','legacySingle':True,'kind':'wedding','title':'김동준 · 김지원 결혼식 안내','date':'2026-12-13','values':{'name':'김동준 · 김지원 결혼식 안내','time':'13:00','venue':'메이필드호텔 볼룸홀','address':'서울 강서구 방화대로 94','groomName':'김동준','brideName':'김지원','groomParents':'김영남·장미연','brideParents':'김병선·연은숙','groomRelation':'장남','brideRelation':'차녀'},'items':[{'price':93500,'url':'https://bellavita-wedding-notice.shrewdmaxim1.chatgpt.site/invitation','orderUrl':'https://testshop.shop.blogpay.co.kr/v/g/dpca1'}]}
+  with tempfile.TemporaryDirectory() as tmp,patch.dict(os.environ,{'BLOGPAY_SHOP_ID':'testshop'}):
+   root=Path(tmp);first=library.register_external_pair(root,payload,'staff');again=library.register_external_pair(root,payload,'staff')
+   self.assertEqual(first['id'],again['id']);self.assertTrue(again['replayed'])
+   data=library.catalog(self.empty_worker(root),root);self.assertEqual(data['summary']['operating'],1);self.assertEqual(data['summary']['links'],1)
+   row=data['items'][0];self.assertTrue(row['external']);self.assertTrue(row['readOnly']);self.assertTrue(row['legacySingle']);self.assertEqual(row['links'],[{'price':93500,'url':payload['items'][0]['url'],'orderUrl':payload['items'][0]['orderUrl'],'source':'manual-blogpay','verification':'provided-links'}])
+   detail=library.detail(root,row);self.assertTrue(detail['readOnly']);self.assertEqual(len(detail['links']),1)
+ def test_legacy_single_requires_explicit_flag_one_allowed_price_and_safe_urls(self):
+  item={'price':93500,'url':'https://example.chatgpt.site/invitation','orderUrl':'https://testshop.shop.blogpay.co.kr/v/g/one'}
+  base={'kind':'wedding','title':'구형 단일 초대장','date':'2099-12-13','items':[item]}
+  with tempfile.TemporaryDirectory() as tmp,patch.dict(os.environ,{'BLOGPAY_SHOP_ID':'testshop'}):
+   root=Path(tmp)
+   bad=[]
+   bad.append(base)
+   bad.append({**base,'legacySingle':True,'items':[item,{**item,'price':99000,'url':'https://example.chatgpt.site/other','orderUrl':'https://testshop.shop.blogpay.co.kr/v/g/two'}]})
+   bad.append({**base,'legacySingle':True,'items':[{**item,'price':1000}]})
+   bad.append({**base,'legacySingle':True,'items':[{**item,'url':'http://example.chatgpt.site/invitation'}]})
+   bad.append({**base,'legacySingle':True,'items':[{**item,'orderUrl':'https://other.shop.blogpay.co.kr/v/g/one'}]})
+   for payload in bad:
+    with self.subTest(payload=payload),self.assertRaises(ValueError):library.register_external_pair(root,payload,'staff')
  def test_manual_publication_is_not_rewritten_to_own_checkout(self):
   with tempfile.TemporaryDirectory() as tmp:
    root=Path(tmp);w=self.empty_worker(root);key='f'*32;folder=w.root/'public'/key;folder.mkdir(parents=True)

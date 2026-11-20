@@ -118,7 +118,7 @@ def catalog(worker,root):
     data=register(worker,root);items=[{k:v for k,v in row.items() if k not in ('folder','edits')}|status(row) for row in data.values() if not row.get('deleted')]
     items.sort(key=lambda r:r['createdAt'],reverse=True)
     active=[r for r in items if r['operating']]
-    return {'items':items,'summary':{'total':len(items),'deleted':sum(row.get('deleted') is True for row in data.values()),'operating':len(active),'links':len(active)*2,'selling':sum(not r['salesStopped'] for r in active),'byKind':{k:sum(r['kind']==k for r in active) for k in ('wedding','event','memorial')},'checkedAt':now().isoformat()}}
+    return {'items':items,'summary':{'total':len(items),'deleted':sum(row.get('deleted') is True for row in data.values()),'operating':len(active),'links':sum(len(r.get('links',[])) for r in active),'selling':sum(not r['salesStopped'] for r in active),'byKind':{k:sum(r['kind']==k for r in active) for k in ('wedding','event','memorial')},'checkedAt':now().isoformat()}}
 
 def product_status(root,product):
     """Return None for unmanaged products, otherwise the authoritative shared gate."""
@@ -223,7 +223,12 @@ def external_url(value):
     except ValueError:return False
 
 def register_external_pair(root,payload,actor):
-    """Index an existing pair without changing either original URL or creating products."""
+    """Index existing external links without changing their pages or products.
+
+    Normal registrations remain an exact two-price pair.  ``legacySingle`` is
+    an explicit read-only migration path for a real older invitation that only
+    ever had one product; it never invents the missing price.
+    """
     kind=payload.get('kind');values=payload.get('values') or {};title=payload.get('title','')
     if not isinstance(values,dict):raise ValueError('초대장 입력값을 확인하세요.')
     date=payload.get('date') or values.get('date','')
@@ -232,16 +237,21 @@ def register_external_pair(root,payload,actor):
         if not isinstance(date,str) or not re.fullmatch(r'20\d\d-\d\d-\d\d',date):raise ValueError()
         dt.date.fromisoformat(date)
     except (ValueError,TypeError):raise ValueError('행사 날짜를 YYYY-MM-DD로 입력하세요.') from None
-    items=payload.get('items') or payload.get('links')
-    if not isinstance(items,list) or len(items)!=2 or any(not isinstance(x,dict) for x in items):raise ValueError('두 가격의 초대장·상품 링크를 함께 등록하세요.')
-    if {x.get('price') for x in items}!=set(PRICES):raise ValueError('93,500원과 99,000원 초대장을 각각 등록하세요.')
+    items=payload.get('items') or payload.get('links');legacy_single=payload.get('legacySingle') is True
+    required_count=1 if legacy_single else 2
+    if not isinstance(items,list) or len(items)!=required_count or any(not isinstance(x,dict) for x in items):
+        raise ValueError('기존 단일 상품 링크 한 개를 등록하세요.' if legacy_single else '두 가격의 초대장·상품 링크를 함께 등록하세요.')
+    prices={x.get('price') for x in items}
+    if (legacy_single and (len(prices)!=1 or not prices.issubset(set(PRICES)))) or (not legacy_single and prices!=set(PRICES)):
+        raise ValueError('기존 상품 가격은 93,500원 또는 99,000원이어야 합니다.' if legacy_single else '93,500원과 99,000원 초대장을 각각 등록하세요.')
     links=[]
     for item in sorted(items,key=lambda x:x['price']):
         url=item.get('url','');order=item.get('orderUrl','')
         if not external_url(url) or not erp_manual_blogpay.order_url(order,os.getenv('BLOGPAY_SHOP_ID') or None):raise ValueError('공개 HTTPS 초대장 링크와 현재 상점의 블로그페이 상품 링크를 확인하세요.')
         links.append({'price':item['price'],'url':url,'orderUrl':order,'source':'manual-blogpay','verification':'provided-links'})
-    if len({x['url'] for x in links})!=2 or len({x['orderUrl'] for x in links})!=2:raise ValueError('두 가격은 서로 다른 초대장·상품 링크를 사용해야 합니다.')
-    if len({urlsplit(x['url']).hostname for x in links})!=1:raise ValueError('두 초대장은 같은 발행 사이트의 링크를 사용하세요.')
+    if not legacy_single:
+        if len({x['url'] for x in links})!=2 or len({x['orderUrl'] for x in links})!=2:raise ValueError('두 가격은 서로 다른 초대장·상품 링크를 사용해야 합니다.')
+        if len({urlsplit(x['url']).hostname for x in links})!=1:raise ValueError('두 초대장은 같은 발행 사이트의 링크를 사용하세요.')
     key=hashlib.sha256(json.dumps(links,sort_keys=True).encode()).hexdigest()[:32]
     with LOCK:
         data=state(root)
@@ -249,7 +259,7 @@ def register_external_pair(root,payload,actor):
             if not data[key].get('external'):raise ValueError('기존 발행 정보와 충돌합니다.')
             return {'id':key,'revision':data[key]['revision'],'replayed':True,**status(data[key])}
         kept={k:str(values[k])[:250] for k in ('name','date','time','venue','address','groomName','brideName','groomParents','brideParents','groomRelation','brideRelation','hostSide') if isinstance(values.get(k),str)}
-        created=now().isoformat();row={'id':key,'external':True,'readOnly':True,'orderMode':'blogpay-manual','kind':kind,'createdAt':created,'date':date,'title':title.strip(),'values':kept,'links':links,'revision':1,'salesStopped':False,'updatedAt':created,'updatedBy':str(actor)[:160]}
+        created=now().isoformat();row={'id':key,'external':True,'readOnly':True,'orderMode':'blogpay-manual','kind':kind,'createdAt':created,'date':date,'title':title.strip(),'values':kept,'links':links,'revision':1,'salesStopped':False,'updatedAt':created,'updatedBy':str(actor)[:160],**({'legacySingle':True} if legacy_single else {})}
         data[key]=row;save(root,data)
     return {'id':key,'revision':1,'replayed':False,**status(row)}
 
