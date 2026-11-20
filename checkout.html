@@ -34,6 +34,7 @@
   background: var(--canvas);
 }
 [hidden] { display: none !important; }
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 * { box-sizing: border-box; }
 body { margin: 0; }
 header {
@@ -106,26 +107,19 @@ section {
   inset: 46.364% auto auto 31.859%;
   width: 39.079%;
   height: 35.612%;
-  border: 1px solid #a18a55;
-  background:
-    radial-gradient(circle at 18% 18%, rgb(255 255 255 / .45) 0 1px, transparent 1.6px),
-    radial-gradient(circle at 76% 28%, rgb(255 255 255 / .35) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 35% 72%, rgb(255 255 255 / .25) 0 1px, transparent 1.5px),
-    linear-gradient(160deg, #111827 0%, #030712 54%, #121827 100%);
-  background-size: 43px 49px, 61px 57px, 53px 67px, 100% 100%;
-  box-shadow: inset 0 0 0 2px rgb(214 184 112 / .22), inset 0 0 24px #000;
-  color: #fff5df;
+  overflow: hidden;
+  border: 0;
+  background: #030712;
+  box-shadow: none;
+  color: rgb(252 245 227);
   font-family: 'Bellavita Memorial', var(--heading);
 }
-.memorial-preview .memorial-scroll-paper::after { content: ''; position: absolute; left: 7%; right: 7%; top: 48.6%; border-top: 1px solid rgb(226 197 126 / .72); }
-.memorial-rice-notice { position: absolute; left: 2.7%; right: 15.7%; top: 2%; height: 6.7%; margin: 0; display: flex; flex-direction: column; justify-content: center; color: #fff5df; font-family: 'Bellavita Memorial', var(--heading); font-size: 2.1cqw; font-weight: 400; line-height: 1.35; letter-spacing: -.025em; text-align: right; white-space: nowrap; }
-.memorial-rice-notice > span { display: block; }
-.memorial-rice-qr { position: absolute; left: 87.2%; top: 2%; width: 9.3%; height: 6.6%; display: block; background: #fff; }
-.memorial-rice-qr img { display: block; width: 100%; height: 100%; }
-.memorial-rice-mark { position: absolute; left: 29%; top: 12%; width: 42%; height: 23.5%; }
-.memorial-rice-mark .scroll-weight { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; filter: brightness(0) invert(.93) sepia(.25); }
-.memorial-preview .scroll-greeting { inset: 37.4% 6% 53.7%; color: #fff5df; font-family: 'Bellavita Memorial', var(--heading); font-size: 5.1cqw; font-weight: 400; line-height: 1.3; letter-spacing: -.025em; }
-.memorial-preview .scroll-sender { inset: 64.5% 5% 5%; color: #fff5df; font-family: 'Bellavita Memorial', var(--heading); font-weight: 400; letter-spacing: -.025em; }
+.memorial-scroll-base { position: absolute; z-index: 0; inset: 0; display: block; width: 100%; height: 100%; object-fit: fill; }
+.memorial-rice-qr { position: absolute; z-index: 3; left: 87.184787%; top: 2.015377%; width: 9.264868%; height: 6.549974%; display: block; background: transparent; }
+.memorial-preview .scroll-greeting { z-index: 2; inset: 37.405542% 5.344418% 53.694374%; color: rgb(252 245 227); font-family: 'Bellavita Memorial', var(--heading); font-size: 4.275534cqw; font-weight: 400; line-height: 1.3; letter-spacing: 0; }
+.memorial-preview .scroll-sender { z-index: 2; inset: 52.332148% 5.344418% 3.778338%; color: rgb(252 245 227); font-family: 'Bellavita Memorial', var(--heading); font-weight: 400; letter-spacing: 0; }
+.memorial-preview .scroll-sender-row { display: flex; flex: 0 0 auto; align-items: baseline; justify-content: center; width: 100%; line-height: 1.16; white-space: nowrap; }
+.memorial-preview .scroll-sender-segment { display: inline-block; flex: 0 0 auto; white-space: pre; }
 .memorial-detail-sample { width: 100%; overflow: hidden; background: var(--canvas); }
 #product-detail .memorial-detail-sample img { width: 200%; max-width: none; transform: translateX(-50%); }
 .wreath-preview figcaption { margin: 8px 0 0; color: var(--muted); text-align: center; font-size: .94rem; }
@@ -498,12 +492,87 @@ function layoutMobileGreeting(paragraphs, style) {
   svg.setAttribute('viewBox', [-width / 2, bounds.y + (bounds.height - height) / 2, width, height].join(' '));
 }
 
-function layoutGreeting(text) {
+function layoutMemorialGreeting(text, custom, style) {
+  const width = scrollGreeting.clientWidth;
+  const height = scrollGreeting.clientHeight;
+  const maximum = parseFloat(style.fontSize);
+  const leading = 1.3;
+  const paragraphs = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const measure = (value, size) => {
+    greetingMeasure.font = style.fontWeight + ' ' + size + 'px ' + style.fontFamily;
+    return greetingMeasure.measureText(value).width;
+  };
+  const wrapAt = size => paragraphs.flatMap(paragraph => {
+    const rows = [];
+    let line = '';
+    for (const word of paragraph.split(/\s+/)) {
+      const trial = (line + ' ' + word).trim();
+      if (line && measure(trial, size) > width) {
+        rows.push(line);
+        line = '';
+      }
+      if (!line && measure(word, size) > width) {
+        for (const character of word) {
+          if (line && measure(line + character, size) > width) {
+            rows.push(line);
+            line = '';
+          }
+          line += character;
+        }
+      } else {
+        line = (line + ' ' + word).trim();
+      }
+    }
+    if (line) rows.push(line);
+    return rows;
+  });
+  let rows;
+  let size;
+  if (custom) {
+    const lowerLimit = maximum * 11 / 36;
+    const upperLimit = Math.max(lowerLimit, maximum * 1.7);
+    if (paragraphs.length === 1) {
+      const oneLine = Math.min(upperLimit,
+        width / Math.max(measure(paragraphs[0], 1), .01), height / leading);
+      if (oneLine >= maximum) {
+        rows = paragraphs;
+        size = oneLine;
+      }
+    }
+    if (!rows) {
+      let lower = lowerLimit;
+      let upper = upperLimit;
+      for (let index = 0; index < 14; index += 1) {
+        const candidate = (lower + upper) / 2;
+        if (wrapAt(candidate).length * candidate * leading <= height) lower = candidate;
+        else upper = candidate;
+      }
+      size = lower;
+      rows = wrapAt(size);
+    }
+  } else {
+    rows = wrapAt(maximum);
+    const widest = Math.max(...rows.map(row => measure(row, maximum)), 1);
+    size = Math.min(maximum, maximum * width / widest, height / (rows.length * leading));
+  }
+  scrollGreeting.style.fontSize = size + 'px';
+  scrollGreeting.replaceChildren(...rows.map(text => {
+    const row = document.createElement('span');
+    row.textContent = text;
+    return row;
+  }));
+}
+
+function layoutGreeting(text, custom = false) {
   scrollGreeting.replaceChildren();
   scrollGreeting.style.fontSize = '';
   if (!text || !scrollGreeting.clientWidth) return;
   const paragraphs = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   const style = getComputedStyle(scrollGreeting);
+  if (memorialPreview) {
+    layoutMemorialGreeting(text, custom, style);
+    return;
+  }
   if (mobile.matches) {
     layoutMobileGreeting(paragraphs, style);
     return;
@@ -542,9 +611,41 @@ function layoutGreeting(text) {
 let senderLayout;
 let senderTimer;
 let senderRequest;
+function layoutMemorialSender() {
+  const rows = senderLayout.rows?.length
+    ? senderLayout.rows
+    : (senderLayout.group || []).map(text => [{text, ratio: 1}]);
+  if (!rows.length) return;
+  const base = scrollSender.clientWidth * 175.5 / 752;
+  const rendered = rows.map(parts => {
+    const row = document.createElement('span');
+    row.className = 'scroll-sender-row';
+    const segments = parts.filter(part => part.text).map(part => {
+      const segment = document.createElement('span');
+      segment.className = 'scroll-sender-segment';
+      segment.textContent = part.text;
+      segment.style.fontSize = (base * Number(part.ratio || 1)) + 'px';
+      row.append(segment);
+      return {segment, size: base * Number(part.ratio || 1)};
+    });
+    scrollSender.append(row);
+    return {row, segments, height: Math.max(...segments.map(item => item.size), 0)};
+  });
+  const widest = Math.max(...rendered.map(item => item.row.scrollWidth), 1);
+  const totalHeight = rendered.reduce((sum, item) => sum + item.height * 1.16, 0);
+  const fit = Math.min(1, scrollSender.clientWidth / widest,
+    totalHeight ? scrollSender.clientHeight / totalHeight : 1);
+  rendered.forEach(item => item.segments.forEach(segment => {
+    segment.segment.style.fontSize = (segment.size * fit) + 'px';
+  }));
+}
 function layoutSender() {
   if (!scrollSender || wreath.hidden || !senderLayout) return;
   scrollSender.replaceChildren();
+  if (memorialPreview) {
+    layoutMemorialSender();
+    return;
+  }
   const rows = senderLayout.group
     ? senderLayout.group.map(text => [text, .65])
     : [...senderLayout.label.map(text => [text, .48]), [senderLayout.name, 1],
@@ -577,7 +678,9 @@ function updateSender() {
   clearTimeout(senderTimer);
   senderRequest?.abort();
   const value = sender.value.trim();
-  senderLayout = {group: value ? [value] : []};
+  senderLayout = memorialPreview
+    ? {group: value ? [value] : [], rows: value ? [[{text: value, ratio: 1}]] : []}
+    : {group: value ? [value] : []};
   layoutSender();
   if (!value) return;
   senderTimer = setTimeout(async () => {
@@ -603,12 +706,16 @@ function updateScroll() {
   const greeting = selected?.dataset.custom === '1' ? message.value.trim() : selected?.dataset.greeting || '';
   mobileMessage.hidden = !greeting;
   mobileMessage.textContent = greeting;
-  layoutGreeting(greeting);
+  layoutGreeting(greeting, selected?.dataset.custom === '1');
   layoutSender();
   const kg = choices.map(select => select.selectedOptions[0]?.dataset.kg).find(Boolean) || '10';
-  const badge = '/checkout-art/rice-' + kg + 'kg.webp';
+  // Memorial invitation products are the approved fixed 10kg product.  Do
+  // not invent 20/30kg production artwork; wedding keeps its existing badges.
+  const badge = memorialPreview
+    ? '/checkout-art/memorial-rice-10kg-base.webp'
+    : '/checkout-art/rice-' + kg + 'kg.webp';
   if (scrollWeight.getAttribute('src') !== badge) scrollWeight.src = badge;
-  scrollWeight.alt = '쌀 ' + kg + 'kg';
+  scrollWeight.alt = memorialPreview ? '원본 은하수 쌀 10kg 근조 족자' : '쌀 ' + kg + 'kg';
 }
 function update() {
   const options = choices.map(select => select.selectedOptions[0]);

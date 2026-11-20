@@ -36,7 +36,7 @@ ARTWORK_PATHS = {
     'rice-30kg.webp': ARTWORK / 'rice-30kg.webp',
     'memorial-easel-base.webp': MEMORIAL_ARTWORK / 'memorial-easel-base.webp',
     'memorial-frame-right.jpg': MEMORIAL_ARTWORK / 'memorial-frame-right.jpg',
-    'memorial-rice-qr.svg': MEMORIAL_ARTWORK / 'memorial-rice-qr.svg',
+    'memorial-rice-10kg-base.webp': MEMORIAL_ARTWORK / 'memorial-rice-10kg-base.webp',
     'hy-gungseo.ttf': SCROLL_ARTWORK / 'hy-gungseo.ttf',
 }
 ARTWORK_FILES = frozenset(ARTWORK_PATHS)
@@ -288,12 +288,22 @@ def wedding_image(preview, *, review=False):
 def sender_preview(sender):
     parsed = split_sender(sender)
     name = parsed.get('name') or sender
+    # The live memorial preview uses the same semantic rows and ratios as the
+    # production PDF renderer.  Keep the legacy fields for the unchanged
+    # wedding preview and older clients.
+    from wedding_scroll import render as scroll_render
+    rows = [
+        [{'text': text, 'ratio': ratio} for text, ratio in row]
+        for row in scroll_render.canonical_sender_plan(
+            sender, scroll_render.SENDER_REFERENCE_FONT)
+    ]
     if parsed.get('group'):
-        return {'group': name.splitlines()}
+        return {'group': name.splitlines(), 'rows': rows}
     structured = parsed.get('companyAffiliationTitle')
     label = list(structured) if structured else parsed.get('label', '').splitlines()
     extra = [part for key in ('note', 'footer') for part in parsed.get(key, '').splitlines() if part]
-    return {'label': label, 'name': name + parsed.get('nameSuffix', ''), 'note': extra}
+    return {'label': label, 'name': name + parsed.get('nameSuffix', ''),
+            'note': extra, 'rows': rows}
 
 
 def admin_page(orders, action):
@@ -378,9 +388,9 @@ def render(product, action, can_pay):
             <img class="wreath-base" src="{escape(memorial['base'])}" alt="근조 쌀빛그림화환">
             <img class="memorial-frame-photo" src="{escape(memorial['frame'])}" alt="44번 설악산 울산바위 은하수 작품 액자">
             <div class="scroll-paper memorial-scroll-paper">
-              <p class="memorial-rice-notice"><span>설치 액자 또는 쌀을 받으시거나, 상주님 명의로 쌀을 기부하실 수 있습니다.</span><span>우측 QR로 정보 전달 부탁드리며 발인 후 5일까지 회신 없으시면 쌀을 기부처리합니다.</span></p>
-              <a class="memorial-rice-qr" href="https://form.jotform.com/251220921797458" target="_blank" rel="noopener noreferrer" aria-label="쌀빛 수령 안내 정보 입력"><img src="/checkout-art/memorial-rice-qr.svg" alt=""></a>
-              <div class="memorial-rice-mark"><img class="scroll-weight" id="scroll-weight" src="/checkout-art/rice-10kg.webp" alt="쌀 10kg"></div>
+              <img class="memorial-scroll-base" id="scroll-weight" src="/checkout-art/memorial-rice-10kg-base.webp" alt="원본 은하수 쌀 10kg 근조 족자">
+              <p class="memorial-rice-notice sr-only">설치 액자 또는 쌀을 받으시거나, 상주님 명의로 쌀을 기부하실 수 있습니다. 우측 QR로 정보 전달 부탁드리며 발인 후 5일까지 회신 없으시면 쌀을 기부처리합니다.</p>
+              <a class="memorial-rice-qr" href="https://form.jotform.com/251220921797458" target="_blank" rel="noopener noreferrer" aria-label="쌀빛 수령 안내 정보 입력"></a>
               <p class="scroll-greeting" id="scroll-greeting"></p>
               <div class="scroll-sender" id="scroll-sender"></div>
             </div>

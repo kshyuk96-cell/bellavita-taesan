@@ -467,6 +467,62 @@ def memorial_sender_box(page):
     return fitz.Rect(45,divider+45,w-45,h-45)
 
 
+MEMORIAL_RICE_TEMPLATE_PAGE = 16
+MEMORIAL_RICE_MESSAGE_BOX = (445.5, 551.5)
+MEMORIAL_RICE_SOURCE_MESSAGE_BOX = (350, 550)
+
+
+def memorial_rice_checkout_geometry():
+    """Return checkout boxes derived from the production A3 rice page."""
+    with fitz.open(ASSETS / 'layout.pdf') as template:
+        page = template[MEMORIAL_RICE_TEMPLATE_PAGE]
+        width = page.rect.width
+        return {
+            'page': fitz.Rect(page.rect),
+            'message': fitz.Rect(45, MEMORIAL_RICE_MESSAGE_BOX[0],
+                                 width - 45, MEMORIAL_RICE_MESSAGE_BOX[1]),
+            # Keep this tied to the divider in layout.pdf.  A template edit
+            # must not silently leave checkout on a hand-maintained copy.
+            'sender': memorial_sender_box(page),
+            'qr': fitz.Rect(734, 24, 812, 102) * (width / 841.89),
+        }
+
+
+def make_memorial_rice_checkout_base(output, rice_kg=10, dpi=144):
+    """Render a live-text checkout base through the production rice path.
+
+    The full-page Milky Way raster is kept intact.  Only the template's old
+    vector message and sender glyphs are removed; the production weight logo,
+    notice, QR and divider remain in the resulting image.
+    """
+    if rice_kg != 10:
+        # The approved memorial invitation product is fixed at 10kg.  There
+        # are no production 20/30kg PNG masters, so never fabricate them from
+        # the small wedding checkout badges.
+        raise ValueError('근조 초대장 미리보기는 확정된 쌀 10kg 상품 전용입니다.')
+    output = Path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with fitz.open(ASSETS / 'layout.pdf') as template, fitz.open() as document:
+        document.insert_pdf(template, from_page=MEMORIAL_RICE_TEMPLATE_PAGE,
+                            to_page=MEMORIAL_RICE_TEMPLATE_PAGE)
+        page = document[0]
+        replace_memorial_heading(page, rice_kg, offset=59.5)
+        draw_memorial_rice_notice(page)
+        width = page.rect.width
+        source_top, source_bottom = MEMORIAL_RICE_SOURCE_MESSAGE_BOX
+        page.add_redact_annot(fitz.Rect(0, source_top, width, source_bottom), fill=None)
+        page.add_redact_annot(memorial_sender_box(page), fill=None)
+        # PDF_REDACT_IMAGE_NONE / PDF_REDACT_LINE_ART_NONE: preserve xref 38,
+        # the real full-page Milky Way image, and the divider line.
+        page.apply_redactions(images=0, graphics=0)
+        pixmap = page.get_pixmap(dpi=dpi, alpha=False)
+        image = Image.frombytes('RGB', (pixmap.width, pixmap.height), pixmap.samples)
+        # The source remains the production raster; high-quality WebP keeps a
+        # public checkout load small without introducing a second artwork.
+        image.save(output, 'WEBP', quality=95, method=6)
+    return output
+
+
 def make_scroll(output, sender, message='', kind='wedding', paper='A3', wedding_photo=None, subject=None, safe=None, sender_lines=0, layout='general', name_scale=1, text_scale=1, rice_kg=10, custom_message=False):
     scaling = dict(name_scale=name_scale, text_scale=text_scale)
     def draw_message(page, text, box, maximum, color, wrap=True):

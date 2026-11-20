@@ -1,9 +1,11 @@
 import json
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
 
 from lxml import html
+from PIL import Image, ImageStat
 
 import checkout
 
@@ -39,8 +41,7 @@ class MemorialCheckoutUI(unittest.TestCase):
         self.assertEqual(tree.xpath('//figure[@id="wreath-preview"]/@data-preview-kind'), ['memorial'])
         self.assertEqual(tree.xpath('//a[contains(@class,"memorial-rice-qr")]/@href'),
                          ['https://form.jotform.com/251220921797458'])
-        self.assertEqual(tree.xpath('//a[contains(@class,"memorial-rice-qr")]/img/@src'),
-                         ['/checkout-art/memorial-rice-qr.svg'])
+        self.assertFalse(tree.xpath('//a[contains(@class,"memorial-rice-qr")]//img'))
         notice = ' '.join(tree.xpath('//p[contains(@class,"memorial-rice-notice")]')[0].text_content().split())
         self.assertIn('설치 액자 또는 쌀을 받으시거나, 상주님 명의로 쌀을 기부하실 수 있습니다.', notice)
         self.assertIn('발인 후 5일까지 회신 없으시면 쌀을 기부처리합니다.', notice)
@@ -51,11 +52,14 @@ class MemorialCheckoutUI(unittest.TestCase):
 
     def test_memorial_weight_uses_one_complete_artwork_without_duplicate_text(self):
         tree = html.fromstring(checkout.render(checkout.apply_memorial_rules(self.product()), '#', False))
-        mark = tree.xpath('//div[@class="memorial-rice-mark"]')[0]
-        self.assertEqual(mark.xpath('./img/@id'), ['scroll-weight'])
-        self.assertEqual(mark.xpath('./img/@src'), ['/checkout-art/rice-10kg.webp'])
-        self.assertFalse(mark.xpath('.//span|.//strong|.//small'))
+        base = tree.xpath('//img[contains(@class,"memorial-scroll-base")]')[0]
+        self.assertEqual(base.get('id'), 'scroll-weight')
+        self.assertEqual(base.get('src'), '/checkout-art/memorial-rice-10kg-base.webp')
+        self.assertFalse(tree.xpath('//*[contains(@class,"memorial-rice-mark")]'))
         self.assertFalse(tree.xpath('//*[@id="scroll-weight-label"]'))
+        output = checkout.render(checkout.apply_memorial_rules(self.product()), '#', False)
+        self.assertIn("memorialPreview\n    ? '/checkout-art/memorial-rice-10kg-base.webp'", output)
+        self.assertIn(": '/checkout-art/rice-' + kg + 'kg.webp'", output)
         icon = tree.xpath('//link[@rel="icon"]/@href')
         self.assertEqual(len(icon), 1)
         self.assertTrue(icon[0].startswith('data:image/svg+xml,'))
@@ -115,14 +119,42 @@ class MemorialCheckoutUI(unittest.TestCase):
         self.assertNotIn('특1호실', venue)
         self.assertIn('const choiceTotal = choices.length;', output)
 
-    def test_approved_memorial_qr_is_local_svg_artwork(self):
-        path = checkout.artwork_path('memorial-rice-qr.svg')
+    def test_approved_memorial_base_is_real_production_artwork(self):
+        path = checkout.artwork_path('memorial-rice-10kg-base.webp')
         self.assertIsNotNone(path)
         self.assertTrue(path.is_file())
-        self.assertEqual(checkout.artwork_mime('memorial-rice-qr.svg'), 'image/svg+xml')
-        svg = path.read_text(encoding='utf-8')
-        self.assertIn('쌀빛 수령 안내 정보 입력 QR 코드', svg)
-        self.assertIn('shape-rendering="crispEdges"', svg)
+        self.assertEqual(checkout.artwork_mime(path.name), 'image/webp')
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),
+                         'f6f9e7e72c4b15b59baad53cc4edfa9d66e24d87cd0fe29e717783ff00872648')
+        with Image.open(path) as image:
+            self.assertEqual(image.size, (1684, 2382))
+            # A synthetic flat/gradient replacement cannot satisfy the star
+            # field's channel variation in the lower production background.
+            variation = ImageStat.Stat(image.convert('RGB').crop((1100, 1300, 1500, 2100))).stddev
+        self.assertGreater(min(variation), 20)
+
+    def test_live_boxes_share_the_production_pdf_geometry(self):
+        from wedding_scroll.render import (make_memorial_rice_checkout_base,
+                                            memorial_rice_checkout_geometry)
+        geometry = memorial_rice_checkout_geometry()
+        page = geometry['page']
+        css = checkout.TEMPLATE.read_text(encoding='utf-8')
+        message = geometry['message']
+        sender = geometry['sender']
+        qr = geometry['qr']
+        self.assertIn(f'inset: {message.y0 / page.height * 100:.6f}% '
+                      f'{(page.width-message.x1) / page.width * 100:.6f}% '
+                      f'{(page.height-message.y1) / page.height * 100:.6f}%', css)
+        self.assertIn(f'inset: {sender.y0 / page.height * 100:.6f}% '
+                      f'{(page.width-sender.x1) / page.width * 100:.6f}% '
+                      f'{(page.height-sender.y1) / page.height * 100:.6f}%', css)
+        self.assertIn(f'left: {qr.x0 / page.width * 100:.6f}%', css)
+        self.assertIn(f'top: {qr.y0 / page.height * 100:.6f}%', css)
+        self.assertNotIn('radial-gradient', css)
+        self.assertNotIn('inset: 64.5%', css)
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(ValueError, '10kg'):
+                make_memorial_rice_checkout_base(Path(temp) / 'invented-20kg.webp', 20)
 
     def test_memorial_thumbnail_lines_use_customer_relationship_and_death_date(self):
         from erp_invitation_render import memorial_thumbnail_lines
