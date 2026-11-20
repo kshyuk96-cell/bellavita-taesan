@@ -38,11 +38,12 @@ def status(row,at=None):
     except (KeyError,ValueError,TypeError):end=None;active=False
     return {'operating':active,'operatingUntil':end.isoformat() if end else None,
             'salesStopped':row.get('salesStopped',False),'saleStatus':('운영 종료' if not active else '판매 중지' if row.get('salesStopped') else '판매 중')}
-def register(worker,root):
+def register(worker,root,pending=None):
     """Discover successful publications and legacy HTML pairs. Never count previews."""
     with LOCK:
         data=state(root);changed=False
         with worker.db() as c:rows=c.execute("SELECT * FROM jobs WHERE action='publish' AND state='done' ORDER BY created_at").fetchall()
+        if pending is not None:rows=[*rows,pending]
         for row in rows:
             try:
                 job=json.loads(row['input']);result=json.loads(row['result']);key=result.get('jobId') or (row['public_id'] if 'public_id' in row.keys() else '');v=job['values']
@@ -94,6 +95,8 @@ def current_html(root,row,price):
     if row.get('external'):raise ValueError('외부 발행 초대장은 등록된 링크에서 확인하세요. ERP에서 문구·디자인을 직접 수정할 수 없습니다.')
     raw=(base(root)/row['editPath']/f'{price}.html').read_text() if row.get('editPath') else (Path(row['folder'])/f'{price}.html').read_text()
     for old,new in row.get('orderRewrites',{}).items():raw=raw.replace(old,new)
+    if row.get('thumbnailVersion'):
+        raw=re.sub(r'(thumbnail\.jpg)(?:\?v=[a-f0-9]+)?',r'\1?v='+row['thumbnailVersion'],raw)
     return raw
 def nodes(tree):
     return tree.xpath('//h1[not(*)]|//h2[not(*)]|//h3[not(*)]|//p[not(*)]')
@@ -200,6 +203,26 @@ def register_external_pair(root,payload,actor):
         data[key]=row;save(root,data)
     return {'id':key,'revision':1,'replayed':False,**status(row)}
 
+
+def refresh_thumbnail(worker,root,key,actor):
+    """Re-render only the managed thumbnail; keep invitation and checkout URLs stable."""
+    with LOCK:
+        data=state(root);row=data.get(key)
+        if not row or row.get('external'):raise ValueError('ERP에서 발행한 초대장만 썸네일을 갱신할 수 있습니다.')
+        with worker.db() as db:
+            job=db.execute("SELECT input FROM jobs WHERE public_id=? AND action='publish' AND state='done' ORDER BY created_at DESC LIMIT 1",(key,)).fetchone()
+        if not job:raise ValueError('발행 원본을 확인할 수 없습니다.')
+        source=json.loads(job['input'])
+        from erp_invitation_render import thumbnail
+        raw=thumbnail(source['values'],source['kind']);version=hashlib.sha256(raw).hexdigest()[:16]
+        target=Path(row['folder'])/'thumbnail.jpg'
+        if target.is_file() and not target.with_name('thumbnail.previous.jpg').exists():target.with_name('thumbnail.previous.jpg').write_bytes(target.read_bytes())
+        temp=target.with_name('thumbnail.refresh.tmp');temp.write_bytes(raw);temp.replace(target)
+        row['thumbnailVersion']=version;row['revision']+=1;row['updatedAt']=now().isoformat();row['updatedBy']=str(actor)[:160]
+        save(root,data)
+        return {'id':key,'revision':row['revision'],'thumbnailVersion':version}
+
+
 def dispatch(handler,method,path,root,worker):
     if path!='/erp/invitations/library':return False
     try:
@@ -211,6 +234,8 @@ def dispatch(handler,method,path,root,worker):
         if payload.get('action')=='register-external-pair':
             handler.send_json(register_external_pair(root,payload,payload.get('actor','ERP 직원')));return True
         key=payload.get('id','');data=register(worker,root)
+        if payload.get('action')=='refresh-thumbnail':
+            handler.send_json(refresh_thumbnail(worker,root,key,payload.get('actor','ERP 직원')));return True
         if key not in data:raise ValueError('발행된 초대장을 찾지 못했습니다.')
         if payload.get('action')=='detail':handler.send_json(detail(root,data[key]));return True
         handler.send_json(update(root,key,payload,payload.get('actor','ERP 직원')))

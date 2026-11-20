@@ -10,11 +10,19 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 ASSETS = Path(os.getenv('ERP_INVITATION_ASSETS') or Path(__file__).with_name('assets'))
 SEOUL = dt.timezone(dt.timedelta(hours=9))
+BUNDLED_SERIF_DIR = Path(__file__).with_name('erp_invitation_assets')
 
 def font(size, bold=False):
+    # Match the approved notice even on Render, which lacks system Noto fonts.
+    bundled = BUNDLED_SERIF_DIR / ('NotoSerifKR-Bold.otf' if bold else 'NotoSerifKR-Regular.otf')
+    if bundled.is_file():
+        return ImageFont.truetype(str(bundled), size)
     path = Path('/usr/share/fonts/opentype/noto/NotoSerifCJK-' + ('Bold' if bold else 'Regular') + '.ttc')
     if path.exists():
         return ImageFont.truetype(str(path), size, index=1)
+    regular = BUNDLED_SERIF_DIR / 'NotoSerifKR-Regular.otf'
+    if regular.is_file():
+        return ImageFont.truetype(str(regular), size)
     from importlib.util import find_spec
     package=find_spec('koreanize_matplotlib')
     if package is None or not package.origin:raise ValueError('한글 글꼴 파일 연결을 확인하세요.')

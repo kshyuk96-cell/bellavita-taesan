@@ -160,11 +160,35 @@ class Engine:
         if not old:self.schedule(key)
         return self.get(key)
 
+    def progress(self,key,step,label,detail='',completedPhotos=None):
+        """Persist observed work only; never replace a completed/error job result."""
+        if not isinstance(key,str) or not re.fullmatch(r'[\w-]{10,100}',key) or type(step) is not int or not 1<=step<=7:return None
+        with self.db() as db:
+            row=db.execute('SELECT state,result,created_at FROM jobs WHERE id=?',(key,)).fetchone()
+            if not row or row['state'] not in ('queued','running'):return None
+            try:payload=json.loads(row['result'] or '{}')
+            except (ValueError,TypeError):payload={}
+            if not isinstance(payload,dict):payload={}
+            previous=payload.get('progress') if isinstance(payload.get('progress'),dict) else {}
+            current={'step':step,'total':7,'label':str(label)[:100],'detail':str(detail)[:240],
+                     'totalPhotos':4,'startedAt':previous.get('startedAt') or row['created_at'],
+                     'updatedAt':dt.datetime.now(dt.timezone.utc).isoformat()}
+            if completedPhotos is not None:
+                if type(completedPhotos) is int:current['completedPhotos']=min(4,max(0,completedPhotos))
+            elif type(previous.get('completedPhotos')) is int:current['completedPhotos']=previous['completedPhotos']
+            payload['progress']=current
+            db.execute("UPDATE jobs SET result=? WHERE id=? AND state IN ('queued','running')",(json.dumps(payload,ensure_ascii=False),key))
+        return current
+
     def get(self,key):
         with self.db() as db:row=db.execute('SELECT * FROM jobs WHERE id=?',(key,)).fetchone()
         if not row:return None
         if row['state'] in ('done','error'):return json.loads(row['result'])
-        return {'requestId':key,'status':'processing','action':row['action']}
+        answer={'requestId':key,'status':'processing','action':row['action']}
+        try:progress=json.loads(row['result'] or '{}').get('progress')
+        except (ValueError,TypeError,AttributeError):progress=None
+        if isinstance(progress,dict) and type(progress.get('step')) is int and 1<=progress['step']<=7:answer['progress']=progress
+        return answer
 
     def upload(self,raw):
         image=decode_image(raw);data=render.image_bytes(image);hashed=hashlib.sha256(data).hexdigest()
@@ -186,20 +210,24 @@ class Engine:
         return download_image(value)
 
     def parse(self,data):
+        self.progress(data.get('requestId',''),1,'원본 청첩장 읽기','공개 링크의 행사 정보와 사진 목록을 읽고 있습니다.')
         if data['kind']=='memorial':
             import sys
             v,warnings_out=erp_memorial_invitation.extract(data['source'],lambda url:erp_memorial_invitation.fetch_source(url,sys.modules[__name__]))
+            self.progress(data.get('requestId',''),2,'행사 정보 추출','원본에서 확인한 항목을 정리하고 있습니다.')
             values=clean_values(v);return {'status':'done','values':values,'missing':missing('memorial',values),'warnings':warnings_out}
         # Reuse all five provider parsers. On incomplete/unsupported sources, return
         # only available fields; never drop the original URL or invent relationships.
         source=data['source'];warnings_out=[]
         try:
             event=self.legacy.parse_source(source,self.extract)
+            self.progress(data.get('requestId',''),2,'행사 정보 추출','원본에서 확인한 예식일·장소·혼주 정보를 정리하고 있습니다.')
             when=event.get('when');families=event.get('families') or []
             values={'name':event.get('name',''),'date':when.date().isoformat() if when else '', 'time':when.strftime('%H:%M') if when else '', 'venue':event.get('venue',''),'address':event.get('address',''),'sourceUrl':event.get('source',''),'greeting':event.get('greeting',''),'note':event.get('note',''),'host':event.get('signature','').removesuffix(' 올림'),'hostSide':event.get('host_side',''),'wreathRestriction':event.get('wreath_restriction') is True,'images':event.get('photos') or [],'hero':event.get('image','')}
             for side,family in zip(('groom','bride'),families):
                 values.update({side+'Parents':family[0],side+'Relation':family[1],side+'Name':family[2]})
         except (ValueError,OSError):
+            self.progress(data.get('requestId',''),2,'행사 정보 추출','확인된 원문에서 누락 항목을 보완하고 있습니다.')
             urls=list(dict.fromkeys(re.findall(r'https://[^\s<>"\]]+',source)))
             url=urls[0].rstrip(').,') if len(urls)==1 else ''
             text=source.replace(url,'') if url else source
@@ -213,7 +241,8 @@ class Engine:
         values=clean_values(values)
         if data['kind']=='wedding' and data.get('automatic') is True:
             import erp_invitation_auto
-            values,photo_warnings=erp_invitation_auto.select_photos(self,values)
+            self.progress(data.get('requestId',''),3,'커플 사진 4장 선별','중복·독사진·흑백 사진을 제외하고 있습니다.',completedPhotos=0)
+            values,photo_warnings=erp_invitation_auto.select_photos(self,values,progress=lambda done,total:self.progress(data.get('requestId',''),3,'커플 사진 4장 선별',f'{done}/{total}장 확인',completedPhotos=done))
             warnings_out.extend(photo_warnings)
         if data['kind']=='event' and not values['host']:
             labelled=re.search(r'(?:주최(?:\s*측)?|주관)\s*[:：]\s*([^\n.;。]{1,100})',source)
@@ -290,6 +319,7 @@ class Engine:
         if dt.datetime.now(render.SEOUL).date().isoformat()>expires:raise ValueError('공유 기간이 지난 행사입니다.')
         # Validate four source photos, face-safe crops and banner geometry before
         # making any checkout/product records. A failed photo must not create products.
+        self.progress(data.get('requestId',''),4,'액자·족자 제작','얼굴 보존 크롭과 세로 액자·배너 정렬을 계산하고 있습니다.')
         photos={key:self.image(v[key]) for key in IMAGE_FIELDS if v.get(key)}
         import erp_invitation_auto
         if kind=='wedding':
@@ -298,6 +328,7 @@ class Engine:
         else:
             image,boxes=render.composite(v,kind,photos)
             parts=erp_invitation_auto.components(render,v,kind,photos,image)
+        self.progress(data.get('requestId',''),5,'두 가격 주문서 생성','93,500원·99,000원 주문서를 준비하고 있습니다.')
         local=data.get('orderMode')=='invitation-checkout'
         local_key,items,snapshots=erp_local_checkout.build(self.checkout_root,self.origin,data) if local else ('',erp_manual_blogpay.products(v) if data.get('orderMode')=='blogpay-manual' else self.products(render.product_name(v,kind)),{})
         sample=render.image_bytes(image)
@@ -357,6 +388,7 @@ class Engine:
                         with self.db() as db:previous=db.execute("SELECT * FROM jobs WHERE id=? AND action='preview' AND state='done'",(data.get('previewRequestId'),)).fetchone()
                         if not previous or previous['invitation_id']!=data['invitationId'] or previous['version']!=data['version'] or json.loads(previous['result']).get('fingerprint')!=data.get('fingerprint') or result['fingerprint']!=data.get('fingerprint'):raise ValueError('상품 또는 사진이 변경됐습니다. 현재 버전을 다시 미리보기하세요.')
                         if not safe_https(self.origin):raise ValueError('고객용 공개 HTTPS 주소를 확인하세요.')
+                        self.progress(key,6,'초대장 발행','두 가격의 초대장·썸네일·주문 링크를 저장하고 있습니다.')
                         public=self.root/'public'/row['public_id'];public.mkdir(parents=True,exist_ok=True)
                         origin=self.origin+'/erp/i/'+row['public_id']
                         for name,raw in assets.items():
@@ -373,14 +405,19 @@ class Engine:
                         # Manifest is written last: incomplete pages cannot become public.
                         temp=public/'result.tmp';temp.write_text(json.dumps(result,ensure_ascii=False),encoding='utf-8');temp.replace(public/'result.json')
                         with self.db() as db:db.execute('INSERT INTO publications VALUES(?,?,?)',(publication_key,result['fingerprint'],json.dumps(result,ensure_ascii=False)))
-            result={**result,'requestId':key}
+            if action=='publish':
+                self.progress(key,7,'초대장 관리 등록','발행된 두 링크와 연결 상품을 관리 목록에 등록하고 있습니다.')
+                pending={'input':json.dumps(data,ensure_ascii=False),'result':json.dumps(result,ensure_ascii=False),'public_id':row['public_id'],'created_at':row['created_at']}
+                erp_invitation_library.register(self,self.checkout_root,pending=pending)
+            current=self.get(key) or {};progress=current.get('progress')
+            result={**result,'requestId':key,**({'progress':progress} if isinstance(progress,dict) else {})}
             with self.db() as db:db.execute('UPDATE jobs SET state=?,result=? WHERE id=?',('done',json.dumps(result,ensure_ascii=False),key))
-            if action=='publish':erp_invitation_library.register(self,self.checkout_root)
         except Exception as error:
             import traceback
             frames=[{'file':Path(f.filename).name,'line':f.lineno,'function':f.name} for f in traceback.extract_tb(error.__traceback__)[-6:]]
             print(json.dumps({'event':'ERP_INVITATION_FAILURE','requestId':key,'errorType':type(error).__name__,'frames':frames}),flush=True)
-            result={'requestId':key,'status':'error','error':str(error)[:500] if isinstance(error,ValueError) else '제작 서버 연결 또는 원본 자료를 확인해 주세요.'}
+            current=self.get(key) or {};progress=current.get('progress')
+            result={'requestId':key,'status':'error','error':str(error)[:500] if isinstance(error,ValueError) else '제작 서버 연결 또는 원본 자료를 확인해 주세요.',**({'progress':progress} if isinstance(progress,dict) else {})}
             with self.db() as db:db.execute('UPDATE jobs SET state=?,result=? WHERE id=?',('error',json.dumps(result,ensure_ascii=False),key))
         finally:
             with LOCK:self.active.discard(key)

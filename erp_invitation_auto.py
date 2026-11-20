@@ -36,8 +36,9 @@ def photo_check(image):
         while len(_VERDICTS)>128:_VERDICTS.popitem(last=False)
     return ok
 
-def select_photos(worker,values,checker=None):
+def select_photos(worker,values,checker=None,progress=None):
     checker=checker or photo_check;chosen=[];seen=[]
+    if progress:progress(0,4)
     for url in list(dict.fromkeys(values.get('images',[])))[:20]:
         try:
             image=normalized(worker.image(url));identity=visual_id(image)
@@ -49,6 +50,7 @@ def select_photos(worker,values,checker=None):
                 size=((371,550) if image.height>image.width else (550,371)) if len(chosen)==1 else wedding_photo_size('A3')
                 geometry.crop(image,size)
             chosen.append(url);seen.append(identity)
+            if progress:progress(len(chosen),4)
             if len(chosen)==4:break
         except (ValueError,OSError):continue
     if len(chosen)<4:
