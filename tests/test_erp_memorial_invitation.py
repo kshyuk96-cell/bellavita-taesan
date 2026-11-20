@@ -27,9 +27,10 @@ class Memorial(unittest.TestCase):
    v,_=memorial.extract(SOURCE);v['productPrefix']='가상상주 대표님 모친상';_,items,products=checkout_products.build(root,'https://example.org',{'kind':'memorial','invitationId':'memorial-test','version':1,'values':v})
    self.assertEqual(len(items),2);self.assertEqual([p['price'] for p in products.values()],[93500,99000]);self.assertIn('근조 문구',str(products));self.assertNotIn('결혼',str(products));self.assertNotIn('축하',str(products));self.assertEqual(products[93500]['kind'],'memorial')
    greeting=next(g for g in products[93500]['groups'] if g['label']=='근조 문구')
-   self.assertEqual(list(greeting['choices']),['0','1','2','3','4'])
+   self.assertEqual(list(greeting['choices']),['0','1','2','3','4','5','6'])
    self.assertTrue(greeting['choices']['0']['custom'])
-   self.assertEqual([greeting['choices'][str(i)]['label'] for i in range(1,5)],list(__import__('checkout').MEMORIAL_MESSAGES))
+   self.assertEqual([greeting['choices'][str(i)]['label'] for i in range(1,7)],list(__import__('checkout').MEMORIAL_MESSAGES))
+   self.assertEqual([g['label'] for g in products[93500]['groups']],['근조 문구','상품 선택'])
  def test_end_to_end_parse_banner_publish_and_memorial_checkout(self):
   import checkout
   from types import SimpleNamespace
@@ -55,6 +56,25 @@ class Memorial(unittest.TestCase):
   self.assertEqual(v['date'],'2099-01-02');self.assertEqual(v['time'],'09:30')
   with self.assertRaisesRegex(ValueError,'직접 입력'):memorial.product_title(v)
   v['productPrefix']='가상상주 대표님 모친상'
-  self.assertEqual(memorial.product_title(v),'가상상주 대표님 모친상 · 검증장례식장 특1호실')
+  self.assertEqual(memorial.product_title(v),'가상상주님 모친상 · 검증장례식장 특1호실')
   v['venue']+=' 특1호실'
   self.assertEqual(memorial.product_title(v).count('특1호실'),1)
+ def test_product_title_removes_roles_but_preserves_relationship_and_literal_name(self):
+  base={'venue':'검증장례식장','funeralRoom':'특1호실'}
+  cases=[
+   ({'host':'정명천 회장님','productPrefix':'정명천 회장님 모친상'},'정명천님 모친상 · 검증장례식장 특1호실'),
+   ({'host':'김상주','productPrefix':'김상주 상주님 빙모상'},'김상주님 빙모상 · 검증장례식장 특1호실'),
+   ({'host':'','productPrefix':'가상상주 대표이사 장인상'},'가상상주님 장인상 · 검증장례식장 특1호실'),
+  ]
+  for values,expected in cases:
+   with self.subTest(values=values):self.assertEqual(memorial.product_title({**base,**values}),expected)
+  with self.assertRaisesRegex(ValueError,'상주 이름'):
+   memorial.product_title({**base,'host':'회장님','productPrefix':'회장님 모친상'})
+ def test_canonical_product_title_upgrades_old_snapshot_without_touching_obituary_title(self):
+  self.assertEqual(
+   memorial.canonical_product_title('정명천 회장님 모친상 · 검증장례식장 특11호실'),
+   '정명천님 모친상 · 검증장례식장 특11호실')
+  self.assertEqual(
+   memorial.canonical_product_title('김상주 상주님 빙모상 · 검증장례식장'),
+   '김상주님 빙모상 · 검증장례식장')
+  self.assertEqual(memorial.canonical_product_title('故 오금순 부고'),'故 오금순 부고')

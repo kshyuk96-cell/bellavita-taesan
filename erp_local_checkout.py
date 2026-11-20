@@ -27,11 +27,13 @@ def build(root,origin,data):
     if g['label']=='받으시는 분':g['choices']={'1':{'label':('故 '+v['deceasedName']) if data['kind']=='memorial' else v['name'],'amount':0,'custom':False}}
     if g['label']=='축하 문구':g['choices']=checkout.memorial_choices() if data['kind']=='memorial' else {'0':{'label':'직접 입력','amount':0,'custom':True},'1':{'label':'행사 개최를 진심으로 축하드립니다.','amount':0,'custom':False}}
   if data['kind']=='memorial':
+   groups=[g for g in groups if g['label']!='받으시는 분']
    for g in groups:
     if g['label']=='축하 문구':g['label']='근조 문구'
   number=str(int(hashlib.sha256((key+':'+str(price)).encode()).hexdigest()[:15],16))
   when=dt.datetime.fromisoformat(v['date']+'T'+v['time']).replace(tzinfo=dt.timezone(dt.timedelta(hours=9)))
   snapshots[price]={'number':number,'title':product_title(v) if data['kind']=='memorial' else v['name'],'price':price,'images':original.get('images',[]),'groups':groups,'date':v['date'],'clock':v['time'],'venue':v['venue'],'address':v['address'],'source':v.get('sourceUrl',''),'event_time':when.isoformat(),'localCheckout':True,'kind':data['kind']}
+  if data['kind']=='memorial':snapshots[price]['funeralRoom']=v.get('funeralRoom','')
   items.append({'price':price,'productId':number,'orderUrl':origin+f'/i/{key}/{price}/order','verified':True,'source':'own-checkout'})
  return key,items,snapshots
 

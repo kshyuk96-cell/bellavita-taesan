@@ -36,6 +36,7 @@ ARTWORK_PATHS = {
     'rice-30kg.webp': ARTWORK / 'rice-30kg.webp',
     'memorial-easel-base.webp': MEMORIAL_ARTWORK / 'memorial-easel-base.webp',
     'memorial-frame-right.jpg': MEMORIAL_ARTWORK / 'memorial-frame-right.jpg',
+    'memorial-rice-qr.svg': MEMORIAL_ARTWORK / 'memorial-rice-qr.svg',
     'hy-gungseo.ttf': SCROLL_ARTWORK / 'hy-gungseo.ttf',
 }
 ARTWORK_FILES = frozenset(ARTWORK_PATHS)
@@ -44,7 +45,22 @@ MEMORIAL_MESSAGES = (
     '하늘의 별이 되신 고인을 추모하며 유가족분들께 깊은 위로의 마음을 전합니다',
     '주님 품 안에서 고인께 영원한 안식과 평안 있으시길 마음 모아 기도 드립니다',
     '고인께서 주님 안에 평안하시고 주님의 위로가 유가족분들께 함께하시길 기도 드립니다',
+    '삼가 고인의 명복을 빕니다.',
+    '삼가 故人의 冥福을 빕니다.',
 )
+PRODUCT_DETAIL_SECTION = '''<section>
+<button class="detail-open" type="button" id="open-detail">상세설명 보기</button>
+</section>'''
+PRODUCT_DETAIL_DIALOG = '''<dialog class="product-detail" id="product-detail" aria-labelledby="detail-title">
+<div class="detail-head"><h2 id="detail-title">상품 설명</h2><form method="dialog"><button>닫기</button></form></div>
+<div class="detail-content">
+<p><strong>쌀(쌀빛그림)화환 관련</strong></p>
+<p>신청해주신 쌀빛그림화환은 친환경 웨딩갤러리를 만들기 위해 액자를 설치하고<br>예식 후 쌀로 교환하여 혼주님께 드리거나 필요한 시설에 기부합니다.</p>
+<p>필요한 웨딩액자나 작품액자는 준비된 액자를 사용하니<br>전화나 문자를 이용하시거나 주문시스템에서 시청하시면 됩니다.</p>
+<p>문의 전화 031-8067-8580</p>
+<img src="https://bellavita1004.blogpay.io/img/editor/bellavita1004/temp/0524251001759278768.jpg" alt="쌀빛그림화환 상세 안내" loading="lazy">
+</div>
+</dialog>'''
 PAYAPP_FIELDS = ('USER_ID', 'LINK_KEY', 'LINK_VALUE', 'REQUEST_KEY')
 
 
@@ -53,11 +69,12 @@ def artwork_path(filename):
 
 
 def artwork_mime(filename):
-    return {'jpg': 'image/jpeg', 'ttf': 'font/ttf'}.get(filename.rsplit('.', 1)[-1], 'image/webp')
+    return {'jpg': 'image/jpeg', 'svg': 'image/svg+xml', 'ttf': 'font/ttf'}.get(
+        filename.rsplit('.', 1)[-1], 'image/webp')
 
 
 def memorial_choices():
-    """Four approved ERP condolence texts and the shared custom option."""
+    """Approved ERP condolence texts and the shared custom option."""
     return {'0': {'label': '직접 입력', 'amount': 0, 'custom': True}, **{
         str(index): {'label': message, 'amount': 0, 'custom': False}
         for index, message in enumerate(MEMORIAL_MESSAGES, 1)
@@ -68,11 +85,38 @@ def apply_memorial_rules(product):
     """Apply current memorial choices on read, including already-published links."""
     if product.get('kind') != 'memorial':
         return product
-    for group in product.get('groups', []):
+    from erp_memorial_invitation import canonical_product_title
+    product['title'] = canonical_product_title(product.get('title'))
+    # The deceased/mourner is fixed by the published obituary product.  It is
+    # not a customer choice, so old snapshots must lose the legacy required
+    # select at read time as well as newly published products.
+    product['groups'] = [
+        group for group in product.get('groups', [])
+        if group.get('label') != '받으시는 분'
+    ]
+    for group in product['groups']:
         if group.get('label') in ('축하 문구', '근조 문구'):
             group['label'] = '근조 문구'
             group['choices'] = memorial_choices()
     return product
+
+
+def installation_venue(product):
+    """Return the visible venue, adding a memorial room when snapshots omit it."""
+    venue = str(product.get('venue') or '').strip()
+    if product.get('kind') != 'memorial':
+        return venue
+    room = str(product.get('funeralRoom') or '').strip()
+    if not room:
+        # Older immutable checkout snapshots kept the room only in the title:
+        # "... · 장례식장 특1호실".  Recover only the suffix after the exact
+        # venue, so unrelated words in a product name are never shown as a room.
+        suffix = str(product.get('title') or '').rpartition('·')[2].strip()
+        if venue and suffix.startswith(venue):
+            room = suffix[len(venue):].strip()
+    if room and room not in venue:
+        return ' '.join(filter(None, (venue, room)))
+    return venue
 
 
 def enabled():
@@ -171,11 +215,12 @@ def read(root, job, price):
             if not re.fullmatch(r'[a-f0-9]{32}',publication):return None
             manifest=Path(os.getenv('ERP_INVITATION_DATA') or root)/'erp-invitations'/'public'/publication/'result.json'
             if not manifest.is_file() or json.loads(manifest.read_text()).get('fingerprint')!=product.get('releaseFingerprint'):return None
-        apply_memorial_rules(product)
         product['_libraryKey']=job
         product['_libraryRoot']=str(root)
         import erp_invitation_product_edits
-        return erp_invitation_product_edits.apply(root,job,price,product)
+        # Apply current public memorial rules after the editable text overlay,
+        # so an old stored title or legacy recipient choice cannot reappear.
+        return apply_memorial_rules(erp_invitation_product_edits.apply(root,job,price,product))
     except FileNotFoundError:
         return None
 
@@ -303,6 +348,7 @@ def admin_page(orders, action):
 
 def render(product, action, can_pay):
     escaped = {key: escape(str(product[key])) for key in ('title', 'date', 'clock', 'venue', 'address')}
+    escaped['venue'] = escape(installation_venue(product))
     groups = []
     for index, group in enumerate(product['groups']):
         options = ['<option value="">선택해 주세요</option>']
@@ -332,6 +378,8 @@ def render(product, action, can_pay):
             <img class="wreath-base" src="{escape(memorial['base'])}" alt="근조 쌀빛그림화환">
             <img class="memorial-frame-photo" src="{escape(memorial['frame'])}" alt="44번 설악산 울산바위 은하수 작품 액자">
             <div class="scroll-paper memorial-scroll-paper">
+              <p class="memorial-rice-notice"><span>설치 액자 또는 쌀을 받으시거나, 상주님 명의로 쌀을 기부하실 수 있습니다.</span><span>우측 QR로 정보 전달 부탁드리며 발인 후 5일까지 회신 없으시면 쌀을 기부처리합니다.</span></p>
+              <a class="memorial-rice-qr" href="https://form.jotform.com/251220921797458" target="_blank" rel="noopener noreferrer" aria-label="쌀빛 수령 안내 정보 입력"><img src="/checkout-art/memorial-rice-qr.svg" alt=""></a>
               <div class="memorial-rice-mark"><img class="scroll-weight" id="scroll-weight" src="/checkout-art/rice-10kg.webp" alt="쌀 10kg"></div>
               <p class="scroll-greeting" id="scroll-greeting"></p>
               <div class="scroll-sender" id="scroll-sender"></div>
@@ -357,18 +405,17 @@ def render(product, action, can_pay):
         </figure><div class="gallery" id="wreath-fallback" role="group" aria-label="상품 사진" tabindex="0" hidden>{pictures}</div>'''
     else:
         pictures = f'<div class="gallery" role="group" aria-label="상품 사진" tabindex="0">{pictures}</div>'
+    memorial_checkout = product.get('kind') == 'memorial'
     page=Template(TEMPLATE.read_text(encoding='utf-8')).substitute(
         escaped, action=escape(action), groups=''.join(groups), pictures=pictures,
         base=str(product['price']), base_display=f'{product["price"]:,}',
         attempt=secrets.token_hex(16),
         button_state='' if can_pay else 'disabled', can_submit='true' if can_pay else 'false',
+        detail_section='' if memorial_checkout else PRODUCT_DETAIL_SECTION,
+        detail_dialog='' if memorial_checkout else PRODUCT_DETAIL_DIALOG,
         notice=('<p class="hint order-notice" style="white-space:pre-line">'+escape(str(product['orderNotice']))+'</p>' if product.get('orderNotice') else '')+('' if can_pay else '<p class="hint">현재 결제를 이용할 수 없습니다. 문의 031-8067-8580</p>'))
-    if product.get('kind')=='memorial':
+    if memorial_checkout:
         page=page.replace('웨딩액자','액자').replace('축하 문구','근조 문구').replace('신청해주신 쌀빛그림화환은 친환경 웨딩갤러리를 만들기 위해 액자를 설치하고<br>예식 후 쌀로 교환하여 혼주님께 드리거나 필요한 시설에 기부합니다.','조문의 마음을 전하는 쌀빛그림화환입니다.<br>선택한 상품과 빈소 정보를 확인해 주세요.')
-        if product.get('images'):
-            detail=('<div class="memorial-detail-sample"><img src="'+escape(product['images'][0])+
-                    '" alt="근조 쌀빛그림화환 설치 예시" loading="lazy"></div>')
-            page=re.sub(r'<img src="https://bellavita1004\.blogpay\.io/img/editor/[^"]+" alt="쌀빛그림화환 상세 안내" loading="lazy">',detail,page)
     return page
 
 
@@ -398,7 +445,7 @@ def normalize_order(product, fields):
     return {'product': product['number'], 'title': product['title'], 'options': selected,
             'sender': sender, 'message': value('message', 200) if custom else '',
             'buyer': buyer, 'buyer_phone': buyer_phone,
-            'venue': product['venue'], 'address': product['address'],
+            'venue': installation_venue(product), 'address': product['address'],
             'event_time': product['event_time'], 'amount': amount, 'source': product.get('source', '')}
 
 

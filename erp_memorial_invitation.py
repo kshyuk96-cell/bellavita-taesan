@@ -9,6 +9,8 @@ from PIL import Image,ImageDraw
 
 FIELDS={'productPrefix':100,'deceasedName':80,'mourners':800,'departure':100,'admission':100,'funeralRoom':120,'burial':200,'contactPhone':30,'deceasedDescription':160,'deathDate':100,'funeralPhone':30,'portrait':1000,'entrance':100,'originalNotice':700}
 MOURNER_ROLE_WORDS=frozenset({'상주','대표이사','대표','회장','사장','이사장','원장','목사','고객'})
+MOURNING_RELATION_WORDS=('외조모상','외조부상','배우자상','장모상','장인상','빙모상','빙부상','모친상','부친상','조모상','조부상','자녀상','부군상','형제상','자매상','아들상','딸상')
+MOURNING_RELATION_RE=re.compile(r'('+'|'.join(map(re.escape,MOURNING_RELATION_WORDS))+r')\s*$')
 
 def fetch_source(url,bridge,method='GET',data=None):
  from urllib.parse import urlencode
@@ -33,7 +35,7 @@ def fetch_source(url,bridge,method='GET',data=None):
 def normalize_mourner_name(value):
  from unicodedata import normalize
  text=normalize('NFKC',str(value or '')).strip()
- text=re.sub(r'\s*(?:모친상|부친상|배우자상|조모상|조부상|빙모상|빙부상|장모상|장인상|자녀상|별세|부고)\s*$','',text)
+ text=re.sub(r'\s*(?:'+'|'.join(map(re.escape,MOURNING_RELATION_WORDS))+r'|별세|부고)\s*$','',text)
  text=re.sub(r'\s*님\s*$','',text).strip()
  roles=r'(?:상주|대표이사|대표|회장|사장|이사장|원장|목사|고객)(?:님)?|님'
  for _ in range(3):
@@ -190,14 +192,36 @@ def extract(source,fetcher=None,target_mourner='',account_fetcher=None):
  return values,warnings
 
 def product_title(values):
- """Only staff-supplied prefix; venue and room are the automatic suffix."""
+ """Canonical public title: mourner name + 님, relationship, venue and room."""
  prefix=values.get('productPrefix','').strip()
- if not prefix:raise ValueError('상품명 앞부분을 직접 입력하세요. 예: 홍길동 대표님 모친상')
+ if not prefix:raise ValueError('상품명 앞부분을 직접 입력하세요. 예: 홍길동 모친상')
+ # A title such as "정명천 회장님 모친상" is staff-facing source data.
+ # Public product names must not expose the job title: "정명천님 모친상".
+ # Prefer the explicitly selected customer mourner, but safely fall back to the
+ # prefix for older records that predate a separate host field.
+ mourner=normalize_mourner_name(values.get('host')) or normalize_mourner_name(prefix)
+ if not mourner:raise ValueError('상품명에 넣을 상주 이름을 확인하세요.')
+ relation=MOURNING_RELATION_RE.search(prefix)
+ customer=mourner+'님'+((' '+relation.group(1)) if relation else '')
  venue=values.get('venue','').strip();room=values.get('funeralRoom','').strip()
  if not venue:raise ValueError('상품명에 넣을 장례식장을 확인하세요.')
  compact=lambda s:re.sub(r'\s+','',s)
  suffix=venue if not room or compact(room) in compact(venue) else venue+' '+room
- return prefix+' · '+suffix
+ return customer+' · '+suffix
+
+
+def canonical_product_title(value):
+ """Upgrade an already-published memorial title to the public name format."""
+ title=str(value or '').strip()
+ prefix,separator,suffix=title.partition('·')
+ relation=MOURNING_RELATION_RE.search(prefix.strip())
+ # Only canonicalize the staff-entered customer-prefix form.  Obituary page
+ # titles such as "故 오금순 부고" are deliberately left alone.
+ if not relation:return title
+ mourner=normalize_mourner_name(prefix)
+ if not mourner:return title
+ canonical=mourner+'님 '+relation.group(1)
+ return canonical+((" · "+suffix.strip()) if separator and suffix.strip() else '')
 
 
 def banner(renderer,v):
