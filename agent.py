@@ -1428,9 +1428,9 @@ class Handler(BaseHTTPRequestHandler):
         if report:
             return self.send_route_report(path, report[1], report[2])
         if path.startswith('/checkout-art/') and (filename := path.removeprefix('/checkout-art/')) in checkout.ARTWORK_FILES:
-            data = (checkout.ARTWORK / filename).read_bytes()
+            data = checkout.artwork_path(filename).read_bytes()
             self.send_response(200)
-            self.send_header('Content-Type', 'image/webp')
+            self.send_header('Content-Type', checkout.artwork_mime(filename))
             self.send_header('Cache-Control', 'public, max-age=3600')
             self.send_header('Content-Length', str(len(data)))
             self.end_headers()

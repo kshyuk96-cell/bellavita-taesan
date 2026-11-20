@@ -26,6 +26,10 @@ class Memorial(unittest.TestCase):
    for price in checkout_products.PRICES:(folder/f'{price}.order.json').write_text(json.dumps(baseline))
    v,_=memorial.extract(SOURCE);v['productPrefix']='가상상주 대표님 모친상';_,items,products=checkout_products.build(root,'https://example.org',{'kind':'memorial','invitationId':'memorial-test','version':1,'values':v})
    self.assertEqual(len(items),2);self.assertEqual([p['price'] for p in products.values()],[93500,99000]);self.assertIn('근조 문구',str(products));self.assertNotIn('결혼',str(products));self.assertNotIn('축하',str(products));self.assertEqual(products[93500]['kind'],'memorial')
+   greeting=next(g for g in products[93500]['groups'] if g['label']=='근조 문구')
+   self.assertEqual(list(greeting['choices']),['0','1','2','3','4'])
+   self.assertTrue(greeting['choices']['0']['custom'])
+   self.assertEqual([greeting['choices'][str(i)]['label'] for i in range(1,5)],list(__import__('checkout').MEMORIAL_MESSAGES))
  def test_end_to_end_parse_banner_publish_and_memorial_checkout(self):
   import checkout
   from types import SimpleNamespace

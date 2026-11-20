@@ -60,6 +60,16 @@ class MemorialPageTests(unittest.TestCase):
         # Kept exactly once for the approved real two-product banner wrapper.
         self.assertEqual(len(re.findall(r'<section class="products">.*?</section>', output, re.S)), 1)
 
+    def test_browser_and_kakao_title_use_deceased_name_with_courtesy_suffix(self):
+        values = self.values()
+        values['name'] = '오래 저장된 다른 제목'
+        tree = html.fromstring(self.render(values))
+        self.assertEqual(tree.xpath('//title/text()'), ['故 가상고인님 부고'])
+        self.assertEqual(tree.xpath('//meta[@property="og:title"]/@content'), ['故 가상고인님 부고'])
+        values['deceasedName'] = '故 가상고인님'
+        tree = html.fromstring(self.render(values))
+        self.assertEqual(tree.xpath('//meta[@property="og:title"]/@content'), ['故 가상고인님 부고'])
+
     def test_accounts_fail_closed_without_target_or_when_target_account_ambiguous(self):
         values = self.values()
         values['host'] = ''

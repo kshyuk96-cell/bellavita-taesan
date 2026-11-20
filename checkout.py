@@ -26,9 +26,53 @@ RECEIPT_PATH = re.compile(r'/invitation-orders/([a-f0-9]{32})/receipt')
 ADMIN_PATH = re.compile(r'/invitation-orders/admin/([0-9]{10})/([a-f0-9]{64})')
 TEMPLATE = Path(__file__).with_name('checkout.html')
 ARTWORK = Path(__file__).with_name('assets') / 'checkout'
-ARTWORK_FILES = frozenset({'sunflower-easel.webp', 'scroll-paper.webp',
-                           'rice-10kg.webp', 'rice-20kg.webp', 'rice-30kg.webp'})
+MEMORIAL_ARTWORK = Path(__file__).with_name('erp_invitation_assets')
+SCROLL_ARTWORK = Path(__file__).with_name('wedding_scroll') / 'assets'
+ARTWORK_PATHS = {
+    'sunflower-easel.webp': ARTWORK / 'sunflower-easel.webp',
+    'scroll-paper.webp': ARTWORK / 'scroll-paper.webp',
+    'rice-10kg.webp': ARTWORK / 'rice-10kg.webp',
+    'rice-20kg.webp': ARTWORK / 'rice-20kg.webp',
+    'rice-30kg.webp': ARTWORK / 'rice-30kg.webp',
+    'memorial-easel-base.webp': MEMORIAL_ARTWORK / 'memorial-easel-base.webp',
+    'memorial-frame-right.jpg': MEMORIAL_ARTWORK / 'memorial-frame-right.jpg',
+    'hy-gungseo.ttf': SCROLL_ARTWORK / 'hy-gungseo.ttf',
+}
+ARTWORK_FILES = frozenset(ARTWORK_PATHS)
+MEMORIAL_MESSAGES = (
+    '하늘의 별이 되신 고인을 추모하며 삼가 고인의 영전 앞에 깊은 애도의 마음을 전합니다',
+    '하늘의 별이 되신 고인을 추모하며 유가족분들께 깊은 위로의 마음을 전합니다',
+    '주님 품 안에서 고인께 영원한 안식과 평안 있으시길 마음 모아 기도 드립니다',
+    '고인께서 주님 안에 평안하시고 주님의 위로가 유가족분들께 함께하시길 기도 드립니다',
+)
 PAYAPP_FIELDS = ('USER_ID', 'LINK_KEY', 'LINK_VALUE', 'REQUEST_KEY')
+
+
+def artwork_path(filename):
+    return ARTWORK_PATHS.get(filename)
+
+
+def artwork_mime(filename):
+    return {'jpg': 'image/jpeg', 'ttf': 'font/ttf'}.get(filename.rsplit('.', 1)[-1], 'image/webp')
+
+
+def memorial_choices():
+    """Four approved ERP condolence texts and the shared custom option."""
+    return {'0': {'label': '직접 입력', 'amount': 0, 'custom': True}, **{
+        str(index): {'label': message, 'amount': 0, 'custom': False}
+        for index, message in enumerate(MEMORIAL_MESSAGES, 1)
+    }}
+
+
+def apply_memorial_rules(product):
+    """Apply current memorial choices on read, including already-published links."""
+    if product.get('kind') != 'memorial':
+        return product
+    for group in product.get('groups', []):
+        if group.get('label') in ('축하 문구', '근조 문구'):
+            group['label'] = '근조 문구'
+            group['choices'] = memorial_choices()
+    return product
 
 
 def enabled():
@@ -127,6 +171,7 @@ def read(root, job, price):
             if not re.fullmatch(r'[a-f0-9]{32}',publication):return None
             manifest=Path(os.getenv('ERP_INVITATION_DATA') or root)/'erp-invitations'/'public'/publication/'result.json'
             if not manifest.is_file() or json.loads(manifest.read_text()).get('fingerprint')!=product.get('releaseFingerprint'):return None
+        apply_memorial_rules(product)
         product['_libraryKey']=job
         product['_libraryRoot']=str(root)
         import erp_invitation_product_edits
@@ -169,6 +214,19 @@ def wedding_preview(product):
     if type(crop) in (int, float) and 0 <= crop <= 100:
         return {'url': photo, 'position': float(crop)}
     return {'url': photo, 'position': None}
+
+
+def memorial_preview(product):
+    if product.get('kind') != 'memorial':
+        return None
+    publication = product.get('publicationId', '')
+    if product.get('localCheckout') is not True or not re.fullmatch(r'[a-f0-9]{32}', publication):
+        return None
+    return {
+        'sample': product.get('images', [''])[0] if product.get('images') else '',
+        'base': '/checkout-art/memorial-easel-base.webp',
+        'frame': '/checkout-art/memorial-frame-right.jpg',
+    }
 
 
 def wedding_image(preview, *, review=False):
@@ -265,7 +323,24 @@ def render(product, action, can_pay):
                        + (' loading="lazy"' if index else '') + '>'
                        for index, src in enumerate(product['images']))
     preview = wedding_preview(product)
-    if preview:
+    memorial = memorial_preview(product)
+    if memorial:
+        fallback = pictures
+        pictures = f'''<figure class="wreath-preview memorial-preview" id="wreath-preview" data-preview-kind="memorial">
+          <div class="wreath-viewport">
+          <div class="wreath-stage">
+            <img class="wreath-base" src="{escape(memorial['base'])}" alt="근조 쌀빛그림화환">
+            <img class="memorial-frame-photo" src="{escape(memorial['frame'])}" alt="44번 설악산 울산바위 은하수 작품 액자">
+            <div class="scroll-paper memorial-scroll-paper">
+              <div class="memorial-rice-mark"><img class="scroll-weight" id="scroll-weight" src="/checkout-art/rice-10kg.webp" alt="쌀 10kg"><span id="scroll-weight-label">쌀 <strong>10</strong><small>kg</small></span></div>
+              <p class="scroll-greeting" id="scroll-greeting"></p>
+              <div class="scroll-sender" id="scroll-sender"></div>
+            </div>
+          </div>
+          </div>
+          <figcaption>근조 쌀빛그림화환 설치 예시입니다.<br>선택 내용이 바로 반영됩니다.</figcaption>
+        </figure><div class="gallery" id="wreath-fallback" role="group" aria-label="근조 쌀빛그림화환 상품 사진" tabindex="0" hidden>{fallback}</div>'''
+    elif preview:
         pictures = f'''<figure class="wreath-preview" id="wreath-preview">
           <div class="wreath-viewport">
           <div class="wreath-stage">
@@ -291,7 +366,9 @@ def render(product, action, can_pay):
     if product.get('kind')=='memorial':
         page=page.replace('웨딩액자','액자').replace('축하 문구','근조 문구').replace('신청해주신 쌀빛그림화환은 친환경 웨딩갤러리를 만들기 위해 액자를 설치하고<br>예식 후 쌀로 교환하여 혼주님께 드리거나 필요한 시설에 기부합니다.','조문의 마음을 전하는 쌀빛그림화환입니다.<br>선택한 상품과 빈소 정보를 확인해 주세요.')
         if product.get('images'):
-            page=re.sub(r'<img src="https://bellavita1004\.blogpay\.io/img/editor/[^"]+" alt="쌀빛그림화환 상세 안내" loading="lazy">','<img src="'+escape(product['images'][0])+'" alt="쌀빛그림화환 안내" loading="lazy">',page)
+            detail=('<div class="memorial-detail-sample"><img src="'+escape(product['images'][0])+
+                    '" alt="근조 쌀빛그림화환 설치 예시" loading="lazy"></div>')
+            page=re.sub(r'<img src="https://bellavita1004\.blogpay\.io/img/editor/[^"]+" alt="쌀빛그림화환 상세 안내" loading="lazy">',detail,page)
     return page
 
 

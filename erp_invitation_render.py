@@ -124,7 +124,35 @@ def data_image(raw,mime='image/webp'):
     return 'data:'+mime+';base64,'+base64.b64encode(raw).decode()
 
 
+def memorial_thumbnail_lines(values):
+    import re
+    from erp_memorial_invitation import normalize_mourner_name
+    prefix = str(values.get('productPrefix') or '').strip()
+    customer = normalize_mourner_name(values.get('host') or prefix)
+    relationships = (
+        ('외조모상', '외조모'), ('외조부상', '외조부'), ('장인상', '장인'), ('장모상', '장모'),
+        ('빙부상', '장인'), ('빙모상', '장모'), ('시부상', '시부'), ('시모상', '시모'),
+        ('배우자상', '배우자'), ('부군상', '부군'), ('조모상', '조모'), ('조부상', '조부'),
+        ('모친상', '모친'), ('부친상', '부친'), ('형제상', '형제'), ('자매상', '자매'),
+    )
+    relationship = next((label for suffix, label in relationships if suffix in prefix), '가족')
+    deceased = re.sub(r'^(?:故\s*)', '', str(values.get('deceasedName') or '').strip())
+    deceased = re.sub(r'님$', '', deceased).strip()
+    raw_date = str(values.get('deathDate') or '')
+    match = re.search(r'((?:19|20)\d{2})\D{0,4}(\d{1,2})\D{0,4}(\d{1,2})', raw_date)
+    death = (f'{int(match[1])}년 {int(match[2])}월 {int(match[3])}일 별세 하셨음을'
+             if match else '별세 하셨음을')
+    return [f'{customer or "대표"} 상주의 {relationship}',
+            f'故 {deceased or "고인"}님께서', death, '삼가 알려드립니다.']
+
+
 def thumbnail(v,kind):
+    if kind == 'memorial':
+        canvas=Image.new('RGB',(1200,630),'#eee6d7');draw=ImageDraw.Draw(canvas)
+        draw.rectangle((56,39,1144,591),fill='#fffdf7',outline='#e3d4bb',width=2)
+        fit_text(canvas,'\n'.join(memorial_thumbnail_lines(v)),(82,95,1118,545),64,
+                 fill='#24271f',bold=False,max_lines=4)
+        return image_bytes(canvas,'JPEG')
     if kind=='wedding':
         canvas=Image.new('RGB',(1200,630),'#eee7d7');draw=ImageDraw.Draw(canvas)
         draw.rectangle((55,43,1145,588),fill='#fffdf7',outline='#e3d4bb',width=2)

@@ -6,6 +6,7 @@ import json
 import os
 import re
 import secrets
+import checkout
 from erp_memorial_invitation import product_title
 from pathlib import Path
 
@@ -24,7 +25,7 @@ def build(root,origin,data):
   if data['kind'] in ('event','memorial'):
    for g in groups:
     if g['label']=='받으시는 분':g['choices']={'1':{'label':('故 '+v['deceasedName']) if data['kind']=='memorial' else v['name'],'amount':0,'custom':False}}
-    if g['label']=='축하 문구':g['choices']={'0':{'label':'직접 입력','amount':0,'custom':True},'1':{'label':'삼가 고인의 명복을 빕니다.' if data['kind']=='memorial' else '행사 개최를 진심으로 축하드립니다.','amount':0,'custom':False}}
+    if g['label']=='축하 문구':g['choices']=checkout.memorial_choices() if data['kind']=='memorial' else {'0':{'label':'직접 입력','amount':0,'custom':True},'1':{'label':'행사 개최를 진심으로 축하드립니다.','amount':0,'custom':False}}
   if data['kind']=='memorial':
    for g in groups:
     if g['label']=='축하 문구':g['label']='근조 문구'

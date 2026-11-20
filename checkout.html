@@ -14,6 +14,11 @@
   src: local('SeoulHangangC BL'), local('서울한강 장체 BL');
   font-weight: 900;
 }
+@font-face {
+  font-family: 'Bellavita Memorial';
+  src: url('/checkout-art/hy-gungseo.ttf') format('truetype');
+  font-display: swap;
+}
 :root {
   color-scheme: light;
   --canvas: #f5f2ea;
@@ -93,6 +98,34 @@ section {
 .scroll-greeting > span, .scroll-sender > span { display: block; flex: 0 0 auto; white-space: nowrap; }
 .scroll-greeting { contain: size layout paint; -webkit-text-size-adjust: none; text-size-adjust: none; }
 .scroll-greeting, .scroll-sender { font-family: 'Bellavita Scroll', var(--heading); font-weight: 900; letter-spacing: -.045em; }
+.memorial-preview .wreath-viewport { aspect-ratio: 716 / 1100; }
+.memorial-preview .wreath-stage { transform-origin: 51.4% 65%; }
+.memorial-preview .memorial-frame-photo { position: absolute; left: 12.8%; top: 2.6%; width: 76.5%; height: 33.3%; object-fit: cover; }
+.memorial-preview .memorial-scroll-paper {
+  inset: 46.364% auto auto 31.859%;
+  width: 39.079%;
+  height: 35.612%;
+  border: 1px solid #a18a55;
+  background:
+    radial-gradient(circle at 18% 18%, rgb(255 255 255 / .45) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 76% 28%, rgb(255 255 255 / .35) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 35% 72%, rgb(255 255 255 / .25) 0 1px, transparent 1.5px),
+    linear-gradient(160deg, #111827 0%, #030712 54%, #121827 100%);
+  background-size: 43px 49px, 61px 57px, 53px 67px, 100% 100%;
+  box-shadow: inset 0 0 0 2px rgb(214 184 112 / .22), inset 0 0 24px #000;
+  color: #fff5df;
+  font-family: 'Bellavita Memorial', var(--heading);
+}
+.memorial-preview .memorial-scroll-paper::after { content: ''; position: absolute; left: 7%; right: 7%; top: 60.5%; border-top: 1px solid rgb(226 197 126 / .72); }
+.memorial-rice-mark { position: absolute; left: 29%; top: 3%; width: 42%; height: 25%; }
+.memorial-rice-mark .scroll-weight { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; filter: sepia(1) saturate(.9) brightness(1.5); }
+.memorial-rice-mark span { position: absolute; inset: 24% 22% 16%; display: flex; align-items: baseline; justify-content: center; gap: 1px; color: #f1d7a0; font: 700 6.2cqw/1 var(--heading); white-space: nowrap; }
+.memorial-rice-mark strong { font-size: 2em; line-height: .8; }
+.memorial-rice-mark small { font-size: .9em; }
+.memorial-preview .scroll-greeting { inset: 30% 6% 42%; color: #fff5df; font-family: 'Bellavita Memorial', var(--heading); font-size: 5.1cqw; font-weight: 400; line-height: 1.3; letter-spacing: -.025em; }
+.memorial-preview .scroll-sender { inset: 64.5% 5% 5%; color: #fff5df; font-family: 'Bellavita Memorial', var(--heading); font-weight: 400; letter-spacing: -.025em; }
+.memorial-detail-sample { width: 100%; overflow: hidden; background: var(--canvas); }
+#product-detail .memorial-detail-sample img { width: 200%; max-width: none; transform: translateX(-50%); }
 .wreath-preview figcaption { margin: 8px 0 0; color: var(--muted); text-align: center; font-size: .94rem; }
 .mobile-preview, .mobile-choice { display: none; }
 .detail-open { background: var(--paper); border: 1px solid #83715d; color: #64503d; }
@@ -148,6 +181,7 @@ summary { cursor: pointer; }
   .product { grid-template-columns: minmax(0, 1fr); gap: 18px; }
   .wreath-preview .wreath-viewport { width: min(100%, 245px); }
   .wreath-preview.is-close-up .wreath-stage { transform: none; }
+  .memorial-preview.is-close-up .wreath-stage { transform: scale(2.1); }
   .scroll-greeting { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .scroll-greeting > svg { display: block; flex: none; width: 100%; height: 100%; overflow: hidden; fill: currentColor; }
   .mobile-preview:not([hidden]) {
@@ -263,16 +297,20 @@ const greetingChoice = document.getElementById('greeting-choice');
 const scrollGreeting = document.getElementById('scroll-greeting');
 const scrollSender = document.getElementById('scroll-sender');
 const scrollWeight = document.getElementById('scroll-weight');
+const scrollWeightLabel = document.getElementById('scroll-weight-label');
 const detail = document.getElementById('product-detail');
 const mobile = matchMedia('(max-width: 670px)');
 const mobilePreview = document.getElementById('mobile-preview');
 const mobileMessage = document.getElementById('mobile-example-message');
+const memorialPreview = wreath?.dataset.previewKind === 'memorial';
+let resetCloseUp = () => {};
+let showCloseUp = () => {};
 document.getElementById('open-detail').addEventListener('click', () => detail.showModal());
 if (wreath) {
-  const couple = wreath.querySelector('.scroll-couple');
+  const primaryVisual = wreath.querySelector(memorialPreview ? '.memorial-frame-photo' : '.scroll-couple');
   const productChoice = choices.find(select => select.querySelector('option[data-kg]'));
   let closeUpTimer;
-  const resetCloseUp = () => {
+  resetCloseUp = () => {
     clearTimeout(closeUpTimer);
     wreath.classList.remove('is-close-up');
   };
@@ -282,16 +320,16 @@ if (wreath) {
     mobilePreview.hidden = true;
     document.getElementById('wreath-fallback').hidden = false;
   };
-  couple.addEventListener('error', showPhotos);
-  if (couple.complete && !couple.naturalWidth) showPhotos();
-  const changeCloseUp = () => {
+  primaryVisual?.addEventListener('error', showPhotos);
+  if (primaryVisual?.complete && !primaryVisual.naturalWidth) showPhotos();
+  showCloseUp = () => {
     resetCloseUp();
     if (wreath.hidden || !greetingChoice?.value) return;
     wreath.classList.add('is-close-up');
-    if (productChoice?.value) closeUpTimer = setTimeout(resetCloseUp, 5000);
+    if (!memorialPreview && productChoice?.value) closeUpTimer = setTimeout(resetCloseUp, 5000);
   };
-  greetingChoice?.addEventListener('change', changeCloseUp);
-  productChoice?.addEventListener('change', changeCloseUp);
+  greetingChoice?.addEventListener('change', showCloseUp);
+  if (!memorialPreview) productChoice?.addEventListener('change', showCloseUp);
   form.addEventListener('submit', resetCloseUp);
 }
 function setupMobileSteps() {
@@ -356,7 +394,7 @@ function setupMobileSteps() {
     status.textContent = count === 3 ? '옵션 선택 완료' : '옵션 ' + count + ' / 3 선택';
     if (viewport && !wreath.hidden) {
       mobilePreview.hidden = false;
-      const image = wreath.querySelector(count ? '.scroll-couple' : '.wreath-base');
+      const image = wreath.querySelector(count ? '.scroll-couple, .memorial-frame-photo' : '.wreath-base');
       if (thumbnail.src !== image.src) thumbnail.src = image.src;
     }
   }
@@ -580,6 +618,7 @@ function updateScroll() {
   const badge = '/checkout-art/rice-' + kg + 'kg.webp';
   if (scrollWeight.getAttribute('src') !== badge) scrollWeight.src = badge;
   scrollWeight.alt = '쌀 ' + kg + 'kg';
+  if (scrollWeightLabel) scrollWeightLabel.innerHTML = '쌀 <strong>' + kg + '</strong><small>kg</small>';
 }
 function update() {
   const options = choices.map(select => select.selectedOptions[0]);
@@ -617,6 +656,12 @@ window.addEventListener('pageshow', event => {
   if (event.persisted) updateSender();
 });
 if (wreath) {
+  if (memorialPreview) {
+    sender.addEventListener('focus', resetCloseUp);
+    sender.addEventListener('input', resetCloseUp);
+    message.addEventListener('focus', showCloseUp);
+    message.addEventListener('input', showCloseUp);
+  }
   sender.addEventListener('input', updateSender);
   sender.addEventListener('change', updateSender);
   window.addEventListener('resize', updateScroll);

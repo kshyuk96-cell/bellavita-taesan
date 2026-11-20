@@ -40,6 +40,17 @@ def _customer_name(value):
     return re.sub(r'\s*상주님\s*$', '', _text(value)).strip()
 
 
+def memorial_title(values):
+    """Canonical Kakao/browser title; never trust a stale saved display name."""
+    name = _text(values.get('deceasedName'))
+    if not name:
+        name = re.sub(r'^(?:故\s*)', '', _text(values.get('name'))).strip()
+        name = re.sub(r'(?:님)?\s*부고$', '', name).strip()
+    name = re.sub(r'^(?:故\s*)', '', name).strip()
+    name = re.sub(r'님$', '', name).strip()
+    return ('故 ' + name + '님 부고') if name else '부고 안내'
+
+
 def _copy_button(value, label):
     return '<button type="button" class="copy" data-copy="' + escape(_text(value), quote=True) + '">' + escape(label) + '</button>'
 
@@ -68,7 +79,7 @@ def page(renderer, v, price, order_url, sample, og, url, preview=False):
 
     venue, room, address = (_text(v.get(key)) for key in ('venue', 'funeralRoom', 'address'))
     name = _text(v.get('deceasedName'))
-    title = _text(v.get('name')) or ('故 ' + name + ' 부고')
+    title = memorial_title(v)
     greeting = _text(v.get('greeting')) or '삼가 고인의 명복을 빕니다.'
     departure = _text(v.get('departure'))
     if not departure:
