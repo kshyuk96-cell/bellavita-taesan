@@ -30,6 +30,24 @@ def save(root,data):
 def timestamp(value):
     value=dt.datetime.fromisoformat(str(value).replace('Z','+00:00'))
     return value if value.tzinfo else value.replace(tzinfo=dt.timezone.utc)
+def snapshot_date(product):
+    """Legacy snapshots use a Korean display date; event_time is the source date."""
+    event=product.get('event_time')
+    if isinstance(event,str) and event:
+        try:
+            value=dt.datetime.fromisoformat(event.replace('Z','+00:00'))
+            if value.tzinfo:value=value.astimezone(SEOUL)
+            return value.date().isoformat()
+        except ValueError:pass
+    raw=product.get('date')
+    if not isinstance(raw,str):return ''
+    try:
+        if re.fullmatch(r'20\d\d-\d\d-\d\d',raw):return dt.date.fromisoformat(raw).isoformat()
+        match=re.fullmatch(r'\s*(20\d\d)년\s*(\d{1,2})월\s*(\d{1,2})일(?:\s*\([월화수목금토일]\))?\s*',raw)
+        if match:return dt.date(*map(int,match.groups())).isoformat()
+    except ValueError:pass
+    return ''
+
 def deadline(kind,created,date):
     if kind=='memorial':return timestamp(created)+dt.timedelta(hours=72)
     return dt.datetime.combine(dt.date.fromisoformat(date)+dt.timedelta(days=1),dt.time(),SEOUL)
@@ -82,13 +100,13 @@ def register(worker,root,pending=None):
                     if any(url in known for url in urls.values()):continue
                     if any(v.get('publicationId') in data for v in snapshots.values() if v.get('publicationId')):continue
                     product=snapshots[93500]
-                    date=product.get('date') or str(product.get('event_time',''))[:10]
+                    date=snapshot_date(product)
                     if not product.get('title') or not re.fullmatch(r'20\d\d-\d\d-\d\d',date):continue
                     dt.date.fromisoformat(date)
                     order_only=not all((folder/f'{price}.html').is_file() for price in PRICES)
                     created=dt.datetime.fromtimestamp(min(file.stat().st_mtime for file in files),dt.timezone.utc).isoformat()
                     links=[{'price':price,'productId':str(snapshots[price].get('number') or 'own:'+key+':'+str(price)),'url':urls[price] if order_only else worker.origin+f'/i/{key}/{price}.html','orderUrl':urls[price],'source':'own-checkout'} for price in PRICES]
-                    data[key]={'id':key,'kind':product.get('kind','wedding'),'createdAt':created,'date':product.get('date') or str(product.get('event_time',''))[:10],'title':product.get('title') or '기존 자체 주문서','folder':str(folder),'links':links,'revision':1,'salesStopped':False,'legacy':True,'legacyOrderOnly':order_only,'orderOnly':order_only,'readOnly':order_only,'invitationId':key,'orderMode':'invitation-checkout'};changed=True
+                    data[key]={'id':key,'kind':product.get('kind','wedding'),'createdAt':created,'date':date,'title':product.get('title') or '기존 자체 주문서','folder':str(folder),'links':links,'revision':1,'salesStopped':False,'legacy':True,'legacyOrderOnly':order_only,'orderOnly':order_only,'readOnly':order_only,'invitationId':key,'orderMode':'invitation-checkout'};changed=True
                 except (OSError,ValueError,TypeError):continue
         if changed:save(root,data)
         return data

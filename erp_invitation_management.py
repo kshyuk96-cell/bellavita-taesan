@@ -105,6 +105,7 @@ def products(worker,root=None):
                 item.update({k:match[k] for k in ('operating','operatingUntil','salesStopped','saleStatus')})
                 item.update(libraryId=match['id'],libraryRevision=match['revision'],readOnly=match.get('readOnly',False),orderOnly=match.get('orderOnly',False),legacyOrderOnly=match.get('legacyOrderOnly',False))
                 if not item.get('invitationId'):item['invitationId']=match.get('invitationId') or match['id']
+                if item.get('verification')=='own-snapshot':item['date']=match.get('date') or item.get('date','')
                 linked=next((link for link in match['links'] if link.get('orderUrl')==item.get('orderUrl')),None)
                 if linked and (not item.get('url') or item.get('verification')=='own-snapshot'):item['url']=linked.get('url') or item['orderUrl']
             else:item['saleStatus']='미발행'

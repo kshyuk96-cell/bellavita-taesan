@@ -55,7 +55,7 @@ class Delete(unittest.TestCase):
   self.assertNotIn(key,[r['id'] for r in library.catalog(self.worker,self.root)['items']])
  def test_original_order_only_pair_is_discovered_without_invented_invitation_html(self):
   original='7f494a310ca9371914b8863b45732bd5';folder=self.root/'invitations'/original;folder.mkdir()
-  for p in library.PRICES:(folder/f'{p}.order.json').write_text(json.dumps({'number':str(p),'title':'원래 자체 주문서','event_time':'2099-12-13T13:00:00+09:00','price':p,'localCheckout':False}))
+  for p in library.PRICES:(folder/f'{p}.order.json').write_text(json.dumps({'number':str(p),'title':'원래 자체 주문서','date':'2099년 12월 13일(일)','clock':'오후 1시','event_time':'2099-12-13T13:00:00+09:00','price':p,'localCheckout':False}))
   rows=library.catalog(self.worker,self.root)['items'];legacy=next(r for r in rows if r['id']==original)
   self.assertTrue(legacy['readOnly']);self.assertTrue(legacy['legacyOrderOnly']);self.assertEqual(legacy['date'],'2099-12-13')
   self.assertEqual([x['url'] for x in legacy['links']],[f'https://erp.example/i/{original}/{p}/order' for p in library.PRICES])
@@ -65,6 +65,12 @@ class Delete(unittest.TestCase):
   self.assertNotIn(original,[r['id'] for r in library.catalog(self.worker,self.root)['items']])
   self.assertTrue(all(p['libraryId']!=original for p in management.products(self.worker,self.root)))
   for p in library.PRICES:self.assertFalse(checkout.available({'_libraryKey':original,'_libraryRoot':str(self.root),'event_time':'2099-12-13T13:00:00+09:00'}))
+ def test_legacy_snapshot_date_normalization_uses_event_time_not_display_date(self):
+  self.assertEqual(library.snapshot_date({'date':'2026년 12월 13일(일)','event_time':'2026-12-13T13:00:00+09:00'}),'2026-12-13')
+  self.assertEqual(library.snapshot_date({'date':'2026년 12월 13일(일)'}),'2026-12-13')
+  self.assertEqual(library.snapshot_date({'date':'2026-12-13'}),'2026-12-13')
+  self.assertEqual(library.snapshot_date({'date':'2099년 2월 30일(월)'}),'')
+  self.assertEqual(library.snapshot_date({'date':'2026-12-13','event_time':'2026-12-12T16:00:00Z'}),'2026-12-13')
  def test_expired_order_only_pair_is_visible_but_not_counted_operating(self):
   key='c'*32;folder=self.root/'invitations'/key;folder.mkdir()
   for p in library.PRICES:(folder/f'{p}.order.json').write_text(json.dumps({'title':'과거 주문서','date':'2001-01-01','price':p,'localCheckout':True}))
