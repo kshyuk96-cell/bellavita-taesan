@@ -45,7 +45,9 @@ def select_photos(worker,values,checker=None,progress=None):
             if any((identity^old).bit_count()<=4 for old in seen):continue
             if not colored(image) or not checker(image):continue
             # All four slots are actual couples. Frame/scroll additionally require safe two-face crops.
-            if chosen:
+            if not chosen:
+                geometry.crop(image,(1380,915))
+            else:
                 from wedding_scroll.render import wedding_photo_size
                 size=((371,550) if image.height>image.width else (550,371)) if len(chosen)==1 else wedding_photo_size('A3')
                 geometry.crop(image,size)
@@ -94,6 +96,9 @@ def portrait_base(base,g):
 def components(renderer,v,kind,photos,composite=None):
     if kind!='wedding':return None
     validate_photos(photos)
+    # The hero also appears in the own-checkout scroll header. Validate that
+    # crop before publishing, rather than discovering a bad photo on customer GET.
+    geometry.crop(photos['hero'],(1380,915))
     from wedding_scroll import render as scroll
     base=Image.open(renderer.ASSETS/'rice-wreath-10kg.webp').convert('RGBA');g=banner_geometry(base,normalized(photos['frame']))
     frame=geometry.crop(photos['frame'],tuple(round(x) for x in g['frame'][2:]))

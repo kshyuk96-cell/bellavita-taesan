@@ -38,6 +38,15 @@ class SharedRules(unittest.TestCase):
   # Lower body of right and left samples has same vertical bounds after bottom alignment.
   left=im.getpixel((220,1100));right=im.getpixel((936,1100));self.assertTrue(all(abs(a-b)<=3 for a,b in zip(left,right)));self.assertEqual(left[3],255)
   self.assertIn('align-items:end',auto.geometry_css(parts))
+ def test_automatic_hero_is_also_verified_for_checkout_crop(self):
+  from types import SimpleNamespace
+  def photo(url):return Image.new('RGB',(100,150),(int(url[-1])*30,40,80))
+  def crop(im,size):
+   if im.getpixel((0,0))[0]==0:raise ValueError('unsafe hero')
+   return im
+  with patch.object(auto,'visual_id',side_effect=lambda im:(1<<((im.getpixel((0,0))[0]//30+1)*8))-1),patch.object(auto.geometry,'crop',side_effect=crop):
+   values,warnings=auto.select_photos(SimpleNamespace(image=photo),{'images':['https://x.test/'+str(i) for i in range(5)]},checker=lambda im:True)
+  self.assertEqual(values['hero'],'https://x.test/1');self.assertEqual(len(set(values[k] for k in auto.ROLES)),4);self.assertFalse(warnings)
  def test_single_parent_title_and_signature(self):
   v={'hostSide':'bride','brideParents':'김영숙','brideName':'이다온','brideRelation':'장녀'}
   self.assertEqual(render.words(v,'wedding')[2:],["김영숙 올림","김영숙의 장녀 이다온 예식"] if False else ('김영숙 올림','김영숙의 장녀 이다온 예식'))
