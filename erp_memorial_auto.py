@@ -100,7 +100,11 @@ def components(renderer,v):
     stars=[]
     for name in ['memorial-birch-left.jpg','memorial-frame-right.jpg']:
         with Image.open(ASSETS/name) as source:
-            stars.append(ImageOps.fit(ImageOps.exif_transpose(source).convert('RGB'),size,Image.Resampling.LANCZOS))
+            # The fixed catalog artwork already has virtually the same ratio as
+            # its frame. Preserve every source edge instead of shaving the left
+            # and right sides to gain a fraction of a pixel.
+            stars.append(ImageOps.pad(ImageOps.exif_transpose(source).convert('RGB'),size,
+                                      Image.Resampling.LANCZOS,color='white'))
     if hashlib.sha256(stars[0].tobytes()).digest()==hashlib.sha256(stars[1].tobytes()).digest():
         raise ValueError('서로 다른 두 작품을 확인하세요.')
     data=lambda image:renderer.data_image(renderer.image_bytes(image))
@@ -131,7 +135,7 @@ def preview_composite(renderer,parts):
 
 # Scoped to the promotional block: obituary details keep their existing format.
 PROMOTION_CSS='''
-.memorial-promotion{display:block;color:inherit;text-decoration:none}.memorial-promotion:focus-visible{outline:3px solid #877147;outline-offset:-4px}.memorial-promotion .wreath{background:#edf0e5;padding:37px clamp(22px,7vw,48px);text-align:center;border-top:1px solid #e1dace}.memorial-promotion h2{font-family:"Noto Serif KR",serif;font-size:clamp(24px,6vw,34px);font-weight:500;margin:0 0 23px}.memorial-promotion .wreath-letter{font-family:"Noto Serif KR",serif;font-size:clamp(12px,3.25vw,16px);line-height:1.95;color:#303a2e;word-break:keep-all;overflow-wrap:break-word}.memorial-promotion .wreath-letter span{display:block}.memorial-promotion .wreath-letter p{margin:0;white-space:normal}.memorial-promotion .wreath-letter p+p{margin-top:14px}.memorial-promotion .samples{display:grid;grid-template-columns:1fr 1fr;gap:clamp(4px,3vw,18px);margin-top:24px;align-items:end}.memorial-promotion figure{width:100%;margin:0}.memorial-promotion .product{position:relative}.memorial-promotion .base{display:block;width:100%;height:auto}.memorial-promotion .frame-photo{position:absolute;left:12.8%;top:2.6%;width:76.5%;height:33.3%;object-fit:cover}.memorial-promotion .scroll-render{position:absolute;left:31.85898328%;top:46.36444516%;width:39.07880872%;height:35.61145260%;object-fit:fill}.memorial-promotion .order-action{display:table;min-height:43px;padding:8px 19px;margin:17px auto 0;border:1px solid #304737;border-radius:4px;background:#304737;color:white;font:600 14px/1.45 "Noto Sans KR",system-ui,sans-serif}.memorial-promotion:hover .order-action{background:#435d49}
+.memorial-promotion{display:block;color:inherit;text-decoration:none}.memorial-promotion:focus-visible{outline:3px solid #877147;outline-offset:-4px}.memorial-promotion .wreath{background:#edf0e5;padding:37px clamp(22px,7vw,48px);text-align:center;border-top:1px solid #e1dace}.memorial-promotion h2{font-family:"Noto Serif KR",serif;font-size:clamp(24px,6vw,34px);font-weight:500;margin:0 0 23px}.memorial-promotion .wreath-letter{font-family:"Noto Serif KR",serif;font-size:clamp(12px,3.25vw,16px);line-height:1.95;color:#303a2e;word-break:keep-all;overflow-wrap:break-word}.memorial-promotion .wreath-letter span{display:block}.memorial-promotion .wreath-letter p{margin:0;white-space:normal}.memorial-promotion .wreath-letter p+p{margin-top:14px}.memorial-promotion .samples{display:grid;grid-template-columns:1fr 1fr;gap:clamp(4px,3vw,18px);margin-top:24px;align-items:end}.memorial-promotion figure{width:100%;margin:0}.memorial-promotion .product{position:relative}.memorial-promotion .base{display:block;width:100%;height:auto}.memorial-promotion .frame-photo{position:absolute;left:12.8%;top:2.6%;width:76.5%;height:33.3%;object-fit:contain;background:#fff}.memorial-promotion .scroll-render{position:absolute;left:31.85898328%;top:46.36444516%;width:39.07880872%;height:35.61145260%;object-fit:fill}.memorial-promotion .order-action{display:table;min-height:43px;padding:8px 19px;margin:17px auto 0;border:1px solid #304737;border-radius:4px;background:#304737;color:white;font:600 14px/1.45 "Noto Sans KR",system-ui,sans-serif}.memorial-promotion:hover .order-action{background:#435d49}
 '''
 
 

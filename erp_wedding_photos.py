@@ -53,3 +53,30 @@ def crop(image,size):
     bounds=face_crop_bounds(image.size,size,faces)
     if bounds is None:raise ValueError('두 얼굴을 보존하면서 채울 수 없는 사진입니다. 다른 커플 사진을 선택하세요.')
     return image.crop(bounds).resize(size,Image.Resampling.LANCZOS)
+
+
+def automatic_crop(image, size, centering=(.5, .2)):
+    """Use a face-safe crop, or preserve the entire source over a soft fill."""
+    from PIL import Image, ImageFilter, ImageOps
+
+    image = ImageOps.exif_transpose(image).convert('RGB')
+    try:
+        faces = detect_faces(image)
+    except (ValueError, OSError):
+        faces = []
+    bounds = face_crop_bounds(image.size, size, faces) if len(faces) == 2 else None
+    if bounds is not None:
+        return image.crop(bounds).resize(size, Image.Resampling.LANCZOS)
+    # Detector misses and geometrically impossible face layouts must not lose
+    # either source edge. Fill the target with a blurred version of the photo,
+    # then place the complete uncropped source above it. This stays full-frame
+    # without black/white bands while keeping every original pixel in view.
+    background = ImageOps.fit(image, size, Image.Resampling.LANCZOS,
+                              centering=centering)
+    background = background.filter(ImageFilter.GaussianBlur(
+        radius=max(4, round(min(size) * .025))))
+    foreground = ImageOps.contain(image, size, Image.Resampling.LANCZOS)
+    left = round((size[0] - foreground.width) * centering[0])
+    top = round((size[1] - foreground.height) * centering[1])
+    background.paste(foreground, (left, top))
+    return background

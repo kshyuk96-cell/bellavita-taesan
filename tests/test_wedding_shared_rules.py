@@ -27,9 +27,9 @@ class SharedRules(unittest.TestCase):
  def test_solo_rejected_for_scroll(self):
   with patch.object(geometry,'detect_faces',return_value=[]):
    with self.assertRaisesRegex(ValueError,'신랑신부 두 얼굴'):geometry.crop(Image.new('RGB',(600,800)),(600,400))
- def test_same_photo_under_different_urls_is_rejected(self):
+ def test_same_verified_photo_can_fill_role_specific_crops_when_source_is_short(self):
   photos={k:Image.new('RGB',(600,800),'red') for k in auto.ROLES}
-  with self.assertRaisesRegex(ValueError,'사진 중복'):auto.validate_photos(photos,checker=lambda im:True)
+  auto.validate_photos(photos,checker=lambda im:True)
  def test_shared_photo_geometry_is_bottom_aligned_and_transparency_survives(self):
   g=auto.banner_geometry(self.fixture(),Image.new('RGB',(1400,1900)))
   def data(im):return render.data_image(render.image_bytes(im))
@@ -38,15 +38,27 @@ class SharedRules(unittest.TestCase):
   # Lower body of right and left samples has same vertical bounds after bottom alignment.
   left=im.getpixel((220,1100));right=im.getpixel((936,1100));self.assertTrue(all(abs(a-b)<=3 for a,b in zip(left,right)));self.assertEqual(left[3],255)
   self.assertIn('align-items:end',auto.geometry_css(parts))
- def test_automatic_hero_is_also_verified_for_checkout_crop(self):
+ def test_explicit_main_photo_is_preserved_and_distinct_sources_are_preferred(self):
   from types import SimpleNamespace
   def photo(url):return Image.new('RGB',(100,150),(int(url[-1])*30,40,80))
-  def crop(im,size):
-   if im.getpixel((0,0))[0]==0:raise ValueError('unsafe hero')
-   return im
-  with patch.object(auto,'visual_id',side_effect=lambda im:(1<<((im.getpixel((0,0))[0]//30+1)*8))-1),patch.object(auto.geometry,'crop',side_effect=crop):
-   values,warnings=auto.select_photos(SimpleNamespace(image=photo),{'images':['https://x.test/'+str(i) for i in range(5)]},checker=lambda im:True)
-  self.assertEqual(values['hero'],'https://x.test/1');self.assertEqual(len(set(values[k] for k in auto.ROLES)),4);self.assertFalse(warnings)
+  faces=[(1,1,20,30),(40,1,60,30)]
+  with patch.object(auto.geometry,'detect_faces',side_effect=lambda im:faces if im.getpixel((0,0))[0]>0 else []):
+   values,warnings=auto.select_photos(SimpleNamespace(image=photo),{'hero':'https://x.test/0','images':['https://x.test/'+str(i) for i in range(5)]},checker=lambda im:(_ for _ in ()).throw(AssertionError('local candidates must skip checker')))
+  self.assertEqual(values['hero'],'https://x.test/0');self.assertEqual(len(set(values[k] for k in auto.ROLES)),4);self.assertFalse(warnings)
+ def test_automatic_crop_falls_back_to_full_bleed_when_faces_are_not_detected(self):
+  source=Image.new('RGB',(800,1200),'#2468a0')
+  with patch.object(geometry,'detect_faces',return_value=[]):result=geometry.automatic_crop(source,(600,400))
+  self.assertEqual(result.size,(600,400))
+  self.assertEqual(result.getpixel((0,0)),(36,104,160))
+ def test_fallback_preserves_both_source_edges_over_blurred_full_frame(self):
+  source=Image.new('RGB',(100,200),'#2468a0');draw=ImageDraw.Draw(source)
+  draw.rectangle((0,0,9,199),fill='#ef2838');draw.rectangle((90,0,99,199),fill='#27c76f')
+  with patch.object(geometry,'detect_faces',return_value=[]):result=geometry.automatic_crop(source,(300,200))
+  self.assertEqual(result.size,(300,200))
+  # The complete 100px-wide source is centred over the soft-fill background;
+  # both exact edge markers remain in the foreground instead of being cropped.
+  self.assertEqual(result.getpixel((100,100)),(239,40,56))
+  self.assertEqual(result.getpixel((199,100)),(39,199,111))
  def test_single_parent_title_and_signature(self):
   v={'hostSide':'bride','brideParents':'김영숙','brideName':'이다온','brideRelation':'장녀'}
   self.assertEqual(render.words(v,'wedding')[2:],["김영숙 올림","김영숙의 장녀 이다온 예식"] if False else ('김영숙 올림','김영숙의 장녀 이다온 예식'))

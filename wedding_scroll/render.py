@@ -468,7 +468,10 @@ def memorial_sender_box(page):
 
 
 MEMORIAL_RICE_TEMPLATE_PAGE = 16
-MEMORIAL_RICE_MESSAGE_BOX = (445.5, 551.5)
+# Painted-ink audit (HY memorial engine, 10kg logo, default condolence) found
+# 48.000pt above the greeting and 39.443pt below it. Moving the unchanged
+# 106pt box up 4.279pt makes both visible gaps approximately 43.721pt.
+MEMORIAL_RICE_MESSAGE_BOX = (441.221273, 547.221273)
 MEMORIAL_RICE_SOURCE_MESSAGE_BOX = (350, 550)
 
 
@@ -638,7 +641,8 @@ def make_scroll(output, sender, message='', kind='wedding', paper='A3', wedding_
                 page.insert_image(rect,stream=buf.getvalue())
             for (top,bottom),value,maximum,is_name in changes:
                 if memorial_rice and not is_name:
-                    top, bottom, maximum = 445.5, 551.5, 36
+                    top, bottom = MEMORIAL_RICE_MESSAGE_BOX
+                    maximum = 36
                 light=memorial and (paper=='A3' or not is_name)
                 color=(.99,.96,.89) if light else (.09,.16,.28) if is_name and not memorial else (.08,.08,.08)
                 box = fitz.Rect(45, top, w - 45, bottom)

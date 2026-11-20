@@ -49,6 +49,8 @@ class MemorialCheckoutUI(unittest.TestCase):
         self.assertIn("form.addEventListener('change', update);", output)
         self.assertIn("sender.addEventListener('focus', resetCloseUp)", output)
         self.assertIn("message.addEventListener('focus', showCloseUp)", output)
+        self.assertIn('.memorial-frame-photo { position: absolute;', output)
+        self.assertIn('object-fit: contain; background: #fff;', output)
 
     def test_memorial_weight_uses_one_complete_artwork_without_duplicate_text(self):
         tree = html.fromstring(checkout.render(checkout.apply_memorial_rules(self.product()), '#', False))

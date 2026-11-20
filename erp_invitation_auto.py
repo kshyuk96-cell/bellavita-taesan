@@ -4,7 +4,7 @@ from pathlib import Path
 from collections import OrderedDict
 from PIL import Image,ImageDraw,ImageFont,ImageOps,ImageChops,ImageStat
 import erp_wedding_photos as geometry
-RENDER_VERSION='wedding-four-couples-portrait-bottom-v6'
+RENDER_VERSION='wedding-auto-scroll-photo-fallback-v7'
 ROLES=('hero','frame','scrollLeft','scrollRight')
 _VERDICTS=OrderedDict();_LOCK=threading.Lock()
 
@@ -37,37 +37,75 @@ def photo_check(image):
     return ok
 
 def select_photos(worker,values,checker=None,progress=None):
-    checker=checker or photo_check;chosen=[];seen=[]
+    checker=checker or photo_check;seen=set();hero_url='';first_readable='';local_verified=[];color_urls=[];reported=0
     if progress:progress(0,4)
-    for url in list(dict.fromkeys(values.get('images',[])))[:20]:
+    def report(done):
+        nonlocal reported
+        if progress and done>reported:
+            progress(done,4);reported=done
+    hero=values.get('hero','')
+    urls=list(dict.fromkeys(([hero] if hero else [])+list(values.get('images',[]))))[:20]
+    for url in urls:
         try:
-            image=normalized(worker.image(url));identity=visual_id(image)
-            if any((identity^old).bit_count()<=4 for old in seen):continue
-            if not colored(image) or not checker(image):continue
-            # All four slots are actual couples. Frame/scroll additionally require safe two-face crops.
-            if not chosen:
-                geometry.crop(image,(1380,915))
-            else:
-                from wedding_scroll.render import wedding_photo_size
-                size=((371,550) if image.height>image.width else (550,371)) if len(chosen)==1 else wedding_photo_size('A3')
-                geometry.crop(image,size)
-            chosen.append(url);seen.append(identity)
-            if progress:progress(len(chosen),4)
-            if len(chosen)==4:break
+            image=normalized(worker.image(url));identity=photo_id(image)
+            if identity in seen:continue
+            seen.add(identity)
+            if not first_readable:first_readable=url
+            # The parser's explicit hero is the card's main photograph. Keep
+            # that original, but verify design candidates independently so a
+            # logo or scenery hero cannot silently fill every production slot.
+            if url==hero and hero:
+                hero_url=url
+                report(1)
+            if not colored(image):continue
+            color_urls.append(url)
+            try:faces=geometry.detect_faces(image)
+            except (ValueError,OSError):faces=[]
+            if len(faces)==2:
+                local_verified.append(url)
+                if not hero and not hero_url:hero_url=url
+                report(min(4,1+len({candidate for candidate in local_verified if candidate!=hero_url})))
+            if hero_url and len([candidate for candidate in local_verified if candidate!=hero_url])>=3:break
+            if not hero and len(local_verified)>=4:break
         except (ValueError,OSError):continue
-    if len(chosen)<4:
-        return values,['컬러 신랑신부 커플 사진 4장 확인 필요 · 원본 중복·독사진·얼굴이 잘리는 사진은 제외합니다.']
+    if not hero_url and (local_verified or first_readable):
+        hero_url=local_verified[0] if local_verified else first_readable
+        report(1)
+    if not hero_url:
+        return values,['컬러 신랑신부 커플 사진을 확인해 주세요.']
+    design=[candidate for candidate in local_verified if candidate!=hero_url]
+    if len(design)<3 and hero_url in local_verified:design.append(hero_url)
+    fallback=False
+    # A local two-face result is authoritative and fast. Only if none exists
+    # may the remote couple checker inspect at most two originals, finding one
+    # source which can be safely reused for all design roles.
+    if not local_verified:
+        candidates=list(dict.fromkeys([hero_url,*color_urls]))[:2]
+        for url in candidates:
+            try:approved=checker(normalized(worker.image(url)))
+            except Exception:approved=False
+            if approved:
+                design=[url]
+                break
+    if not design:
+        fallback=True;design=[hero_url]
+    distinct_design=len(set(design))
+    while len(design)<3:design.append(design[len(design)%distinct_design])
+    chosen=[hero_url,*design[:3]]
+    for done in range(2,5):report(done)
     values.update(dict(zip(ROLES,chosen)))
-    return values,[]
+    warnings=[] if len(set(chosen))==4 else [
+        ('제작용 커플 판정을 확인하지 못해 메인 원본을 '
+         '자동족자 방식으로 안전 크롭했습니다.' if fallback else
+         f'확인된 제작용 커플 원본이 {distinct_design}장이어서 액자·족자는 역할별 안전 크롭으로 구성했습니다.')]
+    return values,warnings
 
 def validate_photos(photos,checker=None):
-    checker=checker or photo_check;seen=[]
     if any(k not in photos for k in ROLES):raise ValueError('사진 4장: 대표·액자·왼쪽 족자·오른쪽 족자를 모두 선택하세요.')
     for role in ROLES:
-        im=photos[role];key=visual_id(im)
-        if any((key^old).bit_count()<=4 for old in seen):raise ValueError('사진 중복: 대표 사진·액자 사진·두 족자에는 서로 다른 원본 4장이 필요합니다.')
-        if not colored(im) or not checker(im):raise ValueError('컬러 커플 사진: 네 사진 모두 신랑신부가 함께 나와야 합니다. 독사진은 제외하세요.')
-        seen.append(key)
+        im=photos[role]
+        if not isinstance(im,Image.Image) or im.width<1 or im.height<1:
+            raise ValueError('액자·족자에 사용할 사진 원본을 확인하세요.')
 
 def banner_geometry(base,frame):
     w,h=base.size
@@ -96,20 +134,17 @@ def portrait_base(base,g):
 def components(renderer,v,kind,photos,composite=None):
     if kind!='wedding':return None
     validate_photos(photos)
-    # The hero also appears in the own-checkout scroll header. Validate that
-    # crop before publishing, rather than discovering a bad photo on customer GET.
-    geometry.crop(photos['hero'],(1380,915))
     from wedding_scroll import render as scroll
     base=Image.open(renderer.ASSETS/'rice-wreath-10kg.webp').convert('RGBA');g=banner_geometry(base,normalized(photos['frame']))
-    frame=geometry.crop(photos['frame'],tuple(round(x) for x in g['frame'][2:]))
+    frame=geometry.automatic_crop(photos['frame'],tuple(round(x) for x in g['frame'][2:]))
     def data(image):return renderer.data_image(renderer.image_bytes(image))
-    def make(photo,sender):
-        safe=geometry.crop(photo,scroll.wedding_photo_size('A3'))
+    def make(photo,sender,centering):
+        safe=geometry.automatic_crop(photo,scroll.wedding_photo_size('A3'),centering=centering)
         with tempfile.TemporaryDirectory() as temp:
             folder=Path(temp);safe.save(folder/'photo.jpg',quality=98)
             scroll.make_scroll(folder,sender,wedding_photo=folder/'photo.jpg',message='결혼을 진심으로 축하 드리며 함께 하는 길이\n언제나 행복하고 기쁨이 가득하길 기원합니다')
             return data(Image.open(folder/'scroll.png').convert('RGB'))
-    return {'BASE':data(base),'BASE_LEFT':data(portrait_base(base,g)),'FRAME':data(frame),'SCROLL_LEFT':make(photos['scrollLeft'],'쌀빛그림화환'),'SCROLL_RIGHT':make(photos['scrollRight'],renderer.signature(v,'wedding')),'_geometry':g,'renderVersion':RENDER_VERSION}
+    return {'BASE':data(base),'BASE_LEFT':data(portrait_base(base,g)),'FRAME':data(frame),'SCROLL_LEFT':make(photos['scrollLeft'],'쌀빛그림화환',(.42,.2)),'SCROLL_RIGHT':make(photos['scrollRight'],renderer.signature(v,'wedding'),(.58,.2)),'_geometry':g,'renderVersion':RENDER_VERSION}
 
 def geometry_css(parts):
     g=parts.get('_geometry')

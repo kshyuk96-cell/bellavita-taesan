@@ -399,8 +399,8 @@ class Engine:
         year,month=(when.year+1,1) if when.month==12 else (when.year,when.month+1)
         expires=dt.date(year,month,min(when.day,calendar.monthrange(year,month)[1])).isoformat()
         if dt.datetime.now(render.SEOUL).date().isoformat()>expires:raise ValueError('공유 기간이 지난 행사입니다.')
-        # Validate four source photos, face-safe crops and banner geometry before
-        # making any checkout/product records. A failed photo must not create products.
+        # Keep the main card photo unchanged. Frame and scroll derivatives use
+        # the shared automatic-scroll face-safe/edge-preserving fallback.
         self.progress(data.get('requestId',''),4,'액자·족자 제작','얼굴 보존 크롭과 세로 액자·배너 정렬을 계산하고 있습니다.')
         photos={}
         for key in IMAGE_FIELDS:
@@ -426,7 +426,7 @@ class Engine:
         hashes={k:hashlib.sha256(render.image_bytes(photo)).hexdigest() for k,photo in photos.items()}
         fingerprint=digest({'values':v,'kind':kind,'items':items,'images':hashes,'orderMode':data.get('orderMode'),**({'renderVersion':getattr(erp_invitation_auto,'RENDER_VERSION','wedding-rules-v2')} if kind=='wedding' else {'renderVersion':erp_memorial_auto.RENDER_VERSION} if kind=='memorial' else {}),**({'orderMode':'invitation-checkout','products':snapshots} if local else {})})
         warnings_out=[]
-        if len(set(hashes.values()))<len(hashes):warnings_out.append('사진 중복이 있습니다. 대표·제작 액자·족자의 사진 구성을 확인하세요.')
+        if len(set(hashes.values()))<len(hashes):warnings_out.append('원본이 부족한 제작 위치는 같은 커플 사진을 역할별 안전 크롭으로 사용했습니다.')
         if kind=='event' and not photos.get('logo'):warnings_out.append('로고·행사 이미지가 없어 행사명으로 시안을 구성했습니다. 설치 예시를 확인하세요.')
         return {'status':'done','items':items,'fingerprint':fingerprint,'expires':expires,'warnings':warnings_out}, {**({'local-products.json':json.dumps({'key':local_key,'products':snapshots}).encode()} if local else {}),'reference-components.json':json.dumps(parts).encode(),'sample.webp':sample,'hero.webp':hero,'thumbnail.jpg':og,'layout.json':json.dumps(boxes,ensure_ascii=False).encode()}
 
@@ -559,9 +559,9 @@ class Engine:
                         try:
                             import erp_wedding_photos
                             with Image.open(folder/'hero.webp') as source:
-                                image=erp_wedding_photos.crop(source,(1380,915))
+                                image=erp_wedding_photos.automatic_crop(source,(1380,915))
                             raw=render.image_bytes(image);temp=target.with_suffix('.tmp');temp.write_bytes(raw);temp.replace(target)
-                        except (ValueError,OSError):return 422,'text/plain; charset=utf-8','두 얼굴을 보존하는 주문서 사진을 확인해 주세요.'.encode()
+                        except (ValueError,OSError):return 422,'text/plain; charset=utf-8','주문서 사진 원본을 확인해 주세요.'.encode()
         try:raw=(folder/name).read_bytes()
         except OSError:return 404,None,None
         return 200,('text/html; charset=utf-8' if name.endswith('.html') else 'image/jpeg' if name.endswith('.jpg') else 'image/webp'),raw

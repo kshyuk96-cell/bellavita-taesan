@@ -1,12 +1,51 @@
 import base64,io,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
-from PIL import Image
+from PIL import Image,ImageChops
 import fitz
 import erp_invitation_render as renderer
 import erp_memorial_auto as memorial
 
 class MemorialApprovedSamples(unittest.TestCase):
+ def test_rice_logo_message_and_sender_painted_ink_gaps_are_balanced(self):
+  engine=memorial.scroll_engine();scale=4
+  with tempfile.TemporaryDirectory() as tmp:
+   output=Path(tmp)/'right'
+   engine.make_scroll(output,'빅마운틴 대표이사 강신혁',memorial.CONDOLENCE,
+                      kind='memorial',paper='A3',layout='rice',rice_kg=10)
+   source=(output/'scroll.pdf').read_bytes()
+
+   def rendered(redact=None):
+    with fitz.open(stream=source,filetype='pdf') as doc:
+     page=doc[0]
+     if redact:
+      page.add_redact_annot(fitz.Rect(redact),fill=None)
+      page.apply_redactions(images=0,graphics=0)
+     pix=page.get_pixmap(matrix=fitz.Matrix(scale,scale),alpha=False)
+     return Image.frombytes('RGB',(pix.width,pix.height),pix.samples)
+
+   original=rendered()
+   def painted_box(redact):
+    difference=ImageChops.difference(original,rendered(redact)).convert('L')
+    box=difference.point(lambda value:255 if value>4 else 0).getbbox()
+    self.assertIsNotNone(box)
+    return tuple(value/scale for value in box)
+
+   with fitz.open(stream=source,filetype='pdf') as doc:
+    page=doc[0]
+    logo=next(info for info in page.get_image_info(xrefs=True)
+              if info['width']==418 and info['height']==320)['bbox']
+    divider=max(shape['rect'] for shape in page.get_drawings()
+                if shape['rect'].width>page.rect.width*.45).y0
+    sender_box=engine.memorial_sender_box(page)
+    page_bottom=page.rect.y1
+   message=painted_box((0,350,842,550))
+   sender=painted_box((0,sender_box.y0,842,sender_box.y1))
+   upper_gaps=(message[1]-logo[3],divider-message[3])
+   lower_gaps=(sender[1]-divider,page_bottom-sender[3])
+   self.assertLess(abs(upper_gaps[0]-upper_gaps[1]),.75,upper_gaps)
+   self.assertLess(abs(lower_gaps[0]-lower_gaps[1]),.75,lower_gaps)
+
  def test_actual_general_and_rice_a3_preserve_senders_font_and_rollback(self):
   from wedding_scroll import render as wedding
   prior=wedding.FONT_NAME
@@ -68,6 +107,7 @@ class MemorialApprovedSamples(unittest.TestCase):
   page=memorial.page(renderer,v,93500,'https://order.test/93500',parts,'https://notice.test/og','https://notice.test/93500')
   self.assertLess(page.index('장례 안내'),page.index('wreath-promotion memorial-promotion'))
   self.assertEqual(page.count('class="frame-photo"'),2);self.assertEqual(page.count('class="scroll-render"'),2)
+  self.assertIn('object-fit:contain;background:#fff',page)
   self.assertIn('href="https://order.test/93500"',page);self.assertIn('align-items:end',page)
   self.assertNotIn('웨딩',page);self.assertNotIn('신랑신부',page);self.assertNotIn('결혼',page)
   preview=memorial.page(renderer,v,93500,'https://order.test/93500',parts,'https://notice.test/og','https://notice.test/93500',True)
