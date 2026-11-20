@@ -423,7 +423,7 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
         return True
     # Distinct token: existing invitation API / Kakao credentials remain unchanged.
     token=os.getenv('ERP_INVITATION_TOKEN','')
-    tokens=[v for v in (token,os.getenv('ERP_AUTOMATION_TOKEN','')) if v]
+    tokens=[v for v in (token,os.getenv('ERP_AUTOMATION_TOKEN',''),os.getenv('ERP_INVITATION_BRIDGE_TOKEN','')) if v]
     if not any(hmac.compare_digest(handler.headers.get('Authorization',''),'Bearer '+v) for v in tokens):
         handler.send_json({'error':'초대장 서버 인증이 필요합니다.'},401);return True
     if path=='/erp/invitations/capabilities' and method=='GET':
