@@ -34,6 +34,13 @@ class TargetAccount(unittest.TestCase):
  def test_target_normalizer_is_terminal_only_and_handles_manual_product_prefix(self):
   for target in ['김병섭','김병섭 상주님','김병섭(상주님)','김병섭 회장님 모친상',' 김 병 섭 대표님 ']:self.assertEqual(m.normalize_mourner_name(target),'김병섭')
   self.assertNotEqual(m.normalize_mourner_name('김병섭X'),'김병섭');self.assertNotEqual(m.normalize_mourner_name('김병'),'김병섭')
+ def test_literal_person_names_ending_in_role_words_are_never_shortened(self):
+  for source,expected in [('김상주','김상주'),('김상주님','김상주'),('김 상주님','김상주'),('김상주 상주님','김상주'),('김상주상주님','김상주'),('김상주모친상','김상주'),('김병섭상주님','김병섭'),('정명천회장님','정명천'),('회장님','')]:
+   with self.subTest(source=source):self.assertEqual(m.normalize_mourner_name(source),expected)
+ def test_person_name_role_collision_cannot_select_a_different_customers_account(self):
+  rows=[{'name':'김','bank':'가상은행','account':'222-0000-0002'},{'name':'김상주','bank':'가상은행','account':'111-0000-0001'}]
+  selected=m.clean_mourner_accounts(rows,'김상주님')
+  self.assertEqual(selected,[rows[1]]);self.assertEqual(m.clean_mourner_accounts([rows[0]],'김상주님'),[])
  def test_no_target_does_not_even_fetch_account_popup(self):
   with patch('builtins.print') as output:
    fetch=lambda *args:(_ for _ in ()).throw(AssertionError('unnecessary account collection'))

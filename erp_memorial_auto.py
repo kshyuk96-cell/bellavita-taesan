@@ -11,7 +11,7 @@ import threading
 from pathlib import Path
 from PIL import Image, ImageOps
 
-RENDER_VERSION='memorial-approved-backing-birch23-stars44-balanced-v4'
+RENDER_VERSION='memorial-approved-backing-birch23-stars44-name-only-v5'
 ASSETS=Path(__file__).with_name('erp_invitation_assets')
 SCROLL_ASSETS=Path(__file__).with_name('wedding_scroll')/'assets'
 HY_GUNGSEO_SHA256='b41cef3386d034040704b1a143ef13a63c5b9f1ec4222a7579c1796ea05517f6'
@@ -65,16 +65,18 @@ def scroll_engine():
 
 
 def scroll_sender_name(host):
-    # Courtesy words identify the customer in the obituary, not the gift's name.
-    name=re.sub(r'\s*상주님\s*$','',str(host or '').strip())
-    name=re.sub(r'\s+상주\s*$','',name)
-    return re.sub(r'(대표|대표이사|회장|이사장|사장|원장|교수|의원)님(?=\s|$)',r'\1',name).strip()
+    from erp_memorial_invitation import normalize_mourner_name
+    source=str(host or '').strip()
+    # 상주 can be the given name itself; do not turn 김상주 into 김.
+    without_courtesy=re.sub(r'\s*상주님\s*$','',source)
+    if re.fullmatch(r'[가-힣]상주',without_courtesy):return without_courtesy
+    return normalize_mourner_name(source)
 
 
 def render_scrolls(output,sender):
     """Use the very same v21 production functions, with the rollback respected."""
     sender=scroll_sender_name(sender)
-    if not sender:raise ValueError('오른쪽 쌀빛 근조 족자에 넣을 상주 이름·호칭을 입력하세요.')
+    if not sender:raise ValueError('오른쪽 쌀빛 근조 족자에 넣을 이름을 입력하세요.')
     engine=scroll_engine();root=Path(output);result={}
     for side,name,layout in [('left',LEFT_SENDER,'general'),('right',sender,'rice')]:
         folder=root/side

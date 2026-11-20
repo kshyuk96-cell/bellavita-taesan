@@ -8,6 +8,7 @@ from lxml import html
 from PIL import Image,ImageDraw
 
 FIELDS={'productPrefix':100,'deceasedName':80,'mourners':800,'departure':100,'admission':100,'funeralRoom':120,'burial':200,'contactPhone':30,'deceasedDescription':160,'deathDate':100,'funeralPhone':30,'portrait':1000,'entrance':100,'originalNotice':700}
+MOURNER_ROLE_WORDS=frozenset({'상주','대표이사','대표','회장','사장','이사장','원장','목사','고객'})
 
 def fetch_source(url,bridge,method='GET',data=None):
  from urllib.parse import urlencode
@@ -33,8 +34,11 @@ def normalize_mourner_name(value):
  from unicodedata import normalize
  text=normalize('NFKC',str(value or '')).strip()
  text=re.sub(r'\s*(?:모친상|부친상|배우자상|조모상|조부상|빙모상|빙부상|장모상|장인상|자녀상|별세|부고)\s*$','',text)
+ text=re.sub(r'\s*님\s*$','',text).strip()
  roles=r'(?:상주|대표이사|대표|회장|사장|이사장|원장|목사|고객)(?:님)?|님'
  for _ in range(3):
+  compact=re.sub(r'\s+','',text)
+  if re.fullmatch(r'[가-힣]{2,4}',compact) and compact not in MOURNER_ROLE_WORDS:break
   updated=re.sub(r'\s*(?:[\[(（]\s*(?:'+roles+r')\s*[\])）]|(?:'+roles+r'))\s*$','',text).strip()
   if updated==text:break
   text=updated

@@ -11,7 +11,7 @@ class MemorialApprovedSamples(unittest.TestCase):
   from wedding_scroll import render as wedding
   prior=wedding.FONT_NAME
   with tempfile.TemporaryDirectory() as tmp:
-   results=memorial.render_scrolls(tmp,'김병섭 상주님')
+   results=memorial.render_scrolls(tmp,'김병섭대표님')
    sizes={};texts={}
    for side in ['left','right']:
     with fitz.open(results[side]/'scroll.pdf') as doc:
@@ -19,6 +19,8 @@ class MemorialApprovedSamples(unittest.TestCase):
      text=doc[0].get_text();self.assertNotIn('화환 보내신 분',text)
      self.assertIn('쌀빛그림화환' if side=='left' else '김병섭',text)
      self.assertNotIn('상주님',doc[0].get_textbox(memorial.scroll_engine().memorial_sender_box(doc[0])))
+     self.assertNotIn('대표',doc[0].get_textbox(memorial.scroll_engine().memorial_sender_box(doc[0])))
+     self.assertNotIn('회장',doc[0].get_textbox(memorial.scroll_engine().memorial_sender_box(doc[0])))
      self.assertTrue(any('HYgsrB' in f[3] for f in doc[0].get_fonts()))
      box=memorial.scroll_engine().memorial_sender_box(doc[0]);texts[side]=doc[0].get_textbox(box)
      spans=[span for block in doc[0].get_text('dict')['blocks'] if 'lines' in block for line in block['lines'] for span in line['spans'] if fitz.Rect(span['bbox']).intersects(box)]
@@ -31,9 +33,20 @@ class MemorialApprovedSamples(unittest.TestCase):
    self.assertGreater(sizes['right'],sizes['left']*1.8)
    self.assertGreater(sizes['right'],200)
    self.assertEqual(wedding.FONT_NAME,prior)
-  self.assertEqual(memorial.scroll_sender_name('정명천 회장님'),'정명천 회장')
+  self.assertEqual(memorial.scroll_sender_name('정명천 회장님'),'정명천')
+  self.assertEqual(memorial.scroll_sender_name('정명천회장님'),'정명천')
+  self.assertEqual(memorial.scroll_sender_name('김병섭대표님'),'김병섭')
   self.assertEqual(memorial.scroll_sender_name('김병섭상주님'),'김병섭')
   self.assertEqual(memorial.scroll_sender_name('김상주'),'김상주')
+  self.assertEqual(memorial.scroll_sender_name('김상주 상주님'),'김상주')
+  self.assertEqual(memorial.scroll_sender_name('회장님'),'')
+
+ def test_right_scroll_removes_title_from_actual_pdf(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   result=memorial.render_scrolls(tmp,'정명천회장님')
+   with fitz.open(result['right']/'scroll.pdf') as doc:
+    text=doc[0].get_textbox(memorial.scroll_engine().memorial_sender_box(doc[0])).strip()
+    self.assertEqual(text,'정명천');self.assertNotIn('회장',text)
 
  def test_birch23_and_star44_with_original_memorial_backing_and_distinct_scrolls(self):
   with tempfile.TemporaryDirectory() as tmp,patch.object(renderer,'ASSETS',Path(tmp)):
