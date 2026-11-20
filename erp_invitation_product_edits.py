@@ -48,7 +48,9 @@ def resolve(root,product_id):
 def read_product(root,job,price):
     import checkout
     product=checkout.read(Path(root),job,str(price))
-    if not isinstance(product,dict) or int(product.get('price',0))!=int(price):raise ValueError('발행된 자체 주문서 상품을 찾지 못했습니다.')
+    # The URL selects an immutable snapshot, not its payable amount. Legacy
+    # payment-test snapshots may legitimately contain 1,000 won at /93500/order.
+    if not isinstance(product,dict) or type(product.get('price')) is not int or product['price']<=0:raise ValueError('발행된 자체 주문서 상품을 찾지 못했습니다.')
     return product
 
 def describe(product_id,product):

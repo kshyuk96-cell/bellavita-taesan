@@ -54,6 +54,16 @@ class ProductEdits(unittest.TestCase):
         self.assertIn('&lt;script&gt;alert(1)&lt;/script&gt;',page);self.assertNotIn('<script>alert(1)</script>',page)
         order=checkout.normalize_order(product,{'consent':'yes','choice0':'1','choice1':'1','choice2':'1','sender':'가상 보내는분','same_buyer':'yes','buyer_phone':'01000000001'})
         self.assertEqual((order['title'],order['venue'],order['address'],order['amount']),('수정 예식','수정홀','서울 수정로 20',93500))
+    def test_legacy_payment_test_price_is_preserved_independently_of_url_branch(self):
+        snapshot=self.folder/'93500.order.json';original=json.loads(snapshot.read_text());original['price']=1000;snapshot.write_text(json.dumps(original,ensure_ascii=False))
+        before=snapshot.read_bytes();payments=(self.root/'state.sqlite3').read_bytes()
+        result=edits.update(self.root,self.payload());self.assertEqual(result['price'],1000)
+        self.assertEqual(snapshot.read_bytes(),before);self.assertEqual((self.root/'state.sqlite3').read_bytes(),payments)
+        product=checkout.read(self.root,self.job,'93500');self.assertEqual(product['price'],1000);self.assertEqual(product['title'],'수정 예식')
+        order=checkout.normalize_order(product,{'consent':'yes','choice0':'1','choice1':'1','choice2':'1','sender':'가상 보내는분','same_buyer':'yes','buyer_phone':'01000000001'})
+        self.assertEqual(order['amount'],1000)
+        row=next(row for row in management.products(self.worker,self.root) if row['orderUrl'].endswith('/93500/order'))
+        self.assertTrue(row['canEditProduct']);self.assertEqual(row['price'],1000);self.assertEqual(row['productEditRevision'],1)
     def test_numeric_published_id_and_legacy_own_id_share_revision(self):
         result=edits.update(self.root,self.payload(productId='93600'));self.assertEqual(result['revision'],1)
         self.assertEqual(edits.detail(self.root,'own:'+self.job+':93500')['title'],'수정 예식')

@@ -80,7 +80,10 @@ def page(renderer, v, price, order_url, sample, og, url, preview=False):
     portrait_url = _url(v.get('portrait'))
     portrait = ('<img class="portrait-image" src="' + e(portrait_url) + '" alt="고인 영정사진" style="object-position:50% 35%">') if portrait_url else LILY
     portrait = '<div class="memorial-portrait ' + ('with-photo' if portrait_url else 'without-photo') + '"><div class="portrait-frame">' + portrait + '</div></div>'
-    description = '<small>' + e(v['deceasedDescription']) + '</small>' if _text(v.get('deceasedDescription')) else ''
+    description_text = _text(v.get('deceasedDescription'))
+    if name:
+        description_text = re.sub(r'^(?:故\s*)?' + re.escape(name) + r'(?:\s*님)?\s*', '', description_text)
+    description = '<small>' + e(description_text) + '</small>' if description_text else ''
     death = '<p>' + e(v['deathDate']) + '</p>' if _text(v.get('deathDate')) else ''
     mourners = _mourners(v.get('mourners'), v.get('host'))
     family = '<section class="obit-section"><h3>상주</h3>' + mourners + '</section>' if mourners else ''

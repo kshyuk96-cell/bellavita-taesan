@@ -119,8 +119,8 @@ def products(worker,root=None):
             if item.get('source')!='own-checkout' or not native:continue
             try:
                 product=checkout.read(Path(root),native[1],native[2])
-                if product:
-                    item.update(name=product.get('title',''),venue=product.get('venue',''),address=product.get('address',''),orderNotice=product.get('orderNotice',''),canEditProduct=True,productEditRevision=product.get('_productEditRevision',0))
+                if product and type(product.get('price')) is int and product['price']>0:
+                    item.update(name=product.get('title',''),venue=product.get('venue',''),address=product.get('address',''),orderNotice=product.get('orderNotice',''),price=product['price'],canEditProduct=True,productEditRevision=product.get('_productEditRevision',0))
             except (OSError,ValueError,TypeError,sqlite3.Error):continue
     return list(items.values())
 
