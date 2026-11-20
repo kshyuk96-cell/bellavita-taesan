@@ -28,15 +28,15 @@ class Charmcard(unittest.TestCase):
   decoded=charm.decode(RAW);self.assertIn('가상신랑',decoded);self.assertIn('뷁',decoded)
   result=charm.fields(URL,RAW)
   self.assertEqual(result['venue'],'가상웨딩컨벤션 3층 그랜드볼룸홀');self.assertEqual(result['address'],'서울시 동작구 가상로5길 15 (가상동 395-70번지)')
-  self.assertEqual(result['families'],[('故 가상부친·가상모친','','가상신랑'),('다른부친·다른모친','','가상신부')])
+  self.assertEqual(result['families'],[('故 가상부친·가상모친','아들','가상신랑'),('다른부친·다른모친','딸','가상신부')])
   self.assertEqual(len(result['photos']),7);self.assertEqual(len(set(result['photos'])),7)
   self.assertTrue(all('/img2/' in url and 'image_view' not in url for url in result['photos']))
-  self.assertTrue(result['warnings']);self.assertNotIn('�',decoded)
- def test_provider_fetch_does_not_require_ai_and_keeps_missing_birth_order_blank(self):
+  self.assertFalse(result['warnings']);self.assertNotIn('�',decoded)
+ def test_provider_fetch_does_not_require_ai_and_uses_child_relation_without_inventing_birth_order(self):
   with patch.object(charm,'fetch',return_value=RAW),patch('invitation.get_page',side_effect=AssertionError('ordinary HTTPS fetch must not run')):
    event=invitation.parse_source(URL,lambda _:(_ for _ in ()).throw(AssertionError('no AI extraction required')))
   self.assertEqual(event['name'],'가상신랑 가상신부 결혼');self.assertEqual(event['when'].isoformat(),'2099-12-19T11:00:00');self.assertEqual(len(event['photos']),7)
-  self.assertTrue(all(not family[1] for family in event['families']));self.assertEqual(event['source'],URL)
+  self.assertEqual([family[1] for family in event['families']],['아들','딸']);self.assertEqual(event['source'],URL)
  def test_http_exception_is_exact_host_path_only_and_attachments_are_preserved(self):
   invalid=['http://127.0.0.1/m/m9999/index.html','http://charmcard.com.evil.test/m/m9999/index.html','http://charmcard.com:8080/m/m9999/index.html','http://user@charmcard.com/m/m9999/index.html','http://charmcard.com/m/../index.html',URL+'?redirect=http://127.0.0.1',URL+'#fragment']
   for url in invalid:
@@ -74,10 +74,10 @@ class Charmcard(unittest.TestCase):
     result=engine.parse({'requestId':'charmcard-parser-fixture','kind':'wedding','source':URL,'automatic':False})
     values=result['values'];self.assertEqual(values['groomName'],'가상신랑');self.assertEqual(values['brideName'],'가상신부')
     self.assertEqual(values['date'],'2099-12-19');self.assertEqual(values['time'],'11:00');self.assertIn('3층 그랜드볼룸홀',values['venue']);self.assertIn('395-70',values['address'])
-    self.assertEqual(values['groomRelation'],'');self.assertEqual(values['brideRelation'],'');self.assertEqual(len(values['images']),7)
+    self.assertEqual(values['groomRelation'],'아들');self.assertEqual(values['brideRelation'],'딸');self.assertEqual(len(values['images']),7)
     self.assertTrue(all(url.startswith('attachment:') for url in values['images']));self.assertTrue(values['hero'].startswith('attachment:'))
     with engine.db() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM uploads').fetchone()[0],7)
-    self.assertTrue(any('관계' in warning for warning in result['warnings']))
+    self.assertFalse(result['warnings'])
    finally:engine.executor.shutdown(wait=True)
 
 if __name__=='__main__':unittest.main()

@@ -79,19 +79,18 @@ def fields(source,raw):
         nodes=by_class(name)
         return text(nodes[0]) if nodes else ''
     families=[]
-    for side in ('groom','bride'):
+    for side,relation in (('groom','아들'),('bride','딸')):
         def person(class_name):
             nodes=by_class(class_name)
             matches=nodes[0].xpath('.//*[contains(concat(" ",normalize-space(@class)," ")," name ")]/span') if nodes else []
             return re.sub(r'^\(\s*故\s*\)\s*','故 ',text(matches[0])) if matches else ''
         parents=[person(side+'_'+role) for role in ('father','mother')]
-        # This source contains no birth-order wording. Keep that field blank
-        # rather than inferring 장남/장녀 from a name or the side of the card.
-        families.append(('·'.join(value for value in parents if value),'',person(side)))
+        # Charmcard identifies the couple's side even when it omits birth order.
+        # Keep the known family relationship (아들/딸) without inventing 장남·장녀.
+        families.append(('·'.join(value for value in parents if value),relation,person(side)))
     photos=[];folder=urlsplit(source).path.rsplit('/',1)[0]+'/'
     for value in tree.xpath('//*[contains(concat(" ",normalize-space(@class)," ")," swiper-slide ")]//img/@src|//*[contains(concat(" ",normalize-space(@class)," ")," top_pic ")]//img/@src'):
         url=urljoin(source,value)
         if is_image_url(url) and urlsplit(url).path.startswith(folder) and url not in photos:photos.append(url)
     return {'date':content('top_space_t1'),'venue':content('hall_name'),'address':content('hall_addr'),
-            'families':families,'photos':photos[:20],'source':source,'greeting':content('con_box_t3'),
-            'warnings':['원본에 장남·장녀 등의 관계가 없어 관계 항목만 직접 확인해 주세요.']}
+            'families':families,'photos':photos[:20],'source':source,'greeting':content('con_box_t3'),'warnings':[]}

@@ -120,6 +120,15 @@ def download_image(url):
     raise ValueError('사진 주소가 너무 많이 이동합니다.')
 
 
+class JobCancelled(Exception):
+    """Cooperative stop signal; ordinary provider fallbacks must not swallow it."""
+
+
+class CancellationConflict(Exception):
+    def __init__(self,message,result):
+        super().__init__(message);self.result=result
+
+
 class Engine:
     def __init__(self,root,origin,legacy,extract,*,async_jobs=True):
         self.checkout_root=Path(os.getenv('TAESAN_DATA') or root);self.root=Path(root)/'erp-invitations';self.root.mkdir(parents=True,exist_ok=True)
@@ -145,6 +154,57 @@ class Engine:
         if self.async_jobs:self.executor.submit(self.run,key)
         else:self.run(key)
 
+    def check_cancelled(self,key):
+        if not key:return
+        with self.db() as db:row=db.execute('SELECT state FROM jobs WHERE id=?',(key,)).fetchone()
+        if row and row['state']=='cancelled':raise JobCancelled()
+
+    def _quarantine_unpublished(self,row,data):
+        """Keep crash leftovers privately without indexing a cancelled native pair."""
+        if data.get('action')!='publish' or data.get('orderMode')!='invitation-checkout':return
+        local_key=hashlib.sha256(('local-checkout:'+data['invitationId']+':'+str(data['version'])).encode()).hexdigest()[:32]
+        folder=self.checkout_root/'invitations'/local_key;owned=[]
+        for price in PRICES:
+            file=folder/f'{price}.order.json'
+            try:product=json.loads(file.read_text(encoding='utf-8'))
+            except FileNotFoundError:continue
+            if isinstance(product,dict) and product.get('localCheckout') is True and product.get('publicationId')==row['public_id']:owned.append(file)
+        if not owned:return
+        private=self.root/'private'/row['id']/('cancelled-checkout-'+secrets.token_hex(6));private.mkdir(parents=True,exist_ok=True)
+        with erp_invitation_library.LOCK:
+            index=erp_invitation_library.state(self.checkout_root);legacy=index.get(local_key)
+            if legacy and legacy.get('legacy') and legacy.get('orderOnly'):
+                (private/'library-row.json').write_text(json.dumps(legacy,ensure_ascii=False),encoding='utf-8')
+                index.pop(local_key);erp_invitation_library.save(self.checkout_root,index)
+            for file in owned:file.replace(private/file.name)
+
+    def cancel(self,key,payload=None):
+        if not isinstance(key,str) or not re.fullmatch(r'[\w-]{10,100}',key):raise ValueError('중단할 작업 번호를 확인하세요.')
+        if payload is None:payload={}
+        if not isinstance(payload,dict):raise ValueError('제작 중단 요청을 확인하세요.')
+        with LOCK:
+            with self.db() as db:row=db.execute('SELECT * FROM jobs WHERE id=?',(key,)).fetchone()
+            if not row:return None
+            if ('invitationId' in payload and payload['invitationId']!=row['invitation_id']) or ('version' in payload and (type(payload['version']) is not int or payload['version']!=row['version'])):raise ValueError('중단할 초대장과 버전을 확인하세요.')
+            if row['state']=='cancelled':return {**json.loads(row['result']),'replayed':True}
+            data=json.loads(row['input'])
+            # A crash may leave a completed manifest before the final job update.
+            # Reconcile it instead of pretending the already-public pair stopped.
+            committed=self.recover_publication(row,data)
+            if not committed and data['action']=='publish':
+                with self.db() as db:published=db.execute('SELECT * FROM publications WHERE key=?',(f"{row['invitation_id']}:{row['version']}",)).fetchone()
+                if published:committed=json.loads(published['result'])
+            if committed:
+                completed=self.finish(row,data,committed,committed=True)
+                raise CancellationConflict('이미 발행이 완료되었습니다. 기존 초대장과 주문 링크를 보존했습니다.',completed)
+            if row['state'] in ('done','error'):raise CancellationConflict('이미 종료된 제작 작업입니다. 새 작업으로 시작해 주세요.',json.loads(row['result']))
+            self._quarantine_unpublished(row,data)
+            current=self.get(key) or {};at=dt.datetime.now(dt.timezone.utc).isoformat()
+            result={'requestId':key,'status':'cancelled','action':row['action'],'cancelledAt':at,'cancelledBy':str(payload.get('actor') or 'ERP 직원')[:160],'replayed':False,
+                    **({'progress':current['progress']} if isinstance(current.get('progress'),dict) else {})}
+            with self.db() as db:db.execute("UPDATE jobs SET state='cancelled',result=? WHERE id=? AND state IN ('queued','running')",(json.dumps(result,ensure_ascii=False),key))
+            return result
+
     def submit(self,data):
         if not isinstance(data,dict):raise ValueError('입력 형식 오류')
         key=data.get('requestId','');inv=data.get('invitationId','');version=data.get('version')
@@ -168,6 +228,7 @@ class Engine:
         if not isinstance(key,str) or not re.fullmatch(r'[\w-]{10,100}',key) or type(step) is not int or not 1<=step<=7:return None
         with self.db() as db:
             row=db.execute('SELECT state,result,created_at FROM jobs WHERE id=?',(key,)).fetchone()
+            if row and row['state']=='cancelled':raise JobCancelled()
             if not row or row['state'] not in ('queued','running'):return None
             try:payload=json.loads(row['result'] or '{}')
             except (ValueError,TypeError):payload={}
@@ -186,16 +247,17 @@ class Engine:
     def get(self,key):
         with self.db() as db:row=db.execute('SELECT * FROM jobs WHERE id=?',(key,)).fetchone()
         if not row:return None
-        if row['state'] in ('done','error'):return json.loads(row['result'])
+        if row['state'] in ('done','error','cancelled'):return json.loads(row['result'])
         answer={'requestId':key,'status':'processing','action':row['action']}
         try:progress=json.loads(row['result'] or '{}').get('progress')
         except (ValueError,TypeError,AttributeError):progress=None
         if isinstance(progress,dict) and type(progress.get('step')) is int and 1<=progress['step']<=7:answer['progress']=progress
         return answer
 
-    def upload(self,raw):
+    def upload(self,raw,*,job_key=''):
         image=decode_image(raw);data=render.image_bytes(image);hashed=hashlib.sha256(data).hexdigest()
         with LOCK,self.db() as db:
+            if job_key:self.check_cancelled(job_key)
             old=db.execute('SELECT id FROM uploads WHERE digest=?',(hashed,)).fetchone()
             if old:return {'id':old['id']}
             if db.execute('SELECT COUNT(*) FROM uploads').fetchone()[0]>=2000:raise ValueError('첨부 보관 용량을 확인하세요.')
@@ -231,10 +293,12 @@ class Engine:
             import invitation_charmcard
             if invitation_charmcard.is_card_url(event.get('source','')):
                 attachments=[]
-                self.progress(data.get('requestId',''),3,'참카드 원본 사진 수집','HTTP 원본 사진을 제작용 첨부로 저장하고 있습니다.',completedPhotos=0)
+                self.progress(data.get('requestId',''),1,'참카드 원본 사진 수집','HTTP 원본 사진을 제작용 첨부로 저장하고 있습니다.',completedPhotos=0)
                 for url in event.get('photos',[])[:20]:
                     if not invitation_charmcard.is_image_url(url):continue
-                    try:attachments.append('attachment:'+self.upload(invitation_charmcard.fetch(url,image=True))['id'])
+                    try:
+                        self.check_cancelled(data.get('requestId',''))
+                        attachments.append('attachment:'+self.upload(invitation_charmcard.fetch(url,image=True),job_key=data.get('requestId',''))['id'])
                     except (ValueError,OSError):continue
                 event={**event,'photos':attachments,'image':next(iter(attachments),'')}
                 warnings_out.extend(event.get('warnings') or [])
@@ -338,7 +402,10 @@ class Engine:
         # Validate four source photos, face-safe crops and banner geometry before
         # making any checkout/product records. A failed photo must not create products.
         self.progress(data.get('requestId',''),4,'액자·족자 제작','얼굴 보존 크롭과 세로 액자·배너 정렬을 계산하고 있습니다.')
-        photos={key:self.image(v[key]) for key in IMAGE_FIELDS if v.get(key)}
+        photos={}
+        for key in IMAGE_FIELDS:
+            if v.get(key):
+                self.check_cancelled(data.get('requestId',''));photos[key]=self.image(v[key]);self.check_cancelled(data.get('requestId',''))
         import erp_invitation_auto
         if kind=='wedding':
             parts=erp_invitation_auto.components(render,v,kind,photos)
@@ -366,28 +433,74 @@ class Engine:
     def recover_publication(self,row,data):
         """Recover the completed filesystem commit if the process died before journal commit."""
         if data['action']!='publish':return None
-        folder=self.root/'public'/row['public_id']
-        try:result=json.loads((folder/'result.json').read_text(encoding='utf-8'))
-        except FileNotFoundError:return None
-        items=result.get('items') or []
-        complete=(result.get('status')=='done' and result.get('jobId')==row['public_id']
-                  and result.get('fingerprint')==data.get('fingerprint')
-                  and len(items)==2 and {i.get('price') for i in items}==set(PRICES)
-                  and all((folder/name).is_file() for name in ('93500.html','99000.html','sample.webp','thumbnail.jpg')))
-        if not complete:raise ValueError('저장된 발행 결과의 두 가격을 확인해야 합니다. 기존 요청 ID를 유지해 주세요.')
-        publication_key=f"{data['invitationId']}:{data['version']}"
-        with self.db() as db:
-            old=db.execute('SELECT fingerprint FROM publications WHERE key=?',(publication_key,)).fetchone()
-            if old and old['fingerprint']!=result['fingerprint']:raise ValueError('발행 원장의 버전이 일치하지 않습니다.')
-            db.execute('INSERT OR IGNORE INTO publications VALUES(?,?,?)',(publication_key,result['fingerprint'],json.dumps(result,ensure_ascii=False)))
-        return result
+        with LOCK:
+            self.check_cancelled(row['id'])
+            folder=self.root/'public'/row['public_id']
+            try:result=json.loads((folder/'result.json').read_text(encoding='utf-8'))
+            except FileNotFoundError:return None
+            items=result.get('items') or []
+            complete=(result.get('status')=='done' and result.get('jobId')==row['public_id']
+                      and result.get('fingerprint')==data.get('fingerprint')
+                      and len(items)==2 and {i.get('price') for i in items}==set(PRICES)
+                      and all((folder/name).is_file() for name in ('93500.html','99000.html','sample.webp','thumbnail.jpg')))
+            if not complete:raise ValueError('저장된 발행 결과의 두 가격을 확인해야 합니다. 기존 요청 ID를 유지해 주세요.')
+            publication_key=f"{data['invitationId']}:{data['version']}"
+            with self.db() as db:
+                old=db.execute('SELECT fingerprint FROM publications WHERE key=?',(publication_key,)).fetchone()
+                if old and old['fingerprint']!=result['fingerprint']:raise ValueError('발행 원장의 버전이 일치하지 않습니다.')
+                db.execute('INSERT OR IGNORE INTO publications VALUES(?,?,?)',(publication_key,result['fingerprint'],json.dumps(result,ensure_ascii=False)))
+            return result
+
+    def finish(self,row,data,result,*,committed=False):
+        """Terminal result and library registration share the cancellation fence."""
+        key=row['id']
+        with LOCK:
+            self.check_cancelled(key)
+            with self.db() as db:current_row=db.execute('SELECT state,result FROM jobs WHERE id=?',(key,)).fetchone()
+            if not current_row:return None
+            if current_row['state']=='done' or current_row['state']=='error' and not committed:return json.loads(current_row['result'])
+            if data['action']=='publish':
+                self.progress(key,7,'초대장 관리 등록','발행된 두 링크와 연결 상품을 관리 목록에 등록하고 있습니다.')
+                pending={'input':json.dumps(data,ensure_ascii=False),'result':json.dumps(result,ensure_ascii=False),'public_id':row['public_id'],'created_at':row['created_at']}
+                erp_invitation_library.register(self,self.checkout_root,pending=pending)
+            current=self.get(key) or {};progress=current.get('progress')
+            result={**result,'requestId':key,**({'progress':progress} if isinstance(progress,dict) else {})}
+            with self.db() as db:db.execute("UPDATE jobs SET state='done',result=? WHERE id=? AND state IN ('queued','running'"+(",'error'" if committed else '')+")",(json.dumps(result,ensure_ascii=False),key))
+            return result
+
+    def publish_commit(self,row,data,result,assets):
+        """Prepare HTML first; cancel and the final visibility commit are atomic."""
+        key=row['id']
+        with self.db() as db:previous=db.execute("SELECT * FROM jobs WHERE id=? AND action='preview' AND state='done'",(data.get('previewRequestId'),)).fetchone()
+        if not previous or previous['invitation_id']!=data['invitationId'] or previous['version']!=data['version'] or json.loads(previous['result']).get('fingerprint')!=data.get('fingerprint') or result['fingerprint']!=data.get('fingerprint'):raise ValueError('상품 또는 사진이 변경됐습니다. 현재 버전을 다시 미리보기하세요.')
+        if not safe_https(self.origin):raise ValueError('고객용 공개 HTTPS 주소를 확인하세요.')
+        self.progress(key,6,'초대장 발행','두 가격의 초대장·썸네일·주문 링크를 저장하고 있습니다.')
+        origin=self.origin+'/erp/i/'+row['public_id'];documents={};items=[]
+        for item in result['items']:
+            self.check_cancelled(key)
+            price=item['price'];url=origin+f'/{price}.html'
+            documents[f'{price}.html']=render.page(data['values'],data['kind'],price,item['orderUrl'],json.loads(assets['reference-components.json']) if data['kind'] in ('wedding','memorial') else origin+'/sample.webp',origin+'/hero.webp' if assets['hero.webp'] else '',origin+'/thumbnail.jpg',url)
+            items.append({**item,'url':url,'message':render.message(data['values'],data['kind'],price,url)})
+        result={**result,'items':items,'jobId':row['public_id'],'publishedAt':dt.datetime.now(dt.timezone.utc).isoformat(),'thumbnail':origin+'/thumbnail.jpg'}
+        with LOCK:
+            self.check_cancelled(key)
+            public=self.root/'public'/row['public_id'];public.mkdir(parents=True,exist_ok=True)
+            for name,raw in assets.items():
+                if raw:(public/name).write_bytes(raw)
+            for name,page in documents.items():(public/name).write_text(page,encoding='utf-8')
+            if data.get('orderMode')=='invitation-checkout':
+                local=json.loads(assets['local-products.json']);erp_local_checkout.publish(self.checkout_root,local['key'],local['products'],row['public_id'],result['fingerprint'],self.origin,data['kind']=='wedding',data['values'].get('weddingCrop'))
+            # Manifest last: a cancelled request never enters this fenced commit.
+            temp=public/'result.tmp';temp.write_text(json.dumps(result,ensure_ascii=False),encoding='utf-8');temp.replace(public/'result.json')
+            with self.db() as db:db.execute('INSERT INTO publications VALUES(?,?,?)',(f"{data['invitationId']}:{data['version']}",result['fingerprint'],json.dumps(result,ensure_ascii=False)))
+            return self.finish(row,data,result,committed=True)
 
     def run(self,key):
         try:
-            with self.db() as db:
+            with LOCK,self.db() as db:
                 row=db.execute('SELECT * FROM jobs WHERE id=?',(key,)).fetchone()
                 if not row or row['state'] not in ('queued','running'):return
-                db.execute("UPDATE jobs SET state='running' WHERE id=?",(key,))
+                db.execute("UPDATE jobs SET state='running' WHERE id=? AND state IN ('queued','running')",(key,))
             data=json.loads(row['input']);action=data['action']
             recovered=self.recover_publication(row,data)
             if recovered:result=recovered
@@ -400,47 +513,30 @@ class Engine:
                     result=json.loads(published['result'])
                 else:
                     result,assets=self.prepare(data)
-                    folder=self.root/'private'/key;folder.mkdir(parents=True,exist_ok=True)
-                    for name,raw in assets.items():
-                        if raw:(folder/name).write_bytes(raw)
+                    with LOCK:
+                        self.check_cancelled(key)
+                        folder=self.root/'private'/key;folder.mkdir(parents=True,exist_ok=True)
+                        for name,raw in assets.items():
+                            if raw:(folder/name).write_bytes(raw)
                     if action=='preview':
                         v=data['values'];sample=render.data_image(assets['sample.webp']);hero=render.data_image(assets['hero.webp']) if assets['hero.webp'] else ''
-                        (folder/'preview.html').write_text(render.page(v,data['kind'],93500,'#',json.loads(assets['reference-components.json']) if data['kind'] in ('wedding','memorial') else sample,hero,render.data_image(assets['thumbnail.jpg'],'image/jpeg'),'about:blank',preview=True),encoding='utf-8')
+                        page=render.page(v,data['kind'],93500,'#',json.loads(assets['reference-components.json']) if data['kind'] in ('wedding','memorial') else sample,hero,render.data_image(assets['thumbnail.jpg'],'image/jpeg'),'about:blank',preview=True)
+                        with LOCK:
+                            self.check_cancelled(key)
+                            (folder/'preview.html').write_text(page,encoding='utf-8')
                     else:
-                        with self.db() as db:previous=db.execute("SELECT * FROM jobs WHERE id=? AND action='preview' AND state='done'",(data.get('previewRequestId'),)).fetchone()
-                        if not previous or previous['invitation_id']!=data['invitationId'] or previous['version']!=data['version'] or json.loads(previous['result']).get('fingerprint')!=data.get('fingerprint') or result['fingerprint']!=data.get('fingerprint'):raise ValueError('상품 또는 사진이 변경됐습니다. 현재 버전을 다시 미리보기하세요.')
-                        if not safe_https(self.origin):raise ValueError('고객용 공개 HTTPS 주소를 확인하세요.')
-                        self.progress(key,6,'초대장 발행','두 가격의 초대장·썸네일·주문 링크를 저장하고 있습니다.')
-                        public=self.root/'public'/row['public_id'];public.mkdir(parents=True,exist_ok=True)
-                        origin=self.origin+'/erp/i/'+row['public_id']
-                        for name,raw in assets.items():
-                            if raw:(public/name).write_bytes(raw)
-                        items=[]
-                        for item in result['items']:
-                            price=item['price'];url=origin+f'/{price}.html'
-                            page=render.page(data['values'],data['kind'],price,item['orderUrl'],json.loads(assets['reference-components.json']) if data['kind'] in ('wedding','memorial') else origin+'/sample.webp',origin+'/hero.webp' if assets['hero.webp'] else '',origin+'/thumbnail.jpg',url)
-                            (public/f'{price}.html').write_text(page,encoding='utf-8')
-                            items.append({**item,'url':url,'message':render.message(data['values'],data['kind'],price,url)})
-                        result={**result,'items':items,'jobId':row['public_id'],'publishedAt':dt.datetime.now(dt.timezone.utc).isoformat(),'thumbnail':origin+'/thumbnail.jpg'}
-                        if data.get('orderMode')=='invitation-checkout':
-                            local=json.loads(assets['local-products.json']);erp_local_checkout.publish(self.checkout_root,local['key'],local['products'],row['public_id'],result['fingerprint'],self.origin,data['kind']=='wedding',data['values'].get('weddingCrop'))
-                        # Manifest is written last: incomplete pages cannot become public.
-                        temp=public/'result.tmp';temp.write_text(json.dumps(result,ensure_ascii=False),encoding='utf-8');temp.replace(public/'result.json')
-                        with self.db() as db:db.execute('INSERT INTO publications VALUES(?,?,?)',(publication_key,result['fingerprint'],json.dumps(result,ensure_ascii=False)))
-            if action=='publish':
-                self.progress(key,7,'초대장 관리 등록','발행된 두 링크와 연결 상품을 관리 목록에 등록하고 있습니다.')
-                pending={'input':json.dumps(data,ensure_ascii=False),'result':json.dumps(result,ensure_ascii=False),'public_id':row['public_id'],'created_at':row['created_at']}
-                erp_invitation_library.register(self,self.checkout_root,pending=pending)
-            current=self.get(key) or {};progress=current.get('progress')
-            result={**result,'requestId':key,**({'progress':progress} if isinstance(progress,dict) else {})}
-            with self.db() as db:db.execute('UPDATE jobs SET state=?,result=? WHERE id=?',('done',json.dumps(result,ensure_ascii=False),key))
+                        self.publish_commit(row,data,result,assets);return
+            self.finish(row,data,result,committed=action=='publish')
+        except JobCancelled:
+            pass
         except Exception as error:
             import traceback
             frames=[{'file':Path(f.filename).name,'line':f.lineno,'function':f.name} for f in traceback.extract_tb(error.__traceback__)[-6:]]
             print(json.dumps({'event':'ERP_INVITATION_FAILURE','requestId':key,'errorType':type(error).__name__,'frames':frames}),flush=True)
-            current=self.get(key) or {};progress=current.get('progress')
-            result={'requestId':key,'status':'error','error':str(error)[:500] if isinstance(error,ValueError) else '제작 서버 연결 또는 원본 자료를 확인해 주세요.',**({'progress':progress} if isinstance(progress,dict) else {})}
-            with self.db() as db:db.execute('UPDATE jobs SET state=?,result=? WHERE id=?',('error',json.dumps(result,ensure_ascii=False),key))
+            with LOCK:
+                current=self.get(key) or {};progress=current.get('progress')
+                result={'requestId':key,'status':'error','error':str(error)[:500] if isinstance(error,ValueError) else '제작 서버 연결 또는 원본 자료를 확인해 주세요.',**({'progress':progress} if isinstance(progress,dict) else {})}
+                with self.db() as db:db.execute("UPDATE jobs SET state='error',result=? WHERE id=? AND state IN ('queued','running')",(json.dumps(result,ensure_ascii=False),key))
         finally:
             with LOCK:self.active.discard(key)
 
@@ -579,7 +675,19 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
             size=int(handler.headers.get('Content-Length','0'))
             if not 0<size<=80000:raise ValueError('입력 크기 오류')
             data=json.loads(handler.rfile.read(size));result=worker.submit(data)
-            handler.send_json(result,200 if result['status'] in ('done','error') else 202);return True
+            handler.send_json(result,200 if result['status'] in ('done','error','cancelled') else 202);return True
+        cancel_match=re.fullmatch(r'/erp/invitations/jobs/([\w-]{10,100})/cancel',path)
+        if cancel_match:
+            if method!='POST':handler.send_json({'error':'제작 중단은 POST 요청으로 처리합니다.'},405);return True
+            size=int(handler.headers.get('Content-Length','0'))
+            if not 0<=size<=4000:raise ValueError('제작 중단 요청 크기를 확인하세요.')
+            payload=json.loads(handler.rfile.read(size)) if size else {}
+            try:result=worker.cancel(cancel_match[1],payload)
+            except CancellationConflict as error:
+                handler.send_json({**error.result,'error':str(error)},409);return True
+            if result is None:handler.send_json({'error':'중단할 작업을 찾지 못했습니다.'},404)
+            else:handler.send_json(result)
+            return True
         if method=='POST' and path=='/erp/invitations/uploads':
             size=int(handler.headers.get('Content-Length','0'))
             if not 0<size<=5*1024*1024:raise ValueError('사진 크기 오류')
