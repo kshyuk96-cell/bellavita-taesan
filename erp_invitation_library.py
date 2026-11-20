@@ -71,7 +71,7 @@ def register(worker,root,pending=None):
                 job=json.loads(row['input']);result=json.loads(row['result']);key=result.get('jobId') or (row['public_id'] if 'public_id' in row.keys() else '');v=job['values']
                 if not re.fullmatch('[a-f0-9]{32}',key) or len(result.get('items',[]))!=2:continue
                 if key in data and data[key].get('deleted'):continue
-                if key in data and (data[key].get('orderMode')=='blogpay-manual' or data[key].get('orderRewrites') or all('/i/' in x.get('orderUrl','') for x in data[key]['links'])):continue
+                if key in data and (data[key].get('orderMode')=='blogpay-manual' or data[key].get('orderRewrites') or data[key].get('orderRewritesByPrice') or all('/i/' in x.get('orderUrl','') for x in data[key]['links'])):continue
                 old_row=data.get(key,{})
                 folder=worker.root/'public'/key
                 if not all((folder/f'{p}.html').is_file() for p in PRICES):continue
@@ -133,6 +133,11 @@ def current_html(root,row,price):
     if row.get('external') or row.get('orderOnly'):raise ValueError('외부 발행 또는 주문서 전용 초대장은 등록된 링크에서 확인하세요. ERP에서 문구·디자인을 직접 수정할 수 없습니다.')
     raw=(base(root)/row['editPath']/f'{price}.html').read_text() if row.get('editPath') else (Path(row['folder'])/f'{price}.html').read_text()
     for old,new in row.get('orderRewrites',{}).items():raw=raw.replace(old,new)
+    rewrites=row.get('orderRewritesByPrice',{})
+    if isinstance(rewrites,dict):
+        selected=rewrites.get(str(price),{})
+        if isinstance(selected,dict):
+            for old,new in selected.items():raw=raw.replace(old,new)
     if row.get('thumbnailVersion'):
         raw=re.sub(r'(thumbnail\.jpg)(?:\?v=[a-f0-9]+)?',r'\1?v='+row['thumbnailVersion'],raw)
     return raw
@@ -173,6 +178,52 @@ def edit_documents(root,row,payload):
         docs[str(price)]=html.tostring(tree,encoding='unicode',doctype='<!DOCTYPE html>')
     return docs
 
+def relink_values(payload):
+    """Validate one explicit, current-shop BlogPay order-link replacement."""
+    price=payload.get('price');target=payload.get('orderUrl','');expected=payload.get('expectedOrderUrl','')
+    if type(price) is not int or price not in PRICES:raise ValueError('가격은 93,500원 또는 99,000원이어야 합니다.')
+    if not isinstance(target,str) or not target or len(target)>1000:raise ValueError('현재 블로그페이 상점의 HTTPS 상품 링크를 입력하세요.')
+    shop=os.getenv('BLOGPAY_SHOP_ID','').strip().lower()
+    try:host=(urlsplit(target).hostname or '').lower()
+    except ValueError:host=''
+    if not shop or host!=shop+'.shop.blogpay.co.kr' or not erp_manual_blogpay.order_url(target,shop):
+        raise ValueError('현재 블로그페이 상점의 HTTPS 상품 링크를 입력하세요.')
+    if not isinstance(expected,str) or not expected or len(expected)>1500:raise ValueError('현재 주문 링크를 다시 확인하세요.')
+    return price,expected,target
+
+def relink_replay(row,payload,values):
+    """Recognize an exact retry after the first atomic state commit."""
+    price,expected,target=values;history=row.get('history') or []
+    if not history or payload.get('revision')==row.get('revision'):return False
+    last=history[-1]
+    links=row.get('links') or []
+    selected=[item for item in links if isinstance(item,dict) and item.get('price')==price]
+    return (len(selected)==1 and selected[0].get('orderUrl')==target
+            and last.get('action')=='relink-order' and last.get('price')==price
+            and last.get('previousRevision')==payload.get('revision')
+            and last.get('fromOrderUrl')==expected and last.get('toOrderUrl')==target)
+
+def relink_order(root,row,values):
+    price,expected,target=values;links=row.get('links')
+    if not isinstance(links,list):raise ValueError('발행된 가격별 주문 링크를 찾지 못했습니다.')
+    selected=[item for item in links if isinstance(item,dict) and item.get('price')==price]
+    if len(selected)!=1:raise ValueError('선택한 가격의 주문 링크를 하나로 확인하지 못했습니다.')
+    link=selected[0];current=link.get('orderUrl','')
+    if current!=expected:raise ValueError('현재 주문 링크가 변경되었습니다. 새로고침하세요.')
+    if current==target:raise ValueError('이미 같은 주문 링크로 연결되어 있습니다.')
+    if any(item is not link and isinstance(item,dict) and item.get('orderUrl')==target for item in links):
+        raise ValueError('다른 가격에 연결된 주문 링크입니다.')
+    raw=current_html(root,row,price)
+    try:buttons=html.fromstring(raw).xpath('//a[@href=$url]',url=current)
+    except (ValueError,TypeError):buttons=[]
+    if len(buttons)!=1 or raw.count(current)!=1:raise ValueError('선택한 가격의 주문 버튼을 하나로 확인하지 못했습니다.')
+    rewrites=row.setdefault('orderRewritesByPrice',{})
+    if not isinstance(rewrites,dict):raise ValueError('기존 주문 링크 변경 이력을 확인해 주세요.')
+    selected_rewrites=rewrites.setdefault(str(price),{})
+    if not isinstance(selected_rewrites,dict):raise ValueError('가격별 주문 링크 변경 이력을 확인해 주세요.')
+    selected_rewrites[current]=target;link['orderUrl']=target
+    return {'price':price,'fromOrderUrl':current,'toOrderUrl':target}
+
 def update(root,key,payload,actor):
     with LOCK:
         data=state(root);row=data.get(key)
@@ -182,9 +233,13 @@ def update(root,key,payload,actor):
             if action=='delete':return {'id':key,'revision':row['revision'],'replayed':True,**status(row)}
             raise ValueError('삭제된 초대장입니다.')
         if action!='delete' and (row.get('external') or row.get('orderOnly')):raise ValueError('외부 발행 또는 주문서 전용 초대장입니다. 문구·디자인은 원래 발행 사이트에서, 상품 판매 중지는 블로그페이에서 처리하세요.')
+        relink=relink_values(payload) if action=='relink-order' else None
+        if relink and relink_replay(row,payload,relink):
+            return {'id':key,'revision':row['revision'],'replayed':True,'price':relink[0],'orderUrl':relink[2],**status(row)}
         if payload.get('revision')!=row['revision']:raise ValueError('다른 직원이 수정했습니다. 새로고침하세요.')
         if action=='preview':return {'documents':edit_documents(root,row,payload),'revision':row['revision']}
         if action=='sales' and row.get('orderMode')=='blogpay-manual':raise ValueError('수동 연결된 블로그페이 상품입니다. 두 상품의 판매 상태는 블로그페이에서 변경하세요.')
+        audit=None;previous_revision=row['revision']
         if action=='delete':
             row.update(deleted=True,deletedAt=now().isoformat(),deletedBy=str(actor)[:160],salesStopped=True)
         elif action=='sales':
@@ -194,11 +249,16 @@ def update(root,key,payload,actor):
             docs=edit_documents(root,row,payload);rev=row['revision']+1;rel=f'{key}/{rev}';folder=base(root)/rel;folder.mkdir(parents=True,exist_ok=False)
             for price,raw in docs.items():(folder/f'{price}.html').write_text(raw)
             row['editPath']=rel;row['design']=payload.get('design',{})
+        elif action=='relink-order':audit=relink_order(root,row,relink)
         else:raise ValueError('지원하지 않는 관리 작업입니다.')
         row['revision']+=1;row['updatedAt']=now().isoformat();row['updatedBy']=str(actor)[:160]
-        row.setdefault('history',[]).append({'revision':row['revision'],'action':action,'at':row['updatedAt'],'by':row['updatedBy'],'salesStopped':row['salesStopped'],'editPath':row.get('editPath')})
+        event={'revision':row['revision'],'action':action,'at':row['updatedAt'],'by':row['updatedBy'],'salesStopped':row['salesStopped'],'editPath':row.get('editPath')}
+        if audit:event.update(previousRevision=previous_revision,**audit)
+        row.setdefault('history',[]).append(event)
         save(root,data)
-        return {'id':key,'revision':row['revision'],**status(row)}
+        result={'id':key,'revision':row['revision'],**status(row)}
+        if audit:result.update(price=audit['price'],orderUrl=audit['toOrderUrl'])
+        return result
 
 def public(root,key,name):
     row=state(root).get(key)
