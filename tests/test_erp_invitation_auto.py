@@ -29,7 +29,9 @@ class AutomaticTests(unittest.TestCase):
         self.assertEqual(calls,['https://card.test/'+str(i) for i in range(6)])
         self.assertEqual(result['hero'],'https://card.test/2');self.assertEqual(result['frame'],'https://card.test/3');self.assertEqual(result['scrollLeft'],'https://card.test/4');self.assertEqual(result['scrollRight'],'https://card.test/5');self.assertFalse(warnings)
     def test_incomplete_source_leaves_only_missing_fields_unfilled(self):
-        v,w=auto.select_photos(types.SimpleNamespace(image=lambda u:Image.new('RGB',(40,30),'red')),{'images':['https://card.test/1']},checker=lambda im:True)
+        from unittest.mock import patch
+        with patch.object(auto.geometry,'crop',side_effect=lambda im,size:im):
+            v,w=auto.select_photos(types.SimpleNamespace(image=lambda u:Image.new('RGB',(40,30),'red')),{'images':['https://card.test/1']},checker=lambda im:True)
         self.assertNotIn('frame',v);self.assertTrue(w)
     def test_approved_reference_css_and_dom_are_preserved_and_dynamic_data_escaped(self):
         values={'name':'가상 예식','groomName':'가상남','brideName':'가상녀','groomParents':'가상父·가상母','brideParents':'가상父·가상母','groomRelation':'장남','brideRelation':'장녀','date':'2099-12-12','time':'14:30','venue':'검증홀 <script>','address':'가상 주소','sourceUrl':'https://card.test/1'}

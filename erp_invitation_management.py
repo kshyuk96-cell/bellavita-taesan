@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sqlite3
+import erp_invitation_order_edits as order_edits
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -137,24 +138,43 @@ def query(worker,root,params):
         a,b=dt.date.fromisoformat(start),dt.date.fromisoformat(end);page=int(params.get('page',['1'])[0])
         if a>b or (b-a).days>366 or not 1<=page<=100:raise ValueError()
     except ValueError:raise ValueError('조회 기간은 1년 이내, 페이지는 1~100으로 입력하세요.')
-    catalog=[p for p in products(worker,root) if p.get('source')=='own-checkout' or p.get('external') or p.get('orderMode')=='blogpay-manual'];orders=[];warnings=[];pages=1
+    edits=order_edits.metadata(root);hidden=[order_edits.source_key(key) for key,row in edits.items() if row['hidden']]
+    include_hidden=params.get('includeHidden',['0'])[0]=='1'
+    excluded=json.dumps([] if include_hidden else hidden)
+    catalog=[p for p in products(worker,root) if p.get('source')=='own-checkout' or p.get('external') or p.get('orderMode')=='blogpay-manual'];orders=[];warnings=[];pages=1;count=0
     c=read_db(Path(root)/'state.sqlite3')
     if c:
         try:
             target=params.get('id',[''])[0]
-            count=c.execute('SELECT COUNT(*) FROM invitation_orders WHERE substr(created,1,10)>=? AND substr(created,1,10)<=?',(start,end)).fetchone()[0]
+            count=c.execute('SELECT COUNT(*) FROM invitation_orders WHERE substr(created,1,10)>=? AND substr(created,1,10)<=? AND id NOT IN (SELECT value FROM json_each(?))',(start,end,excluded)).fetchone()[0]
             pages=max(1,(count+499)//500)
-            rows=c.execute("SELECT i.*,o.order_number AS legacy_order_number FROM invitation_orders i LEFT JOIN order_operations o ON replace(o.id,'-','')=i.id WHERE substr(i.created,1,10)>=? AND substr(i.created,1,10)<=? AND (?='' OR 'payapp:'||i.id=?) ORDER BY i.created DESC LIMIT 500 OFFSET ?",(start,end,target,target,0 if target else (page-1)*500)).fetchall()
+            rows=c.execute("SELECT i.*,o.order_number AS legacy_order_number FROM invitation_orders i LEFT JOIN order_operations o ON replace(o.id,'-','')=i.id WHERE substr(i.created,1,10)>=? AND substr(i.created,1,10)<=? AND i.id NOT IN (SELECT value FROM json_each(?)) AND (?='' OR 'payapp:'||i.id=?) ORDER BY i.created DESC LIMIT 500 OFFSET ?",(start,end,excluded,target,target,0 if target else (page-1)*500)).fetchall()
             for row in rows:
-                d=paid_order(row)
+                d=order_edits.apply(paid_order(row),edits)
                 if not params.get('id') or d['id']==params['id'][0]:orders.append(d)
         except sqlite3.OperationalError:warnings.append('자체 주문 원장이 아직 없습니다.')
         finally:c.close()
     if pages>page:warnings.append('다음 페이지 주문이 있습니다. 다음 페이지도 확인하세요.')
-    return {'orders':sorted(orders,key=lambda r:r['createdAt'],reverse=True),'products':catalog,'notifications':notifications(root),'from':start,'to':end,'page':page,'pages':pages,'warnings':warnings,'autoCreateEnabled':True,'productMode':'own-checkout'}
+    return {'orders':sorted(orders,key=lambda r:r['createdAt'],reverse=True),'products':catalog,'notifications':notifications(root),'from':start,'to':end,'page':page,'pages':pages,'warnings':warnings,'autoCreateEnabled':True,'productMode':'own-checkout','total':count if c else 0,'hiddenCount':len(hidden)}
 
 
 def dispatch(handler,method,path,root,worker):
+    if path=='/erp/invitations/pending-orders':
+        if method!='GET':handler.send_json({'error':'승인 대기 목록은 조회만 허용됩니다.'},405);return True
+        try:
+            import erp_invitation_approvals
+            params=parse_qs(urlsplit(getattr(handler,'path',path)).query)
+            handler.send_json(erp_invitation_approvals.query(root,params))
+        except (ValueError,TypeError,sqlite3.Error):handler.send_json({'error':'초대장 승인 대기 목록을 확인하지 못했습니다. 다시 조회하세요.'},502)
+        return True
+    if path=='/erp/invitations/order-update':
+        if method!='POST':handler.send_json({'error':'주문 수정은 POST 요청으로 처리합니다.'},405);return True
+        try:
+            size=int(handler.headers.get('Content-Length','0'))
+            if not 0<size<=20000:raise ValueError('주문 수정 요청 크기를 확인하세요.')
+            payload=json.loads(handler.rfile.read(size));handler.send_json(order_edits.update(root,payload,payload.get('actor','ERP 직원')))
+        except (ValueError,TypeError,KeyError,sqlite3.Error) as error:handler.send_json({'error':str(error)[:240]},409)
+        return True
     if path!='/erp/invitations/management':return False
     if method!='GET':handler.send_json({'error':'조회만 허용됩니다.'},405);return True
     try:
