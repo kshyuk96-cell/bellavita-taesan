@@ -154,6 +154,16 @@ def wedding_preview(product):
     photo = product.get('wedding_photo')
     if not isinstance(photo, str) or not photo.startswith('https://'):
         return None
+    parsed = urlsplit(photo)
+    native = re.fullmatch(r'/erp/i/([a-f0-9]{32})/(?:hero|checkout-photo)\.webp', parsed.path)
+    if (product.get('localCheckout') is True and native
+            and native[1] == product.get('publicationId')
+            and not parsed.query and not parsed.fragment and not parsed.username and not parsed.password):
+        # The public asset route applies the same two-face bounds used by the
+        # automatic scroll renderer. Map on read so existing immutable product
+        # snapshots also receive the fix without rewriting prices or payments.
+        mapped = urlunsplit(parsed._replace(path='/erp/i/' + native[1] + '/checkout-photo.webp'))
+        return {'url': mapped, 'position': None}
     crop = product.get('wedding_crop')
     if type(crop) in (int, float) and 0 <= crop <= 100:
         return {'url': photo, 'position': float(crop)}
@@ -162,7 +172,11 @@ def wedding_preview(product):
 
 def wedding_image(preview, *, review=False):
     position = preview['position']
-    style = f'object-fit:cover;object-position:50% {position:g}%' if position is not None else 'object-fit:contain'
+    safe_header = bool(re.fullmatch(r'/erp/i/[a-f0-9]{32}/checkout-photo\.webp', urlsplit(preview['url']).path))
+    # Its ratio already matches the CSS opening. Filling that opening resizes
+    # the pre-cropped image only; neither a second crop nor letterboxing occurs.
+    style = ('object-fit:fill' if safe_header else
+             f'object-fit:cover;object-position:50% {position:g}%' if position is not None else 'object-fit:contain')
     lazy = ' loading="lazy"' if review else ''
     return f'<img class="scroll-couple" src="{escape(preview["url"])}" alt="신랑신부 사진" style="{style}"{lazy}>'
 

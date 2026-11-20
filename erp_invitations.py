@@ -423,7 +423,7 @@ class Engine:
             with LOCK:self.active.discard(key)
 
     def public(self,key,name):
-        if not re.fullmatch(r'[a-f0-9]{32}',key) or name not in ('93500.html','99000.html','thumbnail.jpg','sample.webp','hero.webp'):return 404,None,None
+        if not re.fullmatch(r'[a-f0-9]{32}',key) or name not in ('93500.html','99000.html','thumbnail.jpg','sample.webp','hero.webp','checkout-photo.webp'):return 404,None,None
         managed=erp_invitation_library.public(self.checkout_root,key,name)
         if managed:return managed
         folder=self.root/'public'/key
@@ -431,6 +431,19 @@ class Engine:
         except (OSError,ValueError):return 404,None,None
         if not all((folder/required).is_file() for required in ('93500.html','99000.html','sample.webp','thumbnail.jpg')):return 404,None,None
         if dt.datetime.now(render.SEOUL).date().isoformat()>result['expires']:return 410,None,None
+        if name=='checkout-photo.webp':
+            # Generated from a fixed, already-published local asset, never a caller URL.
+            # Both price variants share the cache; immutable checkout snapshots stay intact.
+            target=folder/name
+            if not target.is_file():
+                with LOCK:
+                    if not target.is_file():
+                        try:
+                            import erp_wedding_photos
+                            with Image.open(folder/'hero.webp') as source:
+                                image=erp_wedding_photos.crop(source,(1380,915))
+                            raw=render.image_bytes(image);temp=target.with_suffix('.tmp');temp.write_bytes(raw);temp.replace(target)
+                        except (ValueError,OSError):return 422,'text/plain; charset=utf-8','두 얼굴을 보존하는 주문서 사진을 확인해 주세요.'.encode()
         try:raw=(folder/name).read_bytes()
         except OSError:return 404,None,None
         return 200,('text/html; charset=utf-8' if name.endswith('.html') else 'image/jpeg' if name.endswith('.jpg') else 'image/webp'),raw
@@ -454,7 +467,7 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
             if method!='HEAD':handler.wfile.write(raw)
             return True
     if not path.startswith(('/erp/invitations/','/erp/i/','/erp/ai/')):return False
-    public=re.fullmatch(r'/erp/i/([a-f0-9]{32})/(93500\.html|99000\.html|thumbnail\.jpg|sample\.webp|hero\.webp)',path)
+    public=re.fullmatch(r'/erp/i/([a-f0-9]{32})/(93500\.html|99000\.html|thumbnail\.jpg|sample\.webp|hero\.webp|checkout-photo\.webp)',path)
     if public and method in ('GET','HEAD'):
         status,mime,raw=engine(root,origin,legacy,extract).public(*public.groups())
         handler.send_response(status);handler.send_header('Cache-Control','no-store')

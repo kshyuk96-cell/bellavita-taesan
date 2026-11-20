@@ -36,8 +36,9 @@ def deadline(kind,created,date):
 def status(row,at=None):
     try:end=deadline(row['kind'],row['createdAt'],row['date']);active=(at or now())<end
     except (KeyError,ValueError,TypeError):end=None;active=False
-    return {'operating':active,'operatingUntil':end.isoformat() if end else None,
-            'salesStopped':row.get('salesStopped',False),'saleStatus':('운영 종료' if not active else '판매 중지' if row.get('salesStopped') else '판매 중')}
+    deleted=row.get('deleted') is True
+    return {'operating':active and not deleted,'operatingUntil':end.isoformat() if end else None,
+            'deleted':deleted,'salesStopped':deleted or row.get('salesStopped',False),'saleStatus':('삭제됨' if deleted else '운영 종료' if not active else '판매 중지' if row.get('salesStopped') else '판매 중')}
 def register(worker,root,pending=None):
     """Discover successful publications and legacy HTML pairs. Never count previews."""
     with LOCK:
@@ -48,6 +49,7 @@ def register(worker,root,pending=None):
             try:
                 job=json.loads(row['input']);result=json.loads(row['result']);key=result.get('jobId') or (row['public_id'] if 'public_id' in row.keys() else '');v=job['values']
                 if not re.fullmatch('[a-f0-9]{32}',key) or len(result.get('items',[]))!=2:continue
+                if key in data and data[key].get('deleted'):continue
                 if key in data and (data[key].get('orderMode')=='blogpay-manual' or data[key].get('orderRewrites') or all('/i/' in x.get('orderUrl','') for x in data[key]['links'])):continue
                 old_row=data.get(key,{})
                 folder=worker.root/'public'/key
@@ -67,21 +69,35 @@ def register(worker,root,pending=None):
         if legacy.is_dir():
             for folder in legacy.iterdir():
                 key=folder.name
-                if not re.fullmatch('[a-f0-9]{32}',key) or key in data or not all((folder/f'{p}.html').is_file() for p in PRICES):continue
+                if not re.fullmatch('[a-f0-9]{32}',key) or key in data:continue
+                files=[folder/f'{price}.order.json' for price in PRICES]
+                if not all(file.is_file() for file in files):continue
                 try:
-                    product=json.loads((folder/'93500.order.json').read_text())
-                    if product.get('localCheckout'):continue
-                    created=dt.datetime.fromtimestamp(min((folder/f'{p}.html').stat().st_mtime for p in PRICES),dt.timezone.utc).isoformat()
-                    data[key]={'id':key,'kind':product.get('kind','wedding'),'createdAt':created,'date':product.get('date') or str(product.get('event_time',''))[:10],'title':product.get('title',''),'folder':str(folder),'links':[{'price':p,'url':worker.origin+f'/i/{key}/{p}.html','orderUrl':worker.origin+f'/i/{key}/{p}/order'} for p in PRICES],'revision':1,'salesStopped':False,'legacy':True};changed=True
-                except (OSError,ValueError):continue
+                    snapshots={price:json.loads((folder/f'{price}.order.json').read_text()) for price in PRICES}
+                    if any(not isinstance(v,dict) for v in snapshots.values()):continue
+                    urls={price:worker.origin+f'/i/{key}/{price}/order' for price in PRICES}
+                    known={link.get('orderUrl') for row in data.values() for link in row.get('links',[])}
+                    # Native publications already index their checkout snapshots. Do
+                    # not invent a second invitation for those same two products.
+                    if any(url in known for url in urls.values()):continue
+                    if any(v.get('publicationId') in data for v in snapshots.values() if v.get('publicationId')):continue
+                    product=snapshots[93500]
+                    date=product.get('date') or str(product.get('event_time',''))[:10]
+                    if not product.get('title') or not re.fullmatch(r'20\d\d-\d\d-\d\d',date):continue
+                    dt.date.fromisoformat(date)
+                    order_only=not all((folder/f'{price}.html').is_file() for price in PRICES)
+                    created=dt.datetime.fromtimestamp(min(file.stat().st_mtime for file in files),dt.timezone.utc).isoformat()
+                    links=[{'price':price,'productId':str(snapshots[price].get('number') or 'own:'+key+':'+str(price)),'url':urls[price] if order_only else worker.origin+f'/i/{key}/{price}.html','orderUrl':urls[price],'source':'own-checkout'} for price in PRICES]
+                    data[key]={'id':key,'kind':product.get('kind','wedding'),'createdAt':created,'date':product.get('date') or str(product.get('event_time',''))[:10],'title':product.get('title') or '기존 자체 주문서','folder':str(folder),'links':links,'revision':1,'salesStopped':False,'legacy':True,'legacyOrderOnly':order_only,'orderOnly':order_only,'readOnly':order_only,'invitationId':key,'orderMode':'invitation-checkout'};changed=True
+                except (OSError,ValueError,TypeError):continue
         if changed:save(root,data)
         return data
 
 def catalog(worker,root):
-    data=register(worker,root);items=[{k:v for k,v in row.items() if k not in ('folder','edits')}|status(row) for row in data.values()]
+    data=register(worker,root);items=[{k:v for k,v in row.items() if k not in ('folder','edits')}|status(row) for row in data.values() if not row.get('deleted')]
     items.sort(key=lambda r:r['createdAt'],reverse=True)
     active=[r for r in items if r['operating']]
-    return {'items':items,'summary':{'operating':len(active),'links':len(active)*2,'selling':sum(not r['salesStopped'] for r in active),'byKind':{k:sum(r['kind']==k for r in active) for k in ('wedding','event','memorial')},'checkedAt':now().isoformat()}}
+    return {'items':items,'summary':{'total':len(items),'deleted':sum(row.get('deleted') is True for row in data.values()),'operating':len(active),'links':len(active)*2,'selling':sum(not r['salesStopped'] for r in active),'byKind':{k:sum(r['kind']==k for r in active) for k in ('wedding','event','memorial')},'checkedAt':now().isoformat()}}
 
 def product_status(root,product):
     """Return None for unmanaged products, otherwise the authoritative shared gate."""
@@ -92,7 +108,8 @@ def product_status(root,product):
     return None
 
 def current_html(root,row,price):
-    if row.get('external'):raise ValueError('외부 발행 초대장은 등록된 링크에서 확인하세요. ERP에서 문구·디자인을 직접 수정할 수 없습니다.')
+    if row.get('deleted'):raise ValueError('삭제된 초대장입니다.')
+    if row.get('external') or row.get('orderOnly'):raise ValueError('외부 발행 또는 주문서 전용 초대장은 등록된 링크에서 확인하세요. ERP에서 문구·디자인을 직접 수정할 수 없습니다.')
     raw=(base(root)/row['editPath']/f'{price}.html').read_text() if row.get('editPath') else (Path(row['folder'])/f'{price}.html').read_text()
     for old,new in row.get('orderRewrites',{}).items():raw=raw.replace(old,new)
     if row.get('thumbnailVersion'):
@@ -101,7 +118,8 @@ def current_html(root,row,price):
 def nodes(tree):
     return tree.xpath('//h1[not(*)]|//h2[not(*)]|//h3[not(*)]|//p[not(*)]')
 def detail(root,row):
-    if row.get('external'):return {'id':row['id'],'revision':row['revision'],'title':row['title'],'fields':[],'design':{},'external':True,'readOnly':True,'links':row['links'],'notice':'외부 발행 링크를 관리 목록에 등록한 초대장입니다. 문구·디자인·상품 판매 상태는 원래 발행 사이트와 블로그페이에서 수정하세요.'}
+    if row.get('deleted'):raise ValueError('삭제된 초대장입니다.')
+    if row.get('external') or row.get('orderOnly'):return {'id':row['id'],'revision':row['revision'],'title':row['title'],'fields':[],'design':{},'external':row.get('external',False),'orderOnly':row.get('orderOnly',False),'readOnly':True,'links':row['links'],'notice':('기존 자체 주문서입니다. 두 가격의 주문 링크는 그대로 유지합니다. 주문서 전용 항목에는 초대장 디자인 편집을 적용할 수 없습니다.' if row.get('orderOnly') else '외부 발행 링크를 관리 목록에 등록한 초대장입니다. 문구·디자인·상품 판매 상태는 원래 발행 사이트와 블로그페이에서 수정하세요.')}
     tree=html.fromstring(current_html(root,row,93500));other=nodes(html.fromstring(current_html(root,row,99000)))
     return {'id':row['id'],'revision':row['revision'],'title':row['title'],'fields':[{'key':str(i),'text':e.text or ''} for i,e in enumerate(nodes(tree)) if (e.text or '').strip() and i<len(other) and e.text==other[i].text],'design':row.get('design',{})}
 def edit_documents(root,row,payload):
@@ -138,12 +156,17 @@ def update(root,key,payload,actor):
     with LOCK:
         data=state(root);row=data.get(key)
         if not row:raise ValueError('발행된 초대장을 찾지 못했습니다.')
-        if row.get('external'):raise ValueError('외부 발행 초대장입니다. 문구·디자인은 원래 발행 사이트에서, 상품 판매 중지는 블로그페이에서 처리하세요.')
-        if payload.get('revision')!=row['revision']:raise ValueError('다른 직원이 수정했습니다. 새로고침하세요.')
         action=payload.get('action')
+        if row.get('deleted'):
+            if action=='delete':return {'id':key,'revision':row['revision'],'replayed':True,**status(row)}
+            raise ValueError('삭제된 초대장입니다.')
+        if action!='delete' and (row.get('external') or row.get('orderOnly')):raise ValueError('외부 발행 또는 주문서 전용 초대장입니다. 문구·디자인은 원래 발행 사이트에서, 상품 판매 중지는 블로그페이에서 처리하세요.')
+        if payload.get('revision')!=row['revision']:raise ValueError('다른 직원이 수정했습니다. 새로고침하세요.')
         if action=='preview':return {'documents':edit_documents(root,row,payload),'revision':row['revision']}
         if action=='sales' and row.get('orderMode')=='blogpay-manual':raise ValueError('수동 연결된 블로그페이 상품입니다. 두 상품의 판매 상태는 블로그페이에서 변경하세요.')
-        if action=='sales':
+        if action=='delete':
+            row.update(deleted=True,deletedAt=now().isoformat(),deletedBy=str(actor)[:160],salesStopped=True)
+        elif action=='sales':
             if type(payload.get('stopped')) is not bool:raise ValueError('판매 상태를 확인하세요.')
             row['salesStopped']=payload['stopped']
         elif action=='edit':
@@ -208,7 +231,7 @@ def refresh_thumbnail(worker,root,key,actor):
     """Re-render only the managed thumbnail; keep invitation and checkout URLs stable."""
     with LOCK:
         data=state(root);row=data.get(key)
-        if not row or row.get('external'):raise ValueError('ERP에서 발행한 초대장만 썸네일을 갱신할 수 있습니다.')
+        if not row or row.get('deleted') or row.get('external') or row.get('orderOnly'):raise ValueError('ERP에서 발행한 초대장만 썸네일을 갱신할 수 있습니다.')
         with worker.db() as db:
             job=db.execute("SELECT input FROM jobs WHERE public_id=? AND action='publish' AND state='done' ORDER BY created_at DESC LIMIT 1",(key,)).fetchone()
         if not job:raise ValueError('발행 원본을 확인할 수 없습니다.')
@@ -223,6 +246,18 @@ def refresh_thumbnail(worker,root,key,actor):
         return {'id':key,'revision':row['revision'],'thumbnailVersion':version}
 
 
+
+def resolve_key(data,payload):
+    key=payload.get('id','')
+    if isinstance(key,str) and key in data:return key
+    product=payload.get('productId','')
+    if not isinstance(product,str) or not product:return key
+    match=re.fullmatch(r'(?:own|external):([a-f0-9]{32}):(93500|99000)',product)
+    if match and match[1] in data:return match[1]
+    candidates=[key for key,row in data.items() if any(str(link.get('productId',''))==product for link in row.get('links',[]))]
+    if len(candidates)==1:return candidates[0]
+    return ''
+
 def dispatch(handler,method,path,root,worker):
     if path!='/erp/invitations/library':return False
     try:
@@ -233,7 +268,7 @@ def dispatch(handler,method,path,root,worker):
         payload=json.loads(handler.rfile.read(size))
         if payload.get('action')=='register-external-pair':
             handler.send_json(register_external_pair(root,payload,payload.get('actor','ERP 직원')));return True
-        key=payload.get('id','');data=register(worker,root)
+        data=register(worker,root);key=resolve_key(data,payload)
         if payload.get('action')=='refresh-thumbnail':
             handler.send_json(refresh_thumbnail(worker,root,key,payload.get('actor','ERP 직원')));return True
         if key not in data:raise ValueError('발행된 초대장을 찾지 못했습니다.')

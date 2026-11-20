@@ -59,7 +59,7 @@ def notifications(root):
 def products(worker,root=None):
     items={}
     with worker.db() as c:
-        rows=c.execute("SELECT input,result,created_at,invitation_id FROM jobs WHERE action IN ('preview','publish') AND state='done' ORDER BY created_at DESC LIMIT 2000").fetchall()
+        rows=c.execute("SELECT input,result,created_at,invitation_id FROM jobs WHERE action='publish' AND state='done' ORDER BY created_at DESC LIMIT 2000").fetchall()
     for row in rows:
         try:
             data=json.loads(row['input']);result=json.loads(row['result'] or '{}');v=data.get('values',{})
@@ -84,6 +84,11 @@ def products(worker,root=None):
     if root is not None:
         import erp_invitation_library as library
         catalog=library.catalog(worker,root)['items']
+        all_rows=library.state(root)
+        deleted=[row for row in all_rows.values() if row.get('deleted')]
+        deleted_urls={link.get('orderUrl') for row in deleted for link in row.get('links',[])}
+        deleted_products={str(link.get('productId')) for row in deleted for link in row.get('links',[]) if link.get('productId')}
+        items={key:item for key,item in items.items() if item.get('orderUrl') not in deleted_urls and str(item.get('productId')) not in deleted_products}
         # Existing externally published pairs have no engine job or local product
         # snapshot. Index both supplied prices explicitly, preserving their links.
         for row in catalog:
@@ -96,7 +101,12 @@ def products(worker,root=None):
                 items[key]={'productId':key,'source':'blogpay','external':True,'readOnly':True,'orderMode':'blogpay-manual','price':price,'orderUrl':link.get('orderUrl',''),'url':link.get('url',''),'verifiedAt':row.get('createdAt',''),'invitationId':row.get('invitationId') or row['id'],'name':row['title'],'date':row.get('date',''),'time':v.get('time',''),'venue':v.get('venue',''),'address':v.get('address',''),'kind':row['kind'],'hostSide':v.get('hostSide',''),'groomName':v.get('groomName',''),'brideName':v.get('brideName',''),'groomParents':v.get('groomParents',''),'brideParents':v.get('brideParents',''),'verification':'provided-links'}
         for item in items.values():
             match=next((r for r in catalog if any(x.get('orderUrl')==item.get('orderUrl') for x in r['links'])),None)
-            if match:item.update({k:match[k] for k in ('operating','operatingUntil','salesStopped','saleStatus')})
+            if match:
+                item.update({k:match[k] for k in ('operating','operatingUntil','salesStopped','saleStatus')})
+                item.update(libraryId=match['id'],libraryRevision=match['revision'],readOnly=match.get('readOnly',False),orderOnly=match.get('orderOnly',False),legacyOrderOnly=match.get('legacyOrderOnly',False))
+                if not item.get('invitationId'):item['invitationId']=match.get('invitationId') or match['id']
+                linked=next((link for link in match['links'] if link.get('orderUrl')==item.get('orderUrl')),None)
+                if linked and (not item.get('url') or item.get('verification')=='own-snapshot'):item['url']=linked.get('url') or item['orderUrl']
             else:item['saleStatus']='미발행'
     return list(items.values())
 
