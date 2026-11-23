@@ -165,6 +165,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .venue span:last-child { margin-top: 3px; }
 .total { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; margin: 0; }
 .total output { color: var(--forest); font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.payment-method { margin: 18px 0 0; padding: 0; border: 0; }
+.payment-method legend { margin-bottom: 8px; font-weight: 700; }
+.payment-method label { display: inline-flex; align-items: center; margin: 0 22px 6px 0; }
+.payment-method input { width: 19px; height: 19px; margin-right: 8px; accent-color: var(--forest); }
+.bank-account { display: grid; gap: 2px; margin-top: 10px; padding: 14px; border-radius: 10px; background: #edf2ed; }
+.bank-account span { font-variant-numeric: tabular-nums; }
+.bank-account small { margin-top: 5px; color: var(--muted); }
 button { width: 100%; min-height: 51px; margin-top: 5px; padding: 12px; border: 0; border-radius: 8px; background: var(--forest); color: white; font: inherit; font-weight: 700; cursor: pointer; }
 button:disabled { background: #5e6962; cursor: default; }
 summary { cursor: pointer; }
@@ -251,10 +258,21 @@ $detail_section
 <section>
 <h2>최종 결제정보</h2>
 <p class="total"><strong>총 결제금액</strong><output id="amount">${base_display}원</output></p>
+<fieldset class="payment-method">
+<legend>결제 방법</legend>
+<label><input type="radio" name="payment_method" value="bank_transfer" checked required>무통장 입금</label>
+<label><input type="radio" name="payment_method" value="payapp" required>카드·간편결제</label>
+</fieldset>
+<div class="bank-account" id="bank-account">
+<strong>입금 계좌</strong>
+<span>국민은행 037601-04-151244</span>
+<span>예금주 브이에스엔씨</span>
+<small>주문 후 입금이 확인되면 담당자가 주문을 최종 등록합니다.</small>
+</div>
 </section>
 <section>
 <h2>주문 정보 수집 동의</h2>
-<details class="consent-details"><summary>수집 항목과 이용 목적 보기</summary><p>벨라비타는 주문 확인, 행사장 설치, 설치 사진 전송과 고객 문의 처리를 위해 주문자 이름·휴대폰 번호, 보내시는 분, 주문 옵션과 축하 문구를 수집합니다. 결제를 위해 상품명, 결제금액, 주문자 연락처를 페이앱에 전달합니다. 주문 정보는 거래 확인과 관련 법령에 따른 보관에 사용합니다. 필수 항목 수집을 거부할 수 있으며, 거부 시 주문을 진행할 수 없습니다. 문의 031-8067-8580</p></details>
+<details class="consent-details"><summary>수집 항목과 이용 목적 보기</summary><p>벨라비타는 주문 확인, 행사장 설치, 설치 사진 전송과 고객 문의 처리를 위해 주문자 이름·휴대폰 번호, 보내시는 분, 주문 옵션과 축하 문구를 수집합니다. 카드·간편결제를 선택하면 상품명, 결제금액, 주문자 연락처를 페이앱에 전달합니다. 주문 정보는 거래 확인과 관련 법령에 따른 보관에 사용합니다. 필수 항목 수집을 거부할 수 있으며, 거부 시 주문을 진행할 수 없습니다. 문의 031-8067-8580</p></details>
 <label><input type="checkbox" name="consent" value="yes" required>주문 정보 수집에 동의합니다.</label>
 $notice
 <button type="submit" $button_state>결제하기</button>
