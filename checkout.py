@@ -139,6 +139,12 @@ def payment_config():
     return {key: os.getenv('INVITATION_PAYAPP_' + key, '') for key in PAYAPP_FIELDS}
 
 
+def bank_config():
+    return {'bank': os.getenv('INVITATION_BANK_NAME', '국민은행').strip(),
+            'account': os.getenv('INVITATION_BANK_ACCOUNT', '037601-04-151244').strip(),
+            'holder': os.getenv('INVITATION_BANK_HOLDER', '브이에스엔씨').strip()}
+
+
 def product_snapshot(client, row):
     """Read photos, required choices and prices from the copied product's order form."""
     url = client.order_link(row)
@@ -452,11 +458,15 @@ def normalize_order(product, fields):
         raise ValueError('주문자 휴대폰 번호를 확인해 주세요.')
     sender = value('sender', 140)
     buyer = sender if fields.get('same_buyer') == 'yes' else value('buyer', 60)
+    payment_method = fields.get('payment_method', '')
+    if payment_method not in ('bank_transfer', 'payapp'):
+        raise ValueError('결제 방법을 선택해 주세요.')
     return {'product': product['number'], 'title': product['title'], 'options': selected,
             'sender': sender, 'message': value('message', 200) if custom else '',
             'buyer': buyer, 'buyer_phone': buyer_phone,
             'venue': installation_venue(product), 'address': product['address'],
-            'event_time': product['event_time'], 'amount': amount, 'source': product.get('source', '')}
+            'event_time': product['event_time'], 'amount': amount, 'source': product.get('source', ''),
+            'payment_method': payment_method}
 
 
 def setup(connection):
@@ -519,6 +529,8 @@ def start_order(db, job, price, product, fields, origin, config):
             saved.setdefault('source', '')
             if row['job'] != job or row['price'] != int(price) or saved != order:
                 raise ValueError('주문서를 다시 열어 주세요.')
+            if row['state'] == 'bank_pending':
+                return f'/invitation-orders/{attempt}/receipt'
             if row['state'] == 'waiting' and row['payment_url']:
                 return row['payment_url']
             if row['state'] in ('paid', 'cancelled', 'partial_cancel'):
@@ -526,8 +538,15 @@ def start_order(db, job, price, product, fields, origin, config):
             if row['state'] == 'failed':
                 raise ValueError('결제창을 열지 못했어요. 문의 031-8067-8580')
             raise ValueError('결제 요청을 확인하고 있어요. 문의 031-8067-8580')
+        initial = 'bank_pending' if order['payment_method'] == 'bank_transfer' else 'requesting'
         connection.execute('INSERT INTO invitation_orders VALUES (?,?,?,?,?,?,NULL,NULL)',
-                           (attempt, job, int(price), dt.datetime.now(SEOUL).isoformat(), details, 'requesting'))
+                           (attempt, job, int(price), dt.datetime.now(SEOUL).isoformat(), details, initial))
+    if order['payment_method'] == 'bank_transfer':
+        return f'/invitation-orders/{attempt}/receipt'
+    if not all(config.values()):
+        with db() as connection:
+            connection.execute("UPDATE invitation_orders SET state='failed' WHERE id=? AND state='requesting'", (attempt,))
+        raise ValueError('카드·간편결제를 이용할 수 없어요. 무통장 입금을 선택해 주세요.')
     try:
         number, url = payapp_request(config, attempt, order, origin)
     except ValueError:
