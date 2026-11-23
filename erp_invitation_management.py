@@ -157,10 +157,9 @@ def confirm_deposit(root,payload):
         if details.get('payment_method')!='bank_transfer':raise ValueError('무통장 주문만 입금 확인할 수 있습니다.')
         if row['state']=='bank_pending':
             db.execute("UPDATE invitation_orders SET state='paid' WHERE id=? AND state='bank_pending'",(source,))
-            from order_operations import stage_paid
-            stage_paid(db,row)
         elif row['state']!='paid':raise ValueError('입금 확인할 수 없는 주문 상태입니다.')
-        current=db.execute('SELECT i.*,o.order_number AS legacy_order_number FROM invitation_orders i LEFT JOIN order_operations o ON replace(o.id,"-","")=i.id WHERE i.id=?',(source,)).fetchone()
+        operations=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='order_operations'").fetchone()
+        current=db.execute(('SELECT i.*,o.order_number AS legacy_order_number FROM invitation_orders i LEFT JOIN order_operations o ON replace(o.id,"-","")=i.id WHERE i.id=?' if operations else 'SELECT i.* FROM invitation_orders i WHERE i.id=?'),(source,)).fetchone()
     result=paid_order(current);result['depositConfirmedBy']=actor
     return result
 
