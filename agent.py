@@ -1346,7 +1346,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.order_message('이 행사의 주문이 마감됐어요.', 410)
         config = checkout.payment_config()
         origin = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/')
-        if not checkout.payment_enabled(job) or not all(config.values()) or not invitation.https_url(origin):
+        if not checkout.payment_enabled(job) or not all(checkout.bank_config().values()) or not invitation.https_url(origin):
             return self.order_message('현재 결제를 이용할 수 없어요. 문의 031-8067-8580', 503, back=True)
         if self.headers.get('Origin') not in (None, origin):
             return self.order_message('주문서를 다시 열고 결제하기를 눌러 주세요.', 403, back=True)
@@ -1452,7 +1452,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.order_message('주문서를 찾지 못했어요.', 404)
             if not checkout.available(product):
                 return self.order_message('이 행사의 주문이 마감됐어요.', 410)
-            can_pay = checkout.payment_enabled(order[1]) and all(checkout.payment_config().values())
+            can_pay = checkout.payment_enabled(order[1]) and all(checkout.bank_config().values())
             # A no-referrer policy sends Origin: null on a browser form POST.
             return self.send_order_html(checkout.render(product, path, can_pay),
                                         referrer_policy='same-origin')
@@ -1462,7 +1462,7 @@ class Handler(BaseHTTPRequestHandler):
                 row = connection.execute('SELECT state FROM invitation_orders WHERE id=?', (receipt[1],)).fetchone()
             if not row:
                 return self.order_message('주문을 찾지 못했어요.', 404)
-            message = {'paid': '결제가 완료됐어요.', 'cancelled': '결제가 취소됐어요.',
+            message = {'paid': '결제가 완료됐어요.', 'bank_pending': '무통장 주문이 접수됐어요. 입금 확인 후 주문이 최종 등록됩니다.\n국민은행 037601-04-151244\n예금주 브이에스엔씨', 'cancelled': '결제가 취소됐어요.',
                        'partial_cancel': '결제 금액의 일부가 취소됐어요.'}.get(row['state'], '결제 상태를 확인하고 있어요.')
             return self.order_message(message)
         if path == '/owner-alerts/connected':
