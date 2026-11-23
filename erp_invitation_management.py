@@ -141,7 +141,28 @@ def paid_order(row):
     options=[x for x in d.get('options',[]) if isinstance(x,list) and len(x)==2]
     memorial=bool(re.search('부고|근조',d.get('title','')))
     if memorial:date=time=''
-    return {'id':'payapp:'+row['id'],'legacyOrderNumber':row['legacy_order_number'] if 'legacy_order_number' in row.keys() else None,'source':'payapp','sourceId':row['id'],'createdAt':row['created'],'state':row['state'],'stateLabel':{'paid':'결제완료','cancelled':'취소','partial_cancel':'일부취소'}.get(row['state'],row['state']),'amount':d.get('amount'),'quantity':1,'productId':str(d.get('product','')),'title':d.get('title',''),'buyer':d.get('buyer',''),'buyerPhone':d.get('buyer_phone',''),'options':options,'fields':{'date':date,'time':time,'address':' / '.join(dict.fromkeys(x for x in [d.get('address'),d.get('venue')] if x)),'recipient':label_value(options,['받으시는 분','받는 분']) or d.get('recipient',''),'sender':d.get('sender',''),'size':label_value(options,['상품','규격','사이즈']) or '2호 선물형','artwork':'','message':d.get('message',''),'eventType':'근조' if re.search('부고|근조',d.get('title','')) else '결혼' if d.get('wedding_preview') or re.search('예식|결혼',d.get('title','')) else '일반 행사','photoTo':d.get('buyer_phone',''),'note':('발인(배송시각 아님): '+str(d.get('event_time',''))) if memorial else ''}}
+    return {'id':'payapp:'+row['id'],'legacyOrderNumber':row['legacy_order_number'] if 'legacy_order_number' in row.keys() else None,'source':'payapp','sourceId':row['id'],'createdAt':row['created'],'state':row['state'],'stateLabel':{'paid':'결제완료','bank_pending':'무통장 · 입금 대기','cancelled':'취소','partial_cancel':'일부취소'}.get(row['state'],row['state']),'paymentMethod':d.get('payment_method','payapp'),'amount':d.get('amount'),'quantity':1,'productId':str(d.get('product','')),'title':d.get('title',''),'buyer':d.get('buyer',''),'buyerPhone':d.get('buyer_phone',''),'options':options,'fields':{'date':date,'time':time,'address':' / '.join(dict.fromkeys(x for x in [d.get('address'),d.get('venue')] if x)),'recipient':label_value(options,['받으시는 분','받는 분']) or d.get('recipient',''),'sender':d.get('sender',''),'size':label_value(options,['상품','규격','사이즈']) or '2호 선물형','artwork':'','message':d.get('message',''),'eventType':'근조' if re.search('부고|근조',d.get('title','')) else '결혼' if d.get('wedding_preview') or re.search('예식|결혼',d.get('title','')) else '일반 행사','photoTo':d.get('buyer_phone',''),'note':('발인(배송시각 아님): '+str(d.get('event_time',''))) if memorial else ''}}
+
+
+def confirm_deposit(root,payload):
+    source=order_edits.source_key(payload.get('sourceId',''))
+    if not re.fullmatch(r'[a-f0-9]{32}',source):raise ValueError('입금 확인할 주문을 확인하세요.')
+    actor=str(payload.get('actor') or 'ERP 직원').strip()[:80]
+    file=Path(root)/'state.sqlite3'
+    with sqlite3.connect(file) as db:
+        db.row_factory=sqlite3.Row;db.execute('BEGIN IMMEDIATE')
+        row=db.execute('SELECT * FROM invitation_orders WHERE id=?',(source,)).fetchone()
+        if not row:raise ValueError('주문을 찾지 못했습니다.')
+        details=json.loads(row['details'])
+        if details.get('payment_method')!='bank_transfer':raise ValueError('무통장 주문만 입금 확인할 수 있습니다.')
+        if row['state']=='bank_pending':
+            db.execute("UPDATE invitation_orders SET state='paid' WHERE id=? AND state='bank_pending'",(source,))
+            from order_operations import stage_paid
+            stage_paid(db,row)
+        elif row['state']!='paid':raise ValueError('입금 확인할 수 없는 주문 상태입니다.')
+        current=db.execute('SELECT i.*,o.order_number AS legacy_order_number FROM invitation_orders i LEFT JOIN order_operations o ON replace(o.id,"-","")=i.id WHERE i.id=?',(source,)).fetchone()
+    result=paid_order(current);result['depositConfirmedBy']=actor
+    return result
 
 
 def query(worker,root,params):
@@ -200,6 +221,14 @@ def dispatch(handler,method,path,root,worker):
             size=int(handler.headers.get('Content-Length','0'))
             if not 0<size<=20000:raise ValueError('주문 수정 요청 크기를 확인하세요.')
             payload=json.loads(handler.rfile.read(size));handler.send_json(order_edits.update(root,payload,payload.get('actor','ERP 직원')))
+        except (ValueError,TypeError,KeyError,sqlite3.Error) as error:handler.send_json({'error':str(error)[:240]},409)
+        return True
+    if path=='/erp/invitations/deposit-confirm':
+        if method!='POST':handler.send_json({'error':'입금 확인은 POST 요청으로 처리합니다.'},405);return True
+        try:
+            size=int(handler.headers.get('Content-Length','0'))
+            if not 0<size<=20000:raise ValueError('입금 확인 요청 크기를 확인하세요.')
+            payload=json.loads(handler.rfile.read(size));handler.send_json(confirm_deposit(root,payload))
         except (ValueError,TypeError,KeyError,sqlite3.Error) as error:handler.send_json({'error':str(error)[:240]},409)
         return True
     if path!='/erp/invitations/management':return False
