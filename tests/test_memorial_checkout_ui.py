@@ -99,7 +99,7 @@ class MemorialCheckoutUI(unittest.TestCase):
         venue = ' '.join(tree.xpath('//p[contains(@class,"venue")]')[0].text_content().split())
         self.assertIn('가상장례식장 특1호실', venue)
         order = checkout.normalize_order(product, {
-            'consent': 'yes', 'choice0': '1', 'choice1': '1',
+            'consent': 'yes', 'payment_method': 'payapp', 'choice0': '1', 'choice1': '1',
             'sender': '가상 보내는 분', 'same_buyer': 'yes', 'buyer_phone': '01012345678',
         })
         self.assertEqual([label for label, _ in order['options']], ['근조 문구', '상품 선택'])
