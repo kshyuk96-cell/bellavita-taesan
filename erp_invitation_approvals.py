@@ -33,7 +33,7 @@ def query(root, params=None):
         operations = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='order_operations'").fetchone()
         legacy = ("(SELECT MIN(o.order_number) FROM order_operations o WHERE o.id=i.id OR replace(o.id,'-','')=i.id)"
                   if operations else 'NULL')
-        where = "i.state='paid' AND i.id NOT IN (SELECT value FROM json_each(?))"
+        where = "i.state IN ('paid','bank_pending') AND i.id NOT IN (SELECT value FROM json_each(?))"
         bindings = [json.dumps(hidden)]
         result['count'] = db.execute('SELECT COUNT(*) FROM invitation_orders i WHERE ' + where,
                                      bindings).fetchone()[0]
