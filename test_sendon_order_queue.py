@@ -1,4 +1,5 @@
-import os
+import socket
+from urllib.error import HTTPError
 import sqlite3
 import sys
 import tempfile
@@ -11,6 +12,32 @@ import sendon_order_queue as queue
 
 
 class QueueTest(unittest.TestCase):
+    def setUp(self):
+        guard = patch.object(socket.socket, 'connect', side_effect=AssertionError('Outbound network forbidden'))
+        guard.start()
+        self.addCleanup(guard.stop)
+
+    def test_transient_and_ambiguous_provider_outcomes(self):
+        env = {'SENDON_MODE':'live','SENDON_ID':'fixture','SENDON_API_KEY':'fixture'}
+        for exception, state, code in (
+            (HTTPError(queue.API,429,'',{},None),'queued','429'),
+            (HTTPError(queue.API,503,'',{},None),'held','503'),
+            (TimeoutError(),'held','UNKNOWN'),
+        ):
+            def fail(*args, **kwargs):
+                raise exception
+            self.assertEqual(queue.transmit(queue.STAFF,'01000000001',{},env=env,open_request=fail)[::2],(state,code))
+
+    def test_invalid_mode_is_off_and_expired_claim_is_held(self):
+        with sqlite3.connect(':memory:') as db:
+            queue.setup(db)
+            db.execute("INSERT INTO sendon_order_queue(order_id,template,recipient,variables,state,created_at) VALUES(?,?,?,?,?,?)",
+                       ('fixture',queue.STAFF,'01000000001','{}','sending',queue.now()))
+            queue.drain(db,{'SENDON_MODE':'typo'})
+            self.assertEqual(queue.list_jobs(db)[0]['state'],'sending')
+            queue.drain(db,{'SENDON_MODE':'dry_run'})
+            self.assertEqual(queue.list_jobs(db)[0]['state'],'held')
+
     def test_bank_lifecycle_is_idempotent_and_dry(self):
         with tempfile.TemporaryDirectory() as directory:
             def connect():

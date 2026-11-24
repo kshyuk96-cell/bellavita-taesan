@@ -717,9 +717,9 @@ def run_order(message, owner):
 
 
 def order_saved(connection, row, number, details):
-    report = order_intake.report(number, details)
-    if row['kind'] != 'payapp':
-        owner_alerts.enqueue(connection, 'kakao-order:'+row['id'], report)
+    if row['kind'] == 'payapp':
+        return
+    owner_alerts.enqueue(connection, 'kakao-order:'+row['id'], order_intake.report(number, details))
 
 
 def process_order_queue():
@@ -1563,6 +1563,7 @@ if __name__ == '__main__':
             print('ERP_MEMORIAL_SOURCE_PROBE '+json.dumps({'fetched':False,'errorType':type(error).__name__},ensure_ascii=False),flush=True)
     if os.getenv('ERP_MEMORIAL_PROBE_URL'):threading.Thread(target=memorial_source_probe,daemon=True).start()
     import sendon_order_queue
+    owner_alerts.start(db)
     start_order_queue()
     sendon_order_queue.start(db)
     ThreadingHTTPServer((os.getenv('TAESAN_BIND', '127.0.0.1'), int(os.getenv('PORT', '8080'))),
