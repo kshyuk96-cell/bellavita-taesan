@@ -137,6 +137,66 @@ def sender_a3_layout(label, name, box, page_width):
     return max(candidates, key=lambda item: item[0])[1] if candidates else None
 
 
+def balanced_message_lines(text, font_size, width, preferred_lines=0):
+    """Wrap a greeting by visual balance instead of filling each row greedily."""
+    words = [word for word in ' '.join(str(text or '').split()).split(' ') if word]
+    if not words:
+        return []
+    expanded = []
+    for word in words:
+        if pdfmetrics.stringWidth(word, FONT_NAME, font_size) <= width:
+            expanded.append(word)
+            continue
+        part = ''
+        for character in word:
+            if part and pdfmetrics.stringWidth(part + character, FONT_NAME, font_size) > width:
+                expanded.append(part)
+                part = ''
+            part += character
+        if part:
+            expanded.append(part)
+    words = expanded
+    widths = [pdfmetrics.stringWidth(word, FONT_NAME, font_size) for word in words]
+    space = pdfmetrics.stringWidth(' ', FONT_NAME, font_size)
+    prefix = [0]
+    for value in widths:
+        prefix.append(prefix[-1] + value)
+
+    def line_width(start, end):
+        return prefix[end] - prefix[start] + space * max(0, end - start - 1)
+
+    candidates = []
+    for lines in range(1, min(8, len(words)) + 1):
+        if preferred_lines and lines != preferred_lines:
+            continue
+        target = (sum(widths) + space * max(0, len(words) - lines)) / lines
+        states = {(0, 0): (0, [])}
+        for row in range(lines):
+            for (used_rows, start), (score, breaks) in list(states.items()):
+                if used_rows != row:
+                    continue
+                remaining_rows = lines - row - 1
+                for end in range(start + 1, len(words) - remaining_rows + 1):
+                    measured = line_width(start, end)
+                    if measured > width:
+                        break
+                    key = (row + 1, end)
+                    value = score + (measured - target) ** 2
+                    if key not in states or value < states[key][0]:
+                        states[key] = (value, breaks + [end])
+        result = states.get((lines, len(words)))
+        if result:
+            start = 0
+            rows = []
+            for end in result[1]:
+                rows.append(' '.join(words[start:end]))
+                start = end
+            candidates.append((result[0], rows))
+    if not candidates and preferred_lines:
+        return balanced_message_lines(text, font_size, width, 0)
+    return min(candidates, key=lambda item: item[0])[1] if candidates else []
+
+
 def write_text(page, text, box, maximum, color, sender=False, wrap=True, sender_lines=0, name_scale=1, text_scale=1, leading=1.16):
     if sender:
         # Canonical Seoul metrics choose rows for every template/font. Font size
@@ -164,18 +224,9 @@ def write_text(page, text, box, maximum, color, sender=False, wrap=True, sender_
         # Do not apply destination-dependent name tracking: it changes the ratio.
         draw_text_rows(page,box,color,points,leading,'',center_ink=True)
         return
-    rows = []
-    for paragraph in text.splitlines():
-        line = ''
-        for word in paragraph.split():
-            trial = f'{line} {word}'.strip()
-            if wrap and line and pdfmetrics.stringWidth(trial,FONT_NAME,maximum*text_scale)>box.width:
-                rows.append(line)
-                line = word
-            else:
-                line = trial
-        if line:
-            rows.append(line)
+    normalized = ' '.join(text.split())
+    preferred = 3 if len(normalized.replace(' ', '')) >= 28 else 0
+    rows = balanced_message_lines(normalized, maximum * text_scale, box.width, preferred) if wrap else text.splitlines()
     if not rows:
         return
     units = [pdfmetrics.stringWidth(line,FONT_NAME,text_scale) for line in rows]
@@ -190,25 +241,11 @@ def write_custom_message(page, text, box, maximum, color, text_scale):
     if not paragraphs:
         return
 
+    normalized = ' '.join(text.split())
+
     def wrap_at(size):
-        rows = []
-        for paragraph in paragraphs:
-            line = ''
-            for word in paragraph.split():
-                trial = f'{line} {word}'.strip()
-                if line and pdfmetrics.stringWidth(trial, FONT_NAME, size) > box.width:
-                    rows.append(line)
-                    line = ''
-                if not line and pdfmetrics.stringWidth(word, FONT_NAME, size) > box.width:
-                    for character in word:
-                        if line and pdfmetrics.stringWidth(line + character, FONT_NAME, size) > box.width:
-                            rows.append(line)
-                            line = ''
-                        line += character
-                else:
-                    line = f'{line} {word}'.strip()
-            rows.append(line)
-        return rows
+        preferred = max(3, min(8, round(len(normalized.replace(' ', '')) / 14))) if len(normalized.replace(' ', '')) >= 28 else 0
+        return balanced_message_lines(normalized, size, box.width, preferred)
 
     leading = 1.3
     lower, upper = 11, max(11, maximum * 1.7 * text_scale)
@@ -220,15 +257,20 @@ def write_custom_message(page, text, box, maximum, color, text_scale):
             draw_text_rows(page, box, color, [[(paragraphs[0], one_line)]], leading, '')
             return
 
-    if len(wrap_at(lower)) * lower * leading > box.height:
+    initial_rows = wrap_at(lower)
+    if not initial_rows or len(initial_rows) * lower * leading > box.height:
         raise ValueError('인쇄 영역에 비해 문구가 너무 깁니다.')
     for _ in range(14):
         size = (lower + upper) / 2
-        if len(wrap_at(size)) * size * leading <= box.height:
+        rows = wrap_at(size)
+        if rows and len(rows) * size * leading <= box.height:
             lower = size
         else:
             upper = size
-    rows = [[(line, lower)] for line in wrap_at(lower)]
+    final_rows = wrap_at(lower)
+    if not final_rows:
+        raise ValueError('인쇄 영역에 비해 문구가 너무 깁니다.')
+    rows = [[(line, lower)] for line in final_rows]
     draw_text_rows(page, box, color, rows, leading, '')
 
 
@@ -586,7 +628,7 @@ def make_scroll(output, sender, message='', kind='wedding', paper='A3', wedding_
         with fitz.open() as doc:
             page = doc.new_page(width=841.89, height=595.28)
             ink = (.08,.08,.08)
-            draw_message(page, message or '하늘의 별이 되신 고인을 추모하며\n유가족 분들께 깊은 위로의 마음을 전합니다',
+            draw_message(page, message or '하늘의 별이 되신 고인을\n추모하며 유가족 분들께\n깊은 위로의 마음을 전합니다',
                        fitz.Rect(34,46,807.89,215), 48, ink, wrap=False)
             write_text(page, sender, fitz.Rect(65,210,776.89,540), 150, ink, sender=True, sender_lines=sender_lines, **scaling)
             doc.save(output/'scroll.pdf', garbage=4, deflate=True)

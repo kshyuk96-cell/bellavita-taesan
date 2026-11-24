@@ -15,7 +15,7 @@ RENDER_VERSION='memorial-approved-backing-birch23-stars44-name-only-v5'
 ASSETS=Path(__file__).with_name('erp_invitation_assets')
 SCROLL_ASSETS=Path(__file__).with_name('wedding_scroll')/'assets'
 HY_GUNGSEO_SHA256='b41cef3386d034040704b1a143ef13a63c5b9f1ec4222a7579c1796ea05517f6'
-CONDOLENCE='하늘의 별이 되신 고인을 추모하며\n유가족 분들께 깊은 위로의 마음을 전합니다'
+CONDOLENCE='하늘의 별이 되신 고인을\n추모하며 유가족 분들께\n깊은 위로의 마음을 전합니다'
 LEFT_SENDER='쌀빛그림화환\n임직원 일동'
 RIGHT_NAME_SCALE=1.5
 # Preserve the approved landscape frame/easel geometry.  The actual memorial
