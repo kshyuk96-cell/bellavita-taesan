@@ -48,5 +48,23 @@ class SendonTransport(unittest.TestCase):
         with patch.dict(os.environ,self.settings),patch('order_sms.build_opener') as transport:
             with self.assertRaises(ValueError):order_sms.send('01000000001','긴 문구'*1000,'key')
             transport.assert_not_called()
+    def test_staff_and_customer_use_separate_approved_alimtalk_templates(self):
+        calls=[]
+        env={**self.settings,'SENDON_ALIM_PROFILE_ID':'bellavita-channel',
+             'SENDON_CUSTOMER_ALIM_TEMPLATE_ID':'customer-template',
+             'SENDON_STAFF_ALIM_TEMPLATE_ID':'staff-template'}
+        accepted={'code':200,'data':{'groupId':'sendon-alim-group'}}
+        with patch.dict(os.environ,env),patch('order_sms.build_opener',return_value=self.transport(accepted,calls)):
+            variables={'#{주문번호}':'1234'}
+            order_sms.send_sendon_alimtalk('01000000001',variables,'고객 대체 문자','customer-key','customer')
+            order_sms.send_sendon_alimtalk('01000000002',variables,'직원 대체 문자','staff-key','staff')
+        customer,staff=(json.loads(call.data) for call in calls)
+        self.assertEqual(customer['templateId'],'customer-template')
+        self.assertEqual(staff['templateId'],'staff-template')
+        self.assertEqual(customer['sendProfileId'],'bellavita-channel')
+        self.assertEqual(staff['sendProfileId'],'bellavita-channel')
+        self.assertEqual(customer['fallback']['custom']['type'],'LMS')
+        self.assertEqual(staff['fallback']['custom']['type'],'LMS')
+        self.assertTrue(all(call.full_url.endswith('/messages/kakao/alim-talk') for call in calls))
 
 if __name__=='__main__':unittest.main()

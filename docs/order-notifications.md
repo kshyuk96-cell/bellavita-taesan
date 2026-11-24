@@ -18,13 +18,18 @@ INVITATION_SMS_PROVIDER=sendon
 SENDON_ID=<센드온 계정 ID>
 SENDON_API_KEY=<발급한 API KEY>
 SENDON_FROM=<등록·인증한 발신번호>
+SENDON_ALIM_PROFILE_ID=<승인된 카카오 채널 ID>
+SENDON_CUSTOMER_ALIM_TEMPLATE_ID=<승인된 고객 주문확인 템플릿 ID>
+SENDON_STAFF_ALIM_TEMPLATE_ID=<승인된 직원 주문승인대기 템플릿 ID>
 INVITATION_STAFF_NOTIFY_PHONES=<직원 수신번호, 쉼표 구분>
 INVITATION_ORDER_SMS_ENABLED=1
 ```
 
 센드온의 포인트/크레딧 잔액과 문자 발송 후 승인 정책도 계정주가 확인해야 합니다. 현재 어댑터는 포인트를 사용하며 `useCredit=false`입니다. API 발송 후 승인 메뉴는 콘솔 → 발신번호 → 발송 후 승인입니다.
 
-사용 API는 `POST https://api.sendon.io/v2/messages/sms`이며 `Authorization: Basic base64(ID:APIKEY)`를 사용합니다. 90바이트를 넘는 알림은 제목을 포함한 LMS로 전송합니다. 정보성 주문 알림은 `isAd=false`입니다. HTTP 200이더라도 응답 본문 `code`가 200이고 `data.groupId`가 있어야 제공사 접수로 기록합니다.
+직원과 고객 알림 모두 `POST https://api.sendon.io/v2/messages/kakao/alim-talk`을 사용하며 `Authorization: Basic base64(ID:APIKEY)`를 사용합니다. 정상 발송은 알림톡으로 처리하고, 실패한 경우에만 같은 내용의 정보성 LMS로 대체 발송하며 `isAd=false`입니다. HTTP 200이더라도 응답 본문 `code`가 200이고 `data.groupId`가 있어야 제공사 접수로 기록합니다.
+
+고객·직원 알림톡 템플릿에는 `#{주문번호}`, `#{행사명}`, `#{금액}`, `#{행사일시}`, `#{장소}`, `#{주문확인링크}` 변수를 정확히 등록하고 사전 승인을 받아야 합니다. 고객 템플릿의 링크는 주문 확인 페이지, 직원 템플릿의 링크는 승인 대기 주문 페이지로 연결됩니다.
 
 ## 운영 확인
 

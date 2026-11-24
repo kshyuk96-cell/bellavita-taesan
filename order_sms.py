@@ -35,6 +35,16 @@ def configured():
     return bool(keys and all(os.getenv(key) for key in keys))
 
 
+def alimtalk_template(audience):
+    key = 'SENDON_STAFF_ALIM_TEMPLATE_ID' if audience == 'staff' else 'SENDON_CUSTOMER_ALIM_TEMPLATE_ID'
+    return os.getenv(key) or (os.getenv('SENDON_ALIM_TEMPLATE_ID') if audience == 'customer' else '')
+
+
+def alimtalk_configured(audience='customer'):
+    return (provider_name() == 'sendon' and configured() and
+            bool(os.getenv('SENDON_ALIM_PROFILE_ID')) and bool(alimtalk_template(audience)))
+
+
 def enabled():
     return os.getenv('INVITATION_ORDER_SMS_ENABLED') == '1'
 
@@ -138,6 +148,40 @@ def send_sendon(phone, message, reference):
     return receipt
 
 
+def send_sendon_alimtalk(phone, variables, fallback_message, reference, audience='customer'):
+    """Send an approved transactional AlimTalk, with LMS only as fallback."""
+    if not alimtalk_configured(audience):
+        raise ValueError('센드온 알림톡 채널·템플릿 설정 확인 필요')
+    recipient = {'phone': phone, 'variables': variables}
+    data = {
+        'sendProfileId': os.environ['SENDON_ALIM_PROFILE_ID'],
+        'templateId': alimtalk_template(audience),
+        'to': [recipient],
+        'useCredit': False,
+        'fallback': {
+            'fallbackType': 'CUSTOM',
+            'custom': {
+                'type': 'LMS',
+                'senderNumber': re.sub(r'[^0-9]', '', os.environ['SENDON_FROM']),
+                'isAd': False,
+                'title': '벨라비타 주문 알림',
+                'message': fallback_message,
+            },
+        },
+    }
+    token = base64.b64encode((os.environ['SENDON_ID'] + ':' + os.environ['SENDON_API_KEY']).encode()).decode('ascii')
+    request = Request('https://api.sendon.io/v2/messages/kakao/alim-talk',
+                      json.dumps(data, ensure_ascii=False).encode('utf-8'),
+                      {'Content-Type':'application/json', 'Authorization':'Basic ' + token,
+                       'X-Bellavita-Reference': reference})
+    with build_opener(NoRedirect()).open(request, timeout=12) as response:
+        result = json.load(response)
+    receipt = result.get('data', {}).get('groupId') if isinstance(result.get('data'), dict) else None
+    if str(result.get('code')) != '200' or not isinstance(receipt, str) or not receipt:
+        raise ValueError('센드온 알림톡 접수 확인 필요')
+    return receipt
+
+
 def send(phone, message, reference):
     provider = provider_name()
     if provider == 'sendon':
@@ -173,7 +217,29 @@ def message_for(row, base):
                                   when, venue, tail, link)))
 
 
-def send_pending(db, base, sender=send, enabled=None):
+def alimtalk_variables(row, base):
+    details = json.loads(row['details'])
+    try:
+        amount = f"{int(details.get('amount', 0)):,}원"
+    except (TypeError, ValueError):
+        amount = '금액 확인 필요'
+    try:
+        when = datetime.fromisoformat(str(details.get('event_time'))).strftime('%Y.%m.%d %H:%M')
+    except (ValueError, TypeError):
+        when = str(details.get('event_time') or '일시 확인 필요')[:50].replace('T', ' ')
+    staff = row['audience'] == 'staff'
+    return {
+        '#{주문번호}': str(row['order_id'])[-8:],
+        '#{행사명}': str(details.get('title') or '쌀빛그림화환')[:180],
+        '#{금액}': amount,
+        '#{행사일시}': when,
+        '#{장소}': str(details.get('venue') or '장소 확인 필요')[:140],
+        '#{주문확인링크}': (base.rstrip('/') + '/staff-orders?order=' + row['order_id'] if staff else
+                         base.rstrip('/') + '/invitation-orders/' + row['order_id'] + '/receipt'),
+    }
+
+
+def send_pending(db, base, sender=None, enabled=None):
     """Atomically claim one new paid-order notice; independent of Sheet writes.
 
     ``enabled`` is retained as a test seam from the old worker; it controls
@@ -197,7 +263,14 @@ def send_pending(db, base, sender=send, enabled=None):
         # not a reason to send a second message automatically.
         connection.execute("UPDATE invitation_notice_outbox SET state='uncertain' WHERE id=? AND state='pending'", (row['id'],))
     try:
-        receipt = sender(row['phone'], message_for(row, base.rstrip('/')), row['id'][:24])
+        message = message_for(row, base.rstrip('/'))
+        if sender is not None:
+            receipt = sender(row['phone'], message, row['id'][:24])
+        elif provider_name() == 'sendon':
+            receipt = send_sendon_alimtalk(row['phone'], alimtalk_variables(row, base), message,
+                                           row['id'][:24], row['audience'])
+        else:
+            receipt = send(row['phone'], message, row['id'][:24])
         if not isinstance(receipt, str) or not receipt:
             raise ValueError('접수 결과 확인 필요')
     except Exception as error:

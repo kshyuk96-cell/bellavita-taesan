@@ -23,19 +23,29 @@ def notifications(root):
     import order_sms
     active = order_sms.enabled()
     provider = order_sms.configured()
-    readiness = 'ready' if active and provider else 'provider-missing' if active else 'disabled'
+    customer_provider = order_sms.alimtalk_configured()
+    staff_provider = order_sms.alimtalk_configured('staff')
+    readiness = 'ready' if active and staff_provider else 'provider-missing' if active else 'disabled'
+    customer_readiness = 'ready' if active and customer_provider else 'provider-missing' if active else 'disabled'
     note = ('새 결제 완료 주문에 고객·직원 알림을 발송합니다. 접수 완료는 단말 수신 확인과 다릅니다.'
             if readiness == 'ready' else '문자 서비스의 사업자 인증·발신번호 인증·API 연결·잔액 확인이 필요합니다.'
             if active else '주문 문자 알림이 꺼져 있습니다.')
     audience = lambda: {'state':readiness,'pending':0,'accepted':0,'uncertain':0,'expired':0,'delivered':None}
-    result={'customer':audience(),'staff':{**audience(),'recipients':len(order_sms.staff_phones())},
+    result={'customer':{**audience(),'state':customer_readiness},'staff':{**audience(),'recipients':len(order_sms.staff_phones())},
             'providerConfigured':provider,'provider':order_sms.provider_name(),'queueEnabled':active,
+            'sendon':{'enabled':active,'providerConfigured':provider,
+                      'staffTemplateReady':staff_provider,
+                      'customerTemplateReady':customer_provider,
+                      'staffRecipients':len(order_sms.staff_phones())},
             'payappConfigured':all(os.getenv('INVITATION_PAYAPP_'+k) for k in ('USER_ID','LINK_KEY','LINK_VALUE','REQUEST_KEY')),
             'checkoutEnabled':os.getenv('INVITATION_CHECKOUT_ENABLED')=='1',
             'localCheckoutEnabled':os.getenv('INVITATION_LOCAL_CHECKOUT_ENABLED')=='1',
             'checkoutPilotRestricted':bool(os.getenv('INVITATION_CHECKOUT_PILOT_JOBS')),
             'blogpay':'자체 주문서·페이앱 결제 기준입니다. 결제 완료 후 직원 확인을 거쳐 ERP 주문에 등록합니다.'}
-    result['customer']['message']=note
+    result['customer']['message']=(note if customer_provider or not active else
+        '고객 알림톡 채널·승인 템플릿 연결이 필요합니다.')
+    result['staff']['message']=(note if staff_provider or not active else
+        '직원 알림톡 채널·승인 템플릿 연결이 필요합니다.')
     result['localTemplateReady']=all((Path(root)/'invitations'/'7f494a310ca9371914b8863b45732bd5'/f'{price}.order.json').is_file() for price in (93500,99000))
     c=read_db(Path(root)/'state.sqlite3')
     if c:
