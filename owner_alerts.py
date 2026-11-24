@@ -33,6 +33,36 @@ def enqueue(db, event, message, link=None):
         db.execute('INSERT OR IGNORE INTO alert_links VALUES (?,?)', (event, link))
 
 
+def claim_payapp_staff(db, order_id, channel, *, same_channel_retry=False):
+    event = 'payapp:' + order_id.replace('-', '')
+    db.execute("""CREATE TABLE IF NOT EXISTS payapp_staff_dispatch (
+        event_id TEXT PRIMARY KEY, channel TEXT NOT NULL, claimed_at REAL NOT NULL
+    )""")
+    # Delivered or previously attempted legacy notices may predate this guard.
+    old = db.execute("""SELECT 1 FROM alert_outbox WHERE id LIKE 'payapp:%'
+        AND replace(id,'-','')=? AND (sent=1 OR attempts>0)""", (event,)).fetchone()
+    if old:
+        return False
+    if same_channel_retry:
+        previous = db.execute('SELECT channel FROM payapp_staff_dispatch WHERE event_id=?',(event,)).fetchone()
+        if previous:
+            return previous[0] == channel
+    return db.execute('INSERT OR IGNORE INTO payapp_staff_dispatch VALUES (?,?,?)',
+                      (event, channel, time.time())).rowcount == 1
+
+
+def enqueue_payapp_staff(db_factory, order_id, order):
+    import sendon_order_queue
+    if sendon_order_queue.mode(os.environ) == 'live':
+        return
+    from contextlib import closing
+    with closing(db_factory()) as db, db:
+        setup(db)
+        link = ORIGIN + '/staff-orders?order=' + order_id
+        message = '새 초대장 주문\n' + str(order.get('title') or '벨라비타 주문')
+        enqueue(db, 'payapp-staff:' + order_id, message, link)
+
+
 def digest(value):
     return hashlib.sha256(value.encode()).hexdigest()
 
@@ -82,14 +112,17 @@ def connect(db_factory, code, state):
     return True
 
 
-def send_pending(db_factory):
+def send_pending(db_factory, *, env=None):
+    import sendon_order_queue
+    legacy_payapp = sendon_order_queue.mode(os.environ if env is None else env) != 'live'
     with db_factory() as c:
         account = c.execute('SELECT refresh FROM alert_account WHERE singleton=1').fetchone()
         row = c.execute('''SELECT o.*,l.url FROM alert_outbox o LEFT JOIN alert_links l USING(id)
-                        WHERE sent=0 AND id NOT LIKE 'payapp:%' AND retry<=? ORDER BY created LIMIT 1''',
-                        (time.time(),)).fetchone()
+                        WHERE sent=0 AND id NOT LIKE 'payapp:%' AND (? OR id NOT LIKE 'payapp-staff:%') AND retry<=? ORDER BY created LIMIT 1''',
+                        (legacy_payapp, time.time(),)).fetchone()
     if not account or not row:
         return
+    claimed = False
     try:
         issued = token('refresh_token', refresh_token=account['refresh'])
         if issued.get('refresh_token'):
@@ -99,6 +132,13 @@ def send_pending(db_factory):
         link = row['url'] or ORIGIN
         template = {'object_type':'text', 'text':row['message'], 'link':{'web_url':link,'mobile_web_url':link},
                     'button_title':'주문 내역' if row['url'] else '태산이 안내'}
+        if row['id'].startswith('payapp-staff:'):
+            with db_factory() as c:
+                c.execute('BEGIN IMMEDIATE')
+                if not claim_payapp_staff(c, row['id'].split(':',1)[1], 'kakao'):
+                    c.execute('UPDATE alert_outbox SET retry=? WHERE id=?', (253402300799, row['id']))
+                    return
+                claimed = True
         response = post('https://kapi.kakao.com/v2/api/talk/memo/default/send',
                         {'template_object':json.dumps(template, ensure_ascii=False)}, issued['access_token'])
         if response.get('result_code') != 0:
@@ -106,7 +146,7 @@ def send_pending(db_factory):
     except Exception:
         with db_factory() as c:
             c.execute('UPDATE alert_outbox SET attempts=attempts+1,retry=? WHERE id=?',
-                      (time.time()+min(3600, 30*2**min(row['attempts'],7)),row['id']))
+                      (253402300799 if claimed else time.time()+min(3600, 30*2**min(row['attempts'],7)),row['id']))
         return
     with db_factory() as c:
         c.execute('UPDATE alert_outbox SET sent=1 WHERE id=?',(row['id'],))

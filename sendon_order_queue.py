@@ -43,6 +43,11 @@ def setup(db):
 
 def enqueue(db_factory, order_id, order, *, customer=False):
     import order_sms
+    import owner_alerts
+    try:
+        owner_alerts.enqueue_payapp_staff(db_factory, order_id, order)
+    except Exception:
+        logger.error('PayApp staff notification queue write failed')
     try:
         with closing(db_factory()) as db, db:
             setup(db)
@@ -144,6 +149,14 @@ def process(db, order_id, template, *, retry=False, env=None, open_request=None)
             SET state='sending', started_at=?, completed_at=NULL, attempts=attempts+1, lease_until=?
             WHERE order_id=? AND template=? AND state=? AND retry_at<=?
             RETURNING recipient,variables,attempts""", (now(), time.time()+60, order_id, template, initial, time.time())).fetchone()
+        if item and template == STAFF and live_enabled(env):
+            import owner_alerts
+            owner_alerts.setup(db)
+            if not owner_alerts.claim_payapp_staff(db, order_id, 'sendon', same_channel_retry=True):
+                db.execute("""UPDATE sendon_order_queue SET state='held',result_code='STAFF_ALREADY_CLAIMED',
+                    reason='직원 알림 중복 방지',completed_at=?,lease_until=0
+                    WHERE order_id=? AND template=?""", (now(), order_id, template))
+                return True
     if not item:
         return False
     recipient, variables, attempts = item
