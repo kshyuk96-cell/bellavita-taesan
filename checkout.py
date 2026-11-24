@@ -542,6 +542,8 @@ def start_order(db, job, price, product, fields, origin, config):
         connection.execute('INSERT INTO invitation_orders VALUES (?,?,?,?,?,?,NULL,NULL)',
                            (attempt, job, int(price), dt.datetime.now(SEOUL).isoformat(), details, initial))
     if order['payment_method'] == 'bank_transfer':
+        import sendon_order_queue
+        sendon_order_queue.enqueue(db, attempt, order)
         return f'/invitation-orders/{attempt}/receipt'
     if not all(config.values()):
         with db() as connection:
@@ -600,4 +602,7 @@ def receive_payment(db, fields, config):
             if row['state'] != 'paid':
                 import order_sms
                 order_sms.enqueue_paid(connection, row)
+    if state == 'paid':
+        import sendon_order_queue
+        sendon_order_queue.enqueue(db, attempt, json.loads(row['details']), customer=True)
     return True

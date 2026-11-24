@@ -170,6 +170,8 @@ def confirm_deposit(root,payload):
         elif row['state']!='paid':raise ValueError('입금 확인할 수 없는 주문 상태입니다.')
         operations=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='order_operations'").fetchone()
         current=db.execute(('SELECT i.*,o.order_number AS legacy_order_number FROM invitation_orders i LEFT JOIN order_operations o ON replace(o.id,"-","")=i.id WHERE i.id=?' if operations else 'SELECT i.* FROM invitation_orders i WHERE i.id=?'),(source,)).fetchone()
+    import sendon_order_queue
+    sendon_order_queue.enqueue(lambda: sqlite3.connect(file), source, details, customer=True)
     result=paid_order(current);result['depositConfirmedBy']=actor
     return result
 
@@ -201,6 +203,33 @@ def query(worker,root,params):
 
 
 def dispatch(handler,method,path,root,worker):
+    if path == '/erp/invitations/sendon-queue':
+        from contextlib import closing
+        import sendon_order_queue as queue
+        try:
+            with closing(sqlite3.connect(Path(root) / 'state.sqlite3', timeout=10)) as db:
+                if method == 'GET':
+                    handler.send_json({'rows':queue.list_jobs(db)})
+                elif method == 'POST':
+                    size = int(handler.headers.get('Content-Length','0'))
+                    if not 0 < size <= 2000:
+                        raise ValueError()
+                    payload = json.loads(handler.rfile.read(size))
+                    order_id, template, action = (payload.get(k) for k in ('orderId','template','action'))
+                    if (not isinstance(order_id, str) or not re.fullmatch(r'[a-f0-9]{32}', order_id)
+                            or template not in (queue.STAFF, queue.CUSTOMER) or action not in ('simulate','retry')):
+                        raise ValueError()
+                    if queue.live_enabled(os.environ):
+                        handler.send_json({'error':'모의 발송은 실발송 모드에서 실행할 수 없습니다.'},409)
+                    elif queue.process(db, order_id, template, retry=action=='retry'):
+                        handler.send_json({'success':True})
+                    else:
+                        handler.send_json({'error':'이미 처리 중이거나 작업 상태가 변경되었습니다.'},409)
+                else:
+                    handler.send_json({'error':'지원하지 않는 요청입니다.'},405)
+        except (ValueError, AttributeError, sqlite3.Error):
+            handler.send_json({'error':'알림 작업을 확인할 수 없습니다.'},400)
+        return True
     if path in ('/erp/invitations/product-detail','/erp/invitations/product-update'):
         expected='GET' if path.endswith('product-detail') else 'POST'
         if method!=expected:handler.send_json({'error':'상품 조회는 GET, 수정은 POST 요청으로 처리합니다.'},405);return True
