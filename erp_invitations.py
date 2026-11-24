@@ -599,6 +599,9 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
     tokens=[v for v in (token,os.getenv('ERP_AUTOMATION_TOKEN',''),os.getenv('ERP_INVITATION_BRIDGE_TOKEN','')) if v]
     if not any(hmac.compare_digest(handler.headers.get('Authorization',''),'Bearer '+v) for v in tokens):
         handler.send_json({'error':'초대장 서버 인증이 필요합니다.'},401);return True
+    if path=='/erp/invitations/order-stats':
+        from erp_invitation_stats import handle_read
+        return handle_read(handler,method,path,root,origin)
     if path=='/erp/invitations/capabilities' and method=='GET':
         hashes={name:hashlib.sha256((render.ASSETS/name).read_bytes()).hexdigest() for name in TEMPLATE_HASHES if (render.ASSETS/name).is_file()}
         model=os.getenv('TAESAN_MODEL','')
