@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import sendon_order_queue as queue
+import owner_alerts
 
 
 class QueueTest(unittest.TestCase):
@@ -16,6 +17,27 @@ class QueueTest(unittest.TestCase):
         guard = patch.object(socket.socket, 'connect', side_effect=AssertionError('Outbound network forbidden'))
         guard.start()
         self.addCleanup(guard.stop)
+
+    def test_non_payapp_owner_alerts_keep_their_sender(self):
+        with tempfile.TemporaryDirectory() as directory:
+            def connect():
+                db = sqlite3.connect(Path(directory) / 'alerts.sqlite')
+                db.row_factory = sqlite3.Row
+                return db
+            with connect() as db:
+                owner_alerts.setup(db)
+                db.execute("INSERT INTO alert_account VALUES (1,'fixture')")
+                for event in ('payapp:fixture','staff:fixture','job:fixture','kakao-order:fixture'):
+                    owner_alerts.enqueue(db,event,'테스트 알림')
+            with patch.object(owner_alerts,'token',return_value={'access_token':'fixture'}), patch.object(
+                owner_alerts,'post',return_value={'result_code':0}
+            ) as transport:
+                for _ in range(4):
+                    owner_alerts.send_pending(connect)
+                self.assertEqual(transport.call_count,3)
+            with connect() as db:
+                sent = dict(db.execute('SELECT id,sent FROM alert_outbox'))
+            self.assertEqual(sent,{'payapp:fixture':0,'staff:fixture':1,'job:fixture':1,'kakao-order:fixture':1})
 
     def test_transient_and_ambiguous_provider_outcomes(self):
         env = {'SENDON_MODE':'live','SENDON_ID':'fixture','SENDON_API_KEY':'fixture'}
