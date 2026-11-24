@@ -219,7 +219,7 @@ def dispatch(handler,method,path,root,worker):
                     if (not isinstance(order_id, str) or not re.fullmatch(r'[a-f0-9]{32}', order_id)
                             or template not in (queue.STAFF, queue.CUSTOMER) or action not in ('simulate','retry')):
                         raise ValueError()
-                    if queue.live_enabled(os.environ):
+                    if queue.mode(os.environ) != 'dry_run':
                         handler.send_json({'error':'모의 발송은 실발송 모드에서 실행할 수 없습니다.'},409)
                     elif queue.process(db, order_id, template, retry=action=='retry'):
                         handler.send_json({'success':True})

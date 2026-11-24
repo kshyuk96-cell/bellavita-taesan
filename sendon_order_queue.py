@@ -5,6 +5,8 @@ import json
 import logging
 import os
 import re
+import threading
+import time
 from contextlib import closing
 from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -25,8 +27,18 @@ def setup(db):
         variables TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'queued',
         request_id TEXT, result_code TEXT, reason TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL, started_at TEXT, completed_at TEXT,
-        attempts INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(order_id,template)
+        attempts INTEGER NOT NULL DEFAULT 0, retry_at REAL NOT NULL DEFAULT 0,
+        lease_until REAL NOT NULL DEFAULT 0, PRIMARY KEY(order_id,template)
     )""")
+
+    columns = {row[1] for row in db.execute('PRAGMA table_info(sendon_order_queue)')}
+    for name in ('retry_at', 'lease_until'):
+        if name not in columns:
+            try:
+                db.execute(f'ALTER TABLE sendon_order_queue ADD COLUMN {name} REAL NOT NULL DEFAULT 0')
+            except Exception as error:
+                if 'duplicate column' not in str(error).lower():
+                    raise
 
 
 def enqueue(db_factory, order_id, order, *, customer=False):
@@ -58,8 +70,13 @@ def enqueue(db_factory, order_id, order, *, customer=False):
         logger.error('Sendon order notification queue write failed')
 
 
+def mode(env):
+    value = env.get('SENDON_MODE')
+    return value if value in ('off', 'dry_run', 'live') else 'off'
+
+
 def live_enabled(env):
-    return env.get('SENDON_LIVE_ENABLED') == 'true' and all(
+    return mode(env) == 'live' and all(
         env.get(key) for key in ('SENDON_ID', 'SENDON_API_KEY'))
 
 
@@ -70,6 +87,8 @@ class NoRedirect(HTTPRedirectHandler):
 
 def transmit(template, recipient, variables, *, env=None, open_request=None):
     env = os.environ if env is None else env
+    if mode(env) == 'off':
+        return 'held', '', 'MODE_OFF', '발송 모드 꺼짐'
     if not re.fullmatch(r'01[016789][0-9]{7,8}', recipient):
         return 'failed', '', 'INVALID_PHONE', '휴대폰 번호 확인 필요'
     if not live_enabled(env):
@@ -96,7 +115,7 @@ def transmit(template, recipient, variables, *, env=None, open_request=None):
         data = result.get('data')
         group = data.get('groupId', '') if isinstance(data, dict) else ''
         if isinstance(group, str) and re.fullmatch(r'[a-fA-F0-9-]{36}', group):
-            return 'sent', group, '200', '센드온 접수 완료'
+            return 'accepted', group, '200', '센드온 접수 완료'
         return 'held', '', 'NO_GROUP_ID', '발송 접수 여부 확인 필요'
     if code == 429:
         return 'queued', '', '429', '요청 한도 초과'
@@ -115,13 +134,16 @@ def list_jobs(db):
 
 
 def process(db, order_id, template, *, retry=False, env=None, open_request=None):
+    env = os.environ if env is None else env
+    if mode(env) == 'off':
+        return False
     setup(db)
     initial = 'failed' if retry else 'queued'
     with db:
         item = db.execute("""UPDATE sendon_order_queue
-            SET state='sending', started_at=?, completed_at=NULL, attempts=attempts+1
-            WHERE order_id=? AND template=? AND state=?
-            RETURNING recipient,variables,attempts""", (now(), order_id, template, initial)).fetchone()
+            SET state='sending', started_at=?, completed_at=NULL, attempts=attempts+1, lease_until=?
+            WHERE order_id=? AND template=? AND state=? AND retry_at<=?
+            RETURNING recipient,variables,attempts""", (now(), time.time()+60, order_id, template, initial, time.time())).fetchone()
     if not item:
         return False
     recipient, variables, attempts = item
@@ -131,7 +153,76 @@ def process(db, order_id, template, *, retry=False, env=None, open_request=None)
         state = 'failed'
     with db:
         db.execute("""UPDATE sendon_order_queue
-            SET state=?,request_id=?,result_code=?,reason=?,completed_at=?
+            SET state=?,request_id=?,result_code=?,reason=?,completed_at=?,retry_at=?,lease_until=0
             WHERE order_id=? AND template=? AND state='sending' AND attempts=?""",
-            (state, request_id or None, code, reason, now(), order_id, template, attempts))
+            (state, request_id or None, code, reason, now(),
+             time.time()+min(300, 5*2**attempts) if state == 'queued' else 0, order_id, template, attempts))
     return True
+
+
+def reconcile(db, order_id, template, group, recipient, env, *, open_request=None):
+    """Look up the terminal result for the accepted message without resending."""
+    if not live_enabled(env):
+        return
+    auth = base64.b64encode(f"{env['SENDON_ID']}:{env['SENDON_API_KEY']}".encode()).decode()
+    endpoint = f'https://api.sendon.io/v2/statistics/messaging/groups/{group}/messages'
+    request = Request(endpoint, headers={'Authorization':'Basic '+auth})
+    try:
+        with (open_request or build_opener(NoRedirect).open)(request, timeout=12) as response:
+            response_data = json.loads(response.read(100_000))
+        data = response_data.get('data') or {}
+        if response_data.get('code') != 200:
+            return
+        rows = data.get('results') or []
+        matches = [row for row in rows if row.get('groupId') == group
+                   and re.sub(r'\D', '', str(row.get('to') or '')) == recipient]
+        if len(matches) != 1:
+            return
+        item = matches[0]
+        status = item.get('messageStatus')
+        if status not in ('SUCCEEDED', 'FAILED', 'CANCELED'):
+            return
+        code = str(item.get('resultCode') or '')
+        if not re.fullmatch(r'[A-Z0-9_-]{1,16}', code, re.I) or code == recipient:
+            code = status
+        with db:
+            db.execute("""UPDATE sendon_order_queue SET state=?,result_code=?,reason=?,completed_at=?
+                WHERE order_id=? AND template=? AND state='accepted' AND request_id=?""",
+                ('sent' if status == 'SUCCEEDED' else 'failed', code,
+                 '수신 성공' if status == 'SUCCEEDED' else '센드온 최종 발송 실패', now(), order_id, template, group))
+    except (OSError, ValueError, AttributeError, TypeError):
+        return
+
+
+def drain(db, env):
+    if mode(env) == 'off':
+        return
+    setup(db)
+    timestamp = time.time()
+    with db:
+        db.execute("""UPDATE sendon_order_queue SET state='held', reason='중단된 발송의 접수 여부 확인 필요',
+            completed_at=? WHERE state='sending' AND lease_until<=?""", (now(), timestamp))
+        due = db.execute("""SELECT order_id,template FROM sendon_order_queue
+            WHERE state='queued' AND retry_at<=? ORDER BY created_at LIMIT 3""", (timestamp,)).fetchall()
+        accepted = db.execute("""SELECT order_id,template,request_id,recipient FROM sendon_order_queue
+            WHERE state='accepted' AND retry_at<=? ORDER BY retry_at,created_at LIMIT 3""", (timestamp,)).fetchall()
+        if live_enabled(env):
+            db.executemany("UPDATE sendon_order_queue SET retry_at=? WHERE order_id=? AND template=? AND state='accepted'",
+                           [(timestamp+60, item[0], item[1]) for item in accepted])
+    for order_id, template in due:
+        process(db, order_id, template, env=env)
+    for order_id, template, group, recipient in accepted:
+        reconcile(db, order_id, template, group, recipient, env)
+
+
+def start(db_factory):
+    def loop():
+        while True:
+            try:
+                if mode(os.environ) != 'off':
+                    with closing(db_factory()) as db:
+                        drain(db, os.environ)
+            except Exception:
+                logger.error('Sendon outbox processing failed')
+            time.sleep(5)
+    threading.Thread(target=loop, daemon=True, name='sendon-order-outbox').start()

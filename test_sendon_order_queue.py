@@ -27,7 +27,7 @@ class QueueTest(unittest.TestCase):
                 self.fail('dry mode attempted network access')
             with connect() as db:
                 for template in (queue.STAFF, queue.CUSTOMER):
-                    self.assertTrue(queue.process(db,'synthetic',template,env={'SENDON_LIVE_ENABLED':'false'},open_request=no_network))
+                    self.assertTrue(queue.process(db,'synthetic',template,env={'SENDON_MODE':'dry_run'},open_request=no_network))
                     self.assertFalse(queue.process(db,'synthetic',template,env={},open_request=no_network))
                 rows = queue.list_jobs(db)
                 self.assertEqual(len(rows),2)

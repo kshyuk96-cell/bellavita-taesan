@@ -599,9 +599,6 @@ def receive_payment(db, fields, config):
         connection.execute('UPDATE invitation_orders SET state=?, payment_number=? WHERE id=?', (state, number, attempt))
         if state == 'paid':
             stage_paid(connection, row)
-            if row['state'] != 'paid':
-                import order_sms
-                order_sms.enqueue_paid(connection, row)
     if state == 'paid':
         import sendon_order_queue
         sendon_order_queue.enqueue(db, attempt, json.loads(row['details']), customer=True)

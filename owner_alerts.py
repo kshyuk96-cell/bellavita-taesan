@@ -86,7 +86,7 @@ def send_pending(db_factory):
     with db_factory() as c:
         account = c.execute('SELECT refresh FROM alert_account WHERE singleton=1').fetchone()
         row = c.execute('''SELECT o.*,l.url FROM alert_outbox o LEFT JOIN alert_links l USING(id)
-                        WHERE sent=0 AND retry<=? ORDER BY created LIMIT 1''',
+                        WHERE sent=0 AND id NOT LIKE 'payapp:%' AND retry<=? ORDER BY created LIMIT 1''',
                         (time.time(),)).fetchone()
     if not account or not row:
         return

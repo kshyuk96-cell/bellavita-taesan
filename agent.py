@@ -718,10 +718,7 @@ def run_order(message, owner):
 
 def order_saved(connection, row, number, details):
     report = order_intake.report(number, details)
-    if row['kind'] == 'payapp':
-        link = os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/') + '/staff-orders?order=' + row['id'].replace('-', '')
-        owner_alerts.enqueue(connection, 'payapp:'+row['id'], '새 초대장 주문\n' + report, link)
-    else:
+    if row['kind'] != 'payapp':
         owner_alerts.enqueue(connection, 'kakao-order:'+row['id'], report)
 
 
@@ -750,7 +747,6 @@ def start_order_queue():
             try:
                 if os.getenv('TAESAN_ORDER_SHEET_ID'):
                     process_order_queue()
-                    order_sms.send_pending(db, os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'))
             except Exception as error:
                 print('주문 대기열 확인 실패:', type(error).__name__, file=sys.stderr, flush=True)
             time.sleep(3)
@@ -1566,8 +1562,8 @@ if __name__ == '__main__':
         except Exception as error:
             print('ERP_MEMORIAL_SOURCE_PROBE '+json.dumps({'fetched':False,'errorType':type(error).__name__},ensure_ascii=False),flush=True)
     if os.getenv('ERP_MEMORIAL_PROBE_URL'):threading.Thread(target=memorial_source_probe,daemon=True).start()
-    owner_alerts.start(db)
+    import sendon_order_queue
     start_order_queue()
-    order_sms.start(db, os.getenv('TAESAN_PUBLIC_URL', '').rstrip('/'))
+    sendon_order_queue.start(db)
     ThreadingHTTPServer((os.getenv('TAESAN_BIND', '127.0.0.1'), int(os.getenv('PORT', '8080'))),
                         Handler).serve_forever()

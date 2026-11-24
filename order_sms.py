@@ -246,41 +246,8 @@ def send_pending(db, base, sender=None, enabled=None):
     provider readiness only. The explicit order-notification feature flag still
     applies, and no old order_operations row is scanned or enqueued here.
     """
-    provider_ready = enabled if enabled is not None else configured
-    if not globals()['enabled']() or not provider_ready() or not https_url(base):
-        return False
-    with db() as connection:
-        setup(connection)
-        connection.execute('BEGIN IMMEDIATE')
-        cutoff = time.time() - 72 * 3600
-        connection.execute("UPDATE invitation_notice_outbox SET state='expired' WHERE state='pending' AND created<?", (cutoff,))
-        row = connection.execute('''SELECT q.* FROM invitation_notice_outbox q
-            JOIN invitation_orders i ON i.id=q.order_id AND i.state='paid'
-            WHERE q.state='pending' ORDER BY q.created,q.id LIMIT 1''').fetchone()
-        if row is None:
-            return False
-        # Commit before the network call: timeout/process death is uncertain,
-        # not a reason to send a second message automatically.
-        connection.execute("UPDATE invitation_notice_outbox SET state='uncertain' WHERE id=? AND state='pending'", (row['id'],))
-    try:
-        message = message_for(row, base.rstrip('/'))
-        if sender is not None:
-            receipt = sender(row['phone'], message, row['id'][:24])
-        elif provider_name() == 'sendon':
-            receipt = send_sendon_alimtalk(row['phone'], alimtalk_variables(row, base), message,
-                                           row['id'][:24], row['audience'])
-        else:
-            receipt = send(row['phone'], message, row['id'][:24])
-        if not isinstance(receipt, str) or not receipt:
-            raise ValueError('접수 결과 확인 필요')
-    except Exception as error:
-        with db() as connection:
-            connection.execute("UPDATE invitation_notice_outbox SET error=? WHERE id=?", (type(error).__name__, row['id']))
-        return True
-    with db() as connection:
-        connection.execute("UPDATE invitation_notice_outbox SET state='accepted',receipt=?,accepted=? WHERE id=? AND state='uncertain'",
-                           (receipt, time.time(), row['id']))
-    return True
+    # The source Sendon queue is the sole autonomous order-message sender.
+    return False
 
 
 def start(db, base):
