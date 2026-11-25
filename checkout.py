@@ -461,12 +461,15 @@ def normalize_order(product, fields):
     payment_method = fields.get('payment_method', '')
     if payment_method not in ('bank_transfer', 'payapp'):
         raise ValueError('결제 방법을 선택해 주세요.')
-    return {'product': product['number'], 'title': product['title'], 'options': selected,
+    order = {'product': product['number'], 'title': product['title'], 'options': selected,
             'sender': sender, 'message': value('message', 200) if custom else '',
             'buyer': buyer, 'buyer_phone': buyer_phone,
             'venue': installation_venue(product), 'address': product['address'],
             'event_time': product['event_time'], 'amount': amount, 'source': product.get('source', ''),
             'payment_method': payment_method}
+    if product.get('delivery_date'):
+        order['delivery_date'] = dt.date.fromisoformat(product['delivery_date']).isoformat()
+    return order
 
 
 def setup(connection):
@@ -527,7 +530,11 @@ def start_order(db, job, price, product, fields, origin, config):
             saved.pop('recipient_phone', None)
             saved.pop('wedding_preview', None)
             saved.setdefault('source', '')
-            if row['job'] != job or row['price'] != int(price) or saved != order:
+            # Delivery scheduling may change after a checkout attempt has been stored.
+            saved.pop('delivery_date', None)
+            if row['job'] != job or row['price'] != int(price) or saved != {
+                key: value for key, value in order.items() if key != 'delivery_date'
+            }:
                 raise ValueError('주문서를 다시 열어 주세요.')
             if row['state'] == 'bank_pending':
                 return f'/invitation-orders/{attempt}/receipt'

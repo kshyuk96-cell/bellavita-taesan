@@ -85,6 +85,8 @@ def paid_details(row):
     fields.update(event_type='결혼', recipient=recipient, event_date=event_date, event_time=event_time,
                   photo_phone=data.get('buyer_phone', ''), message=message, size=size, quantity=1,
                   note='초대장 페이앱 주문', source=data.get('source', ''))
+    if data.get('delivery_date'):
+        fields['delivery_date'] = data['delivery_date']
     return fields
 
 

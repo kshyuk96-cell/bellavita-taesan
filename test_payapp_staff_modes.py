@@ -13,7 +13,8 @@ import sendon_order_queue as queue
 
 class StaffModes(unittest.TestCase):
     def check_mode(self, mode):
-        env = dict(SENDON_MODE=mode, SENDON_ID='fixture', SENDON_API_KEY='fixture')
+        env = dict(SENDON_MODE=mode, SENDON_ID='fixture', SENDON_API_KEY='fixture',
+                   SENDON_LIVE_START_AT='2000-01-01T00:00:00+00:00')
         with tempfile.TemporaryDirectory() as folder:
             def connect():
                 db=sqlite3.connect(Path(folder)/'fixture.db')

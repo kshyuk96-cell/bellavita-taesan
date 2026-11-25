@@ -54,6 +54,21 @@ class CheckoutIntegration(unittest.TestCase):
         with self.connect() as db:
             return sorted(row['template'] for row in queue.list_jobs(db) if row['order_id']==order_id)
 
+    def test_scheduled_delivery_date_is_independent_of_event_date(self):
+        order_id = 'd'*32
+        self.product['delivery_date'] = '2097-12-30'
+        self.start(order_id, 'bank_transfer')
+        with self.connect() as db:
+            self.assertEqual(db.execute(
+                "SELECT json_extract(variables, '$.배송일') FROM sendon_order_queue"
+            ).fetchone()[0], '2097-12-30')
+        management.confirm_deposit(self.root, {'sourceId':'payapp:'+order_id})
+        with self.connect() as db:
+            dates = db.execute(
+                "SELECT json_extract(variables, '$.배송일') FROM sendon_order_queue"
+            ).fetchall()
+        self.assertEqual([row[0] for row in dates], ['2097-12-30']*2)
+
     def test_card_and_wallet_callbacks_replay_without_duplicate_jobs(self):
         for index, gateway_kind in enumerate(('card','wallet'),1):
             order_id = str(index)*32

@@ -41,6 +41,20 @@ def setup(db):
                     raise
 
 
+def scheduled_delivery_date(db, order_id, order):
+    value = order.get('delivery_date')
+    if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='order_operations'").fetchone():
+        row = db.execute(
+            "SELECT details FROM order_operations WHERE replace(id,'-','')=? AND kind='payapp'",
+            (order_id,),
+        ).fetchone()
+        if row:
+            value = json.loads(row[0]).get('delivery_date', value)
+    try:
+        return dt.date.fromisoformat(str(value)).isoformat()
+    except ValueError:
+        return ''
+
 def enqueue(db_factory, order_id, order, *, customer=False):
     import order_sms
     import owner_alerts
@@ -52,7 +66,7 @@ def enqueue(db_factory, order_id, order, *, customer=False):
         with closing(db_factory()) as db, db:
             setup(db)
             recipient = next(iter(order_sms.staff_phones(db)), '')
-            when = str(order.get('event_time') or '')[:10]
+            when = scheduled_delivery_date(db, order_id, order)
             title = str(order.get('title') or '벨라비타 상품')
             kind = '근조' if re.search('부고|근조', title) else '결혼' if re.search('예식|결혼', title) else '일반 행사'
             jobs = [(STAFF, recipient, {
@@ -100,8 +114,6 @@ def transmit(template, recipient, variables, *, env=None, open_request=None):
         return 'failed', '', 'INVALID_PHONE', '휴대폰 번호 확인 필요'
     if mode(env) == 'dry_run':
         return 'sent', '', 'SIMULATED', '모의 발송'
-    if not live_enabled(env):
-        return 'held', '', 'CONFIG_ERROR', '센드온 인증 설정 누락'
     auth = base64.b64encode(f"{env['SENDON_ID']}:{env['SENDON_API_KEY']}".encode()).decode()
     body = {
         'sendProfileId':'@bellavita', 'templateId':template, 'useCredit':True,
@@ -223,12 +235,19 @@ def hold_pre_live(db, env):
     except (ValueError, TypeError):
         cutoff = None
     with db:
-        db.execute("""UPDATE sendon_order_queue SET state='held',
+        conditions = "julianday(created_at) IS NULL OR julianday(created_at)<=julianday(?)"
+        parameters = [now(), cutoff, cutoff]
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='invitation_orders'").fetchone():
+            conditions += """ OR EXISTS (
+                SELECT 1 FROM invitation_orders AS orders
+                WHERE orders.id=sendon_order_queue.order_id
+                AND (julianday(orders.created) IS NULL OR julianday(orders.created)<=julianday(?))
+            )"""
+            parameters.append(cutoff)
+        db.execute(f"""UPDATE sendon_order_queue SET state='held',
             result_code='PRE_LIVE_HOLD', reason='실발송 시작 전 주문 또는 시작시각 미설정',
             completed_at=?, lease_until=0
-            WHERE state IN ('queued','failed') AND
-            (? IS NULL OR julianday(created_at) IS NULL OR julianday(created_at)<=julianday(?))""",
-            (now(), cutoff, cutoff))
+            WHERE state IN ('queued','failed') AND (? IS NULL OR {conditions})""", parameters)
 
 
 def drain(db, env):

@@ -50,6 +50,50 @@ class QueueTest(unittest.TestCase):
                 raise exception
             self.assertEqual(queue.transmit(queue.STAFF,'01000000001',{},env=env,open_request=fail)[::2],(state,code))
 
+    def test_activation_cutoff_holds_old_orders_even_if_enqueued_later(self):
+        env = dict(SENDON_MODE='live', SENDON_LIVE_START_AT='2020-01-01T00:00:00+00:00',
+                   SENDON_ID='fixture', SENDON_API_KEY='fixture')
+        with sqlite3.connect(':memory:') as db:
+            queue.setup(db)
+            db.execute('CREATE TABLE invitation_orders (id TEXT PRIMARY KEY, created TEXT)')
+            db.executemany('INSERT INTO invitation_orders VALUES (?,?)', [
+                ('past', '2019-01-01'), ('after', '2021-01-01'),
+            ])
+            db.executemany(
+                "INSERT INTO sendon_order_queue(order_id,template,recipient,variables,created_at) "
+                "VALUES(?,?,?,'{}',?)",
+                [('past',queue.CUSTOMER,'01000000001','2021-01-01'),
+                 ('old-queue',queue.CUSTOMER,'01000000001','2019-01-01'),
+                 ('after',queue.CUSTOMER,'01000000001','2021-01-01')],
+            )
+            with patch.object(queue, 'transmit', return_value=('sent','','200','fixture')) as fake:
+                self.assertFalse(queue.process(db, 'past', queue.CUSTOMER, env=env))
+                self.assertTrue(queue.process(db, 'after', queue.CUSTOMER, env=env))
+                self.assertFalse(queue.process(db, 'after', queue.CUSTOMER, env=env))
+                fake.assert_called_once()
+            rows = {row['order_id']: row for row in queue.list_jobs(db)}
+            self.assertEqual(len(rows), 3)
+            for key in ('past', 'old-queue'):
+                self.assertEqual(rows[key]['result_code'], 'PRE_LIVE_HOLD')
+                self.assertEqual(rows[key]['state'], 'held')
+                self.assertTrue(rows[key]['reason'])
+
+    def test_missing_either_credential_records_configuration_error(self):
+        for configured in ('SENDON_ID', 'SENDON_API_KEY'):
+            with self.subTest(configured=configured), sqlite3.connect(':memory:') as db:
+                queue.setup(db)
+                db.execute(
+                    "INSERT INTO sendon_order_queue(order_id,template,recipient,variables,created_at) "
+                    "VALUES(?,?,?,'{}',?)", ('new',queue.STAFF,'01000000001',queue.now()),
+                )
+                env = {'SENDON_MODE':'live', 'SENDON_LIVE_START_AT':'2020-01-01T00:00:00+00:00',
+                       configured:'fixture'}
+                with patch.object(queue, 'build_opener') as http:
+                    self.assertTrue(queue.process(db, 'new', queue.STAFF, env=env))
+                    http.assert_not_called()
+                self.assertEqual(queue.list_jobs(db)[0]['result_code'], 'CONFIG_ERROR')
+                self.assertEqual(queue.list_jobs(db)[0]['state'], 'held')
+
     def test_invalid_mode_is_off_and_expired_claim_is_held(self):
         with sqlite3.connect(':memory:') as db:
             queue.setup(db)
