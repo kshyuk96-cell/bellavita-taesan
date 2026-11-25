@@ -11,6 +11,9 @@ from pathlib import Path
 import sendon_order_queue as queue
 
 
+TEST_JOB = '7f494a310ca9371914b8863b45732bd5'
+
+
 def run(db, order_id, audience, *, send=False, result=False, env=None, open_request=None):
     env = os.environ if env is None else env
     if queue.mode(env) != 'dry_run':
@@ -24,12 +27,20 @@ def run(db, order_id, audience, *, send=False, result=False, env=None, open_requ
     live_env = dict(env, SENDON_MODE='live')
     if not queue.live_enabled(live_env):
         raise ValueError('Sendon API 인증 설정이 필요합니다.')
+    order = db.execute('SELECT job,price,created,details,state FROM invitation_orders WHERE id=?',(order_id,)).fetchone()
+    if not order or order[0] != TEST_JOB or order[1] != 93500:
+        raise ValueError('지정된 93,500원 주문서의 주문만 사용할 수 있습니다.')
+    payment = json.loads(order[3]).get('payment_method')
+    if payment not in ('bank_transfer','payapp'):
+        raise ValueError('무통장 또는 PayApp 결제 주문만 사용할 수 있습니다.')
     with db:
         db.execute('''CREATE TABLE IF NOT EXISTS sendon_supervised_test (
-            template TEXT PRIMARY KEY, order_id TEXT NOT NULL, api_state TEXT NOT NULL,
-            request_id TEXT, api_code TEXT, final_state TEXT, final_code TEXT
+            template TEXT NOT NULL, payment TEXT NOT NULL, order_id TEXT NOT NULL, api_state TEXT NOT NULL,
+            request_id TEXT, api_code TEXT, final_state TEXT, final_code TEXT,
+            PRIMARY KEY(payment,template)
         )''')
-    previous = db.execute('SELECT order_id,api_state,request_id,api_code,final_state,final_code FROM sendon_supervised_test WHERE template=?', (template,)).fetchone()
+    result_sql = 'SELECT order_id,api_state,request_id,api_code,final_state,final_code FROM sendon_supervised_test WHERE payment=? AND template=?'
+    previous = db.execute(result_sql, (payment,template)).fetchone()
     if previous and previous[0] != order_id:
         raise ValueError('이미 다른 주문에 이 테스트를 사용했습니다.')
     if result:
@@ -38,17 +49,14 @@ def run(db, order_id, audience, *, send=False, result=False, env=None, open_requ
         if previous[1] == 'accepted' and not previous[4]:
             queue.reconcile(db, order_id, template, previous[2], allowed, live_env,
                             open_request=open_request, supervised=True)
-            previous = db.execute('SELECT order_id,api_state,request_id,api_code,final_state,final_code FROM sendon_supervised_test WHERE template=?',(template,)).fetchone()
+            previous = db.execute(result_sql,(payment,template)).fetchone()
         return dict(zip(('order_id','api_state','request_id','api_code','final_state','final_code'),previous))
-    order = db.execute('SELECT price,created,details,state FROM invitation_orders WHERE id=?',(order_id,)).fetchone()
-    if not order or order[0] != 1000 or json.loads(order[2]).get('payment_method') != 'bank_transfer':
-        raise ValueError('1,000원 무통장 테스트 주문만 사용할 수 있습니다.')
-    age = dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(order[1])
+    age = dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(order[2])
     if not dt.timedelta(0) <= age <= dt.timedelta(hours=2):
         raise ValueError('최근 2시간 이내에 생성된 주문을 사용하세요.')
-    if order[3] != ('bank_pending' if audience == 'staff' else 'paid'):
+    if order[4] != ('bank_pending' if payment == 'bank_transfer' and audience == 'staff' else 'paid'):
         raise ValueError('접수·입금 단계가 템플릿과 맞지 않습니다.')
-    staff = db.execute('SELECT order_id,api_state FROM sendon_supervised_test WHERE template=?',(queue.STAFF,)).fetchone()
+    staff = db.execute('SELECT order_id,api_state FROM sendon_supervised_test WHERE payment=? AND template=?',(payment,queue.STAFF)).fetchone()
     if audience == 'customer' and (not staff or tuple(staff) != (order_id,'accepted')):
         raise ValueError('같은 주문의 직원 테스트 접수를 먼저 확인하세요.')
     item = db.execute('SELECT recipient,variables FROM sendon_order_queue WHERE order_id=? AND template=?',(order_id,template)).fetchone()
@@ -59,12 +67,12 @@ def run(db, order_id, audience, *, send=False, result=False, env=None, open_requ
     if not send:
         return {'order_id':order_id,'template':template,'recipient_last4':suffix,'ready':True}
     with db:
-        claim = db.execute("INSERT OR IGNORE INTO sendon_supervised_test(template,order_id,api_state) VALUES(?,?,'attempting')",(template,order_id))
+        claim = db.execute("INSERT OR IGNORE INTO sendon_supervised_test(template,payment,order_id,api_state) VALUES(?,?,?,'attempting')",(template,payment,order_id))
         if claim.rowcount != 1:
             raise ValueError('이미 발송을 시도했습니다.')
     status, request_id, code, _ = queue.transmit(template, allowed, json.loads(item[1]),env=live_env,open_request=open_request)
     with db:
-        db.execute('UPDATE sendon_supervised_test SET api_state=?,request_id=?,api_code=? WHERE template=?',(status,request_id,code,template))
+        db.execute('UPDATE sendon_supervised_test SET api_state=?,request_id=?,api_code=? WHERE order_id=? AND template=?',(status,request_id,code,order_id,template))
     return {'api_state':status,'request_id':request_id,'api_code':code}
 
 
