@@ -191,7 +191,7 @@ def process(db, order_id, template, *, retry=False, env=None, open_request=None)
     return True
 
 
-def reconcile(db, order_id, template, group, recipient, env, *, open_request=None):
+def reconcile(db, order_id, template, group, recipient, env, *, open_request=None, supervised=False):
     """Look up the terminal result for the accepted message without resending."""
     if not live_enabled(env):
         return
@@ -217,6 +217,11 @@ def reconcile(db, order_id, template, group, recipient, env, *, open_request=Non
         if not re.fullmatch(r'[A-Z0-9_-]{1,16}', code, re.I) or code == recipient:
             code = status
         with db:
+            if supervised:
+                db.execute("""UPDATE sendon_supervised_test SET final_state=?,final_code=?
+                    WHERE order_id=? AND template=? AND api_state='accepted' AND request_id=?""",
+                    (status, code, order_id, template, group))
+                return
             db.execute("""UPDATE sendon_order_queue SET state=?,result_code=?,reason=?,completed_at=?
                 WHERE order_id=? AND template=? AND state='accepted' AND request_id=?""",
                 ('sent' if status == 'SUCCEEDED' else 'failed', code,
