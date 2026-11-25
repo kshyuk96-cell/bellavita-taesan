@@ -94,10 +94,14 @@ def transmit(template, recipient, variables, *, env=None, open_request=None):
     env = os.environ if env is None else env
     if mode(env) == 'off':
         return 'held', '', 'MODE_OFF', '발송 모드 꺼짐'
+    if mode(env) == 'live' and not live_enabled(env):
+        return 'held', '', 'CONFIG_ERROR', '센드온 인증 설정 누락'
     if not re.fullmatch(r'01[016789][0-9]{7,8}', recipient):
         return 'failed', '', 'INVALID_PHONE', '휴대폰 번호 확인 필요'
-    if not live_enabled(env):
+    if mode(env) == 'dry_run':
         return 'sent', '', 'SIMULATED', '모의 발송'
+    if not live_enabled(env):
+        return 'held', '', 'CONFIG_ERROR', '센드온 인증 설정 누락'
     auth = base64.b64encode(f"{env['SENDON_ID']}:{env['SENDON_API_KEY']}".encode()).decode()
     body = {
         'sendProfileId':'@bellavita', 'templateId':template, 'useCredit':True,
@@ -143,6 +147,8 @@ def process(db, order_id, template, *, retry=False, env=None, open_request=None)
     if mode(env) == 'off':
         return False
     setup(db)
+    if mode(env) == 'live':
+        hold_pre_live(db, env)
     initial = 'failed' if retry else 'queued'
     with db:
         item = db.execute("""UPDATE sendon_order_queue
@@ -207,10 +213,30 @@ def reconcile(db, order_id, template, group, recipient, env, *, open_request=Non
         return
 
 
+def hold_pre_live(db, env):
+    # Explicit activation boundary; missing or invalid boundary fails closed.
+    try:
+        cutoff = dt.datetime.fromisoformat(env.get('SENDON_LIVE_START_AT', ''))
+        if cutoff.tzinfo is None or cutoff > dt.datetime.now(dt.timezone.utc):
+            raise ValueError('invalid activation boundary')
+        cutoff = cutoff.astimezone(dt.timezone.utc).isoformat()
+    except (ValueError, TypeError):
+        cutoff = None
+    with db:
+        db.execute("""UPDATE sendon_order_queue SET state='held',
+            result_code='PRE_LIVE_HOLD', reason='실발송 시작 전 주문 또는 시작시각 미설정',
+            completed_at=?, lease_until=0
+            WHERE state IN ('queued','failed') AND
+            (? IS NULL OR julianday(created_at) IS NULL OR julianday(created_at)<=julianday(?))""",
+            (now(), cutoff, cutoff))
+
+
 def drain(db, env):
     if mode(env) == 'off':
         return
     setup(db)
+    if mode(env) == 'live':
+        hold_pre_live(db, env)
     timestamp = time.time()
     with db:
         db.execute("""UPDATE sendon_order_queue SET state='held', reason='중단된 발송의 접수 여부 확인 필요',
