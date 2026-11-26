@@ -20,10 +20,10 @@ def event_scene_upload(raw):
     if not jpeg.startswith(b'\xff\xd8\xff') or not jpeg.endswith(b'\xff\xd9'):
         raise ValueError()
     boundary=uuid.uuid4().hex
-    fields={'model':'gpt-image-1','size':'1536x1024','quality':'low','output_format':'jpeg','prompt':prompt}
+    fields={'model':'gpt-image-1.5','size':'1536x1024','quality':'low','prompt':prompt}
     parts=[f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode()
            for name,value in fields.items()]
-    parts.extend([f'--{boundary}\r\nContent-Disposition: form-data; name="image"; filename="scene.jpg"\r\nContent-Type: image/jpeg\r\n\r\n'.encode(),
+    parts.extend([f'--{boundary}\r\nContent-Disposition: form-data; name="image[]"; filename="scene.jpg"\r\nContent-Type: image/jpeg\r\n\r\n'.encode(),
                   jpeg,f'\r\n--{boundary}--\r\n'.encode()])
     return b''.join(parts),'multipart/form-data; boundary='+boundary
 
@@ -67,16 +67,20 @@ def dispatch(handler,method,path):
             handler.send_json(value)
         except HTTPError as error:
             status=error.code if error.code in (400,401,403,404,408,429) else 502
-            code=None
+            code=parameter=None
             if event_scene:
                 try:
                     detail=json.loads(error.read(8192)).get('error',{})
                     reason=str(detail.get('code',''))
                     if reason in ('model_not_found','insufficient_quota','billing_hard_limit_reached','organization_verification_required','invalid_api_key','content_policy_violation','invalid_image','invalid_value'):
                         code=reason
+                    field=detail.get('param')
+                    if field in ('model','size','quality','image','image[]','image[0]','prompt','output_format'):
+                        parameter=field
                 except (OSError,ValueError,AttributeError):
                     pass
-            handler.send_json({'error':'AI 공급자 연결 또는 모델 설정을 확인하세요.',**({'code':code} if code else {})},status)
+            handler.send_json({'error':'AI 공급자 연결 또는 모델 설정을 확인하세요.',
+                               **({'code':code} if code else {}),**({'parameter':parameter} if parameter else {})},status)
         except (OSError,URLError):handler.send_json({'error':'AI 응답을 확인하지 못했습니다.'},502)
     except (ValueError,TypeError,UnicodeError):handler.send_json({'error':'지원하는 AI 요청 형식과 모델을 확인하세요.'},400)
     finally:ACTIVE.release()
