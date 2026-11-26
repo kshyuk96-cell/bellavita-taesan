@@ -576,7 +576,8 @@ def make(source, root, origin, extract, photo=None, *, direct_blogpay=False):
                 snapshot['wedding_crop'] = event['wedding_crop']
             (folder / f'{price}.order.json').write_text(json.dumps(snapshot, ensure_ascii=False), encoding='utf-8')
         (folder / f'{price}.html').write_text(page(event, date, clock, order_url, preview, url), encoding='utf-8')
-        message = kakao_copy(event, date, clock, price, url)
+        amount = checkout.own_checkout_pricing.current_base(price) if products else price
+        message = kakao_copy(event, date, clock, amount, url)
         items.append({'price':price,'url':url,'message':message})
     result = {'jobId':job,'status':'done','items':items,'expires':expiry.isoformat()}
     (folder / 'result.json').write_text(json.dumps(result,ensure_ascii=False),encoding='utf-8')
@@ -585,6 +586,12 @@ def make(source, root, origin, extract, photo=None, *, direct_blogpay=False):
 
 def get_result(root, job):
     try:
-        return json.loads((root / 'invitations' / job / 'result.json').read_text(encoding='utf-8'))
+        folder = root / 'invitations' / job
+        result = json.loads((folder / 'result.json').read_text(encoding='utf-8'))
+        for item in result.get('items', []):
+            slot = item['price']
+            if (folder / f'{slot}.order.json').is_file():
+                item['message'] = checkout.own_checkout_pricing.public_copy(item['message'], slot, f'/i/{job}/{slot}/order')
+        return result
     except FileNotFoundError:
         return None

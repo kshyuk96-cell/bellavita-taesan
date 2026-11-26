@@ -32,8 +32,10 @@ import erp_local_checkout
 import erp_memorial_invitation
 import erp_ai
 import erp_manual_blogpay
+import own_checkout_pricing
 
 TEMPLATE_HASHES={'seoul.ttf':'7b3e16b8ccd97d903520f87f22ff970d0ab0594231807d0a0b752eb8fcb670f4','event-wreath-catalog.webp': '5a264152394b1d34f847192b3c05ff7d809a4e1e072eff580220e127070d8b25', 'event-v5.css': '852ce3f563c959ed59ee240ec99896434f62bf91e019e14d63ef3ba7927fdfb3', 'rice-wreath-10kg.webp': '6a0e396b644daeaa76ef79aeee3acaa6b9893f24a31aa129fca070b29209c7a7'}
+
 PRICES=(93500,99000)
 FIELDS={'name':160,'date':10,'time':5,'venue':180,'address':250,'sourceUrl':1000,'greeting':1200,'note':700,'host':100,'groomName':40,'brideName':40,'groomParents':100,'brideParents':100,'groomRelation':24,'brideRelation':24,'hostSide':8,'logo':1000,'hero':1000,'frame':1000,'scrollLeft':1000,'scrollRight':1000,'congrats':160}
 FIELDS.update(erp_memorial_invitation.FIELDS)
@@ -247,7 +249,12 @@ class Engine:
     def get(self,key):
         with self.db() as db:row=db.execute('SELECT * FROM jobs WHERE id=?',(key,)).fetchone()
         if not row:return None
-        if row['state'] in ('done','error','cancelled'):return json.loads(row['result'])
+        if row['state'] in ('done','error','cancelled'):
+            result=json.loads(row['result'])
+            for item in result.get('items',[]):
+                if 'message' in item:
+                    item['message']=own_checkout_pricing.public_copy(item['message'],item['price'],item.get('orderUrl'))
+            return result
         answer={'requestId':key,'status':'processing','action':row['action']}
         try:progress=json.loads(row['result'] or '{}').get('progress')
         except (ValueError,TypeError,AttributeError):progress=None
@@ -417,8 +424,9 @@ class Engine:
         else:
             image,boxes=render.composite(v,kind,photos)
             parts=erp_invitation_auto.components(render,v,kind,photos,image)
-        self.progress(data.get('requestId',''),5,'두 가격 주문서 생성','93,500원·99,000원 주문서를 준비하고 있습니다.')
         local=data.get('orderMode')=='invitation-checkout'
+        prices='93,500원·120,000원' if local else '93,500원·99,000원'
+        self.progress(data.get('requestId',''),5,'두 가격 주문서 생성',prices+' 주문서를 준비하고 있습니다.')
         local_key,items,snapshots=erp_local_checkout.build(self.checkout_root,self.origin,data) if local else ('',erp_manual_blogpay.products(v) if data.get('orderMode')=='blogpay-manual' else self.products(render.product_name(v,kind)),{})
         sample=render.image_bytes(image)
         hero=render.image_bytes(photos['hero']) if kind=='wedding' else b''
@@ -479,8 +487,9 @@ class Engine:
         for item in result['items']:
             self.check_cancelled(key)
             price=item['price'];url=origin+f'/{price}.html'
-            documents[f'{price}.html']=render.page(data['values'],data['kind'],price,item['orderUrl'],json.loads(assets['reference-components.json']) if data['kind'] in ('wedding','memorial') else origin+'/sample.webp',origin+'/hero.webp' if assets['hero.webp'] else '',origin+'/thumbnail.jpg',url)
-            items.append({**item,'url':url,'message':render.message(data['values'],data['kind'],price,url)})
+            amount=own_checkout_pricing.current_base(price) if data.get('orderMode')=='invitation-checkout' else price
+            documents[f'{price}.html']=render.page(data['values'],data['kind'],amount,item['orderUrl'],json.loads(assets['reference-components.json']) if data['kind'] in ('wedding','memorial') else origin+'/sample.webp',origin+'/hero.webp' if assets['hero.webp'] else '',origin+'/thumbnail.jpg',url)
+            items.append({**item,'url':url,'message':render.message(data['values'],data['kind'],amount,url)})
         result={**result,'items':items,'jobId':row['public_id'],'publishedAt':dt.datetime.now(dt.timezone.utc).isoformat(),'thumbnail':origin+'/thumbnail.jpg'}
         with LOCK:
             self.check_cancelled(key)
@@ -564,6 +573,10 @@ class Engine:
                         except (ValueError,OSError):return 422,'text/plain; charset=utf-8','주문서 사진 원본을 확인해 주세요.'.encode()
         try:raw=(folder/name).read_bytes()
         except OSError:return 404,None,None
+        if name.endswith('.html'):
+            slot=int(name.split('.')[0])
+            order_url=next((item.get('orderUrl') for item in result['items'] if item.get('price')==slot),'')
+            raw=own_checkout_pricing.public_copy(raw.decode(),slot,order_url).encode()
         return 200,('text/html; charset=utf-8' if name.endswith('.html') else 'image/jpeg' if name.endswith('.jpg') else 'image/webp'),raw
 
 
@@ -704,7 +717,7 @@ def dispatch(handler,method,path,root,origin,legacy,extract):
             product=json.loads(file.read_text())['products'][order_preview[2]]
             if json.loads(row['input'])['kind']=='wedding':product['wedding_photo']='https://preview.invalid/hero.webp'
             if product.get('kind')=='memorial':product['images']=[render.data_image((worker.root/'private'/row['id']/'sample.webp').read_bytes())]
-            page=legacy.checkout.render(product,'#',can_pay=False)
+            page=legacy.checkout.render(own_checkout_pricing.apply(product,order_preview[2]),'#',can_pay=False)
             hero=worker.root/'private'/row['id']/'hero.webp'
             if hero.is_file():page=page.replace('https://preview.invalid/hero.webp',render.data_image(hero.read_bytes()))
             raw=page.encode();handler.send_response(200);handler.send_header('Content-Type','text/html; charset=utf-8');handler.send_header('Cache-Control','no-store');handler.end_headers();handler.wfile.write(raw);return True

@@ -15,6 +15,7 @@ import threading
 from pathlib import Path
 from urllib.parse import urlsplit
 import erp_manual_blogpay
+import own_checkout_pricing
 from zoneinfo import ZoneInfo
 from lxml import html
 
@@ -128,6 +129,8 @@ def product_status(root,product):
     if row:return status(row)
     return None
 
+
+
 def current_html(root,row,price):
     if row.get('deleted'):raise ValueError('삭제된 초대장입니다.')
     if row.get('external') or row.get('orderOnly'):raise ValueError('외부 발행 또는 주문서 전용 초대장은 등록된 링크에서 확인하세요. ERP에서 문구·디자인을 직접 수정할 수 없습니다.')
@@ -140,7 +143,8 @@ def current_html(root,row,price):
             for old,new in selected.items():raw=raw.replace(old,new)
     if row.get('thumbnailVersion'):
         raw=re.sub(r'(thumbnail\.jpg)(?:\?v=[a-f0-9]+)?',r'\1?v='+row['thumbnailVersion'],raw)
-    return raw
+    order_url=next((item.get('orderUrl') for item in row.get('links',[]) if item.get('price')==price),'')
+    return own_checkout_pricing.public_copy(raw,price,order_url)
 def nodes(tree):
     return tree.xpath('//h1[not(*)]|//h2[not(*)]|//h3[not(*)]|//p[not(*)]')
 def detail(root,row):

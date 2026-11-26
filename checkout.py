@@ -19,6 +19,7 @@ from lxml import html
 from blogpay import NoRedirect
 from scroll_sender import split_sender
 from order_operations import stage_paid
+import own_checkout_pricing
 
 SEOUL = ZoneInfo('Asia/Seoul')
 ORDER_PATH = re.compile(r'/i/([a-f0-9]{32})/(93500|99000)/order')
@@ -213,6 +214,8 @@ def parse_product(tree, row, url, shop):
             'images': images, 'groups': groups}
 
 
+
+
 def read(root, job, price):
     try:
         product=json.loads((root / 'invitations' / job / f'{price}.order.json').read_text(encoding='utf-8'))
@@ -226,7 +229,8 @@ def read(root, job, price):
         import erp_invitation_product_edits
         # Apply current public memorial rules after the editable text overlay,
         # so an old stored title or legacy recipient choice cannot reappear.
-        return apply_memorial_rules(erp_invitation_product_edits.apply(root,job,price,product))
+        product = apply_memorial_rules(erp_invitation_product_edits.apply(root,job,price,product))
+        return own_checkout_pricing.apply(product, price)
     except FileNotFoundError:
         return None
 
@@ -374,7 +378,7 @@ def render(product, action, can_pay):
             custom = ' data-custom="1"' if choice['custom'] else ''
             greeting = (f' data-greeting="{escape(re.sub(r"^\d+\.\s*", "", choice["label"]))}"'
                         if group['label'] in ('축하 문구','근조 문구') and not choice['custom'] else '')
-            kg = re.search(r'(?<!\d)(10|20|30)\s*(?:kg|㎏|키로|킬로)', choice['label'], re.I) if group['label'] == '상품 선택' else None
+            kg = own_checkout_pricing.WEIGHT.search(choice['label']) if group['label'] == '상품 선택' else None
             weight = f' data-kg="{kg[1]}"' if kg else ''
             options.append(f'<option value="{escape(code)}" data-amount="{amount}"{custom}{greeting}{weight}>'
                            f'{escape(choice["label"])}{extra}</option>')

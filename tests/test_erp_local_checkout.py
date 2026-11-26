@@ -18,7 +18,7 @@ class LocalCheckout(unittest.TestCase):
    publication='a'*32;fingerprint='b'*64;local.publish(root,key,products,publication,fingerprint,'https://example.org',True)
    self.assertIsNone(checkout.read(root,key,'93500'))
    manifest=root/'erp-invitations'/'public'/publication;manifest.mkdir(parents=True);(manifest/'result.json').write_text(json.dumps({'fingerprint':fingerprint}))
-   self.assertEqual(checkout.read(root,key,'93500')['price'],93500);self.assertEqual(checkout.read(root,key,'99000')['price'],99000)
+   self.assertEqual(checkout.read(root,key,'93500')['price'],93500);self.assertEqual(checkout.read(root,key,'99000')['price'],120000)
  def test_missing_template_fails_instead_of_guessing_option_prices(self):
   with tempfile.TemporaryDirectory() as root:
    with self.assertRaises(ValueError):local.build(root,'https://example.org',{'invitationId':'iv1','version':1,'kind':'event','values':{}})
@@ -37,5 +37,5 @@ class LocalCheckout(unittest.TestCase):
     preview=engine.submit(req);self.assertEqual(preview['status'],'done')
     result=engine.submit({**req,'requestId':'own-publish-1234','action':'publish','previewRequestId':req['requestId'],'fingerprint':preview['fingerprint']});self.assertEqual(result['status'],'done')
     self.assertEqual(len(result['items']),2);key=result['items'][0]['orderUrl'].split('/i/')[1].split('/')[0]
-    self.assertEqual(checkout.read(root,key,'93500')['price'],93500);self.assertEqual(checkout.read(root,key,'99000')['price'],99000);self.assertTrue(checkout.payment_enabled(key));self.assertFalse(checkout.payment_enabled('0'*32))
+    self.assertEqual(checkout.read(root,key,'93500')['price'],93500);self.assertEqual(checkout.read(root,key,'99000')['price'],120000);self.assertTrue(checkout.payment_enabled(key));self.assertFalse(checkout.payment_enabled('0'*32))
     engine.executor.shutdown()
