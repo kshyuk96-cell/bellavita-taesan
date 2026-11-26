@@ -329,6 +329,7 @@ def admin_page(orders, action):
                   data['sender'], data['message'], data['buyer'] + ' ' + data['buyer_phone'],
                   recipient,
                   data['venue'] + ' ' + data['address'], f"{data['amount']:,}원",
+                  receipt_request_summary(data.get('receipt_request', {})),
                   {'paid': '결제 완료', 'cancelled': '취소', 'partial_cancel': '일부 취소'}[order['state']])
         preview = data.get('wedding_preview')
         review = '사진 확인 필요 · 제작 보류'
@@ -345,7 +346,7 @@ def admin_page(orders, action):
             review = '제작 보류'
         rows.append('<tr>' + ''.join(f'<td>{escape(value)}</td>' for value in values) + f'<td>{review}</td></tr>')
     headings = ('주문번호', '주문 시각', '상품', '옵션', '보내시는 분', '직접 쓴 문구', '주문자',
-                '받으시는 분', '설치 장소', '주문금액', '상태', '제작 사진')
+                '받으시는 분', '설치 장소', '주문금액', '발행 신청', '상태', '제작 사진')
     table = ('<table><thead><tr>' + ''.join(f'<th scope="col">{name}</th>' for name in headings) +
              '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>') if rows else '<p>확정된 주문이 없어요.</p>'
     return ('<!doctype html><html lang="ko"><meta charset="utf-8">'
@@ -439,6 +440,51 @@ def render(product, action, can_pay):
     return page
 
 
+def receipt_request(fields):
+    kind = fields.get('receipt_type', '')
+    if not kind:
+        return None
+
+    def required(name, limit):
+        value = fields.get(name, '').strip()
+        if not value or len(value) > limit:
+            raise ValueError('발행 신청의 필수 항목을 확인해 주세요.')
+        return value
+
+    def digits(name, pattern, error):
+        number = re.sub(r'[\s-]', '', required(name, 20))
+        if not re.fullmatch(pattern, number):
+            raise ValueError(error)
+        return number
+
+    business_error = '사업자등록번호 10자리를 입력해 주세요.'
+    if kind == 'cash_phone':
+        return {'type': kind, 'phone': digits('receipt_phone', r'0[0-9]{8,10}',
+                                              '현금영수증 연락처를 확인해 주세요.')}
+    if kind == 'cash_business':
+        return {'type': kind, 'businessNumber': digits('receipt_business', r'[0-9]{10}', business_error)}
+    if kind == 'invoice':
+        email = required('invoice_email', 254)
+        if not re.fullmatch(r'[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+', email):
+            raise ValueError('계산서를 받을 이메일 주소를 확인해 주세요.')
+        return {'type': kind, 'representative': required('invoice_representative', 60),
+                'company': required('invoice_company', 120),
+                'businessNumber': digits('invoice_business', r'[0-9]{10}', business_error),
+                'email': email}
+    raise ValueError('발행 신청 유형을 확인해 주세요.')
+
+
+def receipt_request_summary(request):
+    kind = request.get('type')
+    if kind == 'cash_phone':
+        return '현금영수증 · 연락처 ' + request['phone']
+    if kind == 'cash_business':
+        return '현금영수증 · 사업자등록번호 ' + request['businessNumber']
+    if kind == 'invoice':
+        return '계산서 · ' + ' / '.join(request[key] for key in ('company', 'representative', 'businessNumber', 'email'))
+    return ''
+
+
 def normalize_order(product, fields):
     def value(key, limit):
         text = fields.get(key, '').strip()
@@ -471,6 +517,9 @@ def normalize_order(product, fields):
             'venue': installation_venue(product), 'address': product['address'],
             'event_time': product['event_time'], 'amount': amount, 'source': product.get('source', ''),
             'payment_method': payment_method}
+    requested_receipt = receipt_request(fields)
+    if requested_receipt:
+        order['receipt_request'] = requested_receipt
     if product.get('delivery_date'):
         order['delivery_date'] = dt.date.fromisoformat(product['delivery_date']).isoformat()
     return order

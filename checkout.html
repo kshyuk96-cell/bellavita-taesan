@@ -271,8 +271,32 @@ $detail_section
 </div>
 </section>
 <section>
+<h2>현금영수증·계산서 신청</h2>
+<label>발행 신청<select name="receipt_type" id="receipt-type">
+<option value="">신청 안 함</option>
+<option value="cash_phone">현금영수증 · 연락처</option>
+<option value="cash_business">현금영수증 · 사업자등록번호</option>
+<option value="invoice">계산서</option>
+</select></label>
+<div data-receipt-fields="cash_phone" hidden>
+<label>현금영수증 연락처<input name="receipt_phone" type="tel" autocomplete="off" maxlength="20" disabled></label>
+</div>
+<div data-receipt-fields="cash_business" hidden>
+<label>현금영수증 사업자등록번호<input name="receipt_business" inputmode="numeric" maxlength="14" disabled></label>
+</div>
+<div data-receipt-fields="invoice" hidden>
+<div class="row">
+<label>대표자명<input name="invoice_representative" maxlength="60" disabled></label>
+<label>상호명<input name="invoice_company" autocomplete="organization" maxlength="120" disabled></label>
+<label>사업자등록번호<input name="invoice_business" inputmode="numeric" maxlength="14" disabled></label>
+<label>수신 이메일<input name="invoice_email" type="email" autocomplete="email" maxlength="254" disabled></label>
+</div>
+</div>
+<p class="photo-note">담당자가 신청 내용을 확인한 뒤 발행합니다.</p>
+</section>
+<section>
 <h2>주문 정보 수집 동의</h2>
-<details class="consent-details"><summary>수집 항목과 이용 목적 보기</summary><p>벨라비타는 주문 확인, 행사장 설치, 설치 사진 전송과 고객 문의 처리를 위해 주문자 이름·휴대폰 번호, 보내시는 분, 주문 옵션과 축하 문구를 수집합니다. 카드·간편결제를 선택하면 상품명, 결제금액, 주문자 연락처를 페이앱에 전달합니다. 주문 정보는 거래 확인과 관련 법령에 따른 보관에 사용합니다. 필수 항목 수집을 거부할 수 있으며, 거부 시 주문을 진행할 수 없습니다. 문의 031-8067-8580</p></details>
+<details class="consent-details"><summary>수집 항목과 이용 목적 보기</summary><p>벨라비타는 주문 확인, 행사장 설치, 설치 사진 전송과 고객 문의 처리를 위해 주문자 이름·휴대폰 번호, 보내시는 분, 주문 옵션과 축하 문구를 수집합니다. 카드·간편결제를 선택하면 상품명, 결제금액, 주문자 연락처를 페이앱에 전달합니다. 발행을 신청하면 신청 유형에 따라 발행용 연락처 또는 사업자등록번호, 대표자명, 상호명, 수신 이메일을 수집해 발행 처리에 사용합니다. 주문 정보는 거래 확인과 관련 법령에 따른 보관에 사용합니다. 필수 항목 수집을 거부할 수 있으며, 거부 시 주문을 진행할 수 없습니다. 문의 031-8067-8580</p></details>
 <label><input type="checkbox" name="consent" value="yes" required>주문 정보 수집에 동의합니다.</label>
 $notice
 <button type="submit" $button_state>결제하기</button>
@@ -287,6 +311,19 @@ $detail_dialog
 <script>
 const form = document.getElementById('order');
 const choices = Array.from(form.querySelectorAll('select'));
+const receiptType = document.getElementById('receipt-type');
+function updateReceiptFields() {
+  for (const group of form.querySelectorAll('[data-receipt-fields]')) {
+    const selected = receiptType.value === group.dataset.receiptFields;
+    group.hidden = !selected;
+    for (const input of group.querySelectorAll('input')) {
+      input.disabled = !selected;
+      input.required = selected;
+    }
+  }
+}
+receiptType.addEventListener('change', updateReceiptFields);
+updateReceiptFields();
 const custom = document.getElementById('custom');
 const preview = document.getElementById('preview');
 const amount = document.getElementById('amount');
